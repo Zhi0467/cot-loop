@@ -1,41 +1,38 @@
 #!/usr/bin/env python3
 """Generate AIME responses with vLLM for Figure 1 reproduction.
 
-Examples
-  # QwQ-32B (8 GPUs)
-  CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 \
-  python scripts/run_vllm_generate.py \
-    --model-id Qwen/QwQ-32B \
-    --data data/aime_2024_2025.jsonl \
-    --metrics-out outputs/qwq32b_metrics.csv \
-    --no-rollouts \
-    --tp 8 \
-    --max-num-seqs 4
+Examples (sbatch)
+  # QwQ-32B (TP=8, 8 GPUs)
+  sbatch --export=ALL,MODEL_ID=Qwen/QwQ-32B,TP=8,DP=1,METRICS_OUT=outputs/qwq32b_metrics.csv \
+    scripts/run_vllm_generate.sbatch
 
-  # OpenThinker3-7B (1 GPU)
-  CUDA_VISIBLE_DEVICES=0 \
-  python scripts/run_vllm_generate.py \
-    --model-id open-thoughts/OpenThinker3-7B \
-    --data data/aime_2024_2025.jsonl \
-    --metrics-out outputs/openthinker3_7b_metrics.csv \
-    --no-rollouts \
-    --tp 1
+  # OpenThinker3-7B (DP=8, 8 GPUs)
+  sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-7B,TP=1,DP=8,METRICS_OUT=outputs/openthinker3_7b_metrics.csv \
+    scripts/run_vllm_generate.sbatch
 
-  # OpenThinker3-1.5B (1 GPU)
-  CUDA_VISIBLE_DEVICES=0 \
-  python scripts/run_vllm_generate.py \
-    --model-id open-thoughts/OpenThinker3-1.5B \
-    --data data/aime_2024_2025.jsonl \
-    --metrics-out outputs/openthinker3_1p5b_metrics.csv \
-    --no-rollouts \
-    --tp 1
+  # OpenThinker3-1.5B (DP=8, 8 GPUs)
+  sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-1.5B,TP=1,DP=8,METRICS_OUT=outputs/openthinker3_1p5b_metrics.csv \
+    scripts/run_vllm_generate.sbatch
+
+Smoke tests (small scale)
+  # QwQ-32B (TP=8, 1 sample, 1 temp)
+  sbatch --export=ALL,MODEL_ID=Qwen/QwQ-32B,TP=8,DP=1,TEMPS=0,N=2,MAX_TOKENS=256,METRICS_OUT=outputs/qwq32b_metrics_smoke.csv \
+    scripts/run_vllm_generate.sbatch
+
+  # OpenThinker3-7B (DP=8, 1 sample, 1 temp)
+  sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-7B,TP=1,DP=8,TEMPS=0,N=2,MAX_TOKENS=256,METRICS_OUT=outputs/openthinker3_7b_metrics_smoke.csv \
+    scripts/run_vllm_generate.sbatch
+
+  # OpenThinker3-1.5B (DP=8, 1 sample, 1 temp)
+  sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-1.5B,TP=1,DP=8,TEMPS=0,N=2,MAX_TOKENS=256,METRICS_OUT=outputs/openthinker3_1p5b_metrics_smoke.csv \
+    scripts/run_vllm_generate.sbatch
 """
 
 import argparse
 import csv
 import json
+import multiprocessing as mp
 import os
-import time
 from collections import defaultdict
 from typing import Dict, List, Tuple
 
@@ -71,6 +68,29 @@ def parse_temps(s: str) -> List[float]:
     return [float(x) for x in s.split(",") if x.strip() != ""]
 
 
+def shard_path(base: str, shard_idx: int) -> str:
+    if not base:
+        return ""
+    root, ext = os.path.splitext(base)
+    suffix = f"rank{shard_idx}"
+    if ext:
+        return f"{root}.{suffix}{ext}"
+    return f"{base}.{suffix}"
+
+
+def get_visible_devices() -> List[str]:
+    visible = os.environ.get("CUDA_VISIBLE_DEVICES", "")
+    if visible:
+        return [v.strip() for v in visible.split(",") if v.strip() != ""]
+    try:
+        import torch  # type: ignore
+
+        count = torch.cuda.device_count()
+        return [str(i) for i in range(count)]
+    except Exception:
+        return []
+
+
 def has_ngram_loop(token_ids, n=30, k=20) -> bool:
     if len(token_ids) < n:
         return False
@@ -97,39 +117,18 @@ def has_ngram_loop(token_ids, n=30, k=20) -> bool:
     return False
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--model-id", required=True)
-    parser.add_argument("--data", required=True)
-    parser.add_argument("--out", default="")
-    parser.add_argument("--no-rollouts", action="store_true")
-    parser.add_argument("--delete-rollouts", action="store_true")
-    parser.add_argument("--metrics-out", default="")
-    parser.add_argument("--temps", default="0,0.2,0.4,0.6,0.8,1.0")
-    parser.add_argument("--n", type=int, default=20)
-    parser.add_argument("--max-tokens", type=int, default=30000)
-    parser.add_argument("--max-model-len", type=int, default=32768)
-    parser.add_argument("--tp", type=int, default=1)
-    parser.add_argument("--max-num-seqs", type=int, default=None)
-    parser.add_argument("--max-num-batched-tokens", type=int, default=None)
-    parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--dtype", default="bfloat16")
-    parser.add_argument("--loop-n", type=int, default=30)
-    parser.add_argument("--loop-k", type=int, default=20)
-    parser.add_argument("--trust-remote-code", action="store_true", default=True)
-    parser.add_argument("--no-trust-remote-code", dest="trust_remote_code", action="store_false")
-    args = parser.parse_args()
-
-    if not args.no_rollouts and not args.out:
-        raise SystemExit("Provide --out or set --no-rollouts.")
-    if args.no_rollouts and args.delete_rollouts:
-        raise SystemExit("--delete-rollouts requires rollouts to be written.")
-    if not args.metrics_out and args.delete_rollouts:
-        raise SystemExit("--delete-rollouts requires --metrics-out.")
-
+def run_generate(args: argparse.Namespace) -> None:
     data = load_jsonl(args.data)
     if not data:
         raise SystemExit("Dataset is empty.")
+    if args.num_shards < 1:
+        raise SystemExit("--num-shards must be >= 1.")
+    if args.shard_idx < 0 or args.shard_idx >= args.num_shards:
+        raise SystemExit("--shard-idx must be in [0, num_shards).")
+    if args.num_shards > 1:
+        data = [row for i, row in enumerate(data) if i % args.num_shards == args.shard_idx]
+        if not data:
+            raise SystemExit("Shard is empty. Check --shard-idx/--num-shards.")
 
     tokenizer = AutoTokenizer.from_pretrained(
         args.model_id,
@@ -168,60 +167,37 @@ def main() -> None:
         lambda: {"count": 0, "loop": 0, "token_sum": 0}
     )
 
-    out_f = None
-    if not args.no_rollouts:
-        os.makedirs(os.path.dirname(args.out), exist_ok=True)
-        out_f = open(args.out, "w", encoding="utf-8")
+    for temperature in temps:
+        n = 1 if temperature == 0.0 else args.n
+        sampling_params = SamplingParams(
+            temperature=temperature,
+            top_p=top_p,
+            top_k=top_k,
+            max_tokens=args.max_tokens,
+            n=n,
+            repetition_penalty=1.0,
+            seed=args.seed,
+        )
 
-    try:
-        for temperature in temps:
-            n = 1 if temperature == 0.0 else args.n
-            sampling_params = SamplingParams(
-                temperature=temperature,
-                top_p=top_p,
-                top_k=top_k,
-                max_tokens=args.max_tokens,
-                n=n,
-                repetition_penalty=1.0,
-                seed=args.seed,
-            )
+        outputs = llm.generate(prompts, sampling_params)
 
-            t0 = time.time()
-            outputs = llm.generate(prompts, sampling_params)
-            dt = time.time() - t0
+        for out in outputs:
+            for sample in out.outputs:
+                token_ids = getattr(sample, "token_ids", None)
+                if not token_ids:
+                    token_ids = tokenizer.encode(sample.text, add_special_tokens=False)
 
-            for row, out in zip(data, outputs):
-                for idx, sample in enumerate(out.outputs):
-                    token_ids = getattr(sample, "token_ids", None)
-                    if not token_ids:
-                        token_ids = tokenizer.encode(sample.text, add_special_tokens=False)
-
-                    if args.metrics_out:
-                        key = (args.model_id, float(temperature))
-                        metrics[key]["count"] += 1
-                        metrics[key]["token_sum"] += len(token_ids)
-                        if has_ngram_loop(token_ids, n=args.loop_n, k=args.loop_k):
-                            metrics[key]["loop"] += 1
-
-                    if out_f is not None:
-                        record = {
-                            "model_id": args.model_id,
-                            "question_id": row.get("id"),
-                            "temperature": temperature,
-                            "sample_idx": idx,
-                            "text": sample.text,
-                            "finish_reason": sample.finish_reason,
-                            "elapsed_s": dt,
-                        }
-                        out_f.write(json.dumps(record, ensure_ascii=False) + "\n")
-            if out_f is not None:
-                out_f.flush()
-    finally:
-        if out_f is not None:
-            out_f.close()
+                if args.metrics_out:
+                    key = (args.model_id, float(temperature))
+                    metrics[key]["count"] += 1
+                    metrics[key]["token_sum"] += len(token_ids)
+                    if has_ngram_loop(token_ids, n=args.loop_n, k=args.loop_k):
+                        metrics[key]["loop"] += 1
 
     if args.metrics_out:
-        os.makedirs(os.path.dirname(args.metrics_out), exist_ok=True)
+        out_dir = os.path.dirname(args.metrics_out)
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
         with open(args.metrics_out, "w", encoding="utf-8", newline="") as metrics_f:
             writer = csv.writer(metrics_f)
             writer.writerow(
@@ -242,8 +218,111 @@ def main() -> None:
                 avg_tokens = (token_sum / count) if count else 0.0
                 writer.writerow([model_id, temperature, count, loop_frac, avg_tokens])
 
-    if args.delete_rollouts and args.out and os.path.exists(args.out):
-        os.remove(args.out)
+def merge_metrics(shard_paths: List[str], out_path: str) -> None:
+    stats: Dict[Tuple[str, float], Dict[str, float]] = {}
+    for path in shard_paths:
+        with open(path, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                key = (row["model_id"], float(row["temperature"]))
+                count = int(row["num_samples"])
+                loop = float(row["loop_fraction"]) * count
+                token_sum = float(row["avg_tokens"]) * count
+                s = stats.setdefault(key, {"count": 0, "loop": 0.0, "token_sum": 0.0})
+                s["count"] += count
+                s["loop"] += loop
+                s["token_sum"] += token_sum
+
+    out_dir = os.path.dirname(out_path)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
+    with open(out_path, "w", encoding="utf-8", newline="") as out_f:
+        writer = csv.writer(out_f)
+        writer.writerow(
+            ["model_id", "temperature", "num_samples", "loop_fraction", "avg_tokens"]
+        )
+        for (model_id, temperature) in sorted(stats.keys()):
+            s = stats[(model_id, temperature)]
+            count = int(s["count"])
+            loop_frac = (s["loop"] / count) if count else 0.0
+            avg_tokens = (s["token_sum"] / count) if count else 0.0
+            writer.writerow([model_id, temperature, count, loop_frac, avg_tokens])
+
+
+def dp_worker(args: argparse.Namespace, device: str) -> None:
+    os.environ["CUDA_VISIBLE_DEVICES"] = device
+    run_generate(args)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model-id", required=True)
+    parser.add_argument("--data", required=True)
+    parser.add_argument("--dp", type=int, default=1)
+    parser.add_argument("--shard-idx", type=int, default=0)
+    parser.add_argument("--num-shards", type=int, default=1)
+    parser.add_argument("--metrics-out", default="")
+    parser.add_argument("--temps", default="0,0.2,0.4,0.6,0.8,1.0")
+    parser.add_argument("--n", type=int, default=20)
+    parser.add_argument("--max-tokens", type=int, default=30000)
+    parser.add_argument("--max-model-len", type=int, default=32768)
+    parser.add_argument("--tp", type=int, default=1)
+    parser.add_argument("--max-num-seqs", type=int, default=None)
+    parser.add_argument("--max-num-batched-tokens", type=int, default=None)
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--dtype", default="bfloat16")
+    parser.add_argument("--loop-n", type=int, default=30)
+    parser.add_argument("--loop-k", type=int, default=20)
+    parser.add_argument("--trust-remote-code", action="store_true", default=True)
+    parser.add_argument("--no-trust-remote-code", dest="trust_remote_code", action="store_false")
+    args = parser.parse_args()
+
+    if args.dp < 1:
+        raise SystemExit("--dp must be >= 1.")
+
+    if args.dp == 1:
+        run_generate(args)
+        return
+
+    if args.tp != 1:
+        raise SystemExit("Data-parallel runs require --tp 1.")
+
+    devices = get_visible_devices()
+    if len(devices) < args.dp:
+        raise SystemExit(
+            f"Requested dp={args.dp}, but only {len(devices)} visible GPU(s)."
+        )
+
+    ctx = mp.get_context("spawn")
+    processes = []
+    shard_metrics = []
+    for rank in range(args.dp):
+        worker_args = argparse.Namespace(**vars(args))
+        worker_args.shard_idx = rank
+        worker_args.num_shards = args.dp
+        worker_args.metrics_out = shard_path(args.metrics_out, rank) if args.metrics_out else ""
+
+        if worker_args.metrics_out:
+            shard_metrics.append(worker_args.metrics_out)
+
+        p = ctx.Process(target=dp_worker, args=(worker_args, devices[rank]))
+        p.start()
+        processes.append(p)
+
+    failures = []
+    for p in processes:
+        p.join()
+        if p.exitcode != 0:
+            failures.append(p.exitcode)
+
+    if failures:
+        raise SystemExit(f"DP worker(s) failed: {failures}")
+
+    if args.metrics_out and shard_metrics:
+        merge_metrics(shard_metrics, args.metrics_out)
+        for path in shard_metrics:
+            if os.path.exists(path):
+                os.remove(path)
 
 
 if __name__ == "__main__":

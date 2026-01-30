@@ -53,7 +53,6 @@ def main() -> None:
     parser.add_argument("--out", required=True)
     parser.add_argument("--n", type=int, default=30)
     parser.add_argument("--k", type=int, default=20)
-    parser.add_argument("--delete-rollouts", action="store_true")
     args = parser.parse_args()
 
     tok_cache: Dict[str, object] = {}
@@ -100,8 +99,6 @@ def main() -> None:
             avg_tokens = (token_sum / count) if count else 0.0
             writer.writerow([model_id, temperature, count, loop_frac, avg_tokens])
 
-    if args.delete_rollouts and os.path.exists(args.generations):
-        os.remove(args.generations)
 
 
 if __name__ == "__main__":

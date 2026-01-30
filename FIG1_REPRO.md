@@ -21,7 +21,6 @@ python scripts/run_vllm_generate.py \
   --model-id Qwen/QwQ-32B \
   --data data/aime_2024_2025.jsonl \
   --metrics-out outputs/qwq32b_metrics.csv \
-  --no-rollouts \
   --tp 8
 
 OpenThinker3-7B (1 GPU)
@@ -30,7 +29,6 @@ python scripts/run_vllm_generate.py \
   --model-id open-thoughts/OpenThinker3-7B \
   --data data/aime_2024_2025.jsonl \
   --metrics-out outputs/openthinker3_7b_metrics.csv \
-  --no-rollouts \
   --tp 1
 
 OpenThinker3-1.5B (1 GPU)
@@ -39,7 +37,6 @@ python scripts/run_vllm_generate.py \
   --model-id open-thoughts/OpenThinker3-1.5B \
   --data data/aime_2024_2025.jsonl \
   --metrics-out outputs/openthinker3_1p5b_metrics.csv \
-  --no-rollouts \
   --tp 1
 
 Notes
@@ -48,7 +45,6 @@ Notes
   Please reason step by step, and put your final answer within \boxed{}.
 - It pulls `top_p` and `top_k` from each model's HF GenerationConfig and sets `repetition_penalty=1.0`.
 - If a model rejects `--max-model-len 32768`, lower it or omit the flag.
-- To keep rollouts for inspection, remove `--no-rollouts` and set `--out`; you can also delete rollouts after metrics with `--delete-rollouts`.
 
 3) Plot (optional)
 Pass the three per-model metrics CSVs directly (no rollout files needed).
