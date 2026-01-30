@@ -51,11 +51,13 @@ def load_jsonl(path: str) -> List[dict]:
     return rows
 
 
-def build_prompt(tokenizer, question: str) -> str:
+def build_prompt(tokenizer, question: str, num_repetition: int) -> str:
     user_msg = (
         f"{question}\n\n"
         "Please reason step by step, and put your final answer within \\boxed{}."
     )
+    if num_repetition > 1:
+        user_msg = user_msg * num_repetition
     messages = [{"role": "user", "content": user_msg}]
     return tokenizer.apply_chat_template(
         messages,
@@ -66,6 +68,16 @@ def build_prompt(tokenizer, question: str) -> str:
 
 def parse_temps(s: str) -> List[float]:
     return [float(x) for x in s.split(",") if x.strip() != ""]
+
+
+def add_repetition_suffix(path: str, num_repetition: int) -> str:
+    if not path or num_repetition == 1:
+        return path
+    root, ext = os.path.splitext(path)
+    suffix = f"rep{num_repetition}"
+    if ext:
+        return f"{root}.{suffix}{ext}"
+    return f"{path}.{suffix}"
 
 
 def shard_path(base: str, shard_idx: int) -> str:
@@ -146,7 +158,9 @@ def run_generate(args: argparse.Namespace) -> None:
     if top_k == 0:
         top_k = -1
 
-    prompts = [build_prompt(tokenizer, row["question"]) for row in data]
+    prompts = [
+        build_prompt(tokenizer, row["question"], args.num_repetition) for row in data
+    ]
 
     llm_kwargs = {
         "model": args.model_id,
@@ -266,6 +280,7 @@ def main() -> None:
     parser.add_argument("--n", type=int, default=20)
     parser.add_argument("--max-tokens", type=int, default=30000)
     parser.add_argument("--max-model-len", type=int, default=32768)
+    parser.add_argument("--num-repetition", type=int, default=1)
     parser.add_argument("--tp", type=int, default=1)
     parser.add_argument("--max-num-seqs", type=int, default=None)
     parser.add_argument("--max-num-batched-tokens", type=int, default=None)
@@ -279,6 +294,11 @@ def main() -> None:
 
     if args.dp < 1:
         raise SystemExit("--dp must be >= 1.")
+    if args.num_repetition < 1:
+        raise SystemExit("--num-repetition must be >= 1.")
+
+    if args.metrics_out:
+        args.metrics_out = add_repetition_suffix(args.metrics_out, args.num_repetition)
 
     if args.dp == 1:
         run_generate(args)
