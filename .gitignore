@@ -1,0 +1,11 @@
+# any PDF files
+*.pdf
+
+#venv
+.venv/
+
+# logs
+logs/
+
+# cache
+__pycache__/

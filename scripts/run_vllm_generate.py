@@ -1,5 +1,35 @@
 #!/usr/bin/env python3
-"""Generate AIME responses with vLLM for Figure 1 reproduction."""
+"""Generate AIME responses with vLLM for Figure 1 reproduction.
+
+Examples
+  # QwQ-32B (8 GPUs)
+  CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 \
+  python scripts/run_vllm_generate.py \
+    --model-id Qwen/QwQ-32B \
+    --data data/aime_2024_2025.jsonl \
+    --metrics-out outputs/qwq32b_metrics.csv \
+    --no-rollouts \
+    --tp 8 \
+    --max-num-seqs 4
+
+  # OpenThinker3-7B (1 GPU)
+  CUDA_VISIBLE_DEVICES=0 \
+  python scripts/run_vllm_generate.py \
+    --model-id open-thoughts/OpenThinker3-7B \
+    --data data/aime_2024_2025.jsonl \
+    --metrics-out outputs/openthinker3_7b_metrics.csv \
+    --no-rollouts \
+    --tp 1
+
+  # OpenThinker3-1.5B (1 GPU)
+  CUDA_VISIBLE_DEVICES=0 \
+  python scripts/run_vllm_generate.py \
+    --model-id open-thoughts/OpenThinker3-1.5B \
+    --data data/aime_2024_2025.jsonl \
+    --metrics-out outputs/openthinker3_1p5b_metrics.csv \
+    --no-rollouts \
+    --tp 1
+"""
 
 import argparse
 import csv
@@ -145,12 +175,13 @@ def main() -> None:
 
     try:
         for temperature in temps:
+            n = 1 if temperature == 0.0 else args.n
             sampling_params = SamplingParams(
                 temperature=temperature,
                 top_p=top_p,
                 top_k=top_k,
                 max_tokens=args.max_tokens,
-                n=args.n,
+                n=n,
                 repetition_penalty=1.0,
                 seed=args.seed,
             )

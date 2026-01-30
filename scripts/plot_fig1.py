@@ -1,8 +1,23 @@
 #!/usr/bin/env python3
-"""Plot Figure 1 (looping fraction and average CoT length) from metrics CSV."""
+"""Plot Figure 1 (looping fraction and average CoT length) from metrics CSVs.
+
+Examples
+  # Plot from three per-model metrics files
+  python scripts/plot_fig1.py \
+    --metrics outputs/qwq32b_metrics.csv \
+    --metrics outputs/openthinker3_7b_metrics.csv \
+    --metrics outputs/openthinker3_1p5b_metrics.csv \
+    --out outputs/fig1.png
+
+  # Glob or directory inputs are also accepted
+  python scripts/plot_fig1.py --metrics "outputs/*_metrics.csv" --out outputs/fig1.png
+  python scripts/plot_fig1.py --metrics outputs --out outputs/fig1.png
+"""
 
 import argparse
 import csv
+import glob
+import os
 from collections import defaultdict
 
 import matplotlib.pyplot as plt
@@ -10,7 +25,12 @@ import matplotlib.pyplot as plt
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--metrics", required=True)
+    parser.add_argument(
+        "--metrics",
+        required=True,
+        action="append",
+        help="Metrics CSVs (repeatable, comma-separated, or globbed).",
+    )
     parser.add_argument("--out", required=True)
     parser.add_argument(
         "--models",
@@ -20,17 +40,39 @@ def main() -> None:
 
     want_models = set(m.strip() for m in args.models.split(",") if m.strip())
 
-    data = defaultdict(list)
-    with open(args.metrics, "r", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            model_id = row["model_id"]
-            if model_id not in want_models:
+    metric_paths = []
+    for entry in args.metrics:
+        for part in entry.split(","):
+            part = part.strip()
+            if not part:
                 continue
-            temp = float(row["temperature"])
-            loop_frac = float(row["loop_fraction"])
-            avg_tokens = float(row["avg_tokens"])
-            data[model_id].append((temp, loop_frac, avg_tokens))
+            if os.path.isdir(part):
+                metric_paths.extend(sorted(glob.glob(os.path.join(part, "*_metrics.csv"))))
+            elif any(ch in part for ch in "*?[]"):
+                metric_paths.extend(sorted(glob.glob(part)))
+            else:
+                metric_paths.append(part)
+
+    metric_paths = [p for p in metric_paths if p]
+    if not metric_paths:
+        raise SystemExit("No metrics files found (after expanding inputs).")
+
+    missing = [p for p in metric_paths if not os.path.isfile(p)]
+    if missing:
+        raise SystemExit(f"Missing metrics files: {', '.join(missing)}")
+
+    data = defaultdict(list)
+    for path in metric_paths:
+        with open(path, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                model_id = row["model_id"]
+                if model_id not in want_models:
+                    continue
+                temp = float(row["temperature"])
+                loop_frac = float(row["loop_fraction"])
+                avg_tokens = float(row["avg_tokens"])
+                data[model_id].append((temp, loop_frac, avg_tokens))
 
     fig, axes = plt.subplots(1, 2, figsize=(10, 4))
 

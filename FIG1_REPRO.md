@@ -50,30 +50,22 @@ Notes
 - If a model rejects `--max-model-len 32768`, lower it or omit the flag.
 - To keep rollouts for inspection, remove `--no-rollouts` and set `--out`; you can also delete rollouts after metrics with `--delete-rollouts`.
 
-3) Combine metrics
-Concatenate the three per-model metrics CSVs.
+3) Plot (optional)
+Pass the three per-model metrics CSVs directly (no rollout files needed).
 
-python - <<'PY'
-import csv
-import glob
-
-rows = []
-for path in glob.glob("outputs/*_metrics.csv"):
-    with open(path, "r", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        rows.extend(list(reader))
-
-with open("outputs/fig1_metrics.csv", "w", encoding="utf-8", newline="") as out_f:
-    writer = csv.DictWriter(out_f, fieldnames=rows[0].keys())
-    writer.writeheader()
-    writer.writerows(rows)
-PY
-
-4) Plot (optional)
 python scripts/plot_fig1.py \
-  --metrics outputs/fig1_metrics.csv \
+  --metrics outputs/qwq32b_metrics.csv \
+  --metrics outputs/openthinker3_7b_metrics.csv \
+  --metrics outputs/openthinker3_1p5b_metrics.csv \
   --out outputs/fig1.png
 
+Alternative: glob the metrics files or pass the output directory.
+
+python scripts/plot_fig1.py --metrics "outputs/*_metrics.csv" --out outputs/fig1.png
+python scripts/plot_fig1.py --metrics outputs --out outputs/fig1.png
+
 Expected outputs
-- `outputs/fig1_metrics.csv` with columns: model_id, temperature, num_samples, loop_fraction, avg_tokens
+- `outputs/qwq32b_metrics.csv`, `outputs/openthinker3_7b_metrics.csv`,
+  `outputs/openthinker3_1p5b_metrics.csv` (per-model metrics with columns:
+  model_id, temperature, num_samples, loop_fraction, avg_tokens)
 - `outputs/fig1.png` (two-panel plot similar to Figure 1)
