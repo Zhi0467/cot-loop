@@ -1,0 +1,19 @@
+[project]
+name = "cot-loop"
+version = "0.1.0"
+description = "Repro scripts for looping analysis (Figure 1)."
+readme = "FIG1_REPRO.md"
+requires-python = ">=3.10"
+
+dependencies = [
+  "datasets>=2.16.0",
+  "matplotlib>=3.7.0",
+  "transformers>=4.39.0",
+  "vllm>=0.6.0",
+  "sentencepiece>=0.1.99",
+  "tiktoken>=0.5.2",
+  "protobuf>=4.25.0",
+]
+
+[tool.uv]
+package = false
