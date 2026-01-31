@@ -3,28 +3,28 @@
 
 Examples (sbatch)
   # QwQ-32B (TP=8, 8 GPUs)
-  sbatch --export=ALL,MODEL_ID=Qwen/QwQ-32B,TP=8,DP=1,METRICS_OUT=outputs/qwq32b_metrics.csv \
+  sbatch --export=ALL,MODEL_ID=Qwen/QwQ-32B,TP=8,DP=1,NUM_REPETITION=1,METRICS_OUT=outputs/qwq32b_metrics.csv \
     scripts/run_vllm_generate.sbatch
 
   # OpenThinker3-7B (DP=8, 8 GPUs)
-  sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-7B,TP=1,DP=8,METRICS_OUT=outputs/openthinker3_7b_metrics.csv \
+  sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-7B,TP=1,DP=8,NUM_REPETITION=1,METRICS_OUT=outputs/openthinker3_7b_metrics.csv \
     scripts/run_vllm_generate.sbatch
 
   # OpenThinker3-1.5B (DP=8, 8 GPUs)
-  sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-1.5B,TP=1,DP=8,METRICS_OUT=outputs/openthinker3_1p5b_metrics.csv \
+  sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-1.5B,TP=1,DP=8,NUM_REPETITION=1,METRICS_OUT=outputs/openthinker3_1p5b_metrics.csv \
     scripts/run_vllm_generate.sbatch
 
 Smoke tests (small scale)
   # QwQ-32B (TP=8, 1 sample, 1 temp)
-  sbatch --export=ALL,MODEL_ID=Qwen/QwQ-32B,TP=8,DP=1,TEMPS=0,N=2,MAX_TOKENS=256,METRICS_OUT=outputs/qwq32b_metrics_smoke.csv \
+  sbatch --export=ALL,MODEL_ID=Qwen/QwQ-32B,TP=8,DP=1,NUM_REPETITION=1,TEMPS=0,N=2,MAX_TOKENS=256,METRICS_OUT=outputs/qwq32b_metrics_smoke.csv \
     scripts/run_vllm_generate.sbatch
 
   # OpenThinker3-7B (DP=8, 1 sample, 1 temp)
-  sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-7B,TP=1,DP=8,TEMPS=0,N=2,MAX_TOKENS=256,METRICS_OUT=outputs/openthinker3_7b_metrics_smoke.csv \
+  sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-7B,TP=1,DP=8,NUM_REPETITION=1,TEMPS=0,N=2,MAX_TOKENS=256,METRICS_OUT=outputs/openthinker3_7b_metrics_smoke.csv \
     scripts/run_vllm_generate.sbatch
 
   # OpenThinker3-1.5B (DP=8, 1 sample, 1 temp)
-  sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-1.5B,TP=1,DP=8,TEMPS=0,N=2,MAX_TOKENS=256,METRICS_OUT=outputs/openthinker3_1p5b_metrics_smoke.csv \
+  sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-1.5B,TP=1,DP=8,NUM_REPETITION=1,TEMPS=0,N=2,MAX_TOKENS=256,METRICS_OUT=outputs/openthinker3_1p5b_metrics_smoke.csv \
     scripts/run_vllm_generate.sbatch
 """
 
@@ -91,6 +91,52 @@ def get_visible_devices() -> List[str]:
         return []
 
 
+def suppress_sem_unlink_errors() -> None:
+    if os.environ.get("VLLM_SUPPRESS_SEM_UNLINK_ERRORS") != "1":
+        return
+    try:
+        import multiprocessing.synchronize as mp_sync  # type: ignore
+    except Exception:
+        return
+    if getattr(mp_sync, "_vllm_cleanup_patched", False):
+        return
+
+    orig_cleanup = mp_sync._cleanup
+
+    def _cleanup(name: str) -> None:
+        try:
+            orig_cleanup(name)
+        except FileNotFoundError:
+            pass
+
+    mp_sync._cleanup = _cleanup  # type: ignore[attr-defined]
+    mp_sync._vllm_cleanup_patched = True
+
+    try:
+        import multiprocessing.resource_tracker as rt  # type: ignore
+    except Exception:
+        return
+    if getattr(rt, "_vllm_rt_patched", False):
+        return
+
+    orig_register = rt.register
+    orig_unregister = rt.unregister
+
+    def _register(name: str, rtype: str) -> None:
+        if rtype == "semaphore":
+            return
+        orig_register(name, rtype)
+
+    def _unregister(name: str, rtype: str) -> None:
+        if rtype == "semaphore":
+            return
+        orig_unregister(name, rtype)
+
+    rt.register = _register  # type: ignore[assignment]
+    rt.unregister = _unregister  # type: ignore[assignment]
+    rt._vllm_rt_patched = True
+
+
 def has_ngram_loop(token_ids, n=30, k=20) -> bool:
     if len(token_ids) < n:
         return False
@@ -138,7 +184,6 @@ def run_generate(args: argparse.Namespace) -> None:
 
     gen_config = GenerationConfig.from_pretrained(
         args.model_id,
-        trust_remote_code=args.trust_remote_code,
     )
 
     top_p = gen_config.top_p if gen_config.top_p is not None else 1.0
@@ -250,6 +295,7 @@ def merge_metrics(shard_paths: List[str], out_path: str) -> None:
 
 
 def dp_worker(args: argparse.Namespace, device: str) -> None:
+    suppress_sem_unlink_errors()
     os.environ["CUDA_VISIBLE_DEVICES"] = device
     run_generate(args)
 
@@ -281,11 +327,21 @@ def main() -> None:
         raise SystemExit("--dp must be >= 1.")
 
     if args.dp == 1:
+        if args.metrics_out and os.path.exists(args.metrics_out):
+            os.remove(args.metrics_out)
         run_generate(args)
         return
 
     if args.tp != 1:
         raise SystemExit("Data-parallel runs require --tp 1.")
+
+    if args.metrics_out:
+        if os.path.exists(args.metrics_out):
+            os.remove(args.metrics_out)
+        for rank in range(args.dp):
+            shard_out = shard_path(args.metrics_out, rank)
+            if os.path.exists(shard_out):
+                os.remove(shard_out)
 
     devices = get_visible_devices()
     if len(devices) < args.dp:

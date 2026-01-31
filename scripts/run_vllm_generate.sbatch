@@ -16,6 +16,9 @@ mkdir -p logs outputs
 
 # Optional: activate your environment here (e.g., conda/venv/module load).
 source .venv/bin/activate
+export VLLM_SUPPRESS_SEM_UNLINK_ERRORS=1
+export HF_HUB_CONNECT_TIMEOUT=30
+export HF_HUB_READ_TIMEOUT=120
 
 MODEL_ID="${MODEL_ID:-open-thoughts/OpenThinker3-7B}"
 DATA="${DATA:-data/aime_2024_2025.jsonl}"
