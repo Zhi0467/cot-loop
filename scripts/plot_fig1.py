@@ -19,9 +19,15 @@ import csv
 import glob
 import os
 import re
+import sys
 from collections import defaultdict
 
 import matplotlib.pyplot as plt
+
+
+def is_rank_shard(path: str) -> bool:
+    root = os.path.splitext(os.path.basename(path))[0]
+    return re.search(r"\.rank\d+", root) is not None
 
 
 def extract_repetition(path: str) -> int:
@@ -36,17 +42,15 @@ def model_slug(model_id: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]+", "_", model_id).strip("_")
 
 
-def avg_by_temp(rows_by_temp):
-    temps = sorted(rows_by_temp.keys())
+def avg_by_temp(stats_by_temp):
+    temps = sorted(stats_by_temp.keys())
     loop_fracs = []
     avg_tokens = []
     for temp in temps:
-        rows = rows_by_temp[temp]
-        if len(rows) == 1:
-            loop, avg = rows[0]
-        else:
-            loop = sum(x[0] for x in rows) / len(rows)
-            avg = sum(x[1] for x in rows) / len(rows)
+        stats = stats_by_temp[temp]
+        count = stats["count"]
+        loop = (stats["loop"] / count) if count else 0.0
+        avg = (stats["token_sum"] / count) if count else 0.0
         loop_fracs.append(loop)
         avg_tokens.append(avg)
     return temps, loop_fracs, avg_tokens
@@ -91,10 +95,26 @@ def main() -> None:
 
     missing = [p for p in metric_paths if not os.path.isfile(p)]
     if missing:
-        raise SystemExit(f"Missing metrics files: {', '.join(missing)}")
+        print(
+            f"Warning: skipping missing metrics files: {', '.join(missing)}",
+            file=sys.stderr,
+        )
+    metric_paths = [p for p in metric_paths if os.path.isfile(p)]
+    if not metric_paths:
+        raise SystemExit("No readable metrics files found (after filtering missing).")
 
-    data = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
-    for path in metric_paths:
+    rank_paths = [p for p in metric_paths if is_rank_shard(p)]
+    if rank_paths:
+        print(
+            f"Warning: skipping rank-sharded metrics files: {', '.join(rank_paths)}",
+            file=sys.stderr,
+        )
+    filtered_paths = [p for p in metric_paths if not is_rank_shard(p)]
+
+    data = defaultdict(
+        lambda: defaultdict(lambda: defaultdict(lambda: {"count": 0, "loop": 0.0, "token_sum": 0.0}))
+    )
+    for path in filtered_paths:
         num_rep = extract_repetition(path)
         with open(path, "r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
@@ -105,29 +125,39 @@ def main() -> None:
                 temp = float(row["temperature"])
                 loop_frac = float(row["loop_fraction"])
                 avg_tokens = float(row["avg_tokens"])
-                data[model_id][num_rep][temp].append((loop_frac, avg_tokens))
+                count = int(row["num_samples"])
+                stats = data[model_id][num_rep][temp]
+                stats["count"] += count
+                stats["loop"] += loop_frac * count
+                stats["token_sum"] += avg_tokens * count
 
     fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+    plotted_models = False
 
     for model_id in model_list:
         reps = data.get(model_id)
-        if not reps:
+        if not reps or 1 not in reps:
             continue
-        rep = 1 if 1 in reps else min(reps.keys())
-        temps, loop_fracs, avg_tokens = avg_by_temp(reps[rep])
+        temps, loop_fracs, avg_tokens = avg_by_temp(reps[1])
         if not temps:
             continue
-        label = model_id if rep == 1 else f"{model_id} (rep {rep})"
+        label = f"{model_id} (rep 1)"
         axes[0].plot(temps, loop_fracs, marker="o", label=label)
         axes[1].plot(temps, avg_tokens, marker="o", label=label)
+        plotted_models = True
+
+    if not plotted_models:
+        axes[0].text(0.5, 0.5, "No rep 1 data", ha="center", va="center")
+        axes[1].text(0.5, 0.5, "No rep 1 data", ha="center", va="center")
 
     axes[0].set_xlabel("Temperature")
     axes[0].set_ylabel("Looping Fraction")
     axes[1].set_xlabel("Temperature")
     axes[1].set_ylabel("Average CoT Length (tokens)")
 
-    axes[0].legend(fontsize=8)
-    axes[1].legend(fontsize=8)
+    if plotted_models:
+        axes[0].legend(fontsize=8)
+        axes[1].legend(fontsize=8)
 
     fig.tight_layout()
     out_dir = os.path.dirname(args.out)
@@ -137,23 +167,30 @@ def main() -> None:
 
     base_root, base_ext = os.path.splitext(args.out)
     for model_id in model_list:
-        reps = data.get(model_id)
-        if not reps:
-            continue
+        reps = data.get(model_id, {})
         fig, axes = plt.subplots(1, 2, figsize=(10, 4))
-        for rep in sorted(reps.keys()):
+        plotted = False
+        for rep in (1, 2, 3):
+            if rep not in reps:
+                continue
             temps, loop_fracs, avg_tokens = avg_by_temp(reps[rep])
             if not temps:
                 continue
             axes[0].plot(temps, loop_fracs, marker="o", label=f"rep {rep}")
             axes[1].plot(temps, avg_tokens, marker="o", label=f"rep {rep}")
+            plotted = True
+
+        if not plotted:
+            axes[0].text(0.5, 0.5, "No rep 1-3 data", ha="center", va="center")
+            axes[1].text(0.5, 0.5, "No rep 1-3 data", ha="center", va="center")
 
         axes[0].set_xlabel("Temperature")
         axes[0].set_ylabel("Looping Fraction")
         axes[1].set_xlabel("Temperature")
         axes[1].set_ylabel("Average CoT Length (tokens)")
-        axes[0].legend(fontsize=8)
-        axes[1].legend(fontsize=8)
+        if plotted:
+            axes[0].legend(fontsize=8)
+            axes[1].legend(fontsize=8)
         fig.suptitle(f"{model_id}: num_repetition sweep", fontsize=10)
         fig.tight_layout(rect=[0, 0, 1, 0.95])
         model_out = f"{base_root}.{model_slug(model_id)}.repetition{base_ext}"

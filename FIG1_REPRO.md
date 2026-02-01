@@ -20,7 +20,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 \
 python scripts/run_vllm_generate.py \
   --model-id Qwen/QwQ-32B \
   --data data/aime_2024_2025.jsonl \
-  --metrics-out outputs/qwq32b_metrics.csv \
+  --metrics-out outputs/qwq32b_metrics.rep1.csv \
   --tp 8
 
 OpenThinker3-7B (1 GPU)
@@ -28,7 +28,7 @@ CUDA_VISIBLE_DEVICES=0 \
 python scripts/run_vllm_generate.py \
   --model-id open-thoughts/OpenThinker3-7B \
   --data data/aime_2024_2025.jsonl \
-  --metrics-out outputs/openthinker3_7b_metrics.csv \
+  --metrics-out outputs/openthinker3_7b_metrics.rep1.csv \
   --tp 1
 
 OpenThinker3-1.5B (1 GPU)
@@ -36,7 +36,7 @@ CUDA_VISIBLE_DEVICES=0 \
 python scripts/run_vllm_generate.py \
   --model-id open-thoughts/OpenThinker3-1.5B \
   --data data/aime_2024_2025.jsonl \
-  --metrics-out outputs/openthinker3_1p5b_metrics.csv \
+  --metrics-out outputs/openthinker3_1p5b_metrics.rep1.csv \
   --tp 1
 
 Notes
@@ -50,18 +50,18 @@ Notes
 Pass the three per-model metrics CSVs directly (no rollout files needed).
 
 python scripts/plot_fig1.py \
-  --metrics outputs/qwq32b_metrics.csv \
-  --metrics outputs/openthinker3_7b_metrics.csv \
-  --metrics outputs/openthinker3_1p5b_metrics.csv \
+  --metrics outputs/qwq32b_metrics.rep1.csv \
+  --metrics outputs/openthinker3_7b_metrics.rep1.csv \
+  --metrics outputs/openthinker3_1p5b_metrics.rep1.csv \
   --out outputs/fig1.png
 
 Alternative: glob the metrics files or pass the output directory.
 
-python scripts/plot_fig1.py --metrics "outputs/*_metrics.csv" --out outputs/fig1.png
+python scripts/plot_fig1.py --metrics "outputs/*_metrics*.csv" --out outputs/fig1.png
 python scripts/plot_fig1.py --metrics outputs --out outputs/fig1.png
 
 Expected outputs
-- `outputs/qwq32b_metrics.csv`, `outputs/openthinker3_7b_metrics.csv`,
-  `outputs/openthinker3_1p5b_metrics.csv` (per-model metrics with columns:
+- `outputs/qwq32b_metrics.rep1.csv`, `outputs/openthinker3_7b_metrics.rep1.csv`,
+  `outputs/openthinker3_1p5b_metrics.rep1.csv` (per-model metrics with columns:
   model_id, temperature, num_samples, loop_fraction, avg_tokens)
 - `outputs/fig1.png` (two-panel plot similar to Figure 1)

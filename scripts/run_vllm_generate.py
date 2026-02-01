@@ -3,28 +3,28 @@
 
 Examples (sbatch)
   # QwQ-32B (TP=8, 8 GPUs)
-  sbatch --export=ALL,MODEL_ID=Qwen/QwQ-32B,TP=8,DP=1,NUM_REPETITION=1,METRICS_OUT=outputs/qwq32b_metrics.csv \
+  sbatch --export=ALL,MODEL_ID=Qwen/QwQ-32B,TP=8,DP=1,NUM_REPETITION=1,METRICS_OUT=outputs/qwq32b_metrics.rep1.csv \
     scripts/run_vllm_generate.sbatch
 
   # OpenThinker3-7B (DP=8, 8 GPUs)
-  sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-7B,TP=1,DP=8,NUM_REPETITION=1,METRICS_OUT=outputs/openthinker3_7b_metrics.csv \
+  sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-7B,TP=1,DP=8,NUM_REPETITION=1,METRICS_OUT=outputs/openthinker3_7b_metrics.rep1.csv \
     scripts/run_vllm_generate.sbatch
 
   # OpenThinker3-1.5B (DP=8, 8 GPUs)
-  sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-1.5B,TP=1,DP=8,NUM_REPETITION=1,METRICS_OUT=outputs/openthinker3_1p5b_metrics.csv \
+  sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-1.5B,TP=1,DP=8,NUM_REPETITION=1,METRICS_OUT=outputs/openthinker3_1p5b_metrics.rep1.csv \
     scripts/run_vllm_generate.sbatch
 
 Smoke tests (small scale)
   # QwQ-32B (TP=8, 1 sample, 1 temp)
-  sbatch --export=ALL,MODEL_ID=Qwen/QwQ-32B,TP=8,DP=1,NUM_REPETITION=1,TEMPS=0,N=2,MAX_TOKENS=256,METRICS_OUT=outputs/qwq32b_metrics_smoke.csv \
+  sbatch --export=ALL,MODEL_ID=Qwen/QwQ-32B,TP=8,DP=1,NUM_REPETITION=1,TEMPS=0,N=2,MAX_TOKENS=256,METRICS_OUT=outputs/qwq32b_metrics_smoke.rep1.csv \
     scripts/run_vllm_generate.sbatch
 
   # OpenThinker3-7B (DP=8, 1 sample, 1 temp)
-  sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-7B,TP=1,DP=8,NUM_REPETITION=1,TEMPS=0,N=2,MAX_TOKENS=256,METRICS_OUT=outputs/openthinker3_7b_metrics_smoke.csv \
+  sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-7B,TP=1,DP=8,NUM_REPETITION=1,TEMPS=0,N=2,MAX_TOKENS=256,METRICS_OUT=outputs/openthinker3_7b_metrics_smoke.rep1.csv \
     scripts/run_vllm_generate.sbatch
 
   # OpenThinker3-1.5B (DP=8, 1 sample, 1 temp)
-  sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-1.5B,TP=1,DP=8,NUM_REPETITION=1,TEMPS=0,N=2,MAX_TOKENS=256,METRICS_OUT=outputs/openthinker3_1p5b_metrics_smoke.csv \
+  sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-1.5B,TP=1,DP=8,NUM_REPETITION=1,TEMPS=0,N=2,MAX_TOKENS=256,METRICS_OUT=outputs/openthinker3_1p5b_metrics_smoke.rep1.csv \
     scripts/run_vllm_generate.sbatch
 """
 
@@ -33,6 +33,8 @@ import csv
 import json
 import multiprocessing as mp
 import os
+import queue as queue_module
+import re
 from collections import defaultdict
 from typing import Dict, List, Tuple
 
@@ -71,23 +73,15 @@ def parse_temps(s: str) -> List[float]:
 
 
 def add_repetition_suffix(path: str, num_repetition: int) -> str:
-    if not path or num_repetition == 1:
+    if not path:
         return path
     root, ext = os.path.splitext(path)
+    if re.search(r"\.rep\d+$", root):
+        return path
     suffix = f"rep{num_repetition}"
     if ext:
         return f"{root}.{suffix}{ext}"
     return f"{path}.{suffix}"
-
-
-def shard_path(base: str, shard_idx: int) -> str:
-    if not base:
-        return ""
-    root, ext = os.path.splitext(base)
-    suffix = f"rank{shard_idx}"
-    if ext:
-        return f"{root}.{suffix}{ext}"
-    return f"{base}.{suffix}"
 
 
 def get_visible_devices() -> List[str]:
@@ -109,6 +103,8 @@ def suppress_sem_unlink_errors() -> None:
     try:
         import multiprocessing.synchronize as mp_sync  # type: ignore
     except Exception:
+        return
+    if not hasattr(mp_sync, "_cleanup"):
         return
     if getattr(mp_sync, "_vllm_cleanup_patched", False):
         return
@@ -175,7 +171,32 @@ def has_ngram_loop(token_ids, n=30, k=20) -> bool:
     return False
 
 
-def run_generate(args: argparse.Namespace) -> None:
+def write_metrics(metrics: Dict[Tuple[str, float], Dict[str, float]], out_path: str) -> None:
+    out_dir = os.path.dirname(out_path)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
+    with open(out_path, "w", encoding="utf-8", newline="") as metrics_f:
+        writer = csv.writer(metrics_f)
+        writer.writerow(
+            [
+                "model_id",
+                "temperature",
+                "num_samples",
+                "loop_fraction",
+                "avg_tokens",
+            ]
+        )
+        for (model_id, temperature) in sorted(metrics.keys()):
+            s = metrics[(model_id, temperature)]
+            count = int(s["count"])
+            loop = float(s["loop"])
+            token_sum = float(s["token_sum"])
+            loop_frac = (loop / count) if count else 0.0
+            avg_tokens = (token_sum / count) if count else 0.0
+            writer.writerow([model_id, temperature, count, loop_frac, avg_tokens])
+
+
+def run_generate(args: argparse.Namespace) -> Dict[Tuple[str, float], Dict[str, float]]:
     data = load_jsonl(args.data)
     if not data:
         raise SystemExit("Dataset is empty.")
@@ -246,72 +267,40 @@ def run_generate(args: argparse.Namespace) -> None:
                 if not token_ids:
                     token_ids = tokenizer.encode(sample.text, add_special_tokens=False)
 
-                if args.metrics_out:
-                    key = (args.model_id, float(temperature))
-                    metrics[key]["count"] += 1
-                    metrics[key]["token_sum"] += len(token_ids)
-                    if has_ngram_loop(token_ids, n=args.loop_n, k=args.loop_k):
-                        metrics[key]["loop"] += 1
+                key = (args.model_id, float(temperature))
+                metrics[key]["count"] += 1
+                metrics[key]["token_sum"] += len(token_ids)
+                if has_ngram_loop(token_ids, n=args.loop_n, k=args.loop_k):
+                    metrics[key]["loop"] += 1
 
     if args.metrics_out:
-        out_dir = os.path.dirname(args.metrics_out)
-        if out_dir:
-            os.makedirs(out_dir, exist_ok=True)
-        with open(args.metrics_out, "w", encoding="utf-8", newline="") as metrics_f:
-            writer = csv.writer(metrics_f)
-            writer.writerow(
-                [
-                    "model_id",
-                    "temperature",
-                    "num_samples",
-                    "loop_fraction",
-                    "avg_tokens",
-                ]
-            )
-            for (model_id, temperature) in sorted(metrics.keys()):
-                s = metrics[(model_id, temperature)]
-                count = int(s["count"])
-                loop = int(s["loop"])
-                token_sum = float(s["token_sum"])
-                loop_frac = (loop / count) if count else 0.0
-                avg_tokens = (token_sum / count) if count else 0.0
-                writer.writerow([model_id, temperature, count, loop_frac, avg_tokens])
+        write_metrics(metrics, args.metrics_out)
 
-def merge_metrics(shard_paths: List[str], out_path: str) -> None:
+    return metrics
+
+
+def merge_metric_dicts(
+    shards: List[Dict[Tuple[str, float], Dict[str, float]]],
+) -> Dict[Tuple[str, float], Dict[str, float]]:
     stats: Dict[Tuple[str, float], Dict[str, float]] = {}
-    for path in shard_paths:
-        with open(path, "r", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                key = (row["model_id"], float(row["temperature"]))
-                count = int(row["num_samples"])
-                loop = float(row["loop_fraction"]) * count
-                token_sum = float(row["avg_tokens"]) * count
-                s = stats.setdefault(key, {"count": 0, "loop": 0.0, "token_sum": 0.0})
-                s["count"] += count
-                s["loop"] += loop
-                s["token_sum"] += token_sum
-
-    out_dir = os.path.dirname(out_path)
-    if out_dir:
-        os.makedirs(out_dir, exist_ok=True)
-    with open(out_path, "w", encoding="utf-8", newline="") as out_f:
-        writer = csv.writer(out_f)
-        writer.writerow(
-            ["model_id", "temperature", "num_samples", "loop_fraction", "avg_tokens"]
-        )
-        for (model_id, temperature) in sorted(stats.keys()):
-            s = stats[(model_id, temperature)]
-            count = int(s["count"])
-            loop_frac = (s["loop"] / count) if count else 0.0
-            avg_tokens = (s["token_sum"] / count) if count else 0.0
-            writer.writerow([model_id, temperature, count, loop_frac, avg_tokens])
+    for shard in shards:
+        for key, s in shard.items():
+            out = stats.setdefault(key, {"count": 0, "loop": 0.0, "token_sum": 0.0})
+            out["count"] += int(s["count"])
+            out["loop"] += float(s["loop"])
+            out["token_sum"] += float(s["token_sum"])
+    return stats
 
 
-def dp_worker(args: argparse.Namespace, device: str) -> None:
+def dp_worker(
+    args: argparse.Namespace,
+    device: str,
+    metrics_queue: "mp.queues.SimpleQueue",
+) -> None:
     suppress_sem_unlink_errors()
     os.environ["CUDA_VISIBLE_DEVICES"] = device
-    run_generate(args)
+    metrics = run_generate(args)
+    metrics_queue.put(metrics)
 
 
 def main() -> None:
@@ -355,13 +344,8 @@ def main() -> None:
     if args.tp != 1:
         raise SystemExit("Data-parallel runs require --tp 1.")
 
-    if args.metrics_out:
-        if os.path.exists(args.metrics_out):
-            os.remove(args.metrics_out)
-        for rank in range(args.dp):
-            shard_out = shard_path(args.metrics_out, rank)
-            if os.path.exists(shard_out):
-                os.remove(shard_out)
+    if args.metrics_out and os.path.exists(args.metrics_out):
+        os.remove(args.metrics_out)
 
     devices = get_visible_devices()
     if len(devices) < args.dp:
@@ -371,17 +355,17 @@ def main() -> None:
 
     ctx = mp.get_context("spawn")
     processes = []
-    shard_metrics = []
+    metrics_queue: "mp.queues.SimpleQueue" = ctx.SimpleQueue()
     for rank in range(args.dp):
         worker_args = argparse.Namespace(**vars(args))
         worker_args.shard_idx = rank
         worker_args.num_shards = args.dp
-        worker_args.metrics_out = shard_path(args.metrics_out, rank) if args.metrics_out else ""
+        worker_args.metrics_out = ""
 
-        if worker_args.metrics_out:
-            shard_metrics.append(worker_args.metrics_out)
-
-        p = ctx.Process(target=dp_worker, args=(worker_args, devices[rank]))
+        p = ctx.Process(
+            target=dp_worker,
+            args=(worker_args, devices[rank], metrics_queue),
+        )
         p.start()
         processes.append(p)
 
@@ -394,11 +378,16 @@ def main() -> None:
     if failures:
         raise SystemExit(f"DP worker(s) failed: {failures}")
 
-    if args.metrics_out and shard_metrics:
-        merge_metrics(shard_metrics, args.metrics_out)
-        for path in shard_metrics:
-            if os.path.exists(path):
-                os.remove(path)
+    metrics_shards = []
+    for _ in range(args.dp):
+        try:
+            metrics_shards.append(metrics_queue.get(timeout=5))
+        except queue_module.Empty:
+            raise SystemExit("Missing metrics from DP worker(s).")
+
+    if args.metrics_out:
+        merged = merge_metric_dicts(metrics_shards)
+        write_metrics(merged, args.metrics_out)
 
 
 if __name__ == "__main__":
