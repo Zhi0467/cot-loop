@@ -300,7 +300,7 @@ def dp_worker(
     suppress_sem_unlink_errors()
     os.environ["CUDA_VISIBLE_DEVICES"] = device
     metrics = run_generate(args)
-    metrics_queue.put(metrics)
+    metrics_queue.put(dict(metrics))
 
 
 def main() -> None:
@@ -355,7 +355,7 @@ def main() -> None:
 
     ctx = mp.get_context("spawn")
     processes = []
-    metrics_queue: "mp.queues.SimpleQueue" = ctx.SimpleQueue()
+    metrics_queue: "mp.queues.Queue" = ctx.Queue()
     for rank in range(args.dp):
         worker_args = argparse.Namespace(**vars(args))
         worker_args.shard_idx = rank
