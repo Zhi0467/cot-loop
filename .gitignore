@@ -9,6 +9,3 @@ logs/
 
 # cache
 __pycache__/
-
-# outputs
-outputs/

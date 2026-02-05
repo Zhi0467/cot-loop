@@ -1,0 +1,7 @@
+model_id,temperature,num_samples,loop_fraction,avg_tokens
+open-thoughts/OpenThinker3-7B,0.0,60,0.13333333333333333,16299.416666666666
+open-thoughts/OpenThinker3-7B,0.2,1200,0.0525,17176.703333333335
+open-thoughts/OpenThinker3-7B,0.4,1200,0.04583333333333333,17074.04
+open-thoughts/OpenThinker3-7B,0.6,1200,0.029166666666666667,16968.975
+open-thoughts/OpenThinker3-7B,0.8,1200,0.01,16913.2675
+open-thoughts/OpenThinker3-7B,1.0,1200,0.005833333333333334,17116.574166666665
