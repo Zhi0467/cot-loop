@@ -8,7 +8,8 @@ Format (one JSON object per line):
   "year": 2024,
   "contest": "AIME I",
   "problem": 1,
-  "question": "Full problem statement text"
+  "question": "Full problem statement text",
+  "answer": "Final answer (string)"
 }
 
 You need all 60 problems:
@@ -19,5 +20,5 @@ You need all 60 problems:
 
 Notes:
 - Use the exact official problem statements.
-- Answers are not required for Figure 1.
+- Answers are required for math-verify grading.
 - Keep only the question text in `question` (no solution).

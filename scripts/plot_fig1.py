@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plot Figure 1 (looping fraction and average CoT length) from metrics CSVs.
+"""Plot Figure 1 (looping fraction, average CoT length, accuracy) from metrics CSVs.
 
 Examples
   # Plot from three per-model metrics files
@@ -46,6 +46,8 @@ def avg_by_temp(stats_by_temp):
     temps = sorted(stats_by_temp.keys())
     loop_fracs = []
     avg_tokens = []
+    accuracies = []
+    has_accuracy = False
     for temp in temps:
         stats = stats_by_temp[temp]
         count = stats["count"]
@@ -53,7 +55,13 @@ def avg_by_temp(stats_by_temp):
         avg = (stats["token_sum"] / count) if count else 0.0
         loop_fracs.append(loop)
         avg_tokens.append(avg)
-    return temps, loop_fracs, avg_tokens
+        graded = stats.get("graded", 0)
+        if graded:
+            accuracies.append(stats.get("correct", 0.0) / graded)
+            has_accuracy = True
+        else:
+            accuracies.append(None)
+    return temps, loop_fracs, avg_tokens, accuracies, has_accuracy
 
 
 def main() -> None:
@@ -112,7 +120,17 @@ def main() -> None:
     filtered_paths = [p for p in metric_paths if not is_rank_shard(p)]
 
     data = defaultdict(
-        lambda: defaultdict(lambda: defaultdict(lambda: {"count": 0, "loop": 0.0, "token_sum": 0.0}))
+        lambda: defaultdict(
+            lambda: defaultdict(
+                lambda: {
+                    "count": 0,
+                    "loop": 0.0,
+                    "token_sum": 0.0,
+                    "correct": 0.0,
+                    "graded": 0.0,
+                }
+            )
+        )
     )
     for path in filtered_paths:
         num_rep = extract_repetition(path)
@@ -126,38 +144,66 @@ def main() -> None:
                 loop_frac = float(row["loop_fraction"])
                 avg_tokens = float(row["avg_tokens"])
                 count = int(row["num_samples"])
+                correct = None
+                graded = None
+                if "num_correct" in row and row["num_correct"] != "":
+                    try:
+                        correct = float(row["num_correct"])
+                        graded = count
+                    except ValueError:
+                        correct = None
+                elif "accuracy" in row and row["accuracy"] != "":
+                    try:
+                        acc = float(row["accuracy"])
+                        correct = acc * count
+                        graded = count
+                    except ValueError:
+                        correct = None
                 stats = data[model_id][num_rep][temp]
                 stats["count"] += count
                 stats["loop"] += loop_frac * count
                 stats["token_sum"] += avg_tokens * count
+                if correct is not None and graded is not None:
+                    stats["correct"] += correct
+                    stats["graded"] += graded
 
-    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4))
     plotted_models = False
+    plotted_accuracy = False
 
     for model_id in model_list:
         reps = data.get(model_id)
         if not reps or 1 not in reps:
             continue
-        temps, loop_fracs, avg_tokens = avg_by_temp(reps[1])
+        temps, loop_fracs, avg_tokens, accuracies, has_accuracy = avg_by_temp(reps[1])
         if not temps:
             continue
         label = f"{model_id} (rep 1)"
         axes[0].plot(temps, loop_fracs, marker="o", label=label)
         axes[1].plot(temps, avg_tokens, marker="o", label=label)
+        if has_accuracy:
+            axes[2].plot(temps, accuracies, marker="o", label=label)
+            plotted_accuracy = True
         plotted_models = True
 
     if not plotted_models:
         axes[0].text(0.5, 0.5, "No rep 1 data", ha="center", va="center")
         axes[1].text(0.5, 0.5, "No rep 1 data", ha="center", va="center")
+    if not plotted_accuracy:
+        axes[2].text(0.5, 0.5, "No accuracy data", ha="center", va="center")
 
     axes[0].set_xlabel("Temperature")
     axes[0].set_ylabel("Looping Fraction")
     axes[1].set_xlabel("Temperature")
     axes[1].set_ylabel("Average CoT Length (tokens)")
+    axes[2].set_xlabel("Temperature")
+    axes[2].set_ylabel("Accuracy")
 
     if plotted_models:
         axes[0].legend(fontsize=8)
         axes[1].legend(fontsize=8)
+    if plotted_accuracy:
+        axes[2].legend(fontsize=8)
 
     fig.tight_layout()
     out_dir = os.path.dirname(args.out)
@@ -168,29 +214,41 @@ def main() -> None:
     base_root, base_ext = os.path.splitext(args.out)
     for model_id in model_list:
         reps = data.get(model_id, {})
-        fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+        fig, axes = plt.subplots(1, 3, figsize=(15, 4))
         plotted = False
+        plotted_acc = False
         for rep in (1, 2, 3):
             if rep not in reps:
                 continue
-            temps, loop_fracs, avg_tokens = avg_by_temp(reps[rep])
+            temps, loop_fracs, avg_tokens, accuracies, has_accuracy = avg_by_temp(
+                reps[rep]
+            )
             if not temps:
                 continue
             axes[0].plot(temps, loop_fracs, marker="o", label=f"rep {rep}")
             axes[1].plot(temps, avg_tokens, marker="o", label=f"rep {rep}")
+            if has_accuracy:
+                axes[2].plot(temps, accuracies, marker="o", label=f"rep {rep}")
+                plotted_acc = True
             plotted = True
 
         if not plotted:
             axes[0].text(0.5, 0.5, "No rep 1-3 data", ha="center", va="center")
             axes[1].text(0.5, 0.5, "No rep 1-3 data", ha="center", va="center")
+        if not plotted_acc:
+            axes[2].text(0.5, 0.5, "No accuracy data", ha="center", va="center")
 
         axes[0].set_xlabel("Temperature")
         axes[0].set_ylabel("Looping Fraction")
         axes[1].set_xlabel("Temperature")
         axes[1].set_ylabel("Average CoT Length (tokens)")
+        axes[2].set_xlabel("Temperature")
+        axes[2].set_ylabel("Accuracy")
         if plotted:
             axes[0].legend(fontsize=8)
             axes[1].legend(fontsize=8)
+        if plotted_acc:
+            axes[2].legend(fontsize=8)
         fig.suptitle(f"{model_id}: num_repetition sweep", fontsize=10)
         fig.tight_layout(rect=[0, 0, 1, 0.95])
         model_out = f"{base_root}.{model_slug(model_id)}.repetition{base_ext}"

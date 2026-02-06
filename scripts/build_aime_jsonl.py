@@ -4,7 +4,7 @@
 Loads:
 - math-ai/aime24 (split: test)
 - math-ai/aime25 (split: test)
-Uses only the `problem` column as `question`.
+Uses `problem` as `question` and `answer` as gold label.
 """
 
 import argparse
@@ -14,9 +14,13 @@ from datasets import load_dataset
 
 def load_problems(repo_id: str, split: str):
     ds = load_dataset(repo_id, split=split)
-    if "problem" not in ds.column_names:
-        raise ValueError(f"Missing 'problem' column in {repo_id}:{split} (columns={ds.column_names})")
-    return [row["problem"] for row in ds]
+    answer_col = "solution" if repo_id == "math-ai/aime24" else "answer"
+    missing = [col for col in ("problem", answer_col) if col not in ds.column_names]
+    if missing:
+        raise ValueError(
+            f"Missing {missing} column(s) in {repo_id}:{split} (columns={ds.column_names})"
+        )
+    return [(row["problem"], row[answer_col]) for row in ds]
 
 
 def main() -> None:
@@ -33,20 +37,22 @@ def main() -> None:
     aime25 = load_problems("math-ai/aime25", args.split)
 
     with open(args.out, "w", encoding="utf-8") as f:
-        for i, question in enumerate(aime24, start=1):
+        for i, (question, answer) in enumerate(aime24, start=1):
             row = {
                 "id": f"AIME24-{i}",
                 "year": 2024,
                 "problem": i,
                 "question": question,
+                "answer": answer,
             }
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
-        for i, question in enumerate(aime25, start=1):
+        for i, (question, answer) in enumerate(aime25, start=1):
             row = {
                 "id": f"AIME25-{i}",
                 "year": 2025,
                 "problem": i,
                 "question": question,
+                "answer": answer,
             }
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
 

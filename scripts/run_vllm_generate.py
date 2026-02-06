@@ -29,171 +29,27 @@ Smoke tests (small scale)
 """
 
 import argparse
-import csv
-import json
 import multiprocessing as mp
 import os
 import queue as queue_module
-import re
 from collections import defaultdict
-from typing import Dict, List, Tuple
+from typing import Dict, Tuple
 
 from transformers import AutoTokenizer, GenerationConfig
 from vllm import LLM, SamplingParams
 
-
-def load_jsonl(path: str) -> List[dict]:
-    rows = []
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            rows.append(json.loads(line))
-    return rows
-
-
-def build_prompt(tokenizer, question: str, num_repetition: int) -> str:
-    user_msg = (
-        f"{question}\n\n"
-        "Please reason step by step, and put your final answer within \\boxed{}."
-    )
-    if num_repetition > 1:
-        user_msg = user_msg * num_repetition
-    messages = [{"role": "user", "content": user_msg}]
-    return tokenizer.apply_chat_template(
-        messages,
-        tokenize=False,
-        add_generation_prompt=True,
-    )
-
-
-def parse_temps(s: str) -> List[float]:
-    return [float(x) for x in s.split(",") if x.strip() != ""]
-
-
-def add_repetition_suffix(path: str, num_repetition: int) -> str:
-    if not path:
-        return path
-    root, ext = os.path.splitext(path)
-    if re.search(r"\.rep\d+$", root):
-        return path
-    suffix = f"rep{num_repetition}"
-    if ext:
-        return f"{root}.{suffix}{ext}"
-    return f"{path}.{suffix}"
-
-
-def get_visible_devices() -> List[str]:
-    visible = os.environ.get("CUDA_VISIBLE_DEVICES", "")
-    if visible:
-        return [v.strip() for v in visible.split(",") if v.strip() != ""]
-    try:
-        import torch  # type: ignore
-
-        count = torch.cuda.device_count()
-        return [str(i) for i in range(count)]
-    except Exception:
-        return []
-
-
-def suppress_sem_unlink_errors() -> None:
-    if os.environ.get("VLLM_SUPPRESS_SEM_UNLINK_ERRORS") != "1":
-        return
-    try:
-        import multiprocessing.synchronize as mp_sync  # type: ignore
-    except Exception:
-        return
-    if not hasattr(mp_sync, "_cleanup"):
-        return
-    if getattr(mp_sync, "_vllm_cleanup_patched", False):
-        return
-
-    orig_cleanup = mp_sync._cleanup
-
-    def _cleanup(name: str) -> None:
-        try:
-            orig_cleanup(name)
-        except FileNotFoundError:
-            pass
-
-    mp_sync._cleanup = _cleanup  # type: ignore[attr-defined]
-    mp_sync._vllm_cleanup_patched = True
-
-    try:
-        import multiprocessing.resource_tracker as rt  # type: ignore
-    except Exception:
-        return
-    if getattr(rt, "_vllm_rt_patched", False):
-        return
-
-    orig_register = rt.register
-    orig_unregister = rt.unregister
-
-    def _register(name: str, rtype: str) -> None:
-        if rtype == "semaphore":
-            return
-        orig_register(name, rtype)
-
-    def _unregister(name: str, rtype: str) -> None:
-        if rtype == "semaphore":
-            return
-        orig_unregister(name, rtype)
-
-    rt.register = _register  # type: ignore[assignment]
-    rt.unregister = _unregister  # type: ignore[assignment]
-    rt._vllm_rt_patched = True
-
-
-def has_ngram_loop(token_ids, n=30, k=20) -> bool:
-    if len(token_ids) < n:
-        return False
-
-    base = 1000003
-    mod = 1 << 64
-    mask = mod - 1
-
-    pow_n = pow(base, n, mod)
-    h = 0
-    for t in token_ids[:n]:
-        h = (h * base + (t + 1)) & mask
-
-    counts = {h: 1}
-    for i in range(n, len(token_ids)):
-        out_t = token_ids[i - n] + 1
-        in_t = token_ids[i] + 1
-        h = (h * base + in_t - (out_t * pow_n)) & mask
-        c = counts.get(h, 0) + 1
-        if c >= k:
-            return True
-        counts[h] = c
-
-    return False
-
-
-def write_metrics(metrics: Dict[Tuple[str, float], Dict[str, float]], out_path: str) -> None:
-    out_dir = os.path.dirname(out_path)
-    if out_dir:
-        os.makedirs(out_dir, exist_ok=True)
-    with open(out_path, "w", encoding="utf-8", newline="") as metrics_f:
-        writer = csv.writer(metrics_f)
-        writer.writerow(
-            [
-                "model_id",
-                "temperature",
-                "num_samples",
-                "loop_fraction",
-                "avg_tokens",
-            ]
-        )
-        for (model_id, temperature) in sorted(metrics.keys()):
-            s = metrics[(model_id, temperature)]
-            count = int(s["count"])
-            loop = float(s["loop"])
-            token_sum = float(s["token_sum"])
-            loop_frac = (loop / count) if count else 0.0
-            avg_tokens = (token_sum / count) if count else 0.0
-            writer.writerow([model_id, temperature, count, loop_frac, avg_tokens])
+from utils import (
+    _math_verify,
+    add_repetition_suffix,
+    build_prompt,
+    get_visible_devices,
+    has_ngram_loop,
+    load_jsonl,
+    merge_metric_dicts,
+    parse_temps,
+    suppress_sem_unlink_errors,
+    write_metrics,
+)
 
 
 def run_generate(args: argparse.Namespace) -> Dict[Tuple[str, float], Dict[str, float]]:
@@ -208,6 +64,8 @@ def run_generate(args: argparse.Namespace) -> Dict[Tuple[str, float], Dict[str, 
         data = [row for i, row in enumerate(data) if i % args.num_shards == args.shard_idx]
         if not data:
             raise SystemExit("Shard is empty. Check --shard-idx/--num-shards.")
+    if any("answer" not in row for row in data):
+        raise SystemExit("Dataset rows must include 'answer' for math-verify grading.")
 
     tokenizer = AutoTokenizer.from_pretrained(
         args.model_id,
@@ -227,6 +85,7 @@ def run_generate(args: argparse.Namespace) -> Dict[Tuple[str, float], Dict[str, 
     prompts = [
         build_prompt(tokenizer, row["question"], args.num_repetition) for row in data
     ]
+    answers = [row["answer"] for row in data]
 
     llm_kwargs = {
         "model": args.model_id,
@@ -244,7 +103,7 @@ def run_generate(args: argparse.Namespace) -> Dict[Tuple[str, float], Dict[str, 
     temps = parse_temps(args.temps)
 
     metrics: Dict[Tuple[str, float], Dict[str, float]] = defaultdict(
-        lambda: {"count": 0, "loop": 0, "token_sum": 0}
+        lambda: {"count": 0, "loop": 0, "token_sum": 0, "correct": 0, "graded": 0}
     )
 
     for temperature in temps:
@@ -260,8 +119,13 @@ def run_generate(args: argparse.Namespace) -> Dict[Tuple[str, float], Dict[str, 
         )
 
         outputs = llm.generate(prompts, sampling_params)
+        if len(outputs) != len(answers):
+            raise SystemExit(
+                f"Expected {len(answers)} outputs, but got {len(outputs)}."
+            )
 
-        for out in outputs:
+        for idx, out in enumerate(outputs):
+            gold = answers[idx]
             for sample in out.outputs:
                 token_ids = getattr(sample, "token_ids", None)
                 if not token_ids:
@@ -272,24 +136,17 @@ def run_generate(args: argparse.Namespace) -> Dict[Tuple[str, float], Dict[str, 
                 metrics[key]["token_sum"] += len(token_ids)
                 if has_ngram_loop(token_ids, n=args.loop_n, k=args.loop_k):
                     metrics[key]["loop"] += 1
+                result = _math_verify(sample.text, gold)
+                if result is None:
+                    continue
+                metrics[key]["graded"] += 1
+                if result:
+                    metrics[key]["correct"] += 1
 
     if args.metrics_out:
         write_metrics(metrics, args.metrics_out)
 
     return metrics
-
-
-def merge_metric_dicts(
-    shards: List[Dict[Tuple[str, float], Dict[str, float]]],
-) -> Dict[Tuple[str, float], Dict[str, float]]:
-    stats: Dict[Tuple[str, float], Dict[str, float]] = {}
-    for shard in shards:
-        for key, s in shard.items():
-            out = stats.setdefault(key, {"count": 0, "loop": 0.0, "token_sum": 0.0})
-            out["count"] += int(s["count"])
-            out["loop"] += float(s["loop"])
-            out["token_sum"] += float(s["token_sum"])
-    return stats
 
 
 def dp_worker(
