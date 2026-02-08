@@ -4,40 +4,47 @@
 Examples (sbatch)
   # QwQ-32B (TP=8, 8 GPUs)
   sbatch --export=ALL,MODEL_ID=Qwen/QwQ-32B,TP=8,DP=1,NUM_REPETITION=1,METRICS_OUT=outputs/qwq32b_metrics.rep1.csv \
-    scripts/run_vllm_generate.sbatch
+    slurm/run_vllm_generate.sbatch
 
   # OpenThinker3-7B (DP=8, 8 GPUs)
   sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-7B,TP=1,DP=8,NUM_REPETITION=1,METRICS_OUT=outputs/openthinker3_7b_metrics.rep1.csv \
-    scripts/run_vllm_generate.sbatch
+    slurm/run_vllm_generate.sbatch
 
   # OpenThinker3-1.5B (DP=8, 8 GPUs)
   sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-1.5B,TP=1,DP=8,NUM_REPETITION=1,METRICS_OUT=outputs/openthinker3_1p5b_metrics.rep1.csv \
-    scripts/run_vllm_generate.sbatch
+    slurm/run_vllm_generate.sbatch
 
 Smoke tests (small scale)
   # QwQ-32B (TP=8, 1 sample, 1 temp)
   sbatch --export=ALL,MODEL_ID=Qwen/QwQ-32B,TP=8,DP=1,NUM_REPETITION=1,TEMPS=0,N=2,MAX_TOKENS=256,METRICS_OUT=outputs/qwq32b_metrics_smoke.rep1.csv \
-    scripts/run_vllm_generate.sbatch
+    slurm/run_vllm_generate.sbatch
 
   # OpenThinker3-7B (DP=8, 1 sample, 1 temp)
   sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-7B,TP=1,DP=8,NUM_REPETITION=1,TEMPS=0,N=2,MAX_TOKENS=256,METRICS_OUT=outputs/openthinker3_7b_metrics_smoke.rep1.csv \
-    scripts/run_vllm_generate.sbatch
+    slurm/run_vllm_generate.sbatch
 
   # OpenThinker3-1.5B (DP=8, 1 sample, 1 temp)
   sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-1.5B,TP=1,DP=8,NUM_REPETITION=1,TEMPS=0,N=2,MAX_TOKENS=256,METRICS_OUT=outputs/openthinker3_1p5b_metrics_smoke.rep1.csv \
-    scripts/run_vllm_generate.sbatch
+    slurm/run_vllm_generate.sbatch
 """
 
 import argparse
 import multiprocessing as mp
 import os
 import queue as queue_module
+import sys
 from collections import defaultdict
 from typing import Dict, Tuple
 
-from transformers import AutoTokenizer, GenerationConfig
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SRC = os.path.join(ROOT, "src")
+if SRC not in sys.path:
+    sys.path.insert(0, SRC)
+
+from transformers import AutoTokenizer
 from vllm import LLM, SamplingParams
 
+from loop_probe.rollout import resolve_sampling_defaults
 from utils import (
     _math_verify,
     add_repetition_suffix,
@@ -73,14 +80,7 @@ def run_generate(args: argparse.Namespace) -> Dict[Tuple[str, float], Dict[str, 
         use_fast=True,
     )
 
-    gen_config = GenerationConfig.from_pretrained(
-        args.model_id,
-    )
-
-    top_p = gen_config.top_p if gen_config.top_p is not None else 1.0
-    top_k = gen_config.top_k if gen_config.top_k is not None else -1
-    if top_k == 0:
-        top_k = -1
+    top_p, top_k = resolve_sampling_defaults(args.model_id)
 
     prompts = [
         build_prompt(tokenizer, row["question"], args.num_repetition) for row in data
@@ -152,12 +152,18 @@ def run_generate(args: argparse.Namespace) -> Dict[Tuple[str, float], Dict[str, 
 def dp_worker(
     args: argparse.Namespace,
     device: str,
+    rank: int,
     metrics_queue: "mp.queues.SimpleQueue",
 ) -> None:
     suppress_sem_unlink_errors()
     os.environ["CUDA_VISIBLE_DEVICES"] = device
+    print(
+        f"[dp-rank {rank}] starting shard {args.shard_idx + 1}/{args.num_shards} on cuda:{device}",
+        flush=True,
+    )
     metrics = run_generate(args)
-    metrics_queue.put(dict(metrics))
+    metrics_queue.put((rank, dict(metrics)))
+    print(f"[dp-rank {rank}] queued metrics", flush=True)
 
 
 def main() -> None:
@@ -221,26 +227,54 @@ def main() -> None:
 
         p = ctx.Process(
             target=dp_worker,
-            args=(worker_args, devices[rank], metrics_queue),
+            args=(worker_args, devices[rank], rank, metrics_queue),
         )
         p.start()
         processes.append(p)
 
+    metrics_by_rank: Dict[int, Dict[Tuple[str, float], Dict[str, float]]] = {}
+    while len(metrics_by_rank) < args.dp:
+        try:
+            rank, shard_metrics = metrics_queue.get(timeout=30)
+        except queue_module.Empty:
+            dead_missing = []
+            for rank, p in enumerate(processes):
+                if rank in metrics_by_rank:
+                    continue
+                if p.exitcode is not None:
+                    dead_missing.append((rank, p.exitcode))
+            if dead_missing:
+                raise SystemExit(
+                    f"DP worker(s) exited before reporting metrics: {dead_missing}"
+                )
+            continue
+        metrics_by_rank[int(rank)] = shard_metrics
+
     failures = []
-    for p in processes:
-        p.join()
-        if p.exitcode != 0:
-            failures.append(p.exitcode)
+    for rank, p in enumerate(processes):
+        p.join(timeout=30)
+        if p.is_alive():
+            if rank in metrics_by_rank:
+                # Some vLLM workers can hang during interpreter teardown.
+                p.terminate()
+                p.join(timeout=10)
+                print(
+                    f"[dp-rank {rank}] terminated after metrics were received (teardown hang)",
+                    flush=True,
+                )
+            else:
+                p.terminate()
+                p.join(timeout=10)
+                failures.append((rank, "alive_without_metrics"))
+                continue
+
+        if p.exitcode not in (0, None) and rank not in metrics_by_rank:
+            failures.append((rank, p.exitcode))
 
     if failures:
         raise SystemExit(f"DP worker(s) failed: {failures}")
 
-    metrics_shards = []
-    for _ in range(args.dp):
-        try:
-            metrics_shards.append(metrics_queue.get(timeout=5))
-        except queue_module.Empty:
-            raise SystemExit("Missing metrics from DP worker(s).")
+    metrics_shards = [metrics_by_rank[rank] for rank in range(args.dp)]
 
     if args.metrics_out:
         merged = merge_metric_dicts(metrics_shards)

@@ -9,3 +9,7 @@ logs/
 
 # cache
 __pycache__/
+
+.env
+.env.local
+.env.example

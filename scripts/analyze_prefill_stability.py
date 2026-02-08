@@ -1,20 +1,22 @@
 #!/usr/bin/env python3
-"""Analyze prefill activation stability with repeated forward passes."""
+"""Analyze prefill activation stability and optional vLLM rollout loop stats."""
 
 import argparse
 import contextlib
 import csv
 import os
-from typing import List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import torch
 import torch.nn.functional as F
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
 
-from utils import build_prompt, load_jsonl
+from utils import build_prompt, has_ngram_loop, load_jsonl
 
 ROLLOUTS = 10
+LOOP_N = 30
+LOOP_K = 20
 
 
 def select_dtype() -> torch.dtype:
@@ -117,6 +119,46 @@ def write_csv(path: str, avg_cos: List[float], min_cos: List[float]) -> None:
             writer.writerow([idx, avg_val, min_val])
 
 
+def write_rollout_csv(
+    path: str,
+    rows: List[Dict[str, object]],
+) -> None:
+    out_dir = os.path.dirname(path)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(
+            [
+                "model_id",
+                "temperature",
+                "num_prompts",
+                "rollouts_per_prompt",
+                "num_samples",
+                "looped",
+                "not_looped",
+                "loop_fraction",
+                "max_tokens",
+                "seed",
+            ]
+        )
+        for row in rows:
+            writer.writerow(
+                [
+                    row["model_id"],
+                    row["temperature"],
+                    row["num_prompts"],
+                    row["rollouts_per_prompt"],
+                    row["num_samples"],
+                    row["looped"],
+                    row["not_looped"],
+                    row["loop_fraction"],
+                    row["max_tokens"],
+                    row["seed"],
+                ]
+            )
+
+
 def save_plot(path: str, avg_cos: List[float], min_cos: List[float]) -> None:
     out_dir = os.path.dirname(path)
     if out_dir:
@@ -133,58 +175,145 @@ def save_plot(path: str, avg_cos: List[float], min_cos: List[float]) -> None:
     fig.savefig(path, dpi=200)
 
 
+def run_vllm_rollouts(
+    tokenizer,
+    model_id: str,
+    prompts: List[str],
+    trust_remote_code: bool,
+    rollouts: int,
+    max_tokens: int,
+    tp: int,
+    dtype: str,
+    max_model_len: int,
+    max_num_seqs: Optional[int],
+    max_num_batched_tokens: Optional[int],
+    seed: int,
+) -> List[Dict[str, object]]:
+    try:
+        from vllm import LLM, SamplingParams
+    except Exception as exc:
+        raise SystemExit(
+            "vLLM is required for rollout generation. "
+            "Install it or skip --out-rollout-csv."
+        ) from exc
+
+    gen_config = GenerationConfig.from_pretrained(model_id)
+    top_p = gen_config.top_p if gen_config.top_p is not None else 1.0
+    top_k = gen_config.top_k if gen_config.top_k is not None else -1
+    if top_k == 0:
+        top_k = -1
+
+    llm_kwargs = {
+        "model": model_id,
+        "tensor_parallel_size": tp,
+        "dtype": dtype,
+        "max_model_len": max_model_len,
+        "trust_remote_code": trust_remote_code,
+    }
+    if max_num_seqs is not None:
+        llm_kwargs["max_num_seqs"] = max_num_seqs
+    if max_num_batched_tokens is not None:
+        llm_kwargs["max_num_batched_tokens"] = max_num_batched_tokens
+
+    llm = LLM(**llm_kwargs)
+    if not prompts:
+        raise RuntimeError("No prompts were provided for vLLM rollouts.")
+
+    looped = 0
+    for rollout_idx in range(rollouts):
+        # Keep greedy settings fixed at temperature=0 (purpose of this script).
+        sampling_params = SamplingParams(
+            temperature=0.0,
+            top_p=top_p,
+            top_k=top_k,
+            max_tokens=max_tokens,
+            n=1,
+            repetition_penalty=1.0,
+            seed=seed + rollout_idx,
+        )
+        outputs = llm.generate(prompts, sampling_params)
+        if len(outputs) != len(prompts):
+            raise RuntimeError(
+                f"Expected {len(prompts)} outputs, but got {len(outputs)}."
+            )
+
+        for out in outputs:
+            if len(out.outputs) != 1:
+                raise RuntimeError(
+                    f"Expected 1 sample per prompt, but got {len(out.outputs)}."
+                )
+            sample = out.outputs[0]
+            token_ids = getattr(sample, "token_ids", None)
+            if not token_ids:
+                token_ids = tokenizer.encode(sample.text, add_special_tokens=False)
+            if has_ngram_loop(token_ids, n=LOOP_N, k=LOOP_K):
+                looped += 1
+
+    num_samples = len(prompts) * rollouts
+    not_looped = num_samples - looped
+    return [
+        {
+            "model_id": model_id,
+            "temperature": 0.0,
+            "num_prompts": len(prompts),
+            "rollouts_per_prompt": rollouts,
+            "num_samples": num_samples,
+            "looped": looped,
+            "not_looped": not_looped,
+            "loop_fraction": (looped / num_samples) if num_samples else 0.0,
+            "max_tokens": max_tokens,
+            "seed": seed,
+        }
+    ]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model-id", required=True)
     parser.add_argument("--data", default="data/aime_2024_2025.jsonl")
-    parser.add_argument("--out-csv", required=True)
-    parser.add_argument("--out-plot", required=True)
+    parser.add_argument("--out-rollout-csv", required=True)
+    parser.add_argument("--rollouts", type=int, default=ROLLOUTS)
+    parser.add_argument("--max-tokens", type=int, default=30000)
+    parser.add_argument("--tp", type=int, default=1)
+    parser.add_argument("--dtype", default="bfloat16")
+    parser.add_argument("--max-model-len", type=int, default=32768)
+    parser.add_argument("--max-num-seqs", type=int, default=None)
+    parser.add_argument("--max-num-batched-tokens", type=int, default=None)
+    parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--trust-remote-code", action="store_true", default=True)
     parser.add_argument("--no-trust-remote-code", dest="trust_remote_code", action="store_false")
     args = parser.parse_args()
 
+    if args.rollouts < 1:
+        raise SystemExit("--rollouts must be >= 1.")
     data = load_jsonl(args.data)
     if not data:
         raise SystemExit("Dataset is empty.")
 
-    dtype = select_dtype()
     tokenizer = AutoTokenizer.from_pretrained(
         args.model_id,
         trust_remote_code=args.trust_remote_code,
         use_fast=True,
     )
-    model = load_model(args.model_id, dtype, args.trust_remote_code)
-    model.eval()
-
-    device = model.device
-    sum_avg: List[float] = []
-    sum_min: List[float] = []
-    num_prompts = 0
-
-    for row in data:
-        prompt = build_prompt(tokenizer, row["question"], 1)
-        input_ids, attention_mask = tokenize_prompt(tokenizer, prompt, device)
-        avg_cos, min_cos = compute_prompt_similarity(
-            model, input_ids, attention_mask, ROLLOUTS
-        )
-        if not sum_avg:
-            sum_avg = [0.0 for _ in avg_cos]
-            sum_min = [0.0 for _ in min_cos]
-        if len(sum_avg) != len(avg_cos):
-            raise RuntimeError("Layer count mismatch across prompts.")
-        for idx in range(len(avg_cos)):
-            sum_avg[idx] += avg_cos[idx]
-            sum_min[idx] += min_cos[idx]
-        num_prompts += 1
-
-    if num_prompts == 0:
-        raise SystemExit("No prompts processed.")
-
-    avg_by_layer = [val / num_prompts for val in sum_avg]
-    min_by_layer = [val / num_prompts for val in sum_min]
-
-    write_csv(args.out_csv, avg_by_layer, min_by_layer)
-    save_plot(args.out_plot, avg_by_layer, min_by_layer)
+    prompts = [build_prompt(tokenizer, row["question"], 1) for row in data]
+    rollout_rows = run_vllm_rollouts(
+        tokenizer=tokenizer,
+        model_id=args.model_id,
+        prompts=prompts,
+        trust_remote_code=args.trust_remote_code,
+        rollouts=args.rollouts,
+        max_tokens=args.max_tokens,
+        tp=args.tp,
+        dtype=args.dtype,
+        max_model_len=args.max_model_len,
+        max_num_seqs=args.max_num_seqs,
+        max_num_batched_tokens=args.max_num_batched_tokens,
+        seed=args.seed,
+    )
+    write_rollout_csv(
+        path=args.out_rollout_csv,
+        rows=rollout_rows,
+    )
 
 
 if __name__ == "__main__":
