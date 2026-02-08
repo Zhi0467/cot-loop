@@ -12,10 +12,7 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-cd "${ROOT_DIR}"
-
+# SLURM starts jobs in the submit directory, so we're already in the right place
 mkdir -p logs outputs
 
 # Optional: activate your environment here (e.g., conda/venv/module load).

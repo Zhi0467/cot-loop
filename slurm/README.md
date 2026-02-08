@@ -22,7 +22,13 @@ This directory contains all SLURM batch scripts for this repository.
 - `PROMPT_FIELD=problem`
 
 Submit with defaults:
+loop fraction and accuracy ablation studies:
+```bash 
+sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-7B,TP=1,DP=8,NUM_REPETITION=1,METRICS_OUT=outputs/openthinker3_7b_metrics.rep1.csv \
+    slurm/run_vllm_generate.sbatch
+```
 
+train probe with defaults:
 ```bash
 sbatch slurm/run_probe_train_e2e.sbatch
 ```

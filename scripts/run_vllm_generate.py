@@ -32,7 +32,9 @@ import argparse
 import multiprocessing as mp
 import os
 import queue as queue_module
+import signal
 import sys
+import time
 from collections import defaultdict
 from typing import Dict, Tuple
 
@@ -156,6 +158,12 @@ def dp_worker(
     metrics_queue: "mp.queues.SimpleQueue",
 ) -> None:
     suppress_sem_unlink_errors()
+    try:
+        # Put each worker in an isolated process group so we can reap orphaned
+        # vLLM descendants without touching the parent batch shell.
+        os.setsid()
+    except OSError as exc:
+        print(f"[dp-rank {rank}] warning: failed to create worker session: {exc}", flush=True)
     os.environ["CUDA_VISIBLE_DEVICES"] = device
     print(
         f"[dp-rank {rank}] starting shard {args.shard_idx + 1}/{args.num_shards} on cuda:{device}",
@@ -164,6 +172,44 @@ def dp_worker(
     metrics = run_generate(args)
     metrics_queue.put((rank, dict(metrics)))
     print(f"[dp-rank {rank}] queued metrics", flush=True)
+
+
+def cleanup_worker_group(worker_pid: int, rank: int) -> None:
+    if worker_pid <= 0:
+        return
+
+    try:
+        os.killpg(worker_pid, 0)
+    except ProcessLookupError:
+        return
+    except PermissionError as exc:
+        print(
+            f"[dp-rank {rank}] warning: cannot probe process group {worker_pid}: {exc}",
+            flush=True,
+        )
+        return
+
+    for sig, wait_s in ((signal.SIGTERM, 1.0), (signal.SIGKILL, 0.5)):
+        try:
+            os.killpg(worker_pid, sig)
+        except ProcessLookupError:
+            return
+        except PermissionError as exc:
+            print(
+                f"[dp-rank {rank}] warning: cannot signal process group {worker_pid}: {exc}",
+                flush=True,
+            )
+            return
+        time.sleep(wait_s)
+        try:
+            os.killpg(worker_pid, 0)
+        except ProcessLookupError:
+            return
+
+    print(
+        f"[dp-rank {rank}] warning: process group {worker_pid} still alive after SIGKILL",
+        flush=True,
+    )
 
 
 def main() -> None:
@@ -233,52 +279,73 @@ def main() -> None:
         processes.append(p)
 
     metrics_by_rank: Dict[int, Dict[Tuple[str, float], Dict[str, float]]] = {}
-    while len(metrics_by_rank) < args.dp:
-        try:
-            rank, shard_metrics = metrics_queue.get(timeout=30)
-        except queue_module.Empty:
-            dead_missing = []
-            for rank, p in enumerate(processes):
-                if rank in metrics_by_rank:
-                    continue
-                if p.exitcode is not None:
-                    dead_missing.append((rank, p.exitcode))
-            if dead_missing:
-                raise SystemExit(
-                    f"DP worker(s) exited before reporting metrics: {dead_missing}"
-                )
-            continue
-        metrics_by_rank[int(rank)] = shard_metrics
-
     failures = []
-    for rank, p in enumerate(processes):
-        p.join(timeout=30)
-        if p.is_alive():
-            if rank in metrics_by_rank:
-                # Some vLLM workers can hang during interpreter teardown.
-                p.terminate()
-                p.join(timeout=10)
-                print(
-                    f"[dp-rank {rank}] terminated after metrics were received (teardown hang)",
-                    flush=True,
-                )
-            else:
-                p.terminate()
-                p.join(timeout=10)
-                failures.append((rank, "alive_without_metrics"))
+    try:
+        while len(metrics_by_rank) < args.dp:
+            try:
+                rank, shard_metrics = metrics_queue.get(timeout=30)
+            except queue_module.Empty:
+                dead_missing = []
+                for rank, p in enumerate(processes):
+                    if rank in metrics_by_rank:
+                        continue
+                    if p.exitcode is not None:
+                        dead_missing.append((rank, p.exitcode))
+                if dead_missing:
+                    raise SystemExit(
+                        f"DP worker(s) exited before reporting metrics: {dead_missing}"
+                    )
                 continue
+            metrics_by_rank[int(rank)] = shard_metrics
 
-        if p.exitcode not in (0, None) and rank not in metrics_by_rank:
-            failures.append((rank, p.exitcode))
+        for rank, p in enumerate(processes):
+            p.join(timeout=30)
+            if p.is_alive():
+                if rank in metrics_by_rank:
+                    # Some vLLM workers can hang during interpreter teardown.
+                    p.terminate()
+                    p.join(timeout=10)
+                    if p.is_alive():
+                        p.kill()
+                        p.join(timeout=5)
+                    print(
+                        f"[dp-rank {rank}] terminated after metrics were received (teardown hang)",
+                        flush=True,
+                    )
+                else:
+                    p.terminate()
+                    p.join(timeout=10)
+                    if p.is_alive():
+                        p.kill()
+                        p.join(timeout=5)
+                    failures.append((rank, "alive_without_metrics"))
+                    continue
 
-    if failures:
-        raise SystemExit(f"DP worker(s) failed: {failures}")
+            if p.exitcode not in (0, None) and rank not in metrics_by_rank:
+                failures.append((rank, p.exitcode))
 
-    metrics_shards = [metrics_by_rank[rank] for rank in range(args.dp)]
+        if failures:
+            raise SystemExit(f"DP worker(s) failed: {failures}")
 
-    if args.metrics_out:
-        merged = merge_metric_dicts(metrics_shards)
-        write_metrics(merged, args.metrics_out)
+        metrics_shards = [metrics_by_rank[rank] for rank in range(args.dp)]
+
+        if args.metrics_out:
+            merged = merge_metric_dicts(metrics_shards)
+            write_metrics(merged, args.metrics_out)
+    finally:
+        for rank, p in enumerate(processes):
+            if p.is_alive():
+                p.terminate()
+                p.join(timeout=3)
+            if p.is_alive():
+                p.kill()
+                p.join(timeout=3)
+            cleanup_worker_group(p.pid, rank)
+        try:
+            metrics_queue.close()
+            metrics_queue.join_thread()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
