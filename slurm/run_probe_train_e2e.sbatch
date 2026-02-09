@@ -59,6 +59,9 @@ NUM_WORKERS="${NUM_WORKERS:-8}"
 DEVICE="${DEVICE:-auto}"
 EVAL_EVERY="${EVAL_EVERY:-1}"
 LOG_EVERY="${LOG_EVERY:-5}"
+LR_SCHEDULER="${LR_SCHEDULER:-cosine}"
+WARMUP_RATIO="${WARMUP_RATIO:-0.1}"
+MIN_LR_RATIO="${MIN_LR_RATIO:-0.2}"
 
 TRAIN_EXTRA_ARGS="${TRAIN_EXTRA_ARGS:-}"
 
@@ -97,6 +100,7 @@ BUILD_ARGS=(
   --train-split "${TRAIN_SPLIT}"
   --prompt-field "${PROMPT_FIELD}"
   --split-ratio "${SPLIT_RATIO}"
+  --seed "${DATASET_SEED}"
   --seed "${DATASET_SEED}"
   --loop-n "${LOOP_N}"
   --loop-k "${LOOP_K}"

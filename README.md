@@ -137,6 +137,11 @@ A sequence is labeled as "looped" if any 30-gram appears ≥20 times in the gene
 - `{out_dir}/best.pt` - Best checkpoint (by ROC-AUC, then macro-F1)
 - `{out_dir}/last.pt` - Final epoch checkpoint
 - `{out_dir}/metrics.jsonl` - Per-epoch evaluation metrics
+- `{out_dir}/best_metrics.json` - Best eval row summary for this run
+
+**Multi-seed SLURM summary:**
+- `${OUT_RUN_DIR}/seed_summary.json` - Per-seed best rows + aggregate mean/std
+- `${OUT_RUN_DIR}/seed_summary.csv` - Aggregate mean/std table
 
 **Multi-seed E2E training (`slurm/run_probe_train_e2e.sbatch`):**
 - `{out_run_dir}/seed_*/metrics.jsonl` - Per-seed train/eval metrics
@@ -165,6 +170,7 @@ cot-loop/
 ├── scripts/
 │   ├── build_probe_dataset.py  # Extract features & labels
 │   ├── train_probe.py          # Train linear probe
+│   ├── aggregate_probe_runs.py # Multi-seed mean/std summary
 │   └── [loop analysis scripts] # See scripts/README.md
 ├── slurm/                   # SLURM batch scripts
 ├── data/                    # Input datasets
