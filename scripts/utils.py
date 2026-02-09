@@ -83,7 +83,7 @@ def load_jsonl(path: str) -> List[dict]:
 def build_prompt(tokenizer, question: str, num_repetition: int) -> str:
     user_msg = (
         f"{question}\n\n"
-        "Please reason step by step, and put your final answer within \\boxed{}."
+        "You must put your final answer within \\boxed{}."
     )
     if num_repetition > 1:
         user_msg = user_msg * num_repetition

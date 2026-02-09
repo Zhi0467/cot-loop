@@ -1,5 +1,6 @@
 from dataclasses import asdict, dataclass, replace
 
+from torch import nn
 
 @dataclass(frozen=True)
 class RolloutConfig:
@@ -13,6 +14,16 @@ class RolloutConfig:
     max_num_seqs: int | None = None
     max_num_batched_tokens: int | None = None
     trust_remote_code: bool = True
+
+    def to_dict(self) -> dict[str, object]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ProbeConfig:
+    probe_type: str = "linear"
+    hidden_dim: int = 1024
+    dropout: float = 0.0
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
@@ -39,9 +50,23 @@ MODEL_ROLLOUT_DEFAULTS: dict[str, RolloutConfig] = {
     ),
 }
 
+PROBE_DEFAULTS: dict[str, ProbeConfig] = {
+    "linear": ProbeConfig(
+        probe_type="linear",
+    ),
+    "mlp": ProbeConfig(
+        probe_type="mlp",
+        hidden_dim=1024,
+        dropout=0.1,
+    ),
+}
 
 def preset_choices() -> list[str]:
     return sorted(MODEL_ROLLOUT_DEFAULTS.keys())
+
+
+def probe_preset_choices() -> list[str]:
+    return sorted(PROBE_DEFAULTS.keys())
 
 
 def get_rollout_config(
@@ -91,3 +116,39 @@ def get_rollout_config(
         cfg = replace(cfg, trust_remote_code=trust_remote_code)
 
     return cfg
+
+
+def get_probe_config(
+    preset: str | None,
+) -> ProbeConfig:
+    key = preset or "linear"
+    if key not in PROBE_DEFAULTS:
+        raise ValueError(
+            f"Unknown probe preset '{key}'. Valid presets: {probe_preset_choices()}"
+        )
+    return PROBE_DEFAULTS[key]
+
+
+def build_probe_model(input_dim: int, probe_cfg: ProbeConfig) -> nn.Module:
+    if input_dim < 1:
+        raise ValueError("input_dim must be >= 1")
+
+    if probe_cfg.probe_type == "linear":
+        from .probes.linear_probe import LinearProbe
+
+        return LinearProbe(input_dim=input_dim)
+    if probe_cfg.probe_type == "mlp":
+        if probe_cfg.hidden_dim < 1:
+            raise ValueError("MLP hidden_dim must be >= 1")
+        if not 0.0 <= probe_cfg.dropout < 1.0:
+            raise ValueError("MLP dropout must be in [0, 1)")
+
+        from .probes.mlp_probe import MLPProbe
+
+        return MLPProbe(
+            input_dim=input_dim,
+            hidden_dim=probe_cfg.hidden_dim,
+            dropout=probe_cfg.dropout,
+        )
+
+    raise ValueError(f"Unsupported probe_type '{probe_cfg.probe_type}'")

@@ -15,7 +15,11 @@ if SRC not in sys.path:
     sys.path.insert(0, SRC)
 
 from loop_probe.dataloader import make_dataloader, read_manifest
-from loop_probe.probes.linear_probe import LinearProbe
+from loop_probe.configs import (
+    build_probe_model,
+    get_probe_config,
+    probe_preset_choices,
+)
 from loop_probe.train_utils import (
     choose_device,
     evaluate_binary_metrics,
@@ -37,6 +41,12 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--eval-every", type=int, default=1)
     parser.add_argument("--log-every", type=int, default=20)
+
+    parser.add_argument(
+        "--probe-preset",
+        choices=probe_preset_choices(),
+        default="linear",
+    )
 
     parser.add_argument("--wandb-project", required=True)
     parser.add_argument("--wandb-run-name", default=None)
@@ -67,14 +77,21 @@ def _write_jsonl(path: str, row: dict[str, object]) -> None:
 
 
 def _checkpoint_payload(
-    model, epoch: int, step: int, metrics: dict[str, float]
+    model,
+    epoch: int,
+    step: int,
+    metrics: dict[str, float],
+    probe_config: dict[str, object] | None = None,
 ) -> dict[str, object]:
-    return {
+    payload = {
         "epoch": epoch,
         "step": step,
         "metrics": metrics,
         "state_dict": model.state_dict(),
     }
+    if probe_config is not None:
+        payload["probe_config"] = probe_config
+    return payload
 
 
 def main() -> None:
@@ -103,6 +120,10 @@ def main() -> None:
 
     manifest = read_manifest(args.data_dir)
     input_dim = int(manifest["input_dim"])
+    try:
+        probe_cfg = get_probe_config(args.probe_preset)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
 
     train_loader = make_dataloader(
         args.data_dir,
@@ -129,7 +150,7 @@ def main() -> None:
     else:
         pos_weight = torch.tensor(1.0, dtype=torch.float32, device=device)
 
-    model = LinearProbe(input_dim=input_dim).to(device)
+    model = build_probe_model(input_dim=input_dim, probe_cfg=probe_cfg).to(device)
     criterion = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
     optimizer = torch.optim.AdamW(
         model.parameters(),
@@ -149,6 +170,7 @@ def main() -> None:
             "weight_decay": args.weight_decay,
             "seed": args.seed,
             "pos_weight": float(pos_weight.item()),
+            "probe_config": probe_cfg.to_dict(),
         },
     )
 
@@ -261,7 +283,13 @@ def main() -> None:
                 best_auc = auc_rank
                 best_f1 = eval_metrics["macro_f1"]
                 torch.save(
-                    _checkpoint_payload(model, epoch, global_step, eval_metrics),
+                    _checkpoint_payload(
+                        model,
+                        epoch,
+                        global_step,
+                        eval_metrics,
+                        probe_config=probe_cfg.to_dict(),
+                    ),
                     best_ckpt,
                 )
 
@@ -294,12 +322,18 @@ def main() -> None:
             )
 
         torch.save(
-            _checkpoint_payload(model, epoch, global_step, {
-                "train_loss": train_loss_epoch,
-                "train_accuracy": train_metrics_epoch["accuracy"],
-                "train_macro_f1": train_metrics_epoch["macro_f1"],
-                "train_roc_auc": train_metrics_epoch["roc_auc"],
-            }),
+            _checkpoint_payload(
+                model,
+                epoch,
+                global_step,
+                {
+                    "train_loss": train_loss_epoch,
+                    "train_accuracy": train_metrics_epoch["accuracy"],
+                    "train_macro_f1": train_metrics_epoch["macro_f1"],
+                    "train_roc_auc": train_metrics_epoch["roc_auc"],
+                },
+                probe_config=probe_cfg.to_dict(),
+            ),
             last_ckpt,
         )
 

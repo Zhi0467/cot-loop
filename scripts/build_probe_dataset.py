@@ -21,6 +21,9 @@ from loop_probe.prefill import extract_prefill_features, load_prefill_model_and_
 from loop_probe.rollout import generate_rollout_token_ids
 from loop_probe.serialization import save_split_shards, write_manifest
 from loop_probe.types import DatasetSpec, SampleRecord
+from utils import build_prompt
+
+DEFAULT_TEST_DATASET = "data/aime_2024_2025.jsonl"
 
 
 def _parse_args() -> argparse.Namespace:
@@ -31,13 +34,27 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--train-split", default="train")
     parser.add_argument("--train-max-samples", type=int, default=None)
 
-    parser.add_argument("--test-dataset", default="")
+    parser.add_argument(
+        "--test-dataset",
+        default="",
+        help=(
+            "Optional test dataset (HF dataset id or local JSONL path). "
+            f"If omitted, defaults to '{DEFAULT_TEST_DATASET}'."
+        ),
+    )
     parser.add_argument("--test-config", default=None)
     parser.add_argument("--test-split", default="test")
     parser.add_argument("--test-max-samples", type=int, default=None)
 
     parser.add_argument("--prompt-field", required=True)
-    parser.add_argument("--split-ratio", type=float, default=0.1)
+    parser.add_argument(
+        "--split-ratio",
+        type=float,
+        default=0.1,
+        help=(
+            "Used only when train/test specs are identical and a random split is needed."
+        ),
+    )
     parser.add_argument("--seed", type=int, default=0)
 
     parser.add_argument("--model-preset", choices=preset_choices(), default=None)
@@ -75,6 +92,24 @@ def _prompts(records: list[SampleRecord]) -> list[str]:
     return [rec.prompt for rec in records]
 
 
+def _apply_chat_prompt(
+    tokenizer,
+    records: list[SampleRecord],
+    *,
+    num_repetition: int = 1,
+) -> list[SampleRecord]:
+    formatted: list[SampleRecord] = []
+    for rec in records:
+        formatted.append(
+            SampleRecord(
+                sample_id=rec.sample_id,
+                prompt=build_prompt(tokenizer, rec.prompt, num_repetition),
+                source_split=rec.source_split,
+            )
+        )
+    return formatted
+
+
 def _make_specs(args: argparse.Namespace) -> tuple[DatasetSpec, DatasetSpec | None]:
     train_spec = DatasetSpec(
         dataset=args.train_dataset,
@@ -83,11 +118,15 @@ def _make_specs(args: argparse.Namespace) -> tuple[DatasetSpec, DatasetSpec | No
         max_samples=args.train_max_samples,
     )
 
-    if not args.test_dataset:
-        return train_spec, None
+    test_dataset = args.test_dataset or DEFAULT_TEST_DATASET
+    if not args.test_dataset and not os.path.isfile(test_dataset):
+        raise SystemExit(
+            f"Default test dataset '{test_dataset}' was not found. "
+            "Pass --test-dataset explicitly or create the default file."
+        )
 
     test_spec = DatasetSpec(
-        dataset=args.test_dataset,
+        dataset=test_dataset,
         config=args.test_config,
         split=args.test_split,
         max_samples=args.test_max_samples,
@@ -207,6 +246,10 @@ def main() -> None:
         trust_remote_code=rollout_cfg.trust_remote_code,
     )
 
+    # Use the same chat prompt construction as AIME eval scripts (single source of truth).
+    train_records = _apply_chat_prompt(tokenizer, train_records, num_repetition=1)
+    test_records = _apply_chat_prompt(tokenizer, test_records, num_repetition=1)
+
     train_features, train_ids = _build_split(
         "train",
         train_records,
@@ -284,6 +327,11 @@ def main() -> None:
         "version": 1,
         "input_dim": input_dim,
         "prompt_field": args.prompt_field,
+        "prompt_template": {
+            "source": "utils.build_prompt",
+            "num_repetition": 1,
+            "chat_template": True,
+        },
         "split_source": split_source,
         "loop_detector": {
             "n": args.loop_n,

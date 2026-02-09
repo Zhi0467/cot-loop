@@ -4,21 +4,22 @@ Purpose
 - Build a binary probe dataset from LLM runs where:
   - input feature = last-token activation at last layer during prefill
   - target label = whether a rollout trajectory loops (`has_ngram_loop`)
-- Train a simple linear classifier probe on those features.
+- Train a probe classifier (linear or MLP) on those features.
 
 High-level flow
 1. Load Hugging Face dataset rows and read prompt text from `--prompt-field`.
-2. Build train/test splits:
+2. Build model-formatted chat prompts with `utils.build_prompt` (shared with AIME eval).
+3. Build train/test splits:
    - separate train/test dataset specs, or
-   - one dataset split into train/test with deterministic random split.
-3. Prefill pass (Transformers): extract one feature vector per prompt.
-4. Rollout pass (vLLM): generate one trajectory per prompt.
-5. Label with loop detector (`n`-gram repeated `k` times).
-6. Save tensors as `.pt` shards and write `manifest.json`.
-7. Train/eval a linear probe with weighted BCE and W&B logging.
+   - identical train/test specs split deterministically with `--split-ratio`.
+4. Prefill pass (Transformers): extract one feature vector per prompt.
+5. Rollout pass (vLLM): generate one trajectory per prompt.
+6. Label with loop detector (`n`-gram repeated `k` times).
+7. Save tensors as `.pt` shards and write `manifest.json`.
+8. Train/eval a probe classifier with weighted BCE and W&B logging.
 
 Key modules
-- `configs.py`: rollout config dataclass and model presets.
+- `configs.py`: rollout + probe config dataclasses, presets, and probe model factory.
 - `hf_data.py`: HF dataset loading and split utilities.
 - `prefill.py`: hidden-state extraction for prefill features.
 - `rollout.py`: rollout generation via vLLM.
@@ -26,6 +27,7 @@ Key modules
 - `serialization.py`: shard writing + manifest.
 - `dataloader.py`: dataset/dataloader for training.
 - `probes/linear_probe.py`: baseline linear classifier.
+- `probes/mlp_probe.py`: one-hidden-layer MLP classifier.
 - `train_utils.py`: seed/device/metrics helpers.
 
 Model presets
@@ -49,7 +51,7 @@ python scripts/build_probe_dataset.py \
   --out-dir outputs/probe_data
 ```
 
-Single-dataset split (90/10 default)
+Omit `--test-dataset` to use local `data/aime_2024_2025.jsonl` as test set
 ```bash
 python scripts/build_probe_dataset.py \
   --train-dataset my_org/my_dataset \
@@ -59,11 +61,15 @@ python scripts/build_probe_dataset.py \
   --out-dir outputs/probe_data
 ```
 
+For this default local test file, prompt loading is hardcoded to `question`
+and requires an `answer` field on each row.
+
 Train probe
 ```bash
 python scripts/train_probe.py \
   --data-dir outputs/probe_data \
   --out-dir outputs/probe_runs/run1 \
+  --probe-preset linear \
   --wandb-project cot-loop-probe
 ```
 

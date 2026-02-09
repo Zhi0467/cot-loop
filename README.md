@@ -1,16 +1,17 @@
-# CoT Loop Detection via Linear Probes
+# CoT Loop Detection via Probe Classifiers
 
-This repository trains linear probes to predict whether a language model will enter a repetitive loop during chain-of-thought reasoning, based solely on prefill activations.
+This repository trains probe classifiers to predict whether a language model will enter a repetitive loop during chain-of-thought reasoning, based solely on prefill activations.
 
 ## Overview
 
 The core hypothesis: Can we detect whether a model will loop **before generation begins**, using only the hidden states from the prefill pass?
 
 **Workflow:**
-1. Extract last-token prefill activations from prompts
-2. Generate rollout trajectories and label them (looped vs not-looped)
-3. Train a binary linear classifier on the prefill features
-4. Evaluate the probe's ability to predict looping behavior
+1. Build model-formatted chat prompts (shared `utils.build_prompt` source)
+2. Extract last-token prefill activations from those prompts
+3. Generate rollout trajectories and label them (looped vs not-looped)
+4. Train a binary probe classifier on the prefill features
+5. Evaluate the probe's ability to predict looping behavior
 
 ## Quick Start
 
@@ -32,7 +33,7 @@ echo "WANDB_API_KEY=your_key_here" > .env
 
 ### Build Probe Dataset
 
-Extract features and labels from a Hugging Face dataset:
+Extract features and labels from train/test datasets:
 
 ```bash
 python scripts/build_probe_dataset.py \
@@ -45,7 +46,7 @@ python scripts/build_probe_dataset.py \
   --out-dir outputs/probe_data
 ```
 
-**For a single dataset with automatic train/test split (90/10):**
+If `--test-dataset` is omitted, it defaults to local `data/aime_2024_2025.jsonl`:
 
 ```bash
 python scripts/build_probe_dataset.py \
@@ -53,20 +54,30 @@ python scripts/build_probe_dataset.py \
   --train-split train \
   --prompt-field prompt \
   --model-preset openthinker3_7b \
-  --split-ratio 0.1 \
   --out-dir outputs/probe_data
 ```
 
-### Train Linear Probe
+For this default local test file, loader behavior is hardcoded to use
+`question` as prompt text and require `answer` on every row.
+
+Optional: if you want a random split of one dataset, pass identical train/test specs
+and use `--split-ratio`.
+
+### Train Probe
 
 ```bash
 python scripts/train_probe.py \
   --data-dir outputs/probe_data \
   --out-dir outputs/probe_runs/run1 \
+  --probe-preset linear \
   --wandb-project cot-loop-probe \
   --epochs 10 \
   --batch-size 256
 ```
+
+Available probe presets:
+- `linear` (default)
+- `mlp` (one hidden layer; shape is defined in `src/loop_probe/configs.py`)
 
 ### SLURM End-to-End Probe Job
 
@@ -84,6 +95,10 @@ Default dataset/model settings in this job:
 - `TRAIN_DATASET=HuggingFaceH4/MATH-500`, `TRAIN_SPLIT=test`
 - `TEST_DATASET=math-ai/aime25`, `TEST_SPLIT=test`
 - `PROMPT_FIELD=problem`
+- `PROBE_PRESET=linear`
+
+Prompt formatting note:
+- Probe dataset build and AIME eval both use the same chat prompt constructor: `scripts/utils.py:build_prompt()`.
 
 ## Model Presets
 
@@ -122,6 +137,17 @@ A sequence is labeled as "looped" if any 30-gram appears ≥20 times in the gene
 - `{out_dir}/best.pt` - Best checkpoint (by ROC-AUC, then macro-F1)
 - `{out_dir}/last.pt` - Final epoch checkpoint
 - `{out_dir}/metrics.jsonl` - Per-epoch evaluation metrics
+
+**Multi-seed E2E training (`slurm/run_probe_train_e2e.sbatch`):**
+- `{out_run_dir}/seed_*/metrics.jsonl` - Per-seed train/eval metrics
+- `{out_run_dir}/probe_multiseed_curves.png` - Aggregated train/eval curves across seeds
+
+Manual plotting command (if needed):
+```bash
+python scripts/plot_probe_multiseed.py \
+  --run-dir outputs/probe_runs/<run_name> \
+  --out outputs/probe_runs/<run_name>/probe_multiseed_curves.png
+```
 
 ## Repository Structure
 
@@ -169,6 +195,7 @@ python scripts/train_probe.py \
   --data-dir outputs/probe_data \
   --out-dir outputs/probe_runs/run1 \
   --wandb-project my-project \
+  --probe-preset mlp \
   --epochs 20 \
   --batch-size 512 \
   --lr 1e-3 \

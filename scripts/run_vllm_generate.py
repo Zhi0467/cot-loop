@@ -13,19 +13,6 @@ Examples (sbatch)
   # OpenThinker3-1.5B (DP=8, 8 GPUs)
   sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-1.5B,TP=1,DP=8,NUM_REPETITION=1,METRICS_OUT=outputs/openthinker3_1p5b_metrics.rep1.csv \
     slurm/run_vllm_generate.sbatch
-
-Smoke tests (small scale)
-  # QwQ-32B (TP=8, 1 sample, 1 temp)
-  sbatch --export=ALL,MODEL_ID=Qwen/QwQ-32B,TP=8,DP=1,NUM_REPETITION=1,TEMPS=0,N=2,MAX_TOKENS=256,METRICS_OUT=outputs/qwq32b_metrics_smoke.rep1.csv \
-    slurm/run_vllm_generate.sbatch
-
-  # OpenThinker3-7B (DP=8, 1 sample, 1 temp)
-  sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-7B,TP=1,DP=8,NUM_REPETITION=1,TEMPS=0,N=2,MAX_TOKENS=256,METRICS_OUT=outputs/openthinker3_7b_metrics_smoke.rep1.csv \
-    slurm/run_vllm_generate.sbatch
-
-  # OpenThinker3-1.5B (DP=8, 1 sample, 1 temp)
-  sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-1.5B,TP=1,DP=8,NUM_REPETITION=1,TEMPS=0,N=2,MAX_TOKENS=256,METRICS_OUT=outputs/openthinker3_1p5b_metrics_smoke.rep1.csv \
-    slurm/run_vllm_generate.sbatch
 """
 
 import argparse

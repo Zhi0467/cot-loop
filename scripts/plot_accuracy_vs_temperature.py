@@ -3,8 +3,8 @@
 
 Example:
 uv run python scripts/plot_accuracy_vs_temperature.py \
-    --model-id open-thoughts/OpenThinker3-1.5B \
-    --out outputs/accuracy_vs_temperature.png
+    --model-id open-thoughts/OpenThinker3-7B \
+    --out outputs/accuracy_vs_temperature_7b.png
 """
 
 import argparse

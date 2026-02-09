@@ -20,6 +20,7 @@ This directory contains all SLURM batch scripts for this repository.
 - `TEST_DATASET=math-ai/aime25`
 - `TEST_SPLIT=test`
 - `PROMPT_FIELD=problem`
+- `PROBE_PRESET=linear` (passed to `scripts/train_probe.py --probe-preset`)
 
 Submit with defaults:
 loop fraction and accuracy ablation studies:
@@ -32,5 +33,8 @@ train probe with defaults:
 ```bash
 sbatch slurm/run_probe_train_e2e.sbatch
 ```
+
+When multiple seeds are used (default: `0 1 2`), the script also writes:
+- `${OUT_RUN_DIR}/probe_multiseed_curves.png` (aggregated train/eval curves from `seed_*/metrics.jsonl`)
 
 Override values with exported environment variables or inline `VAR=... sbatch ...`.
