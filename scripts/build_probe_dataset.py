@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Build loop-probe train/test datasets from Hugging Face datasets."""
 
+from __future__ import annotations
+
 import argparse
 import gc
+import json
 import os
 import sys
 from dataclasses import asdict
@@ -62,6 +65,11 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--loop-n", type=int, default=30)
     parser.add_argument("--loop-k", type=int, default=20)
     parser.add_argument("--shard-size", type=int, default=2048)
+    parser.add_argument(
+        "--reuse-if-compatible",
+        action="store_true",
+        help="Skip rebuilding when out-dir has a compatible manifest and shard files.",
+    )
     parser.add_argument("--out-dir", required=True)
 
     return parser.parse_args()
@@ -130,6 +138,84 @@ def _resolve_splits(
     return train_records, test_records, split_source
 
 
+def _resolve_split_source(train_spec: DatasetSpec, test_spec: DatasetSpec | None) -> str:
+    if test_spec is None:
+        return "single_dataset_split"
+    if specs_equal(train_spec, test_spec):
+        return "same_train_test_spec_split"
+    return "separate_specs"
+
+
+def _split_shards_exist(out_dir: str, split_info: object) -> bool:
+    if not isinstance(split_info, dict):
+        return False
+    shard_paths = split_info.get("shards")
+    if not isinstance(shard_paths, list) or not shard_paths:
+        return False
+    for rel_path in shard_paths:
+        if not isinstance(rel_path, str):
+            return False
+        if not os.path.exists(os.path.join(out_dir, rel_path)):
+            return False
+    return True
+
+
+def _probe_cache_status(
+    out_dir: str,
+    *,
+    train_spec: DatasetSpec,
+    test_spec: DatasetSpec | None,
+    prompt_field: str,
+    split_source: str,
+    split_ratio: float,
+    loop_n: int,
+    loop_k: int,
+    rollout_config: dict[str, object],
+    seed: int,
+) -> tuple[bool, str]:
+    manifest_path = os.path.join(out_dir, "manifest.json")
+    if not os.path.exists(manifest_path):
+        return False, "manifest.json not found"
+
+    try:
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            manifest = json.load(f)
+    except Exception as exc:
+        return False, f"failed to read manifest.json: {exc}"
+
+    expected = {
+        "prompt_field": prompt_field,
+        "split_source": split_source,
+        "loop_detector": {"n": loop_n, "k": loop_k},
+        "rollout_config": rollout_config,
+        "train_spec": asdict(train_spec),
+        "test_spec": asdict(test_spec) if test_spec else None,
+    }
+    if split_source != "separate_specs":
+        expected["split_ratio"] = split_ratio
+    for key, value in expected.items():
+        if manifest.get(key) != value:
+            return False, f"manifest mismatch on '{key}'"
+
+    manifest_seed = manifest.get("seed", None)
+    if manifest_seed is not None:
+        try:
+            seed_value = int(manifest_seed)
+        except Exception:
+            return False, "manifest seed is not an integer"
+        if seed_value != seed:
+            return False, f"manifest seed={seed_value} != requested seed={seed}"
+
+    if not _split_shards_exist(out_dir, manifest.get("train")):
+        return False, "train shards are missing"
+    if not _split_shards_exist(out_dir, manifest.get("test")):
+        return False, "test shards are missing"
+
+    if manifest_seed is None:
+        return True, "compatible legacy manifest match (no seed recorded)"
+    return True, "manifest and shards match requested config"
+
+
 def _build_split(
     split_name: str,
     records: list[SampleRecord],
@@ -194,6 +280,32 @@ def main() -> None:
         raise SystemExit(str(exc)) from exc
 
     train_spec, test_spec = _make_specs(args)
+    split_source = _resolve_split_source(train_spec, test_spec)
+
+    if args.reuse_if_compatible:
+        cache_hit, reason = _probe_cache_status(
+            args.out_dir,
+            train_spec=train_spec,
+            test_spec=test_spec,
+            prompt_field=args.prompt_field,
+            split_source=split_source,
+            split_ratio=args.split_ratio,
+            loop_n=args.loop_n,
+            loop_k=args.loop_k,
+            rollout_config=rollout_cfg.to_dict(),
+            seed=args.seed,
+        )
+        if cache_hit:
+            print(
+                f"Reusing cached probe dataset at {args.out_dir}: {reason}",
+                flush=True,
+            )
+            return
+        print(
+            f"Cache miss at {args.out_dir}: {reason}. Rebuilding dataset.",
+            flush=True,
+        )
+
     train_records, test_records, split_source = _resolve_splits(args, train_spec, test_spec)
 
     print(
@@ -285,6 +397,8 @@ def main() -> None:
         "input_dim": input_dim,
         "prompt_field": args.prompt_field,
         "split_source": split_source,
+        "split_ratio": args.split_ratio if split_source != "separate_specs" else None,
+        "seed": args.seed,
         "loop_detector": {
             "n": args.loop_n,
             "k": args.loop_k,

@@ -35,6 +35,9 @@ TEST_MAX_SAMPLES="${TEST_MAX_SAMPLES:-}"
 
 SPLIT_RATIO="${SPLIT_RATIO:-0.1}"
 SEED="${SEED:-0}"
+SEEDS="${SEEDS:-${SEED}}"
+DATASET_SEED="${DATASET_SEED:-}"
+REUSE_DATASET="${REUSE_DATASET:-1}"
 
 MAX_NUM_SEQS="${MAX_NUM_SEQS:-}"
 
@@ -56,15 +59,47 @@ NUM_WORKERS="${NUM_WORKERS:-8}"
 DEVICE="${DEVICE:-auto}"
 EVAL_EVERY="${EVAL_EVERY:-1}"
 LOG_EVERY="${LOG_EVERY:-5}"
+LR_SCHEDULER="${LR_SCHEDULER:-cosine}"
+WARMUP_RATIO="${WARMUP_RATIO:-0.1}"
+MIN_LR_RATIO="${MIN_LR_RATIO:-0.2}"
 
 TRAIN_EXTRA_ARGS="${TRAIN_EXTRA_ARGS:-}"
+PROBE_SUMMARY_JSON="${PROBE_SUMMARY_JSON:-${OUT_RUN_DIR}/seed_summary.json}"
+PROBE_SUMMARY_CSV="${PROBE_SUMMARY_CSV:-${OUT_RUN_DIR}/seed_summary.csv}"
+
+RAW_SEEDS=()
+IFS=',' read -r -a RAW_SEEDS <<< "${SEEDS}"
+SEED_LIST=()
+for raw_seed in "${RAW_SEEDS[@]}"; do
+  seed_no_ws="${raw_seed//[[:space:]]/}"
+  if [[ -n "${seed_no_ws}" ]]; then
+    SEED_LIST+=("${seed_no_ws}")
+  fi
+done
+if [[ ${#SEED_LIST[@]} -eq 0 ]]; then
+  echo "[probe-e2e] error: SEEDS resolved to an empty list" >&2
+  exit 1
+fi
+for seed in "${SEED_LIST[@]}"; do
+  if [[ ! "${seed}" =~ ^-?[0-9]+$ ]]; then
+    echo "[probe-e2e] error: seed '${seed}' is not an integer" >&2
+    exit 1
+  fi
+done
+if [[ -z "${DATASET_SEED}" ]]; then
+  DATASET_SEED="${SEED_LIST[0]}"
+fi
+if [[ ! "${DATASET_SEED}" =~ ^-?[0-9]+$ ]]; then
+  echo "[probe-e2e] error: DATASET_SEED '${DATASET_SEED}' is not an integer" >&2
+  exit 1
+fi
 
 BUILD_ARGS=(
   --train-dataset "${TRAIN_DATASET}"
   --train-split "${TRAIN_SPLIT}"
   --prompt-field "${PROMPT_FIELD}"
   --split-ratio "${SPLIT_RATIO}"
-  --seed "${SEED}"
+  --seed "${DATASET_SEED}"
   --loop-n "${LOOP_N}"
   --loop-k "${LOOP_K}"
   --shard-size "${SHARD_SIZE}"
@@ -93,25 +128,52 @@ fi
 if [[ -n "${MAX_NUM_SEQS}" ]]; then
   BUILD_ARGS+=(--max-num-seqs "${MAX_NUM_SEQS}")
 fi
+if [[ "${REUSE_DATASET}" == "1" ]]; then
+  BUILD_ARGS+=(--reuse-if-compatible)
+fi
 
-TRAIN_ARGS=(
+BASE_TRAIN_ARGS=(
   --data-dir "${OUT_DATA_DIR}"
-  --out-dir "${OUT_RUN_DIR}"
   --epochs "${EPOCHS}"
   --batch-size "${BATCH_SIZE}"
   --lr "${LR}"
+  --lr-scheduler "${LR_SCHEDULER}"
+  --warmup-ratio "${WARMUP_RATIO}"
+  --min-lr-ratio "${MIN_LR_RATIO}"
   --weight-decay "${WEIGHT_DECAY}"
   --num-workers "${NUM_WORKERS}"
   --device "${DEVICE}"
-  --seed "${SEED}"
   --eval-every "${EVAL_EVERY}"
   --log-every "${LOG_EVERY}"
   --wandb-project "${WANDB_PROJECT}"
-  --wandb-run-name "${WANDB_RUN_NAME}"
 )
 
-echo "[probe-e2e] build dataset: model_preset=${MODEL_PRESET} train=${TRAIN_DATASET}:${TRAIN_SPLIT} test=${TEST_DATASET}:${TEST_SPLIT}"
+echo "[probe-e2e] build dataset: model_preset=${MODEL_PRESET} train=${TRAIN_DATASET}:${TRAIN_SPLIT} test=${TEST_DATASET}:${TEST_SPLIT} dataset_seed=${DATASET_SEED} reuse_dataset=${REUSE_DATASET}"
 python scripts/build_probe_dataset.py "${BUILD_ARGS[@]}"
 
-echo "[probe-e2e] train probe: data_dir=${OUT_DATA_DIR} out_dir=${OUT_RUN_DIR}"
-python scripts/train_probe.py "${TRAIN_ARGS[@]}" ${TRAIN_EXTRA_ARGS}
+RUN_DIRS=()
+for seed in "${SEED_LIST[@]}"; do
+  run_dir="${OUT_RUN_DIR}"
+  wandb_run_name="${WANDB_RUN_NAME}"
+  if [[ ${#SEED_LIST[@]} -gt 1 ]]; then
+    run_dir="${OUT_RUN_DIR}/seed_${seed}"
+    wandb_run_name="${WANDB_RUN_NAME}-seed${seed}"
+  fi
+
+  echo "[probe-e2e] train probe: seed=${seed} data_dir=${OUT_DATA_DIR} out_dir=${run_dir}"
+  python scripts/train_probe.py \
+    "${BASE_TRAIN_ARGS[@]}" \
+    --out-dir "${run_dir}" \
+    --seed "${seed}" \
+    --wandb-run-name "${wandb_run_name}" \
+    ${TRAIN_EXTRA_ARGS}
+  RUN_DIRS+=("${run_dir}")
+done
+
+if [[ ${#RUN_DIRS[@]} -gt 1 ]]; then
+  echo "[probe-e2e] aggregate seeds: ${SEEDS}"
+  python scripts/aggregate_probe_runs.py \
+    --run-dirs "${RUN_DIRS[@]}" \
+    --out-json "${PROBE_SUMMARY_JSON}" \
+    --out-csv "${PROBE_SUMMARY_CSV}"
+fi

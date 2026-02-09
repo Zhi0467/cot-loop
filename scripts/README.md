@@ -196,6 +196,9 @@ Default config:
 - `TRAIN_DATASET=HuggingFaceH4/MATH-500`, `TRAIN_SPLIT=test`
 - `TEST_DATASET=math-ai/aime25`, `TEST_SPLIT=test`
 - `PROMPT_FIELD=problem`
+- `SEEDS=$SEED` (single training seed by default)
+- `REUSE_DATASET=1` (reuses `OUT_DATA_DIR` when manifest+shards match)
+- `LR_SCHEDULER=cosine`, `WARMUP_RATIO=0.1`, `MIN_LR_RATIO=0.2`
 
 Usage:
 
@@ -216,6 +219,19 @@ PROMPT_FIELD=problem \
 WANDB_PROJECT=cot-loop-probe \
 sbatch slurm/run_probe_train_e2e.sbatch
 ```
+
+Run multiple training seeds and aggregate mean/std:
+
+```bash
+SEEDS=0,1,2 \
+DATASET_SEED=0 \
+sbatch slurm/run_probe_train_e2e.sbatch
+```
+
+Multi-seed outputs:
+- per-seed run dirs: `${OUT_RUN_DIR}/seed_<seed>/`
+- aggregate JSON summary: `${OUT_RUN_DIR}/seed_summary.json`
+- aggregate CSV summary: `${OUT_RUN_DIR}/seed_summary.csv`
 
 ## Dataset Preparation
 

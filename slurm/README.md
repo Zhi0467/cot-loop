@@ -20,6 +20,9 @@ This directory contains all SLURM batch scripts for this repository.
 - `TEST_DATASET=math-ai/aime25`
 - `TEST_SPLIT=test`
 - `PROMPT_FIELD=problem`
+- `SEEDS=$SEED` (single seed by default)
+- `REUSE_DATASET=1` (skip rebuild when `OUT_DATA_DIR/manifest.json` is compatible)
+- `LR_SCHEDULER=cosine`, `WARMUP_RATIO=0.1`, `MIN_LR_RATIO=0.2`
 
 Submit with defaults:
 loop fraction and accuracy ablation studies:
@@ -32,5 +35,17 @@ train probe with defaults:
 ```bash
 sbatch slurm/run_probe_train_e2e.sbatch
 ```
+
+Run 3 seeds (shared dataset build, then aggregate mean/std):
+```bash
+SEEDS=0,1,2 \
+DATASET_SEED=0 \
+sbatch slurm/run_probe_train_e2e.sbatch
+```
+
+When `SEEDS` has multiple values, outputs are:
+- per-seed run dirs: `${OUT_RUN_DIR}/seed_<seed>/`
+- aggregate summary JSON: `${OUT_RUN_DIR}/seed_summary.json`
+- aggregate summary CSV: `${OUT_RUN_DIR}/seed_summary.csv`
 
 Override values with exported environment variables or inline `VAR=... sbatch ...`.

@@ -1,19 +1,20 @@
-# any PDF files
+# macOS
+.DS_Store
+
+# documents
 *.pdf
 
-#venv
+# environment
 .venv/
-
-# logs
-logs/
-
-# cache
-__pycache__/
-
 .env
 .env.local
 .env.example
 
+# logs and caches
+logs/
+__pycache__/
+
+# experiment artifacts
 wandb/
 outputs/probe_data/
 outputs/probe_runs/

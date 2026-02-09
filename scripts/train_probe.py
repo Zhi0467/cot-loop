@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Train a probe on last-token prefill activations."""
 
+from __future__ import annotations
+
 import argparse
 import json
 import math
@@ -31,6 +33,9 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--batch-size", type=int, default=256)
     parser.add_argument("--lr", type=float, default=1e-3)
+    parser.add_argument("--lr-scheduler", choices=("none", "cosine"), default="cosine")
+    parser.add_argument("--warmup-ratio", type=float, default=0.1)
+    parser.add_argument("--min-lr-ratio", type=float, default=0.2)
     parser.add_argument("--weight-decay", type=float, default=0.0)
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--device", default="auto")
@@ -77,12 +82,39 @@ def _checkpoint_payload(
     }
 
 
+def _cosine_lr_factor(
+    step: int,
+    *,
+    total_steps: int,
+    warmup_steps: int,
+    min_lr_ratio: float,
+) -> float:
+    if total_steps <= 0:
+        return 1.0
+
+    clamped_step = min(max(step, 1), total_steps)
+    if warmup_steps > 0 and clamped_step <= warmup_steps:
+        return float(clamped_step) / float(warmup_steps)
+
+    decay_steps = max(total_steps - warmup_steps, 1)
+    decay_step = max(clamped_step - warmup_steps, 0)
+    progress = min(max(decay_step / decay_steps, 0.0), 1.0)
+    cosine = 0.5 * (1.0 + math.cos(math.pi * progress))
+    return min_lr_ratio + (1.0 - min_lr_ratio) * cosine
+
+
 def main() -> None:
     args = _parse_args()
     if args.epochs < 1:
         raise SystemExit("--epochs must be >= 1")
     if args.batch_size < 1:
         raise SystemExit("--batch-size must be >= 1")
+    if args.lr <= 0.0:
+        raise SystemExit("--lr must be > 0.")
+    if not 0.0 <= args.warmup_ratio < 1.0:
+        raise SystemExit("--warmup-ratio must be in [0, 1).")
+    if not 0.0 <= args.min_lr_ratio <= 1.0:
+        raise SystemExit("--min-lr-ratio must be in [0, 1].")
 
     set_seed(args.seed)
     device = choose_device(args.device)
@@ -120,6 +152,10 @@ def main() -> None:
         num_workers=args.num_workers,
         pin_memory=(device.type == "cuda"),
     )
+    steps_per_epoch = len(train_loader)
+    if steps_per_epoch < 1:
+        raise SystemExit("Training split is empty.")
+    total_steps = args.epochs * steps_per_epoch
 
     train_info = manifest.get("train", {})
     num_pos = int(train_info.get("num_positive", 0))
@@ -136,6 +172,12 @@ def main() -> None:
         lr=args.lr,
         weight_decay=args.weight_decay,
     )
+    warmup_steps = 0
+    if args.lr_scheduler == "cosine":
+        warmup_steps = int(round(args.warmup_ratio * total_steps))
+        if args.warmup_ratio > 0.0 and warmup_steps < 1:
+            warmup_steps = 1
+        warmup_steps = min(warmup_steps, max(total_steps - 1, 0))
 
     run = wandb.init(
         project=args.wandb_project,
@@ -146,6 +188,10 @@ def main() -> None:
             "epochs": args.epochs,
             "batch_size": args.batch_size,
             "lr": args.lr,
+            "lr_scheduler": args.lr_scheduler,
+            "warmup_ratio": args.warmup_ratio,
+            "warmup_steps": warmup_steps,
+            "min_lr_ratio": args.min_lr_ratio,
             "weight_decay": args.weight_decay,
             "seed": args.seed,
             "pos_weight": float(pos_weight.item()),
@@ -155,9 +201,14 @@ def main() -> None:
     metrics_jsonl = os.path.join(args.out_dir, "metrics.jsonl")
     best_ckpt = os.path.join(args.out_dir, "best.pt")
     last_ckpt = os.path.join(args.out_dir, "last.pt")
+    best_metrics_json = os.path.join(args.out_dir, "best_metrics.json")
+
+    with open(metrics_jsonl, "w", encoding="utf-8"):
+        pass
 
     best_auc = float("-inf")
     best_f1 = float("-inf")
+    best_eval_row: dict[str, object] | None = None
     global_step = 0
 
     for epoch in range(1, args.epochs + 1):
@@ -166,8 +217,20 @@ def main() -> None:
         seen = 0
         epoch_logits = []
         epoch_labels = []
+        lr_now = args.lr
 
         for batch_idx, (x, y) in enumerate(train_loader, start=1):
+            if args.lr_scheduler == "cosine":
+                scale = _cosine_lr_factor(
+                    global_step + 1,
+                    total_steps=total_steps,
+                    warmup_steps=warmup_steps,
+                    min_lr_ratio=args.min_lr_ratio,
+                )
+                lr_now = args.lr * scale
+                for group in optimizer.param_groups:
+                    group["lr"] = lr_now
+
             x = x.to(device)
             y = y.to(device)
 
@@ -192,6 +255,7 @@ def main() -> None:
                 wandb.log(
                     {
                         "train/loss": avg_loss,
+                        "train/lr": lr_now,
                         "epoch": epoch,
                         "step": global_step,
                     },
@@ -199,7 +263,7 @@ def main() -> None:
                 )
                 print(
                     f"epoch={epoch} batch={batch_idx} step={global_step} "
-                    f"train_loss={avg_loss:.6f}",
+                    f"train_loss={avg_loss:.6f} lr={lr_now:.6e}",
                     flush=True,
                 )
 
@@ -217,6 +281,7 @@ def main() -> None:
                 "train/accuracy_epoch": train_metrics_epoch["accuracy"],
                 "train/macro_f1_epoch": train_metrics_epoch["macro_f1"],
                 "train/roc_auc_epoch": train_metrics_epoch["roc_auc"],
+                "train/lr": lr_now,
                 "epoch": epoch,
                 "step": global_step,
             },
@@ -235,6 +300,8 @@ def main() -> None:
                 "train_accuracy": train_metrics_epoch["accuracy"],
                 "train_macro_f1": train_metrics_epoch["macro_f1"],
                 "train_roc_auc": train_metrics_epoch["roc_auc"],
+                "seed": args.seed,
+                "lr": lr_now,
                 **eval_metrics,
             }
             _write_jsonl(metrics_jsonl, log_row)
@@ -260,6 +327,7 @@ def main() -> None:
             if is_better:
                 best_auc = auc_rank
                 best_f1 = eval_metrics["macro_f1"]
+                best_eval_row = dict(log_row)
                 torch.save(
                     _checkpoint_payload(model, epoch, global_step, eval_metrics),
                     best_ckpt,
@@ -304,6 +372,19 @@ def main() -> None:
         )
 
     run.finish()
+    if best_eval_row is not None:
+        best_payload = {
+            "selection_rule": "max(roc_auc), tie_break=max(macro_f1)",
+            **best_eval_row,
+        }
+        with open(best_metrics_json, "w", encoding="utf-8") as f:
+            json.dump(best_payload, f, indent=2, sort_keys=True)
+            f.write("\n")
+    else:
+        print(
+            "No eval checkpoints were logged (check --eval-every); best_metrics.json not written.",
+            flush=True,
+        )
     print(f"Saved checkpoints to {args.out_dir}", flush=True)
 
 
