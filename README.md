@@ -88,14 +88,15 @@ sbatch slurm/run_probe_train_e2e.sbatch
 ```
 
 Default dataset/model settings in this job:
-- `MODEL_PRESET=openthinker3_7b`
+- `MODEL_PRESET=openthinker3_1p5b`
 - `#SBATCH --gres=gpu:8` (job requests 8 GPUs by default)
 - rollout `tp/dp` comes from `src/loop_probe/configs.py` preset defaults
 - optional rollout concurrency override: `MAX_NUM_SEQS=...`
 - `TRAIN_DATASET=HuggingFaceH4/MATH-500`, `TRAIN_SPLIT=test`
-- `TEST_DATASET=math-ai/aime25`, `TEST_SPLIT=test`
+- `TEST_DATASET` omitted (defaults to local `data/aime_2024_2025.jsonl` in `build_probe_dataset.py`)
+- `TEST_SPLIT=test`
 - `PROMPT_FIELD=problem`
-- `PROBE_PRESET=linear`
+- `PROBE_PRESET=mlp`
 
 Prompt formatting note:
 - Probe dataset build and AIME eval both use the same chat prompt constructor: `scripts/utils.py:build_prompt()`.
@@ -169,9 +170,9 @@ cot-loop/
 │   └── train_utils.py       # Training utilities
 ├── scripts/
 │   ├── build_probe_dataset.py  # Extract features & labels
-│   ├── train_probe.py          # Train linear probe
+│   ├── train_probe.py          # Train probe classifier
 │   ├── aggregate_probe_runs.py # Multi-seed mean/std summary
-│   └── [loop analysis scripts] # See scripts/README.md
+│   └── [loop analysis scripts]
 ├── slurm/                   # SLURM batch scripts
 ├── data/                    # Input datasets
 └── outputs/                 # Generated artifacts
@@ -215,7 +216,7 @@ The training script automatically applies `pos_weight` in BCEWithLogitsLoss base
 
 ## Additional Scripts
 
-For loop detection analysis on existing generations and reproducing Figure 1 from the paper, see [scripts/README.md](scripts/README.md).
+For loop detection analysis on existing generations and reproducing Figure 1 from the paper, see the `scripts/` directory.
 
 ## Technical Details
 

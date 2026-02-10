@@ -11,16 +11,16 @@ This directory contains all SLURM batch scripts for this repository.
 ## Probe E2E Defaults
 
 `run_probe_train_e2e.sbatch` defaults to:
-- `MODEL_PRESET=openthinker3_7b`
+- `MODEL_PRESET=openthinker3_1p5b`
 - `#SBATCH --gres=gpu:8` (job requests 8 GPUs by default)
 - rollout `tp/dp` comes from `src/loop_probe/configs.py` preset defaults
 - optional rollout concurrency override: `MAX_NUM_SEQS=...`
 - `TRAIN_DATASET=HuggingFaceH4/MATH-500`
 - `TRAIN_SPLIT=test`
-- `TEST_DATASET=math-ai/aime25`
+- `TEST_DATASET` omitted by default (falls back to local `data/aime_2024_2025.jsonl`)
 - `TEST_SPLIT=test`
 - `PROMPT_FIELD=problem`
-- `PROBE_PRESET=linear` (passed to `scripts/train_probe.py --probe-preset`)
+- `PROBE_PRESET=mlp` (passed to `scripts/train_probe.py --probe-preset`)
 
 Submit with defaults:
 loop fraction and accuracy ablation studies:
