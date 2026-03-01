@@ -7,6 +7,7 @@ import argparse
 import gc
 import json
 import os
+import random
 import sys
 from dataclasses import asdict
 
@@ -27,6 +28,12 @@ from loop_probe.types import DatasetSpec, SampleRecord
 from utils import build_prompt
 
 DEFAULT_TEST_DATASET = "data/aime_2024_2025.jsonl"
+
+RATIO_SPLIT_SOURCES = {
+    "single_dataset_split",
+    "same_train_test_spec_split",
+    "same_train_test_source_ratio_split",
+}
 
 
 def _parse_args() -> argparse.Namespace:
@@ -55,7 +62,7 @@ def _parse_args() -> argparse.Namespace:
         type=float,
         default=0.1,
         help=(
-            "Used only when train/test specs are identical and a random split is needed."
+            "Used for ratio-based splitting when train/test come from one source."
         ),
     )
     parser.add_argument("--seed", type=int, default=0)
@@ -82,6 +89,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--loop-n", type=int, default=30)
     parser.add_argument("--loop-k", type=int, default=20)
     parser.add_argument("--shard-size", type=int, default=2048)
+    parser.add_argument("--prefill-batch-size", type=int, default=1)
     parser.add_argument(
         "--reuse-if-compatible",
         action="store_true",
@@ -116,6 +124,33 @@ def _apply_chat_prompt(
             )
         )
     return formatted
+
+
+def _same_data_source(a: DatasetSpec, b: DatasetSpec) -> bool:
+    if os.path.isfile(a.dataset) and os.path.isfile(b.dataset):
+        try:
+            return os.path.samefile(a.dataset, b.dataset)
+        except OSError:
+            return os.path.abspath(a.dataset) == os.path.abspath(b.dataset)
+
+    return (
+        a.dataset == b.dataset
+        and a.config == b.config
+        and a.split == b.split
+    )
+
+
+def _with_max_samples(spec: DatasetSpec, max_samples: int | None) -> DatasetSpec:
+    return DatasetSpec(
+        dataset=spec.dataset,
+        config=spec.config,
+        split=spec.split,
+        max_samples=max_samples,
+    )
+
+
+def _split_source_uses_ratio(split_source: str) -> bool:
+    return split_source in RATIO_SPLIT_SOURCES
 
 
 def _make_specs(args: argparse.Namespace) -> tuple[DatasetSpec, DatasetSpec | None]:
@@ -167,6 +202,48 @@ def _resolve_splits(
         split_source = "same_train_test_spec_split"
         return train_records, test_records, split_source
 
+    if _same_data_source(train_spec, test_spec):
+        train_max = train_spec.max_samples
+        test_max = test_spec.max_samples
+
+        # When both split sizes are explicitly requested from the same source,
+        # build a single shuffled pool and carve out disjoint train/test subsets.
+        if train_max is not None and test_max is not None:
+            requested_total = train_max + test_max
+            merged_spec = _with_max_samples(train_spec, requested_total)
+            merged_records = load_prompt_records(merged_spec, args.prompt_field)
+            if len(merged_records) < requested_total:
+                raise SystemExit(
+                    "Requested disjoint split sizes exceed available rows: "
+                    f"need train_max_samples + test_max_samples = {requested_total}, "
+                    f"got {len(merged_records)}."
+                )
+            work = list(merged_records)
+            rng = random.Random(args.seed)
+            rng.shuffle(work)
+            test_records = work[:test_max]
+            train_records = work[test_max : test_max + train_max]
+            split_source = "same_train_test_source_count_split"
+            return train_records, test_records, split_source
+
+        merged_spec = _with_max_samples(train_spec, None)
+        merged_records = load_prompt_records(merged_spec, args.prompt_field)
+        train_records, test_records = split_records(
+            merged_records,
+            test_ratio=args.split_ratio,
+            seed=args.seed,
+        )
+        if train_max is not None:
+            train_records = train_records[:train_max]
+        if test_max is not None:
+            test_records = test_records[:test_max]
+        if not train_records:
+            raise SystemExit("Train split is empty.")
+        if not test_records:
+            raise SystemExit("Test split is empty.")
+        split_source = "same_train_test_source_ratio_split"
+        return train_records, test_records, split_source
+
     train_records = load_prompt_records(train_spec, args.prompt_field)
     test_records = load_prompt_records(test_spec, args.prompt_field)
     if not train_records:
@@ -182,6 +259,10 @@ def _resolve_split_source(train_spec: DatasetSpec, test_spec: DatasetSpec | None
         return "single_dataset_split"
     if specs_equal(train_spec, test_spec):
         return "same_train_test_spec_split"
+    if _same_data_source(train_spec, test_spec):
+        if train_spec.max_samples is not None and test_spec.max_samples is not None:
+            return "same_train_test_source_count_split"
+        return "same_train_test_source_ratio_split"
     return "separate_specs"
 
 
@@ -230,7 +311,7 @@ def _probe_cache_status(
         "train_spec": asdict(train_spec),
         "test_spec": asdict(test_spec) if test_spec else None,
     }
-    if split_source != "separate_specs":
+    if _split_source_uses_ratio(split_source):
         expected["split_ratio"] = split_ratio
     for key, value in expected.items():
         if manifest.get(key) != value:
@@ -262,6 +343,7 @@ def _build_split(
     model,
     tokenizer,
     device,
+    prefill_batch_size: int,
 ):
     prompt_count = len(records)
     sample_ids = _sample_ids(records)
@@ -272,6 +354,7 @@ def _build_split(
         device,
         records,
         log_prefix=split_name,
+        batch_size=prefill_batch_size,
     )
     return features, sample_ids
 
@@ -368,6 +451,7 @@ def main() -> None:
         model=model,
         tokenizer=tokenizer,
         device=device,
+        prefill_batch_size=args.prefill_batch_size,
     )
 
     test_features, test_ids = _build_split(
@@ -376,6 +460,7 @@ def main() -> None:
         model=model,
         tokenizer=tokenizer,
         device=device,
+        prefill_batch_size=args.prefill_batch_size,
     )
 
     input_dim = int(train_features.size(1))
@@ -445,7 +530,7 @@ def main() -> None:
             "chat_template": True,
         },
         "split_source": split_source,
-        "split_ratio": args.split_ratio if split_source != "separate_specs" else None,
+        "split_ratio": args.split_ratio if _split_source_uses_ratio(split_source) else None,
         "seed": args.seed,
         "loop_detector": {
             "n": args.loop_n,

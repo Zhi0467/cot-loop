@@ -60,15 +60,30 @@ def extract_prefill_features(
     records: list[SampleRecord],
     *,
     log_prefix: str,
+    batch_size: int = 1,
 ) -> torch.Tensor:
     features: list[torch.Tensor] = []
     total = len(records)
     if total == 0:
         raise SystemExit(f"No records found for split '{log_prefix}'.")
+    if batch_size < 1:
+        raise SystemExit("--prefill-batch-size must be >= 1.")
+    if tokenizer.pad_token_id is None:
+        if tokenizer.eos_token is None:
+            raise SystemExit(
+                "Tokenizer has no pad_token/eos_token; cannot batch prefill prompts."
+            )
+        tokenizer.pad_token = tokenizer.eos_token
 
     with torch.inference_mode():
-        for idx, rec in enumerate(records, start=1):
-            encoded = tokenizer(rec.prompt, return_tensors="pt")
+        for start in range(0, total, batch_size):
+            end = min(start + batch_size, total)
+            batch_records = records[start:end]
+            encoded = tokenizer(
+                [rec.prompt for rec in batch_records],
+                return_tensors="pt",
+                padding=True,
+            )
             input_ids = encoded["input_ids"].to(device)
             attention_mask = encoded.get("attention_mask")
             if attention_mask is not None:
@@ -85,10 +100,27 @@ def extract_prefill_features(
             if out.hidden_states is None:
                 raise RuntimeError("Model did not return hidden states during prefill.")
 
-            vec = out.hidden_states[-1][:, -1, :].squeeze(0).float().cpu()
-            features.append(vec)
+            hidden = out.hidden_states[-1]
+            if attention_mask is None:
+                last_token_idx = torch.full(
+                    (hidden.size(0),),
+                    hidden.size(1) - 1,
+                    device=hidden.device,
+                    dtype=torch.long,
+                )
+            else:
+                token_positions = torch.arange(hidden.size(1), device=hidden.device)
+                token_positions = token_positions.unsqueeze(0).expand(hidden.size(0), -1)
+                masked_positions = token_positions.masked_fill(attention_mask == 0, -1)
+                last_token_idx = masked_positions.max(dim=1).values
+                if torch.any(last_token_idx < 0):
+                    raise RuntimeError("Found an empty prompt after tokenization.")
 
-            if idx == 1 or idx == total or idx % 50 == 0:
-                print(f"[{log_prefix}] prefill {idx}/{total}", flush=True)
+            batch_idx = torch.arange(hidden.size(0), device=hidden.device)
+            batch_vecs = hidden[batch_idx, last_token_idx].float().cpu()
+            features.extend(batch_vecs.unbind(dim=0))
+
+            if end == total or start == 0 or end % 50 == 0:
+                print(f"[{log_prefix}] prefill {end}/{total}", flush=True)
 
     return torch.stack(features, dim=0)

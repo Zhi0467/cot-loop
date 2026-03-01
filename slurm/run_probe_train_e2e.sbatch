@@ -19,6 +19,15 @@ mkdir -p logs outputs
 source .venv/bin/activate
 export HF_HUB_CONNECT_TIMEOUT="${HF_HUB_CONNECT_TIMEOUT:-30}"
 export HF_HUB_READ_TIMEOUT="${HF_HUB_READ_TIMEOUT:-120}"
+if [[ -z "${VLLM_CACHE_ROOT:-}" ]]; then
+  if [[ -d "/data/users/${USER}/cache" ]]; then
+    export VLLM_CACHE_ROOT="/data/users/${USER}/cache/vllm"
+  else
+    export VLLM_CACHE_ROOT="${HOME}/.cache/vllm"
+  fi
+fi
+mkdir -p "${VLLM_CACHE_ROOT}"
+echo "[probe-e2e] VLLM_CACHE_ROOT=${VLLM_CACHE_ROOT}"
 
 MODEL_PRESET="${MODEL_PRESET:-openthinker3_1p5b}"
 PROMPT_FIELD="${PROMPT_FIELD:-problem}"
@@ -39,9 +48,11 @@ SEEDS="${SEEDS:-}"
 DATASET_SEED="${DATASET_SEED:-}"
 
 MAX_NUM_SEQS="${MAX_NUM_SEQS:-}"
+MAX_TOKENS="${MAX_TOKENS:-}"
+PREFILL_BATCH_SIZE="${PREFILL_BATCH_SIZE:-32}"
 
 LOOP_N="${LOOP_N:-30}"
-LOOP_K="${LOOP_K:-20}"
+LOOP_K="${LOOP_K:-10}"
 SHARD_SIZE="${SHARD_SIZE:-2048}"
 
 OUT_DATA_DIR="${OUT_DATA_DIR:-outputs/probe_data/${MODEL_PRESET}}"
@@ -51,8 +62,8 @@ OUT_RUN_DIR="${OUT_RUN_DIR:-outputs/probe_runs/${RUN_NAME}}"
 WANDB_PROJECT="${WANDB_PROJECT:-cot-loop-probe}"
 WANDB_RUN_NAME="${WANDB_RUN_NAME:-${RUN_NAME}}"
 PROBE_PRESET="${PROBE_PRESET:-mlp}"
-EPOCHS="${EPOCHS:-20}"
-BATCH_SIZE="${BATCH_SIZE:-64}"
+EPOCHS="${EPOCHS:-10}"
+BATCH_SIZE="${BATCH_SIZE:-256}"
 LR="${LR:-1e-4}"
 WEIGHT_DECAY="${WEIGHT_DECAY:-0.1}"
 NUM_WORKERS="${NUM_WORKERS:-8}"
@@ -61,14 +72,6 @@ EVAL_EVERY="${EVAL_EVERY:-1}"
 LOG_EVERY="${LOG_EVERY:-5}"
 
 TRAIN_EXTRA_ARGS="${TRAIN_EXTRA_ARGS:-}"
-
-dataset_cached() {
-  local data_dir="$1"
-  [[ -f "${data_dir}/manifest.json" ]] || return 1
-  compgen -G "${data_dir}/train/shard-*.pt" > /dev/null || return 1
-  compgen -G "${data_dir}/test/shard-*.pt" > /dev/null || return 1
-  return 0
-}
 
 declare -a SEED_LIST=()
 if [[ -n "${SEEDS}" ]]; then
@@ -101,6 +104,7 @@ BUILD_ARGS=(
   --loop-n "${LOOP_N}"
   --loop-k "${LOOP_K}"
   --shard-size "${SHARD_SIZE}"
+  --prefill-batch-size "${PREFILL_BATCH_SIZE}"
   --out-dir "${OUT_DATA_DIR}"
 )
 
@@ -126,13 +130,12 @@ fi
 if [[ -n "${MAX_NUM_SEQS}" ]]; then
   BUILD_ARGS+=(--max-num-seqs "${MAX_NUM_SEQS}")
 fi
-
-if dataset_cached "${OUT_DATA_DIR}"; then
-  echo "[probe-e2e] dataset cache hit at ${OUT_DATA_DIR}; skipping build"
-else
-  echo "[probe-e2e] dataset cache miss; building at ${OUT_DATA_DIR} with dataset_seed=${DATASET_SEED}"
-  python scripts/build_probe_dataset.py "${BUILD_ARGS[@]}"
+if [[ -n "${MAX_TOKENS}" ]]; then
+  BUILD_ARGS+=(--max-tokens "${MAX_TOKENS}")
 fi
+
+echo "[probe-e2e] validating/reusing dataset at ${OUT_DATA_DIR} with dataset_seed=${DATASET_SEED}"
+python scripts/build_probe_dataset.py "${BUILD_ARGS[@]}" --reuse-if-compatible
 
 for RUN_SEED in "${SEED_LIST[@]}"; do
   if [[ "${#SEED_LIST[@]}" -gt 1 ]]; then

@@ -56,7 +56,7 @@ PROBE_DEFAULTS: dict[str, ProbeConfig] = {
     ),
     "mlp": ProbeConfig(
         probe_type="mlp",
-        hidden_dim=1024,
+        hidden_dim=128,
         dropout=0.1,
     ),
 }
