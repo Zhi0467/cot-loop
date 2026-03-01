@@ -41,14 +41,27 @@ if [[ -f "${HOME}/.env" ]]; then
 fi
 export HF_HUB_CONNECT_TIMEOUT="${HF_HUB_CONNECT_TIMEOUT:-30}"
 export HF_HUB_READ_TIMEOUT="${HF_HUB_READ_TIMEOUT:-120}"
-if [[ -z "${VLLM_CACHE_ROOT:-}" ]]; then
-  if [[ -d "/data/users/${USER}/cache" ]]; then
-    export VLLM_CACHE_ROOT="/data/users/${USER}/cache/vllm"
-  else
-    export VLLM_CACHE_ROOT="${HOME}/.cache/vllm"
-  fi
+
+DEFAULT_CACHE_BASE="${HOME}/.cache"
+if [[ -d "/data/users/${USER}" ]]; then
+  DEFAULT_CACHE_BASE="/data/users/${USER}/cache"
+elif [[ -d "/data/scratch" ]]; then
+  DEFAULT_CACHE_BASE="/data/scratch/${USER}/cache"
 fi
-mkdir -p "${VLLM_CACHE_ROOT}"
+mkdir -p "${DEFAULT_CACHE_BASE}"
+
+export HF_HOME="${HF_HOME:-${DEFAULT_CACHE_BASE}/huggingface}"
+export HUGGINGFACE_HUB_CACHE="${HUGGINGFACE_HUB_CACHE:-${HF_HOME}/hub}"
+export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-${HF_HOME}/transformers}"
+
+if [[ -z "${VLLM_CACHE_ROOT:-}" ]]; then
+  export VLLM_CACHE_ROOT="${DEFAULT_CACHE_BASE}/vllm"
+fi
+
+mkdir -p "${HF_HOME}" "${HUGGINGFACE_HUB_CACHE}" "${TRANSFORMERS_CACHE}" "${VLLM_CACHE_ROOT}"
+echo "[probe-e2e] HF_HOME=${HF_HOME}"
+echo "[probe-e2e] HUGGINGFACE_HUB_CACHE=${HUGGINGFACE_HUB_CACHE}"
+echo "[probe-e2e] TRANSFORMERS_CACHE=${TRANSFORMERS_CACHE}"
 echo "[probe-e2e] VLLM_CACHE_ROOT=${VLLM_CACHE_ROOT}"
 
 MODEL_PRESET="${MODEL_PRESET:-openthinker3_1p5b}"
