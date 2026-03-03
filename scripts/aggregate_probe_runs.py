@@ -11,18 +11,30 @@ import os
 import statistics
 
 
+SUMMARY_METRICS = (
+    "accuracy",
+    "macro_f1",
+    "roc_auc",
+    "pr_auc",
+    "positive_precision",
+    "positive_recall",
+    "positive_f1",
+    "prevalence",
+)
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-dirs", nargs="+", required=True)
     parser.add_argument(
         "--selection-metric",
-        choices=("roc_auc", "macro_f1", "accuracy"),
+        choices=("roc_auc", "pr_auc", "macro_f1", "positive_f1", "accuracy"),
         default="roc_auc",
         help="Metric used to select best checkpoint row per run.",
     )
     parser.add_argument(
         "--tie-breaker",
-        choices=("roc_auc", "macro_f1", "accuracy"),
+        choices=("roc_auc", "pr_auc", "macro_f1", "positive_f1", "accuracy"),
         default="macro_f1",
         help="Secondary metric used when selection metric ties.",
     )
@@ -133,6 +145,11 @@ def _load_best_row(
         "accuracy": _as_float_or_nan(row.get("accuracy")),
         "macro_f1": _as_float_or_nan(row.get("macro_f1")),
         "roc_auc": _as_float_or_nan(row.get("roc_auc")),
+        "pr_auc": _as_float_or_nan(row.get("pr_auc")),
+        "positive_precision": _as_float_or_nan(row.get("positive_precision")),
+        "positive_recall": _as_float_or_nan(row.get("positive_recall")),
+        "positive_f1": _as_float_or_nan(row.get("positive_f1")),
+        "prevalence": _as_float_or_nan(row.get("prevalence")),
     }
 
 
@@ -166,7 +183,7 @@ def _write_summary_csv(path: str, summary: dict[str, dict[str, object]]) -> None
     with open(path, "w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=["metric", "mean", "std", "n"])
         writer.writeheader()
-        for metric in ("accuracy", "macro_f1", "roc_auc"):
+        for metric in SUMMARY_METRICS:
             stats = summary[metric]
             writer.writerow(
                 {
@@ -198,7 +215,7 @@ def main() -> None:
 
     summary = {
         metric: _aggregate(rows, metric)
-        for metric in ("accuracy", "macro_f1", "roc_auc")
+        for metric in SUMMARY_METRICS
     }
     payload = {
         "selection_metric": args.selection_metric,
@@ -224,7 +241,7 @@ def main() -> None:
         f"tie_breaker={args.tie_breaker}",
         flush=True,
     )
-    for metric in ("accuracy", "macro_f1", "roc_auc"):
+    for metric in SUMMARY_METRICS:
         stats = summary[metric]
         mean_val = float(stats["mean"])
         std_val = float(stats["std"])

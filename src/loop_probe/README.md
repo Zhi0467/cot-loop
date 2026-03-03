@@ -98,6 +98,9 @@ Outputs
   - `out_dir/best.pt`
   - `out_dir/last.pt`
   - `out_dir/metrics.jsonl`
+  - `metrics.jsonl` rows include eval metrics:
+    `accuracy`, `macro_f1`, `roc_auc`, `pr_auc`,
+    `positive_precision`, `positive_recall`, `positive_f1`, `prevalence`
 
 Notes
 - Training script loads `.env` and expects `WANDB_API_KEY`.
