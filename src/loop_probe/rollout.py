@@ -111,6 +111,19 @@ def _generate_rollout_token_ids_single_process(
         "max_model_len": cfg.max_model_len,
         "trust_remote_code": cfg.trust_remote_code,
     }
+    gpu_mem_util = os.environ.get("VLLM_GPU_MEMORY_UTILIZATION", "").strip()
+    if gpu_mem_util:
+        try:
+            gpu_mem_value = float(gpu_mem_util)
+        except Exception as exc:
+            raise SystemExit(
+                "VLLM_GPU_MEMORY_UTILIZATION must be a float in (0, 1]."
+            ) from exc
+        if not (0.0 < gpu_mem_value <= 1.0):
+            raise SystemExit(
+                "VLLM_GPU_MEMORY_UTILIZATION must be in (0, 1]."
+            )
+        llm_kwargs["gpu_memory_utilization"] = gpu_mem_value
     if cfg.max_num_seqs is not None:
         llm_kwargs["max_num_seqs"] = cfg.max_num_seqs
     if cfg.max_num_batched_tokens is not None:
