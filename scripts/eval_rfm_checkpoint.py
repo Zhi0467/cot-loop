@@ -99,11 +99,19 @@ def main() -> None:
         raise SystemExit("Checkpoint pipeline is missing or empty.")
     grad_weight = float(payload.get("grad_weight", 1.0))
     grad_scale = float(np.sqrt(max(grad_weight, 0.0)))
+    checkpoint_feature_key = payload.get("feature_key")
+    resolved_feature_key = args.feature_key
+    if (
+        (resolved_feature_key is None or resolved_feature_key == "")
+        and isinstance(checkpoint_feature_key, str)
+        and checkpoint_feature_key
+    ):
+        resolved_feature_key = checkpoint_feature_key
 
     ds = ActivationDataset(
         data_dir=args.data_dir,
         split=args.split,
-        feature_key=args.feature_key,
+        feature_key=resolved_feature_key,
     )
     x_cur = ds.x.detach().cpu().numpy().astype(np.float32, copy=False)
     labels = ds.y.detach().cpu().numpy().astype(np.int64, copy=False)
@@ -118,11 +126,19 @@ def main() -> None:
         logits = (phi @ entry["beta"]).astype(np.float32)
 
         if idx < len(pipeline) - 1:
-            grads = _rff_gradients(x_std, entry["w_rff"], entry["b_rff"], entry["beta"])
-            x_cur = np.concatenate(
-                [x_std, grad_scale * grads.astype(np.float32)],
-                axis=1,
-            ).astype(np.float32)
+            if grad_weight > 0.0:
+                grads = _rff_gradients(
+                    x_std,
+                    entry["w_rff"],
+                    entry["b_rff"],
+                    entry["beta"],
+                )
+                x_cur = np.concatenate(
+                    [x_std, grad_scale * grads.astype(np.float32)],
+                    axis=1,
+                ).astype(np.float32)
+            else:
+                x_cur = x_std
 
     if logits is None:
         raise SystemExit("No logits produced from checkpoint pipeline.")

@@ -40,11 +40,15 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _load_split(data_dir: str, split: str, feature_key: str | None):
+def _load_split(
+    data_dir: str,
+    split: str,
+    feature_key: str | None,
+) -> tuple[torch.Tensor, torch.Tensor, str | None]:
     ds = ActivationDataset(data_dir=data_dir, split=split, feature_key=feature_key)
     x = ds.x.detach().cpu().float()
     y = ds.y.detach().cpu().float().view(-1, 1)
-    return x, y
+    return x, y, ds.feature_key
 
 
 def _to_metrics(y: torch.Tensor, scores: torch.Tensor) -> dict[str, float]:
@@ -74,8 +78,12 @@ def main() -> None:
             "and ensure `torchmetrics` + `scikit-learn` are installed."
         ) from exc
 
-    x_train, y_train = _load_split(args.data_dir, "train", args.feature_key)
-    x_test, y_test = _load_split(args.data_dir, "test", args.feature_key)
+    x_train, y_train, resolved_feature_key = _load_split(
+        args.data_dir,
+        "train",
+        args.feature_key,
+    )
+    x_test, y_test, _ = _load_split(args.data_dir, "test", resolved_feature_key)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if args.mem_gb is not None:
@@ -133,7 +141,7 @@ def main() -> None:
             "algorithm": "official_rfm",
             "source_repo": "https://github.com/aradha/recursive_feature_machines/tree/pip_install",
             "seed": args.seed,
-            "feature_key": args.feature_key,
+            "feature_key": resolved_feature_key,
             "bandwidth": args.bandwidth,
             "reg": args.reg,
             "iters": args.iters,
@@ -148,7 +156,11 @@ def main() -> None:
         f.write(json.dumps(metrics_row, sort_keys=True) + "\n")
 
     if args.ood_data_dir:
-        x_ood, y_ood = _load_split(args.ood_data_dir, "test", args.feature_key)
+        x_ood, y_ood, _ = _load_split(
+            args.ood_data_dir,
+            "test",
+            resolved_feature_key,
+        )
         with torch.no_grad():
             ood_scores = model.predict(x_ood.to(device)).float().detach().cpu()
         ood_metrics = _to_metrics(y_ood, ood_scores)
@@ -156,7 +168,7 @@ def main() -> None:
             os.path.join(args.out_dir, "ood_metrics.json"),
             {
                 "seed": args.seed,
-                "feature_key": args.feature_key,
+                "feature_key": resolved_feature_key,
                 "data_dir": args.ood_data_dir,
                 **ood_metrics,
             },

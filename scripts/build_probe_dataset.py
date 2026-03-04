@@ -546,7 +546,8 @@ def _probe_cache_status(
             "pooling": only_view["pooling"],
             "layer": only_view["layer"],
         }
-        if manifest.get("feature_extraction") != expected_feature:
+        manifest_feature = manifest.get("feature_extraction")
+        if manifest_feature is not None and manifest_feature != expected_feature:
             return False, "manifest mismatch on 'feature_extraction'"
         if not _split_shards_exist(out_dir, manifest.get("train")):
             return False, "train shards are missing"
