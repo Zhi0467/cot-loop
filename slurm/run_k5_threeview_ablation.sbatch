@@ -119,6 +119,7 @@ run_config "prefill_lasttok_layers_concat" "prefill_layers_concat_h512_d2" 512 2
 python - <<'PY'
 import csv
 import json
+import math
 import os
 
 run_root = os.environ["RUN_ROOT"]
@@ -157,7 +158,17 @@ for run_tag in sorted(os.listdir(run_root)):
         }
     )
 
-rows.sort(key=lambda r: (r["macro_f1_mean"] is None, -(r["macro_f1_mean"] or -1e9)))
+def macro_f1_rank_key(row):
+    value = row.get("macro_f1_mean")
+    try:
+        value_f = float(value)
+    except (TypeError, ValueError):
+        return (1, float("inf"))
+    if math.isnan(value_f):
+        return (1, float("inf"))
+    return (0, -value_f)
+
+rows.sort(key=macro_f1_rank_key)
 
 out_json = os.path.join(summary_dir, "ablation_ranked_summary.json")
 out_csv = os.path.join(summary_dir, "ablation_ranked_summary.csv")

@@ -37,11 +37,13 @@ if [[ -f "${HOME}/.env" ]]; then
   set +a
 fi
 
-DEFAULT_CACHE_BASE="${HOME}/.cache"
 if [[ -d "/data/users/${USER}" ]]; then
   DEFAULT_CACHE_BASE="/data/users/${USER}/cache"
 elif [[ -d "/data/scratch" ]]; then
   DEFAULT_CACHE_BASE="/data/scratch/${USER}/cache"
+else
+  echo "[k5-threeview-data] no supported non-home cache root found (/data/users or /data/scratch)" >&2
+  exit 1
 fi
 mkdir -p "${DEFAULT_CACHE_BASE}"
 
@@ -51,6 +53,14 @@ export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-${HF_HOME}/transformers}"
 export VLLM_CACHE_ROOT="${VLLM_CACHE_ROOT:-${DEFAULT_CACHE_BASE}/vllm}"
 export TORCH_HOME="${TORCH_HOME:-${DEFAULT_CACHE_BASE}/torch}"
 export XDG_CACHE_HOME="${XDG_CACHE_HOME:-${DEFAULT_CACHE_BASE}}"
+
+for cache_var in HF_HOME HUGGINGFACE_HUB_CACHE TRANSFORMERS_CACHE VLLM_CACHE_ROOT TORCH_HOME XDG_CACHE_HOME; do
+  cache_val="${!cache_var}"
+  if [[ "${cache_val}" == "${HOME}"* ]]; then
+    echo "[k5-threeview-data] ${cache_var} points to HOME (${cache_val}); refusing to run" >&2
+    exit 1
+  fi
+done
 
 mkdir -p "${HF_HOME}" "${HUGGINGFACE_HUB_CACHE}" "${TRANSFORMERS_CACHE}" "${VLLM_CACHE_ROOT}" "${TORCH_HOME}" "${XDG_CACHE_HOME}"
 
