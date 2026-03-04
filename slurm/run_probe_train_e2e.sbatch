@@ -85,9 +85,11 @@ DATASET_SEED="${DATASET_SEED:-}"
 MAX_NUM_SEQS="${MAX_NUM_SEQS:-}"
 MAX_TOKENS="${MAX_TOKENS:-}"
 PREFILL_BATCH_SIZE="${PREFILL_BATCH_SIZE:-32}"
+COMPLETION_BATCH_SIZE="${COMPLETION_BATCH_SIZE:-1}"
 FEATURE_POOLING="${FEATURE_POOLING:-last_token}"
 FEATURE_LAYER="${FEATURE_LAYER:--1}"
 FEATURE_KEY="${FEATURE_KEY:-}"
+TRAIN_FEATURE_KEY="${TRAIN_FEATURE_KEY:-}"
 EXTRA_FEATURE_VIEWS="${EXTRA_FEATURE_VIEWS:-}"
 
 LOOP_N="${LOOP_N:-30}"
@@ -134,6 +136,8 @@ echo "[probe-e2e] model_preset=${MODEL_PRESET} train=${TRAIN_DATASET}:${TRAIN_SP
 echo "[probe-e2e] probe_preset=${PROBE_PRESET}"
 echo "[probe-e2e] feature_pooling=${FEATURE_POOLING} feature_layer=${FEATURE_LAYER}"
 echo "[probe-e2e] feature_key=${FEATURE_KEY} extra_feature_views='${EXTRA_FEATURE_VIEWS}'"
+echo "[probe-e2e] train_feature_key=${TRAIN_FEATURE_KEY}"
+echo "[probe-e2e] prefill_batch_size=${PREFILL_BATCH_SIZE} completion_batch_size=${COMPLETION_BATCH_SIZE}"
 echo "[probe-e2e] resolved seeds: ${SEED_LIST[*]}"
 
 BUILD_ARGS=(
@@ -146,6 +150,7 @@ BUILD_ARGS=(
   --loop-k "${LOOP_K}"
   --shard-size "${SHARD_SIZE}"
   --prefill-batch-size "${PREFILL_BATCH_SIZE}"
+  --completion-batch-size "${COMPLETION_BATCH_SIZE}"
   --feature-pooling "${FEATURE_POOLING}"
   --feature-layer "${FEATURE_LAYER}"
   --out-dir "${OUT_DATA_DIR}"
@@ -215,7 +220,9 @@ for RUN_SEED in "${SEED_LIST[@]}"; do
     --wandb-project "${WANDB_PROJECT}"
     --wandb-run-name "${SEED_WANDB_RUN_NAME}"
   )
-  if [[ -n "${FEATURE_KEY}" ]]; then
+  if [[ -n "${TRAIN_FEATURE_KEY}" ]]; then
+    TRAIN_ARGS+=(--feature-key "${TRAIN_FEATURE_KEY}")
+  elif [[ -n "${FEATURE_KEY}" ]]; then
     TRAIN_ARGS+=(--feature-key "${FEATURE_KEY}")
   fi
 

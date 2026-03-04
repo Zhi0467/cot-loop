@@ -81,6 +81,31 @@ python scripts/build_probe_dataset.py \
   --out-dir outputs/probe_data/openthinker3_1p5b_shared_final_views
 ```
 
+To build a three-view dataset with all-layer prefill features plus a
+rollout-completion feature in one rollout-label pass:
+
+```bash
+python scripts/build_probe_dataset.py \
+  --train-dataset my_org/train_pool \
+  --train-split train \
+  --train-max-samples 5000 \
+  --test-dataset my_org/eval_pool \
+  --test-split test \
+  --prompt-field problem \
+  --model-preset openthinker3_1p5b \
+  --max-tokens 15000 \
+  --loop-k 5 \
+  --feature-key rollout_lasttok_layers_mean \
+  --feature-pooling rollout_last_token_all_layers_mean \
+  --feature-layer -1 \
+  --extra-feature-view prefill_lasttok_layers_mean:last_token_all_layers_mean:-1 \
+  --extra-feature-view prefill_lasttok_layers_concat:last_token_all_layers_concat:-1 \
+  --balance-train downsample \
+  --balance-test none \
+  --completion-batch-size 1 \
+  --out-dir outputs/probe_data/openthinker3_three_view_k5
+```
+
 For balanced train/test probes after label construction:
 
 ```bash
@@ -117,7 +142,12 @@ python scripts/train_probe.py \
 
 Available probe presets:
 - `linear` (default)
-- `mlp` (one hidden layer; shape is defined in `src/loop_probe/configs.py`)
+- `mlp` (configurable width/depth; defaults are in `src/loop_probe/configs.py`)
+
+Optional MLP overrides:
+- `--mlp-hidden-dim <int>`
+- `--mlp-depth <int>`
+- `--mlp-dropout <float>`
 
 ### Train RFM-lite Probe
 
@@ -169,6 +199,7 @@ Default dataset/model settings in this job:
 - `#SBATCH --gres=gpu:8` (job requests 8 GPUs by default)
 - rollout `tp/dp` comes from `src/loop_probe/configs.py` preset defaults
 - optional rollout concurrency override: `MAX_NUM_SEQS=...`
+- optional completion-feature extraction throughput override: `COMPLETION_BATCH_SIZE=...` (default: `1`)
 - `TRAIN_DATASET=HuggingFaceH4/MATH-500`, `TRAIN_SPLIT=test`
 - `TEST_DATASET` omitted (defaults to local `data/aime_2024_2025.jsonl` in `build_probe_dataset.py`)
 - `TEST_SPLIT=test`

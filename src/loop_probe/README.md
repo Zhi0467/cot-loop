@@ -65,6 +65,27 @@ python scripts/build_probe_dataset.py \
   --out-dir outputs/probe_data/shared_final_views
 ```
 
+Build a three-view dataset with all-layer prefill features and rollout-completion features:
+```bash
+python scripts/build_probe_dataset.py \
+  --train-dataset my_org/train_pool \
+  --train-split train \
+  --train-max-samples 5000 \
+  --test-dataset my_org/eval_pool \
+  --test-split test \
+  --prompt-field problem \
+  --model-preset openthinker3_1p5b \
+  --max-tokens 15000 \
+  --loop-k 5 \
+  --feature-key rollout_lasttok_layers_mean \
+  --feature-pooling rollout_last_token_all_layers_mean \
+  --feature-layer -1 \
+  --extra-feature-view prefill_lasttok_layers_mean:last_token_all_layers_mean:-1 \
+  --extra-feature-view prefill_lasttok_layers_concat:last_token_all_layers_concat:-1 \
+  --completion-batch-size 1 \
+  --out-dir outputs/probe_data/three_view_k5
+```
+
 Omit `--test-dataset` to use local `data/aime_2024_2025.jsonl` as test set
 ```bash
 python scripts/build_probe_dataset.py \
@@ -84,7 +105,9 @@ python scripts/train_probe.py \
   --data-dir outputs/probe_data \
   --out-dir outputs/probe_runs/run1 \
   --feature-key mean_pool_final \
-  --probe-preset linear \
+  --probe-preset mlp \
+  --mlp-hidden-dim 256 \
+  --mlp-depth 2 \
   --wandb-project cot-loop-probe
 ```
 
@@ -104,4 +127,6 @@ Outputs
 
 Notes
 - Training script loads `.env` and expects `WANDB_API_KEY`.
+- `train_probe.py` supports optional MLP overrides:
+  `--mlp-hidden-dim`, `--mlp-depth`, `--mlp-dropout`.
 - Install deps with `uv sync` before running.

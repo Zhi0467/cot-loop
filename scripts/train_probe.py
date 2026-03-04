@@ -58,6 +58,24 @@ def _parse_args() -> argparse.Namespace:
         default="linear",
     )
     parser.add_argument(
+        "--mlp-hidden-dim",
+        type=int,
+        default=None,
+        help="Optional hidden width override when --probe-preset=mlp.",
+    )
+    parser.add_argument(
+        "--mlp-depth",
+        type=int,
+        default=None,
+        help="Optional number of hidden layers when --probe-preset=mlp.",
+    )
+    parser.add_argument(
+        "--mlp-dropout",
+        type=float,
+        default=None,
+        help="Optional dropout override when --probe-preset=mlp.",
+    )
+    parser.add_argument(
         "--feature-key",
         default=None,
         help=(
@@ -145,6 +163,24 @@ def main() -> None:
         raise SystemExit("--warmup-ratio must be in [0, 1).")
     if not 0.0 <= args.min_lr_ratio <= 1.0:
         raise SystemExit("--min-lr-ratio must be in [0, 1].")
+    if args.mlp_hidden_dim is not None and args.mlp_hidden_dim < 1:
+        raise SystemExit("--mlp-hidden-dim must be >= 1.")
+    if args.mlp_depth is not None and args.mlp_depth < 1:
+        raise SystemExit("--mlp-depth must be >= 1.")
+    if args.mlp_dropout is not None and not 0.0 <= args.mlp_dropout < 1.0:
+        raise SystemExit("--mlp-dropout must be in [0, 1).")
+    if (
+        args.probe_preset != "mlp"
+        and (
+            args.mlp_hidden_dim is not None
+            or args.mlp_depth is not None
+            or args.mlp_dropout is not None
+        )
+    ):
+        raise SystemExit(
+            "--mlp-hidden-dim/--mlp-depth/--mlp-dropout can only be used with "
+            "--probe-preset=mlp."
+        )
 
     set_seed(args.seed)
     device = choose_device(args.device)
@@ -171,7 +207,12 @@ def main() -> None:
     )
     input_dim = resolve_input_dim(manifest, resolved_feature_key)
     try:
-        probe_cfg = get_probe_config(args.probe_preset)
+        probe_cfg = get_probe_config(
+            args.probe_preset,
+            hidden_dim=args.mlp_hidden_dim,
+            dropout=args.mlp_dropout,
+            depth=args.mlp_depth,
+        )
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
 

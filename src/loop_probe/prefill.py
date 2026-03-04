@@ -5,7 +5,17 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from .types import SampleRecord
 
-FEATURE_POOLING_CHOICES = ("last_token", "mean_pool")
+LAST_TOKEN_POOLING = "last_token"
+MEAN_POOLING = "mean_pool"
+LAST_TOKEN_ALL_LAYERS_MEAN = "last_token_all_layers_mean"
+LAST_TOKEN_ALL_LAYERS_CONCAT = "last_token_all_layers_concat"
+
+FEATURE_POOLING_CHOICES = (
+    LAST_TOKEN_POOLING,
+    MEAN_POOLING,
+    LAST_TOKEN_ALL_LAYERS_MEAN,
+    LAST_TOKEN_ALL_LAYERS_CONCAT,
+)
 
 
 def select_prefill_dtype() -> torch.dtype:
@@ -104,7 +114,7 @@ def _pool_hidden_states(
     pooling: str,
     attention_mask: torch.Tensor | None,
 ) -> torch.Tensor:
-    if pooling == "last_token":
+    if pooling == LAST_TOKEN_POOLING:
         last_token_idx = _last_token_idx(
             attention_mask=attention_mask,
             batch_size=hidden.size(0),
@@ -114,7 +124,7 @@ def _pool_hidden_states(
         batch_idx = torch.arange(hidden.size(0), device=hidden.device)
         return hidden[batch_idx, last_token_idx].float().cpu()
 
-    if pooling == "mean_pool":
+    if pooling == MEAN_POOLING:
         if attention_mask is None:
             return hidden.mean(dim=1).float().cpu()
         mask = attention_mask.to(hidden.dtype).unsqueeze(-1)
@@ -164,7 +174,7 @@ def extract_prefill_features_multi(
     features_by_key: dict[str, list[torch.Tensor]] = {
         key: [] for key in normalized_views
     }
-    resolved_view_specs: dict[str, tuple[str, int]] | None = None
+    resolved_view_specs: dict[str, tuple[str, int | None]] | None = None
 
     with torch.inference_mode():
         for start in range(0, total, batch_size):
@@ -195,21 +205,64 @@ def extract_prefill_features_multi(
                 num_hidden_layers = len(out.hidden_states) - 1
                 resolved_view_specs = {}
                 for key, (pooling, feature_layer) in normalized_views.items():
-                    resolved_view_specs[key] = (
-                        pooling,
-                        _resolve_feature_layer(
+                    if pooling in (LAST_TOKEN_POOLING, MEAN_POOLING):
+                        resolved_layer: int | None = _resolve_feature_layer(
                             num_hidden_layers=num_hidden_layers,
                             feature_layer=feature_layer,
-                        ),
-                    )
+                        )
+                    else:
+                        resolved_layer = None
+                    resolved_view_specs[key] = (pooling, resolved_layer)
+
+            needs_all_layers = any(
+                pooling in (LAST_TOKEN_ALL_LAYERS_MEAN, LAST_TOKEN_ALL_LAYERS_CONCAT)
+                for pooling, _ in resolved_view_specs.values()
+            )
+            all_layer_last_token: list[torch.Tensor] | None = None
+            if needs_all_layers:
+                num_hidden_layers = len(out.hidden_states) - 1
+                last_token_idx = _last_token_idx(
+                    attention_mask=attention_mask,
+                    batch_size=input_ids.size(0),
+                    seq_len=input_ids.size(1),
+                    device=input_ids.device,
+                )
+                batch_idx = torch.arange(input_ids.size(0), device=input_ids.device)
+                all_layer_last_token = []
+                for layer_idx in range(num_hidden_layers):
+                    hidden = out.hidden_states[layer_idx + 1]
+                    all_layer_last_token.append(hidden[batch_idx, last_token_idx])
 
             for key, (pooling, resolved_layer) in resolved_view_specs.items():
-                hidden = out.hidden_states[resolved_layer + 1]
-                batch_vecs = _pool_hidden_states(
-                    hidden,
-                    pooling=pooling,
-                    attention_mask=attention_mask,
-                )
+                if pooling in (LAST_TOKEN_POOLING, MEAN_POOLING):
+                    if resolved_layer is None:
+                        raise RuntimeError(
+                            f"Resolved layer is missing for pooling '{pooling}'."
+                        )
+                    hidden = out.hidden_states[resolved_layer + 1]
+                    batch_vecs = _pool_hidden_states(
+                        hidden,
+                        pooling=pooling,
+                        attention_mask=attention_mask,
+                    )
+                elif pooling == LAST_TOKEN_ALL_LAYERS_MEAN:
+                    if all_layer_last_token is None or not all_layer_last_token:
+                        raise RuntimeError(
+                            "All-layer last-token cache is missing for mean pooling."
+                        )
+                    stacked = torch.stack(all_layer_last_token, dim=1)
+                    batch_vecs = stacked.mean(dim=1).float().cpu()
+                elif pooling == LAST_TOKEN_ALL_LAYERS_CONCAT:
+                    if all_layer_last_token is None or not all_layer_last_token:
+                        raise RuntimeError(
+                            "All-layer last-token cache is missing for concat pooling."
+                        )
+                    batch_vecs = torch.cat(all_layer_last_token, dim=1).float().cpu()
+                else:
+                    raise SystemExit(
+                        f"Unknown feature pooling '{pooling}'. "
+                        f"Valid: {FEATURE_POOLING_CHOICES}"
+                    )
                 features_by_key[key].extend(batch_vecs.unbind(dim=0))
 
             if end == total or start == 0 or end % 50 == 0:
