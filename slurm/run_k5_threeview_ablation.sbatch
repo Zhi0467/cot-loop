@@ -136,7 +136,13 @@ for run_tag in sorted(os.listdir(run_root)):
     with open(summary_json, "r", encoding="utf-8") as f:
         payload = json.load(f)
     aggregate = payload.get("aggregate", {})
-    metrics = aggregate.get("metrics", {})
+    if isinstance(aggregate, dict) and isinstance(aggregate.get("metrics"), dict):
+        # Backward compatibility for any old nested shape.
+        metrics = aggregate.get("metrics", {})
+    elif isinstance(aggregate, dict):
+        metrics = aggregate
+    else:
+        metrics = {}
     rows.append(
         {
             "run_tag": run_tag,
