@@ -160,8 +160,8 @@ Posterior (completion) view results, n=3 seeds (mean$\pm$std):
 \toprule
 Run & Accuracy & Macro-F1 & ROC-AUC & PR-AUC \\
 \midrule
-completion\_mean\_h128\_d1 & 0.8643$\pm$0.0031 & 0.8013$\pm$0.0052 & 0.9222$\pm$0.0023 & 0.8055$\pm$0.0025 \\
-completion\_mean\_h256\_d2 & 0.8637$\pm$0.0037 & 0.8040$\pm$0.0048 & 0.9234$\pm$0.0008 & 0.8109$\pm$0.0006 \\
+completion\_mean\_h128\_d1 & 0.8655$\pm$0.0021 & 0.8022$\pm$0.0044 & 0.9219$\pm$0.0026 & 0.8045$\pm$0.0030 \\
+completion\_mean\_h256\_d2 & 0.8631$\pm$0.0045 & 0.8048$\pm$0.0045 & 0.9211$\pm$0.0035 & 0.8057$\pm$0.0071 \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -173,14 +173,16 @@ Prefill view results, n=3 seeds (mean$\pm$std):
 \toprule
 Run & Accuracy & Macro-F1 & ROC-AUC & PR-AUC \\
 \midrule
-prefill\_layers\_mean\_h256\_d2 & 0.7762$\pm$0.0037 & 0.6548$\pm$0.0076 & 0.7360$\pm$0.0033 & 0.4365$\pm$0.0092 \\
-prefill\_layers\_concat\_h512\_d2 & 0.7583$\pm$0.0258 & 0.6641$\pm$0.0172 & 0.7520$\pm$0.0017 & 0.4737$\pm$0.0042 \\
+prefill\_layers\_mean\_h256\_d2 & 0.7756$\pm$0.0027 & 0.6671$\pm$0.0017 & 0.7332$\pm$0.0010 & 0.4292$\pm$0.0014 \\
+prefill\_layers\_concat\_h512\_d2 & 0.7786$\pm$0.0064 & 0.6768$\pm$0.0043 & 0.7503$\pm$0.0031 & 0.4607$\pm$0.0085 \\
 \bottomrule
 \end{tabular}
 \end{center}
 
 \noindent
 Key finding: posterior (completion) features are materially stronger than prefill views under the same labels; prefill concat improves recall but still lags on macro-F1/PR-AUC.
+\newline
+\noindent\textit{Note: metrics recomputed using macro-F1/positive-F1 checkpoint selection after fixing the aggregation selection logic.}
 
 \section*{Consolidated Findings}
 \begin{itemize}
@@ -188,7 +190,7 @@ Key finding: posterior (completion) features are materially stronger than prefil
   \item ROC-AUC should be retained but never alone under imbalance; PR-AUC and positive-class metrics are required.
   \item Earlier ID--OOD deltas were confounded by sparse positives; matched-label datasets are required for fair view comparisons.
   \item Final-layer views are close on ROC-AUC; \texttt{last\_token\_final} is more stable on macro-F1 while \texttt{mean\_pool\_final} can lift PR-AUC.
-  \item In the k=5 three-view study, posterior (completion) features yield strong macro-F1 ($\sim$0.80), while prefill views sit around $\sim$0.65.
+  \item In the k=5 three-view study, posterior (completion) features yield strong macro-F1 ($\sim$0.80), while prefill views sit around $\sim$0.67.
   \item OOD performance remains the bottleneck under current labels; gains likely need data/label improvements before larger models.
 \end{itemize}
 
