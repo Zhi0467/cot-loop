@@ -1,7 +1,7 @@
 # CoT Loop Detection PR #2: Consolidated Experiments and Findings
 
-Last updated: 2026-03-05 15:55 UTC
-Scope covered: 2026-03-01 19:00 UTC through 2026-03-05 15:55 UTC
+Last updated: 2026-03-05 16:27 UTC
+Scope covered: 2026-03-01 19:00 UTC through 2026-03-05 16:27 UTC
 PR: https://github.com/Zhi0467/cot-loop/pull/2
 
 ## Goal
@@ -67,18 +67,27 @@ Predict whether a (model, prompt) pair will enter a loop (n=30-gram repeating >=
 - Built/deduplicated multi-source prompt pool (`29,482` prompts), started large rebuild, then canceled due explicit human `!stop` at 2026-03-03 22:41 UTC.
 - Status: no final metrics from this run (canceled by instruction).
 
-### G) k=5 three-view dataset + posterior-first ablation (in progress)
+### G) k=5 three-view dataset + posterior-first ablation (completed)
 - Request: `k=5`, `max_tokens=15000`, train cap `<=5000` (balanced across sources), eval natural `MATH-500 + AIME24/25`.
 - Feature views:
   - `prefill_lasttok_layers_mean` (prefill last-token, all-layer mean)
   - `prefill_lasttok_layers_concat` (prefill last-token, all-layer concat)
   - `rollout_lasttok_layers_mean` (rollout completion last-token, all-layer mean)
+- Dataset stats (manifest):
+  - Train: `3326` samples (balanced `1663` positive / `1663` negative).
+  - Test: `560` samples (`115` positive, prevalence `0.2054`).
+  - Input dims: mean views `1536`, concat view `43008`.
 - Job timeline:
   - `809` failed immediately (missing runtime env) and was replaced after explicitly pinning the conda env and data-volume outputs.
-  - `811` (dataset build, 8 GPU) is running cleanly after rollout DP IPC was switched to pipes to avoid semaphore rebuild errors.
-  - `812` (dependent ablation sweep) remains pending on `811`.
-- Runtime status (as of 2026-03-05 15:55 UTC): dataset build job `811` running; rollouts ~`688/695` per DP rank; outputs routed to `k5_tok15000_three_view_train5000_eval_math500_aime`.
-- Status: no final metrics yet (in progress).
+  - `811` (dataset build, 8 GPU) completed at 2026-03-05 16:11 UTC.
+  - `812` (dependent ablation sweep) completed at 2026-03-05 16:15 UTC.
+- Posterior (rollout completion) results, n=3 seeds (mean +/- std):
+  - `completion_mean_h128_d1`: accuracy `0.8643 +/- 0.0031`, macro-F1 `0.8013 +/- 0.0052`, ROC-AUC `0.9222 +/- 0.0023`, PR-AUC `0.8055 +/- 0.0025`, positive F1 `0.6893 +/- 0.0086`.
+  - `completion_mean_h256_d2`: accuracy `0.8637 +/- 0.0037`, macro-F1 `0.8040 +/- 0.0048`, ROC-AUC `0.9234 +/- 0.0008`, PR-AUC `0.8109 +/- 0.0006`, positive F1 `0.6959 +/- 0.0071`.
+- Prefill results, n=3 seeds (mean +/- std):
+  - `prefill_layers_mean_h256_d2`: accuracy `0.7762 +/- 0.0037`, macro-F1 `0.6548 +/- 0.0076`, ROC-AUC `0.7360 +/- 0.0033`, PR-AUC `0.4365 +/- 0.0092`, positive F1 `0.4501 +/- 0.0153`.
+  - `prefill_layers_concat_h512_d2`: accuracy `0.7583 +/- 0.0258`, macro-F1 `0.6641 +/- 0.0172`, ROC-AUC `0.7520 +/- 0.0017`, PR-AUC `0.4737 +/- 0.0042`, positive F1 `0.4866 +/- 0.0160`.
+- Finding: posterior (completion) features are materially stronger than prefill views under the same labels; prefill concat improves recall but still lags on macro-F1/PR-AUC.
 
 ## Consolidated Findings
 1. Decode horizon is critical for label validity. `max_tokens=2048` caused degenerate k=20 evaluation (0 positives).
@@ -86,7 +95,8 @@ Predict whether a (model, prompt) pair will enter a loop (n=30-gram repeating >=
 3. The earlier `last_token_final` ID-OOD delta (`-0.1151`) is not strong evidence of inversion because ID had very few positives and high variance.
 4. Shared-label multi-view datasets are necessary for fair feature comparisons; they removed per-feature label drift in later runs.
 5. Final-layer feature comparison is close on AUC; `last_token_final` has better stability/macro-F1, `mean_pool_final` can improve PR-AUC in some matched-label settings.
-6. On current datasets, OOD performance is still the bottleneck; further gains likely require data/label quality improvements before architecture scaling alone.
+6. In the k=5 three-view study, posterior (rollout completion) features yield strong macro-F1 (~0.80), while prefill views sit around ~0.65, indicating prefill-stage prediction is still substantially harder under the current setup.
+7. On current datasets, OOD performance remains the bottleneck; further gains likely require data/label quality improvements before architecture scaling alone.
 
 ## Current PR2 Codebase State
 Implemented in PR #2 branch (`task/1772391564-ood-feature-ablation`):
@@ -102,6 +112,6 @@ Implemented in PR #2 branch (`task/1772391564-ood-feature-ablation`):
 - Runtime hardening for k=5 runs: canonicalized cache guard for HOME, prefill-only builds skip retaining rollout token IDs, and explicit `--probe-preset` is required when a checkpoint lacks `probe_config`.
 
 ## Recommended Next Step (when resumed)
-Finish the k=5 three-view ablation, compare posterior vs prefill view performance under the shared labels, then decide whether to:
-- scale the best-performing view with a larger MLP capacity sweep, or
-- resume the larger multi-source rebuild (Round F) under the same fixed label protocol and metric set.
+Now that the k=5 three-view ablation is complete, decide whether to:
+- invest in stronger prefill modeling (e.g., richer aggregators or larger MLPs on prefill views) to close the prefill/posterior gap, or
+- scale up the multi-source dataset rebuild (Round F) to test whether more diverse data improves prefill metrics under the same label protocol.

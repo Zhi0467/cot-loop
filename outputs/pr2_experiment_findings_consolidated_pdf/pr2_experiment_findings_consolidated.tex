@@ -6,13 +6,13 @@
 \usepackage{longtable}
 \title{CoT Loop Detection PR \#2\\Consolidated Experiment Results}
 \author{}
-\date{2026-03-05 15:55 UTC}
+\date{2026-03-05 16:27 UTC}
 
 \begin{document}
 \maketitle
 
 \section*{Scope}
-This document consolidates the completed experiment results and findings for PR \#2 in \texttt{cot-loop}. Scope covered: 2026-03-01 19:00 UTC through 2026-03-05 15:55 UTC.
+This document consolidates the completed experiment results and findings for PR \#2 in \texttt{cot-loop}. Scope covered: 2026-03-01 19:00 UTC through 2026-03-05 16:27 UTC.
 
 \section*{Fixed Setup Used for Main Comparisons}
 \begin{itemize}
@@ -144,14 +144,43 @@ Key finding: OOD detection remains weak overall; \texttt{last\_token\_final} rem
 \section*{Round F: Larger Multi-Source Rebuild (Canceled)}
 Run \texttt{743} built and deduplicated a \texttt{29,482}-prompt pool but was canceled after explicit \texttt{!stop}; no final metrics were produced.
 
-\section*{Round G: k=5 Three-View Dataset + Posterior-First Ablation (In Progress)}
+\section*{Round G: k=5 Three-View Dataset + Posterior-First Ablation (Completed)}
 Request: \texttt{k=5}, \texttt{max\_tokens=15000}, train cap \texttt{<=5000} (balanced across sources), eval natural \texttt{MATH-500 + AIME24/25}.
 
 \begin{itemize}
   \item Feature views: \texttt{prefill\_lasttok\_layers\_mean}, \texttt{prefill\_lasttok\_layers\_concat}, \texttt{rollout\_lasttok\_layers\_mean}.
-  \item Job timeline: \texttt{809} failed immediately (missing runtime env); requeued with explicit conda env and data-volume outputs; \texttt{811} running cleanly after rollout DP IPC switched to pipes; \texttt{812} pending on \texttt{811}.
-  \item Runtime status (2026-03-05 15:55 UTC): dataset build job \texttt{811} running; rollouts \texttt{688/695} per DP rank; outputs routed to \texttt{k5\_tok15000\_three\_view\_train5000\_eval\_math500\_aime}.
+  \item Dataset stats: train \texttt{3326} samples (balanced \texttt{1663/1663}), test \texttt{560} samples (\texttt{115} positives, prevalence \texttt{0.2054}), input dims mean=1536 concat=43008.
+  \item Job timeline: \texttt{809} failed immediately (missing runtime env); requeued with explicit conda env and data-volume outputs; \texttt{811} completed at 2026-03-05 16:11 UTC; \texttt{812} completed at 2026-03-05 16:15 UTC.
 \end{itemize}
+
+\noindent
+Posterior (completion) view results, n=3 seeds (mean$\pm$std):
+\begin{center}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Run & Accuracy & Macro-F1 & ROC-AUC & PR-AUC \\
+\midrule
+completion\_mean\_h128\_d1 & 0.8643$\pm$0.0031 & 0.8013$\pm$0.0052 & 0.9222$\pm$0.0023 & 0.8055$\pm$0.0025 \\
+completion\_mean\_h256\_d2 & 0.8637$\pm$0.0037 & 0.8040$\pm$0.0048 & 0.9234$\pm$0.0008 & 0.8109$\pm$0.0006 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+Prefill view results, n=3 seeds (mean$\pm$std):
+\begin{center}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Run & Accuracy & Macro-F1 & ROC-AUC & PR-AUC \\
+\midrule
+prefill\_layers\_mean\_h256\_d2 & 0.7762$\pm$0.0037 & 0.6548$\pm$0.0076 & 0.7360$\pm$0.0033 & 0.4365$\pm$0.0092 \\
+prefill\_layers\_concat\_h512\_d2 & 0.7583$\pm$0.0258 & 0.6641$\pm$0.0172 & 0.7520$\pm$0.0017 & 0.4737$\pm$0.0042 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+Key finding: posterior (completion) features are materially stronger than prefill views under the same labels; prefill concat improves recall but still lags on macro-F1/PR-AUC.
 
 \section*{Consolidated Findings}
 \begin{itemize}
@@ -159,6 +188,7 @@ Request: \texttt{k=5}, \texttt{max\_tokens=15000}, train cap \texttt{<=5000} (ba
   \item ROC-AUC should be retained but never alone under imbalance; PR-AUC and positive-class metrics are required.
   \item Earlier ID--OOD deltas were confounded by sparse positives; matched-label datasets are required for fair view comparisons.
   \item Final-layer views are close on ROC-AUC; \texttt{last\_token\_final} is more stable on macro-F1 while \texttt{mean\_pool\_final} can lift PR-AUC.
+  \item In the k=5 three-view study, posterior (completion) features yield strong macro-F1 ($\sim$0.80), while prefill views sit around $\sim$0.65.
   \item OOD performance remains the bottleneck under current labels; gains likely need data/label improvements before larger models.
 \end{itemize}
 
@@ -175,7 +205,7 @@ Request: \texttt{k=5}, \texttt{max\_tokens=15000}, train cap \texttt{<=5000} (ba
 \end{itemize}
 
 \section*{Recommended Next Step}
-Finish the k=5 three-view ablation and compare posterior vs prefill view performance under shared labels, then decide whether to scale the best-performing view with a larger MLP sweep or resume the larger multi-source rebuild under the same fixed label protocol and metrics.
+Now that the k=5 three-view ablation is complete, decide whether to invest in stronger prefill modeling (richer aggregators or larger MLPs) or scale the multi-source dataset rebuild under the same fixed label protocol and metrics.
 
 \section*{Run Links (Representative)}
 \begin{itemize}
