@@ -740,25 +740,26 @@ def _extract_completion_features(
             )
         tokenizer.pad_token = tokenizer.eos_token
 
-    prompt_token_ids = tokenizer(
-        [rec.prompt for rec in records],
-        add_special_tokens=False,
-    )["input_ids"]
-    if len(prompt_token_ids) != len(records):
-        raise RuntimeError("Tokenizer returned a mismatched number of completion prompts.")
-
     features_by_key: dict[str, list[torch.Tensor]] = {k: [] for k in feature_views}
-    total = len(prompt_token_ids)
+    total = len(records)
     pad_id = int(tokenizer.pad_token_id)
 
     with torch.inference_mode():
         for start in range(0, total, batch_size):
             end = min(start + batch_size, total)
             batch_sequences: list[list[int]] = []
-            batch_prompts = prompt_token_ids[start:end]
+            batch_records = records[start:end]
             batch_rollouts = rollout_token_ids[start:end]
+            batch_prompt_ids = tokenizer(
+                [rec.prompt for rec in batch_records],
+                add_special_tokens=False,
+            )["input_ids"]
+            if len(batch_prompt_ids) != len(batch_records):
+                raise RuntimeError(
+                    "Tokenizer returned a mismatched number of completion prompts."
+                )
             for idx, (prompt_ids, gen_ids) in enumerate(
-                zip(batch_prompts, batch_rollouts),
+                zip(batch_prompt_ids, batch_rollouts),
                 start=start,
             ):
                 merged = list(prompt_ids) + [int(tok) for tok in gen_ids]
