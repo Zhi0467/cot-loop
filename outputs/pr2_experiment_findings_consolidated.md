@@ -1,7 +1,7 @@
 # CoT Loop Detection PR #2: Consolidated Experiments and Findings
 
-Last updated: 2026-03-05 15:22 UTC
-Scope covered: 2026-03-01 19:00 UTC through 2026-03-05 15:22 UTC
+Last updated: 2026-03-05 15:55 UTC
+Scope covered: 2026-03-01 19:00 UTC through 2026-03-05 15:55 UTC
 PR: https://github.com/Zhi0467/cot-loop/pull/2
 
 ## Goal
@@ -67,18 +67,18 @@ Predict whether a (model, prompt) pair will enter a loop (n=30-gram repeating >=
 - Built/deduplicated multi-source prompt pool (`29,482` prompts), started large rebuild, then canceled due explicit human `!stop` at 2026-03-03 22:41 UTC.
 - Status: no final metrics from this run (canceled by instruction).
 
-### G) k=5 three-view dataset + ablation pipeline (in progress)
-- Objective: three-view k=5 study with `max_tokens=15000`, balanced train cap, natural eval (MATH-500 + AIME24/25).
+### G) k=5 three-view dataset + posterior-first ablation (in progress)
+- Request: `k=5`, `max_tokens=15000`, train cap `<=5000` (balanced across sources), eval natural `MATH-500 + AIME24/25`.
 - Feature views:
-  - prefill `last_token_all_layers_mean`
-  - prefill `last_token_all_layers_concat`
-  - completion `rollout_last_token_all_layers_mean`
+  - `prefill_lasttok_layers_mean` (prefill last-token, all-layer mean)
+  - `prefill_lasttok_layers_concat` (prefill last-token, all-layer concat)
+  - `rollout_lasttok_layers_mean` (rollout completion last-token, all-layer mean)
 - Job timeline:
   - `809` failed immediately (missing runtime env) and was replaced after explicitly pinning the conda env and data-volume outputs.
   - `811` (dataset build, 8 GPU) is running cleanly after rollout DP IPC was switched to pipes to avoid semaphore rebuild errors.
   - `812` (dependent ablation sweep) remains pending on `811`.
-- Latest rollout progress (2026-03-05 15:27 UTC): ~532–556/695 per DP rank.
-- Status: dataset build still running; no new metrics to report yet.
+- Runtime status (as of 2026-03-05 15:55 UTC): dataset build job `811` running; rollouts ~`688/695` per DP rank; outputs routed to `k5_tok15000_three_view_train5000_eval_math500_aime`.
+- Status: no final metrics yet (in progress).
 
 ## Consolidated Findings
 1. Decode horizon is critical for label validity. `max_tokens=2048` caused degenerate k=20 evaluation (0 positives).
@@ -95,21 +95,13 @@ Implemented in PR #2 branch (`task/1772391564-ood-feature-ablation`):
 - Feature-key-aware train/eval loading to keep comparisons on aligned views.
 - Imbalance-aware metrics (PR-AUC, positive precision/recall/F1, prevalence) in training + aggregation.
 - Official RFM runner integration and result artifacts.
-- k=5 three-view pipeline with new feature modes and knobs:
-  - prefill all-layer pooling (`last_token_all_layers_mean`, `last_token_all_layers_concat`)
-  - completion-view extraction (`rollout_last_token_all_layers_mean`)
-  - configurable MLP depth/width/dropout
-  - dedicated Slurm launchers for dataset build + ablation sweep
-- Runtime hardening for k=5 runs:
-  - dataset launcher fails if any cache path resolves under HOME (canonicalized path guard)
-  - rollout DP IPC uses pipes (avoids semaphore rebuild errors)
-  - prefill-only builds skip retention of rollout token IDs
-  - require explicit `--probe-preset` when checkpoint lacks `probe_config`
+- New k=5 three-view feature modes (prefill all-layer mean/concat + rollout-completion mean).
+- Mixed-stage feature extraction (prefill + completion) in a single dataset build.
+- MLP architecture controls (`--mlp-hidden-dim`, `--mlp-depth`, `--mlp-dropout`).
+- Added k=5 dataset/ablation SLURM launchers and hardened rollout DP IPC.
+- Runtime hardening for k=5 runs: canonicalized cache guard for HOME, prefill-only builds skip retaining rollout token IDs, and explicit `--probe-preset` is required when a checkpoint lacks `probe_config`.
 
 ## Recommended Next Step (when resumed)
-1) Complete the k=5 three-view dataset build and dependent ablation sweep, then fold results into this summary.
-2) After that, run the planned MLP hidden-size ablation on the larger multi-source rebuild after restarting from the canceled round, while keeping:
-- fixed label protocol,
-- fixed feature view (`last_token_final`),
-- OOD-natural + balanced-ID reporting,
-- PR-AUC/positive-class metrics as primary decision criteria.
+Finish the k=5 three-view ablation, compare posterior vs prefill view performance under the shared labels, then decide whether to:
+- scale the best-performing view with a larger MLP capacity sweep, or
+- resume the larger multi-source rebuild (Round F) under the same fixed label protocol and metric set.

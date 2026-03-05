@@ -6,20 +6,20 @@
 \usepackage{longtable}
 \title{CoT Loop Detection PR \#2\\Consolidated Experiment Results}
 \author{}
-\date{2026-03-05 15:27 UTC}
+\date{2026-03-05 15:55 UTC}
 
 \begin{document}
 \maketitle
 
 \section*{Scope}
-This document consolidates the completed experiment results and findings for PR \#2 in \texttt{cot-loop}.
+This document consolidates the completed experiment results and findings for PR \#2 in \texttt{cot-loop}. Scope covered: 2026-03-01 19:00 UTC through 2026-03-05 15:55 UTC.
 
 \section*{Fixed Setup Used for Main Comparisons}
 \begin{itemize}
   \item Base model preset: \texttt{openthinker3\_1p5b}
   \item Loop labeling: \texttt{n=30}, default threshold focus on \texttt{k=20}
   \item Probe family: MLP and linear probes (depending on round)
-\item Primary metrics: ROC-AUC, PR-AUC, macro-F1, accuracy
+  \item Primary metrics: ROC-AUC, PR-AUC, macro-F1, positive-class precision/recall/F1, prevalence
 \end{itemize}
 
 \section*{Round A: Initial Threshold/Architecture Matrix (Before Horizon Fix)}
@@ -63,7 +63,7 @@ Label coverage after correction:
 \noindent
 Key finding: with matched token budget and restored positive coverage, MLP ROC-AUC exceeds linear at both thresholds.
 
-\section*{Round C: Locked k20/tok30000 Feature Ablation\\(MLP, ID vs OOD)}
+\section*{Round C: Locked k20/tok30000 Feature ID-vs-OOD Ablation (MLP)}
 OOD split: train on MATH-500 and evaluate on AIME.\\
 ID split: disjoint MATH-500 train/test.
 
@@ -88,7 +88,7 @@ Shared dataset was built once and reused for both final-layer views, yielding id
 \begin{center}
 \begin{tabular}{@{}lrrrr@{}}
 \toprule
-Feature view & ROC-AUC (m$\pm$s) & PR-AUC (m$\pm$s) & Macro-F1 (m$\pm$s) & Acc (m$\pm$s) \\
+Feature view & ROC-AUC (mean$\pm$std) & PR-AUC (mean$\pm$std) & Macro-F1 (mean$\pm$std) & Accuracy (mean$\pm$std) \\
 \midrule
 last\_token\_final & 0.5723$\pm$0.0909 & 0.3684$\pm$0.0803 & 0.3866$\pm$0.0621 & 0.3944$\pm$0.0567 \\
 mean\_pool\_final & 0.5695$\pm$0.0553 & 0.3892$\pm$0.0701 & 0.3176$\pm$0.1369 & 0.4000$\pm$0.1650 \\
@@ -106,60 +106,76 @@ Key findings on matched labels:
 \end{itemize}
 
 \section*{Round E: Data-First Scope Correction + Official RFM Comparison}
-Two evaluation regimes were added: an ID-balanced split and an OOD-natural split.
+ID balanced dataset: \texttt{22/44} positives. OOD dataset: \texttt{10/200} positives (majority baseline accuracy \texttt{0.95}).
 
-\textbf{ID (balanced) summary} (\texttt{22/44} positives):
+\noindent
+ID results (n=3 seeds):
 \begin{center}
 \begin{tabular}{@{}lrr@{}}
 \toprule
-Model + Feature view & ROC-AUC (mean$\pm$std) & PR-AUC (mean$\pm$std) \\
+Model & ROC-AUC (mean$\pm$std) & PR-AUC (mean$\pm$std) \\
 \midrule
-MLP + last\_token\_final & 0.6550$\pm$0.1643 & 0.6860$\pm$0.1511 \\
-MLP + mean\_pool\_final & 0.6453$\pm$0.0969 & 0.6974$\pm$0.1077 \\
-RFM + last\_token\_final & 0.5124$\pm$0.0000 & 0.5509$\pm$0.0000 \\
-RFM + mean\_pool\_final & 0.3623$\pm$0.0012 & 0.4238$\pm$0.0005 \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\textbf{OOD (natural) summary} (\texttt{10/200} positives; prevalence 0.05):
-\begin{center}
-\begin{tabular}{@{}lrr@{}}
-\toprule
-Model + Feature view & ROC-AUC (mean$\pm$std) & PR-AUC (mean$\pm$std) \\
-\midrule
-MLP + last\_token\_final & 0.5933$\pm$0.0301 & 0.0842$\pm$0.0107 \\
-MLP + mean\_pool\_final & 0.4747$\pm$0.0267 & 0.0598$\pm$0.0045 \\
-RFM + last\_token\_final & 0.6270$\pm$0.0003 & 0.0936$\pm$0.0001 \\
-RFM + mean\_pool\_final & 0.4474$\pm$0.0000 & 0.0564$\pm$0.0006 \\
+MLP + \texttt{last\_token\_final} & 0.6550$\pm$0.1643 & 0.6860$\pm$0.1511 \\
+MLP + \texttt{mean\_pool\_final} & 0.6453$\pm$0.0969 & 0.6974$\pm$0.1077 \\
+official RFM + \texttt{last\_token\_final} & 0.5124$\pm$0.0000 & 0.5509$\pm$0.0000 \\
+official RFM + \texttt{mean\_pool\_final} & 0.3623$\pm$0.0012 & 0.4238$\pm$0.0005 \\
 \bottomrule
 \end{tabular}
 \end{center}
 
 \noindent
-Key finding: OOD detection remains weak overall under current labels; MLP + last\_token\_final remains the strongest practical arm.
+OOD results (n=3 seeds):
+\begin{center}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+Model & ROC-AUC (mean$\pm$std) & PR-AUC (mean$\pm$std) \\
+\midrule
+MLP + \texttt{last\_token\_final} & 0.5933$\pm$0.0301 & 0.0842$\pm$0.0107 \\
+MLP + \texttt{mean\_pool\_final} & 0.4747$\pm$0.0267 & 0.0598$\pm$0.0045 \\
+official RFM + \texttt{last\_token\_final} & 0.6270$\pm$0.0003 & 0.0936$\pm$0.0001 \\
+official RFM + \texttt{mean\_pool\_final} & 0.4474$\pm$0.0000 & 0.0564$\pm$0.0006 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+Key finding: OOD detection remains weak overall; \texttt{last\_token\_final} remains the strongest practical baseline for continued ablations.
 
 \section*{Round F: Larger Multi-Source Rebuild (Canceled)}
-Built a deduplicated prompt pool (\texttt{29,482} prompts) and started a large rebuild, then canceled due to explicit human \texttt{!stop} on 2026-03-03. No final metrics were produced.
+Run \texttt{743} built and deduplicated a \texttt{29,482}-prompt pool but was canceled after explicit \texttt{!stop}; no final metrics were produced.
 
-\section*{Round G: k=5 Three-View Dataset + Ablation (In Progress)}
-Goal: k=5 study with \texttt{max\_tokens=15000}, balanced train cap, and natural eval (MATH-500 + AIME24/25).
-\begin{itemize}
-  \item Feature views: prefill \texttt{last\_token\_all\_layers\_mean}, prefill \texttt{last\_token\_all\_layers\_concat}, completion \texttt{rollout\_last\_token\_all\_layers\_mean}.
-  \item Job history: \texttt{809} failed due to missing runtime env; \texttt{811} is running cleanly after DP IPC switched to pipes; \texttt{812} is pending on \texttt{811}.
-  \item Latest rollout progress (2026-03-05 15:27 UTC): \texttt{532--556/695} per DP rank.
-\end{itemize}
-Status: dataset build still running; no metrics yet.
+\section*{Round G: k=5 Three-View Dataset + Posterior-First Ablation (In Progress)}
+Request: \texttt{k=5}, \texttt{max\_tokens=15000}, train cap \texttt{<=5000} (balanced across sources), eval natural \texttt{MATH-500 + AIME24/25}.
 
-\section*{Implementation Outcomes Included in PR \#2}
 \begin{itemize}
-  \item Shared multi-view dataset build so one rollout-label pass can feed both final-layer feature views.
-  \item Feature-key aware training/evaluation paths for selecting a specific feature view from shared datasets.
-  \item Imbalance-aware metrics added (PR-AUC, positive-class precision/recall/F1, prevalence).
-  \item Follow-up Codex review fixes applied on cache compatibility and feature-key handling paths.
-  \item k=5 three-view pipeline: all-layer prefill pooling, completion-view extraction, and configurable MLP depth/width/dropout.
-  \item Runtime hardening: canonical HOME-cache guard, DP IPC via pipes, and stricter probe preset requirements.
+  \item Feature views: \texttt{prefill\_lasttok\_layers\_mean}, \texttt{prefill\_lasttok\_layers\_concat}, \texttt{rollout\_lasttok\_layers\_mean}.
+  \item Job timeline: \texttt{809} failed immediately (missing runtime env); requeued with explicit conda env and data-volume outputs; \texttt{811} running cleanly after rollout DP IPC switched to pipes; \texttt{812} pending on \texttt{811}.
+  \item Runtime status (2026-03-05 15:55 UTC): dataset build job \texttt{811} running; rollouts \texttt{688/695} per DP rank; outputs routed to \texttt{k5\_tok15000\_three\_view\_train5000\_eval\_math500\_aime}.
 \end{itemize}
+
+\section*{Consolidated Findings}
+\begin{itemize}
+  \item Decode horizon is critical for label validity; short horizons can collapse positives (e.g., \texttt{max\_tokens=2048} for \texttt{k=20}).
+  \item ROC-AUC should be retained but never alone under imbalance; PR-AUC and positive-class metrics are required.
+  \item Earlier ID--OOD deltas were confounded by sparse positives; matched-label datasets are required for fair view comparisons.
+  \item Final-layer views are close on ROC-AUC; \texttt{last\_token\_final} is more stable on macro-F1 while \texttt{mean\_pool\_final} can lift PR-AUC.
+  \item OOD performance remains the bottleneck under current labels; gains likely need data/label improvements before larger models.
+\end{itemize}
+
+\section*{Current PR \#2 Codebase State}
+\begin{itemize}
+  \item Shared multi-view dataset build so one rollout-label pass can feed multiple feature views.
+  \item Feature-key aware training/evaluation paths for selecting a specific view from shared datasets.
+  \item Imbalance-aware metrics added to evaluation logging (PR-AUC, positive-class precision/recall/F1, prevalence).
+  \item Official RFM runner integration and result artifacts.
+  \item New k=5 three-view feature modes and mixed-stage (prefill + completion) extraction.
+  \item MLP architecture controls (hidden dim, depth, dropout) plus k=5 dataset/ablation SLURM launchers.
+  \item Rollout data-parallel IPC hardened to avoid semaphore rebuild failures.
+  \item Runtime hardening: canonicalized cache guard for HOME, prefill-only builds skip retaining rollout token IDs, and explicit \texttt{--probe-preset} is required when a checkpoint lacks \texttt{probe\_config}.
+\end{itemize}
+
+\section*{Recommended Next Step}
+Finish the k=5 three-view ablation and compare posterior vs prefill view performance under shared labels, then decide whether to scale the best-performing view with a larger MLP sweep or resume the larger multi-source rebuild under the same fixed label protocol and metrics.
 
 \section*{Run Links (Representative)}
 \begin{itemize}
