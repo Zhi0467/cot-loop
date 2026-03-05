@@ -106,10 +106,10 @@ A multi-layer perceptron (MLP) classifier is used:
 \toprule
 Run tag & Feature view & Hidden dim & Depth & LR & Batch size \\
 \midrule
-completion mean h128 d1 & Posterior mean (all layers) & 128 & 1 & $1\times10^{-4}$ & 256 \\
-completion mean h256 d2 & Posterior mean (all layers) & 256 & 2 & $8\times10^{-5}$ & 256 \\
-prefill mean h256 d2 & Prefill mean (all layers) & 256 & 2 & $1\times10^{-4}$ & 256 \\
-prefill concat h512 d2 & Prefill concat (all layers) & 512 & 2 & $1\times10^{-4}$ & 64 \\
+\texttt{completion\_mean\_\allowbreak h128\_d1} & Posterior mean (all layers) & 128 & 1 & $1\times10^{-4}$ & 256 \\
+\texttt{completion\_mean\_\allowbreak h256\_d2} & Posterior mean (all layers) & 256 & 2 & $8\times10^{-5}$ & 256 \\
+\texttt{prefill\_layers\_\allowbreak mean\_h256\_d2} & Prefill mean (all layers) & 256 & 2 & $1\times10^{-4}$ & 256 \\
+\texttt{prefill\_layers\_\allowbreak concat\_h512\_d2} & Prefill concat (all layers) & 512 & 2 & $1\times10^{-4}$ & 64 \\
 \bottomrule
 \end{tabular}
 }
@@ -138,10 +138,10 @@ All reported metrics are mean $\pm$ standard deviation over three random seeds.
 \toprule
 Run tag & Accuracy & Macro-F1 & ROC-AUC & PR-AUC & Positive F1 \\
 \midrule
-completion mean h128 d1 & 0.8643 $\pm$ 0.0031 & 0.8013 $\pm$ 0.0052 & 0.9222 $\pm$ 0.0023 & 0.8055 $\pm$ 0.0025 & 0.6893 $\pm$ 0.0086 \\
-completion mean h256 d2 & 0.8637 $\pm$ 0.0037 & 0.8040 $\pm$ 0.0048 & 0.9234 $\pm$ 0.0008 & 0.8109 $\pm$ 0.0006 & 0.6959 $\pm$ 0.0071 \\
-prefill mean h256 d2 & 0.7762 $\pm$ 0.0037 & 0.6548 $\pm$ 0.0076 & 0.7360 $\pm$ 0.0033 & 0.4365 $\pm$ 0.0092 & 0.4501 $\pm$ 0.0153 \\
-prefill concat h512 d2 & 0.7583 $\pm$ 0.0258 & 0.6641 $\pm$ 0.0172 & 0.7520 $\pm$ 0.0017 & 0.4737 $\pm$ 0.0042 & 0.4866 $\pm$ 0.0160 \\
+\texttt{completion\_mean\_\allowbreak h128\_d1} & 0.8643 $\pm$ 0.0031 & 0.8013 $\pm$ 0.0052 & 0.9222 $\pm$ 0.0023 & 0.8055 $\pm$ 0.0025 & 0.6893 $\pm$ 0.0086 \\
+\texttt{completion\_mean\_\allowbreak h256\_d2} & 0.8637 $\pm$ 0.0037 & 0.8040 $\pm$ 0.0048 & 0.9234 $\pm$ 0.0008 & 0.8109 $\pm$ 0.0006 & 0.6959 $\pm$ 0.0071 \\
+\texttt{prefill\_layers\_\allowbreak mean\_h256\_d2} & 0.7762 $\pm$ 0.0037 & 0.6548 $\pm$ 0.0076 & 0.7360 $\pm$ 0.0033 & 0.4365 $\pm$ 0.0092 & 0.4501 $\pm$ 0.0153 \\
+\texttt{prefill\_layers\_\allowbreak concat\_h512\_d2} & 0.7583 $\pm$ 0.0258 & 0.6641 $\pm$ 0.0172 & 0.7520 $\pm$ 0.0017 & 0.4737 $\pm$ 0.0042 & 0.4866 $\pm$ 0.0160 \\
 \bottomrule
 \end{tabular}
 }
