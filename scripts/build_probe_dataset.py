@@ -747,23 +747,28 @@ def _extract_completion_features(
     if len(prompt_token_ids) != len(records):
         raise RuntimeError("Tokenizer returned a mismatched number of completion prompts.")
 
-    merged_sequences: list[list[int]] = []
-    for idx, (prompt_ids, gen_ids) in enumerate(zip(prompt_token_ids, rollout_token_ids)):
-        merged = list(prompt_ids) + [int(tok) for tok in gen_ids]
-        if max_model_len is not None and max_model_len > 0 and len(merged) > max_model_len:
-            merged = merged[-max_model_len:]
-        if not merged:
-            raise RuntimeError(f"Encountered empty prompt+rollout sequence at index {idx}.")
-        merged_sequences.append(merged)
-
     features_by_key: dict[str, list[torch.Tensor]] = {k: [] for k in feature_views}
-    total = len(merged_sequences)
+    total = len(prompt_token_ids)
     pad_id = int(tokenizer.pad_token_id)
 
     with torch.inference_mode():
         for start in range(0, total, batch_size):
             end = min(start + batch_size, total)
-            batch_sequences = merged_sequences[start:end]
+            batch_sequences: list[list[int]] = []
+            batch_prompts = prompt_token_ids[start:end]
+            batch_rollouts = rollout_token_ids[start:end]
+            for idx, (prompt_ids, gen_ids) in enumerate(
+                zip(batch_prompts, batch_rollouts),
+                start=start,
+            ):
+                merged = list(prompt_ids) + [int(tok) for tok in gen_ids]
+                if max_model_len is not None and max_model_len > 0 and len(merged) > max_model_len:
+                    merged = merged[-max_model_len:]
+                if not merged:
+                    raise RuntimeError(
+                        f"Encountered empty prompt+rollout sequence at index {idx}."
+                    )
+                batch_sequences.append(merged)
             max_len = max(len(seq) for seq in batch_sequences)
 
             input_ids = torch.full(
