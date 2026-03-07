@@ -1,16 +1,19 @@
 # CoT Loop Detection via Probe Classifiers
 
-This repository trains probe classifiers to predict whether a language model will enter a repetitive loop during chain-of-thought reasoning, based solely on prefill activations.
+This repository trains probe classifiers to predict whether a language model will enter a repetitive loop during chain-of-thought reasoning from configurable activation views. The current workflow supports both prompt-prefill features and rollout-completion features, including shared-dataset multi-view experiments.
 
 ## Overview
 
-The core hypothesis: Can we detect whether a model will loop **before generation begins**, using only the hidden states from the prefill pass?
+The core question is no longer limited to prefill-only detection. The current experiments compare whether loop risk is most detectable from prompt-prefill activations, rollout-completion activations, or a combination of both.
+
+Latest status:
+- Round G (k=5, three-view) found the completion-view feature set outperforming the tested prefill variants.
 
 **Workflow:**
 1. Build model-formatted chat prompts (shared `utils.build_prompt` source)
-2. Extract pooled prefill activations from those prompts (one or more configurable pooling/layer views)
+2. Extract configurable activation views from prompt-prefill states and/or rollout-completion states (one or more configurable pooling/layer views)
 3. Generate rollout trajectories and label them (looped vs not-looped)
-4. Train a binary probe classifier on the prefill features
+4. Train a binary probe classifier on the precomputed features
 5. Evaluate the probe's ability to predict looping behavior
 
 ## Quick Start
