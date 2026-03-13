@@ -55,6 +55,7 @@ common_rebuild_args=(
 
 "${PYTHON_BIN}" scripts/rebuild_prefill_views_fixed_splits.py \
   --reference-data-dir "${REF_MATCHED_DATA}" \
+  --splits test \
   --out-dir "${ROUND8_MATCHED_DATA}" \
   "${common_rebuild_args[@]}"
 
