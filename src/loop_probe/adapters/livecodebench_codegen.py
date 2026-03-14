@@ -100,14 +100,22 @@ def _import_lcb_symbols(repo_path: str) -> dict[str, Any]:
 def build_lcb_args(release_version: str, repo_path: str) -> SimpleNamespace:
     symbols = _import_lcb_symbols(repo_path)
     scenario = symbols["Scenario"].codegeneration
+    num_process_evaluate = max(
+        1,
+        int(os.environ.get("LCB_NUM_PROCESS_EVALUATE", "1")),
+    )
+    timeout = max(
+        1,
+        int(float(os.environ.get("LCB_EVAL_TIMEOUT_SEC", "5"))),
+    )
     return SimpleNamespace(
         scenario=scenario,
         release_version=release_version,
         not_fast=False,
         start_date=None,
         end_date=None,
-        num_process_evaluate=4,
-        timeout=5.0,
+        num_process_evaluate=num_process_evaluate,
+        timeout=timeout,
     )
 
 
