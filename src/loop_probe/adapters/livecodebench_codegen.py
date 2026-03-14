@@ -1,12 +1,40 @@
 from __future__ import annotations
 
+import json
 import os
+import re
 import sys
 from contextlib import contextmanager
+from datetime import datetime
 from types import SimpleNamespace
 from typing import Any
 
 from ..collector import LcbSampleRecord
+
+_LCB_DATASET_REPO = "livecodebench/code_generation_lite"
+_LCB_RELEASE_FILES = {
+    "release_v1": ["test.jsonl"],
+    "release_v2": ["test.jsonl", "test2.jsonl"],
+    "release_v3": ["test.jsonl", "test2.jsonl", "test3.jsonl"],
+    "release_v4": ["test.jsonl", "test2.jsonl", "test3.jsonl", "test4.jsonl"],
+    "release_v5": ["test.jsonl", "test2.jsonl", "test3.jsonl", "test4.jsonl", "test5.jsonl"],
+    "release_v6": [
+        "test.jsonl",
+        "test2.jsonl",
+        "test3.jsonl",
+        "test4.jsonl",
+        "test5.jsonl",
+        "test6.jsonl",
+    ],
+    "release_latest": [
+        "test.jsonl",
+        "test2.jsonl",
+        "test3.jsonl",
+        "test4.jsonl",
+        "test5.jsonl",
+        "test6.jsonl",
+    ],
+}
 
 
 def _require_repo_path(repo_path: str) -> None:
@@ -42,9 +70,10 @@ def _import_lcb_symbols(repo_path: str) -> dict[str, Any]:
     with _repo_cwd(repo_path):
         try:
             from lcb_runner.evaluation import extract_instance_results
+            from lcb_runner.benchmarks.code_generation import CodeGenerationProblem
             from lcb_runner.lm_styles import LMStyle
+            from lcb_runner.prompts import format_prompt_generation
             from lcb_runner.runner.scenario_router import (
-                build_prompt_benchmark,
                 get_metrics,
                 sort_and_extract_save_results,
             )
@@ -57,8 +86,9 @@ def _import_lcb_symbols(repo_path: str) -> dict[str, Any]:
 
     return {
         "extract_instance_results": extract_instance_results,
+        "CodeGenerationProblem": CodeGenerationProblem,
         "LMStyle": LMStyle,
-        "build_prompt_benchmark": build_prompt_benchmark,
+        "format_prompt_generation": format_prompt_generation,
         "get_metrics": get_metrics,
         "sort_and_extract_save_results": sort_and_extract_save_results,
         "extract_code": extract_code,
@@ -80,6 +110,65 @@ def build_lcb_args(release_version: str, repo_path: str) -> SimpleNamespace:
     )
 
 
+def _release_files(release_version: str) -> list[str]:
+    if release_version in _LCB_RELEASE_FILES:
+        return list(_LCB_RELEASE_FILES[release_version])
+
+    single = re.fullmatch(r"v([1-6])", release_version)
+    if single:
+        idx = int(single.group(1))
+        return [f"test{idx}.jsonl" if idx != 1 else "test.jsonl"]
+
+    pair = re.fullmatch(r"v([1-6])_v([1-6])", release_version)
+    if pair:
+        start = int(pair.group(1))
+        end = int(pair.group(2))
+        if start > end:
+            raise ValueError(
+                f"LiveCodeBench release range must be ordered, got {release_version!r}."
+            )
+        return [
+            f"test{idx}.jsonl" if idx != 1 else "test.jsonl"
+            for idx in range(start, end + 1)
+        ]
+
+    raise ValueError(f"Unsupported LiveCodeBench release_version {release_version!r}.")
+
+
+def _load_codegen_benchmark(
+    repo_path: str,
+    release_version: str,
+    *,
+    start_date: str | None = None,
+    end_date: str | None = None,
+):
+    symbols = _import_lcb_symbols(repo_path)
+    try:
+        from huggingface_hub import hf_hub_download
+    except Exception as exc:
+        raise ImportError(
+            "Failed to import huggingface_hub for LiveCodeBench dataset downloads."
+        ) from exc
+
+    benchmark = []
+    problem_cls = symbols["CodeGenerationProblem"]
+    for filename in _release_files(release_version):
+        path = hf_hub_download(_LCB_DATASET_REPO, filename, repo_type="dataset")
+        with open(path, encoding="utf-8") as handle:
+            for line in handle:
+                benchmark.append(problem_cls(**json.loads(line)))
+
+    if start_date is not None:
+        lower = datetime.strptime(start_date, "%Y-%m-%d")
+        benchmark = [row for row in benchmark if lower <= row.contest_date]
+    if end_date is not None:
+        upper = datetime.strptime(end_date, "%Y-%m-%d")
+        benchmark = [row for row in benchmark if row.contest_date <= upper]
+
+    benchmark = sorted(benchmark, key=lambda row: row.question_id)
+    return benchmark, symbols["format_prompt_generation"]
+
+
 def _get_lm_style(model_id: str, override: str | None = None, repo_path: str = ""):
     symbols = _import_lcb_symbols(repo_path)
     lm_style_cls = symbols["LMStyle"]
@@ -96,21 +185,14 @@ def _get_lm_style(model_id: str, override: str | None = None, repo_path: str = "
 
 
 def preflight(repo_path: str, release_version: str) -> None:
-    symbols = _import_lcb_symbols(repo_path)
-    args_ns = build_lcb_args(release_version, repo_path)
-    with _repo_cwd(repo_path):
-        symbols["build_prompt_benchmark"](args_ns)
+    _load_codegen_benchmark(repo_path, release_version)
 
 
 def load_benchmark(
     repo_path: str,
     release_version: str,
 ):
-    symbols = _import_lcb_symbols(repo_path)
-    args_ns = build_lcb_args(release_version, repo_path)
-    with _repo_cwd(repo_path):
-        benchmark, format_prompt = symbols["build_prompt_benchmark"](args_ns)
-    return benchmark, format_prompt
+    return _load_codegen_benchmark(repo_path, release_version)
 
 
 def build_prompts(
