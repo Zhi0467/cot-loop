@@ -9,6 +9,7 @@ LAST_TOKEN_POOLING = "last_token"
 MEAN_POOLING = "mean_pool"
 LAST_TOKEN_ALL_LAYERS_MEAN = "last_token_all_layers_mean"
 LAST_TOKEN_ALL_LAYERS_CONCAT = "last_token_all_layers_concat"
+LAST_TOKEN_ALL_LAYERS_STACK = "last_token_all_layers_stack"
 TAIL64_STRIDED_CONCAT = "tail64_strided_concat"
 LAST16_ALL_LAYERS_CONCAT = "last16_all_layers_concat"
 LAST8_PREV8_DELTA_ALL_LAYERS_CONCAT = "last8_prev8_delta_all_layers_concat"
@@ -22,6 +23,7 @@ FEATURE_POOLING_CHOICES = (
     MEAN_POOLING,
     LAST_TOKEN_ALL_LAYERS_MEAN,
     LAST_TOKEN_ALL_LAYERS_CONCAT,
+    LAST_TOKEN_ALL_LAYERS_STACK,
     TAIL64_STRIDED_CONCAT,
     LAST16_ALL_LAYERS_CONCAT,
     LAST8_PREV8_DELTA_ALL_LAYERS_CONCAT,
@@ -271,7 +273,11 @@ def _pool_all_layers(
 
     per_layer = []
     for hidden in hidden_states[1:]:
-        if pooling in (LAST_TOKEN_ALL_LAYERS_MEAN, LAST_TOKEN_ALL_LAYERS_CONCAT):
+        if pooling in (
+            LAST_TOKEN_ALL_LAYERS_MEAN,
+            LAST_TOKEN_ALL_LAYERS_CONCAT,
+            LAST_TOKEN_ALL_LAYERS_STACK,
+        ):
             per_layer.append(
                 _pool_hidden_states(
                     hidden,
@@ -290,6 +296,8 @@ def _pool_all_layers(
 
     if pooling == LAST_TOKEN_ALL_LAYERS_MEAN:
         return torch.stack(per_layer, dim=1).mean(dim=1)
+    if pooling == LAST_TOKEN_ALL_LAYERS_STACK:
+        return torch.stack(per_layer, dim=1)
     if pooling in (
         LAST_TOKEN_ALL_LAYERS_CONCAT,
         LAST16_ALL_LAYERS_CONCAT,
@@ -396,6 +404,7 @@ def extract_prefill_features_multi(
                 elif pooling in (
                     LAST_TOKEN_ALL_LAYERS_MEAN,
                     LAST_TOKEN_ALL_LAYERS_CONCAT,
+                    LAST_TOKEN_ALL_LAYERS_STACK,
                     LAST16_ALL_LAYERS_CONCAT,
                     LAST8_PREV8_DELTA_ALL_LAYERS_CONCAT,
                     LAST16_MID16_DELTA_ALL_LAYERS_CONCAT,

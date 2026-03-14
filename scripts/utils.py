@@ -2,7 +2,15 @@ import csv
 import json
 import os
 import re
+import sys
 from typing import Any, Dict, List, Optional, Tuple
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SRC = os.path.join(ROOT, "src")
+if SRC not in sys.path:
+    sys.path.insert(0, SRC)
+
+from loop_probe.labeling import has_ngram_loop
 
 _MATH_VERIFY_CONFIGS: Optional[Tuple[List[Any], List[Any]]] = None
 
@@ -170,32 +178,6 @@ def suppress_sem_unlink_errors() -> None:
     rt.register = _register  # type: ignore[assignment]
     rt.unregister = _unregister  # type: ignore[assignment]
     rt._vllm_rt_patched = True
-
-
-def has_ngram_loop(token_ids, n=30, k=20) -> bool:
-    if len(token_ids) < n:
-        return False
-
-    base = 1000003
-    mod = 1 << 64
-    mask = mod - 1
-
-    pow_n = pow(base, n, mod)
-    h = 0
-    for t in token_ids[:n]:
-        h = (h * base + (t + 1)) & mask
-
-    counts = {h: 1}
-    for i in range(n, len(token_ids)):
-        out_t = token_ids[i - n] + 1
-        in_t = token_ids[i] + 1
-        h = (h * base + in_t - (out_t * pow_n)) & mask
-        c = counts.get(h, 0) + 1
-        if c >= k:
-            return True
-        counts[h] = c
-
-    return False
 
 
 def write_metrics(metrics: Dict[Tuple[str, float], Dict[str, float]], out_path: str) -> None:

@@ -1,17 +1,17 @@
 # CoT Loop Detection via Probe Classifiers
 
-This repository trains probe classifiers to predict whether a language model will enter a repetitive loop during chain-of-thought reasoning from configurable activation views. The current workflow supports both prompt-prefill features and rollout-completion features, including shared-dataset multi-view experiments.
+This repository trains probe classifiers to predict whether a language model will enter a repetitive loop during chain-of-thought reasoning. The canonical workflow stores prompt-prefill last-token activations from every transformer layer as a stacked `[layer, hidden]` tensor, then trains either on a selected layer or an ensemble over all layers.
 
 ## Overview
 
-The core question is no longer limited to prefill-only detection. The current experiments compare whether loop risk is most detectable from prompt-prefill activations, rollout-completion activations, or a combination of both.
+The active workflow focuses on whether loop risk is detectable from stacked prompt-prefill activations, either by slicing one layer or by voting across all layers.
 
 Latest status:
 - Round G (k=5, three-view) found the completion-view feature set outperforming the tested prefill variants.
 
 **Workflow:**
 1. Build model-formatted chat prompts (shared `utils.build_prompt` source)
-2. Extract configurable activation views from prompt-prefill states and/or rollout-completion states (one or more configurable pooling/layer views)
+2. Extract stacked last-token activations from prompt-prefill states
 3. Generate rollout trajectories and label them (looped vs not-looped)
 4. Train a binary probe classifier on the precomputed features
 5. Evaluate the probe's ability to predict looping behavior
@@ -66,8 +66,8 @@ For this default local test file, loader behavior is hardcoded to use
 Optional: if you want a random split of one dataset, pass identical train/test specs
 and use `--split-ratio`.
 
-To build one shared rollout-label dataset that can be reused by both
-`last_token_final` and `mean_pool_final`:
+The default dataset stores one stacked feature view:
+`last_token_all_layers_stack_final`, with per-sample shape `[layer, hidden]`.
 
 ```bash
 python scripts/build_probe_dataset.py \
@@ -77,36 +77,7 @@ python scripts/build_probe_dataset.py \
   --test-split test \
   --prompt-field problem \
   --model-preset openthinker3_1p5b \
-  --feature-key last_token_final \
-  --feature-pooling last_token \
-  --feature-layer -1 \
-  --extra-feature-view mean_pool_final:mean_pool:-1 \
-  --out-dir outputs/probe_data/openthinker3_1p5b_shared_final_views
-```
-
-To build a three-view dataset with all-layer prefill features plus a
-rollout-completion feature in one rollout-label pass:
-
-```bash
-python scripts/build_probe_dataset.py \
-  --train-dataset my_org/train_pool \
-  --train-split train \
-  --train-max-samples 5000 \
-  --test-dataset my_org/eval_pool \
-  --test-split test \
-  --prompt-field problem \
-  --model-preset openthinker3_1p5b \
-  --max-tokens 15000 \
-  --loop-k 5 \
-  --feature-key rollout_lasttok_layers_mean \
-  --feature-pooling rollout_last_token_all_layers_mean \
-  --feature-layer -1 \
-  --extra-feature-view prefill_lasttok_layers_mean:last_token_all_layers_mean:-1 \
-  --extra-feature-view prefill_lasttok_layers_concat:last_token_all_layers_concat:-1 \
-  --balance-train downsample \
-  --balance-test none \
-  --completion-batch-size 1 \
-  --out-dir outputs/probe_data/openthinker3_three_view_k5
+  --out-dir outputs/probe_data/openthinker3_1p5b_layers_stack
 ```
 
 For balanced train/test probes after label construction:
@@ -121,11 +92,9 @@ python scripts/build_probe_dataset.py \
   --test-max-samples 600 \
   --prompt-field problem \
   --model-preset openthinker3_1p5b \
-  --feature-key last_token_final \
-  --extra-feature-view mean_pool_final:mean_pool:-1 \
   --balance-train downsample \
   --balance-test downsample \
-  --out-dir outputs/probe_data/openthinker3_balanced_shared_final_views
+  --out-dir outputs/probe_data/openthinker3_balanced_layers_stack
 ```
 
 ### Train Probe
@@ -134,38 +103,21 @@ python scripts/build_probe_dataset.py \
 python scripts/train_probe.py \
   --data-dir outputs/probe_data \
   --out-dir outputs/probe_runs/run1 \
-  --probe-preset linear \
-  --feature-key mean_pool_final \
   --wandb-project cot-loop-probe \
   --epochs 10 \
   --batch-size 256
 ```
 
-`--feature-key` is optional. If omitted, the manifest default view is used.
+By default, training slices the final layer from the stacked dataset view.
 
 Available probe presets:
-- `linear` (default)
-- `mlp` (configurable width/depth; defaults are in `src/loop_probe/configs.py`)
+- `linear`
+- `mlp` (default; configurable width/depth, defaults are in `src/loop_probe/configs.py`)
 
 Optional MLP overrides:
 - `--mlp-hidden-dim <int>`
 - `--mlp-depth <int>`
 - `--mlp-dropout <float>`
-
-### Train RFM-lite Probe
-
-```bash
-python scripts/train_rfm_probe.py \
-  --data-dir outputs/probe_data/openthinker3_balanced_shared_final_views \
-  --feature-key last_token_final \
-  --out-dir outputs/probe_runs/rfm_last_token/seed_0 \
-  --seed 0 \
-  --random-features 2048 \
-  --bandwidth 1.0 \
-  --ridge 0.1 \
-  --rfm-steps 1 \
-  --grad-weight 1.0
-```
 
 ### Evaluate Saved Checkpoints on Another Split/Dataset
 
@@ -175,17 +127,6 @@ Torch probe checkpoint (`best.pt` / `last.pt`):
 python scripts/eval_probe_checkpoint.py \
   --checkpoint outputs/probe_runs/run1/best.pt \
   --data-dir outputs/probe_data/other_eval_dataset \
-  --feature-key last_token_final \
-  --split test
-```
-
-RFM-lite checkpoint (`best_model.pt`):
-
-```bash
-python scripts/eval_rfm_checkpoint.py \
-  --checkpoint outputs/probe_runs/rfm_last_token/seed_0/best_model.pt \
-  --data-dir outputs/probe_data/other_eval_dataset \
-  --feature-key last_token_final \
   --split test
 ```
 
@@ -244,18 +185,11 @@ A sequence is labeled as "looped" if any 30-gram appears ≥20 times in the gene
 - `{out_dir}/train/shard-*.pt` - Training shards (features + labels)
 - `{out_dir}/test/shard-*.pt` - Test shards
 - `{out_dir}/manifest.json` - Dataset metadata and configuration
-- `{out_dir}/features/<feature_key>/{train,test}/shard-*.pt` - Additional feature views (when `--extra-feature-view` is used)
 
 **Training:**
 - `{out_dir}/best.pt` - Best checkpoint (by ROC-AUC, then macro-F1)
 - `{out_dir}/last.pt` - Final epoch checkpoint
 - `{out_dir}/metrics.jsonl` - Per-epoch evaluation metrics
-- `{out_dir}/best_metrics.json` - Best eval row summary for this run
-
-**RFM-lite training (`scripts/train_rfm_probe.py`):**
-- `{out_dir}/best_model.pt` - Serialized RFM-lite pipeline checkpoint
-- `{out_dir}/model_summary.json` - RFM-lite hyperparameters and selected step
-- `{out_dir}/metrics.jsonl` - Per-step train/eval metrics
 - `{out_dir}/best_metrics.json` - Best eval row summary for this run
 
 **Multi-seed SLURM summary:**
@@ -289,9 +223,8 @@ cot-loop/
 ├── scripts/
 │   ├── build_probe_dataset.py  # Extract features & labels
 │   ├── train_probe.py          # Train probe classifier
-│   ├── train_rfm_probe.py      # Train RFM-lite probe
 │   ├── eval_probe_checkpoint.py # Evaluate torch probe checkpoints
-│   ├── eval_rfm_checkpoint.py  # Evaluate RFM-lite checkpoints
+│   ├── train_metadata_residual_probe.py # Metadata + stacked-feature residual probe
 │   ├── aggregate_probe_runs.py # Multi-seed mean/std summary
 │   └── [loop analysis scripts]
 ├── slurm/                   # SLURM batch scripts

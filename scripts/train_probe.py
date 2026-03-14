@@ -20,6 +20,7 @@ from loop_probe.dataloader import (
     make_dataloader,
     read_manifest,
     resolve_input_dim,
+    resolve_sample_shape,
     resolve_split_info,
 )
 from loop_probe.configs import (
@@ -29,7 +30,8 @@ from loop_probe.configs import (
 )
 from loop_probe.train_utils import (
     choose_device,
-    evaluate_binary_metrics,
+    evaluate_probe_outputs,
+    resolve_classifier_layer,
     set_seed,
 )
 
@@ -55,7 +57,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--probe-preset",
         choices=probe_preset_choices(),
-        default="linear",
+        default="mlp",
     )
     parser.add_argument(
         "--mlp-hidden-dim",
@@ -83,6 +85,20 @@ def _parse_args() -> argparse.Namespace:
             "If omitted, uses manifest default or legacy single-view fields."
         ),
     )
+    parser.add_argument(
+        "--classifier-mode",
+        choices=("last_layer", "ensemble"),
+        default="last_layer",
+    )
+    parser.add_argument(
+        "--classifier-layer",
+        type=int,
+        default=-1,
+        help=(
+            "Layer index to use when --classifier-mode=last_layer and the "
+            "selected feature view is stacked as [layer, hidden]."
+        ),
+    )
 
     parser.add_argument("--wandb-project", required=True)
     parser.add_argument("--wandb-run-name", default=None)
@@ -90,13 +106,66 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _evaluate(model, dataloader, device: torch.device) -> dict[str, float]:
+def _prepare_model_inputs(
+    x: torch.Tensor,
+    *,
+    classifier_mode: str,
+    resolved_classifier_layer: int | None,
+) -> torch.Tensor:
+    if classifier_mode == "last_layer":
+        if x.ndim == 2:
+            return x
+        if x.ndim == 3:
+            if resolved_classifier_layer is None:
+                raise SystemExit(
+                    "Missing resolved classifier layer for stacked last_layer inputs."
+                )
+            return x[:, resolved_classifier_layer, :]
+        raise SystemExit(
+            "last_layer mode expects flat [batch, hidden] or stacked "
+            f"[batch, layer, hidden] inputs, got shape {tuple(x.shape)}"
+        )
+
+    if classifier_mode == "ensemble":
+        if x.ndim != 3:
+            raise SystemExit(
+                "ensemble mode requires stacked [batch, layer, hidden] inputs, "
+                f"got shape {tuple(x.shape)}"
+            )
+        return x
+
+    raise SystemExit(f"Unsupported classifier_mode '{classifier_mode}'.")
+
+
+def _loss_targets(
+    y: torch.Tensor,
+    *,
+    logits: torch.Tensor,
+    classifier_mode: str,
+) -> torch.Tensor:
+    if classifier_mode == "ensemble":
+        return y.unsqueeze(1).expand_as(logits)
+    return y
+
+
+def _evaluate(
+    model,
+    dataloader,
+    device: torch.device,
+    *,
+    classifier_mode: str,
+    resolved_classifier_layer: int | None,
+) -> dict[str, float]:
     model.eval()
     all_logits = []
     all_labels = []
     with torch.inference_mode():
         for x, y in dataloader:
-            x = x.to(device)
+            x = _prepare_model_inputs(
+                x.to(device),
+                classifier_mode=classifier_mode,
+                resolved_classifier_layer=resolved_classifier_layer,
+            )
             y = y.to(device)
             logits = model(x)
             all_logits.append(logits.detach().cpu())
@@ -104,7 +173,11 @@ def _evaluate(model, dataloader, device: torch.device) -> dict[str, float]:
 
     logits_cat = torch.cat(all_logits, dim=0)
     labels_cat = torch.cat(all_labels, dim=0)
-    return evaluate_binary_metrics(labels_cat, logits_cat)
+    return evaluate_probe_outputs(
+        labels_cat,
+        logits_cat,
+        classifier_mode=classifier_mode,
+    )
 
 
 def _write_jsonl(path: str, row: dict[str, object]) -> None:
@@ -119,6 +192,7 @@ def _checkpoint_payload(
     metrics: dict[str, float],
     probe_config: dict[str, object] | None = None,
     feature_key: str | None = None,
+    sample_shape: tuple[int, ...] | None = None,
 ) -> dict[str, object]:
     payload = {
         "epoch": epoch,
@@ -130,6 +204,8 @@ def _checkpoint_payload(
         payload["probe_config"] = probe_config
     if feature_key:
         payload["feature_key"] = feature_key
+    if sample_shape is not None:
+        payload["sample_shape"] = [int(dim) for dim in sample_shape]
     return payload
 
 
@@ -184,6 +260,10 @@ def main() -> None:
             "--mlp-hidden-dim/--mlp-depth/--mlp-dropout can only be used with "
             "--probe-preset=mlp."
         )
+    if args.classifier_mode != "last_layer" and args.classifier_layer != -1:
+        raise SystemExit(
+            "--classifier-layer is only valid when --classifier-mode=last_layer."
+        )
 
     set_seed(args.seed)
     device = choose_device(args.device)
@@ -209,15 +289,24 @@ def main() -> None:
         feature_key=args.feature_key,
     )
     input_dim = resolve_input_dim(manifest, resolved_feature_key)
+    sample_shape = resolve_sample_shape(manifest, resolved_feature_key)
     try:
         probe_cfg = get_probe_config(
             args.probe_preset,
             hidden_dim=args.mlp_hidden_dim,
             dropout=args.mlp_dropout,
             depth=args.mlp_depth,
+            classifier_mode=args.classifier_mode,
+            classifier_layer=args.classifier_layer,
         )
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
+    resolved_classifier_layer: int | None = None
+    if probe_cfg.classifier_mode == "last_layer" and len(sample_shape) == 2:
+        resolved_classifier_layer = resolve_classifier_layer(
+            int(sample_shape[0]),
+            probe_cfg.classifier_layer,
+        )
 
     train_loader = make_dataloader(
         args.data_dir,
@@ -249,7 +338,11 @@ def main() -> None:
     else:
         pos_weight = torch.tensor(1.0, dtype=torch.float32, device=device)
 
-    model = build_probe_model(input_dim=input_dim, probe_cfg=probe_cfg).to(device)
+    model = build_probe_model(
+        input_dim=input_dim,
+        probe_cfg=probe_cfg,
+        sample_shape=sample_shape,
+    ).to(device)
     criterion = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
     optimizer = torch.optim.AdamW(
         model.parameters(),
@@ -270,6 +363,7 @@ def main() -> None:
             "data_dir": args.data_dir,
             "feature_key": resolved_feature_key,
             "input_dim": input_dim,
+            "sample_shape": list(sample_shape),
             "epochs": args.epochs,
             "batch_size": args.batch_size,
             "lr": args.lr,
@@ -280,6 +374,11 @@ def main() -> None:
             "weight_decay": args.weight_decay,
             "seed": args.seed,
             "pos_weight": float(pos_weight.item()),
+            "classifier_mode": probe_cfg.classifier_mode,
+            "classifier_layer": probe_cfg.classifier_layer,
+            "resolved_classifier_layer": resolved_classifier_layer,
+            "vote_rule": probe_cfg.vote_rule,
+            "score_rule": probe_cfg.score_rule,
             "probe_config": probe_cfg.to_dict(),
         },
     )
@@ -317,11 +416,22 @@ def main() -> None:
                 for group in optimizer.param_groups:
                     group["lr"] = lr_now
 
-            x = x.to(device)
+            x = _prepare_model_inputs(
+                x.to(device),
+                classifier_mode=probe_cfg.classifier_mode,
+                resolved_classifier_layer=resolved_classifier_layer,
+            )
             y = y.to(device)
 
             logits = model(x)
-            loss = criterion(logits, y)
+            loss = criterion(
+                logits,
+                _loss_targets(
+                    y,
+                    logits=logits,
+                    classifier_mode=probe_cfg.classifier_mode,
+                ),
+            )
 
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
@@ -358,7 +468,11 @@ def main() -> None:
         # Compute full epoch training metrics (only once per epoch)
         epoch_logits_cat = torch.cat(epoch_logits, dim=0)
         epoch_labels_cat = torch.cat(epoch_labels, dim=0)
-        train_metrics_epoch = evaluate_binary_metrics(epoch_labels_cat, epoch_logits_cat)
+        train_metrics_epoch = evaluate_probe_outputs(
+            epoch_labels_cat,
+            epoch_logits_cat,
+            classifier_mode=probe_cfg.classifier_mode,
+        )
 
         # Always log training metrics to wandb (every epoch)
         wandb.log(
@@ -381,7 +495,13 @@ def main() -> None:
 
         # Evaluate on test set based on eval_every
         if epoch % args.eval_every == 0:
-            eval_metrics = _evaluate(model, test_loader, device)
+            eval_metrics = _evaluate(
+                model,
+                test_loader,
+                device,
+                classifier_mode=probe_cfg.classifier_mode,
+                resolved_classifier_layer=resolved_classifier_layer,
+            )
             
             # Log to metrics.jsonl
             log_row = {
@@ -398,6 +518,13 @@ def main() -> None:
                 "train_pr_auc": train_metrics_epoch["pr_auc"],
                 "seed": args.seed,
                 "lr": lr_now,
+                "feature_key": resolved_feature_key,
+                "sample_shape": list(sample_shape),
+                "classifier_mode": probe_cfg.classifier_mode,
+                "classifier_layer": probe_cfg.classifier_layer,
+                "resolved_classifier_layer": resolved_classifier_layer,
+                "vote_rule": probe_cfg.vote_rule,
+                "score_rule": probe_cfg.score_rule,
                 **eval_metrics,
             }
             _write_jsonl(metrics_jsonl, log_row)
@@ -437,6 +564,7 @@ def main() -> None:
                         eval_metrics,
                         probe_config=probe_cfg.to_dict(),
                         feature_key=resolved_feature_key,
+                        sample_shape=sample_shape,
                     ),
                     best_ckpt,
                 )
@@ -494,6 +622,7 @@ def main() -> None:
                 },
                 probe_config=probe_cfg.to_dict(),
                 feature_key=resolved_feature_key,
+                sample_shape=sample_shape,
             ),
             last_ckpt,
         )

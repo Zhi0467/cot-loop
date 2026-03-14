@@ -131,8 +131,8 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--feature-pooling",
         choices=ALL_FEATURE_POOLING_CHOICES,
-        default="last_token",
-        help="How to pool token activations into one vector per prompt.",
+        default="last_token_all_layers_stack",
+        help="How to pool token activations into one feature tensor per prompt.",
     )
     parser.add_argument(
         "--feature-layer",
@@ -261,6 +261,7 @@ def _validate_layer_for_pooling(*, pooling: str, layer: int, key: str) -> None:
     if pooling in (
         "last_token_all_layers_mean",
         "last_token_all_layers_concat",
+        "last_token_all_layers_stack",
         "last16_all_layers_concat",
         "last8_prev8_delta_all_layers_concat",
         "last16_mid16_delta_all_layers_concat",
@@ -912,6 +913,15 @@ def _subset_list(values: list[int], keep_indices: list[int]) -> list[int]:
     return [values[idx] for idx in keep_indices]
 
 
+def _sample_shape_from_features(features: torch.Tensor) -> list[int]:
+    if features.ndim not in (2, 3):
+        raise SystemExit(
+            "Expected flat or stacked features when materializing the manifest, "
+            f"got shape {tuple(features.shape)}."
+        )
+    return [int(dim) for dim in features.shape[1:]]
+
+
 def _resolve_label_spec(args: argparse.Namespace) -> dict[str, object]:
     label_target = str(args.label_target)
     label_horizon = args.label_horizon
@@ -1155,12 +1165,14 @@ def main() -> None:
         train_features = train_features.index_select(0, train_keep_idx_t)
         test_features = test_features.index_select(0, test_keep_idx_t)
 
-        input_dim = int(train_features.size(1))
-        if int(test_features.size(1)) != input_dim:
+        train_sample_shape = _sample_shape_from_features(train_features)
+        test_sample_shape = _sample_shape_from_features(test_features)
+        if test_sample_shape != train_sample_shape:
             raise SystemExit(
-                "Input dim mismatch between train/test for feature "
-                f"'{feature_key}': {input_dim} vs {int(test_features.size(1))}"
+                "Sample shape mismatch between train/test for feature "
+                f"'{feature_key}': {train_sample_shape} vs {test_sample_shape}"
             )
+        input_dim = int(train_sample_shape[-1])
         if train_features.size(0) != len(train_labels):
             raise SystemExit(
                 "Mismatched feature/label counts for split 'train' "
@@ -1201,6 +1213,7 @@ def main() -> None:
             "pooling": feature_spec["pooling"],
             "layer": feature_spec["layer"],
             "input_dim": input_dim,
+            "sample_shape": train_sample_shape,
             "train": train_meta,
             "test": test_meta,
         }
@@ -1214,8 +1227,9 @@ def main() -> None:
         raise SystemExit(f"Primary feature view '{primary_feature_key}' was not materialized.")
 
     manifest = {
-        "version": 3,
+        "version": 4,
         "input_dim": primary_input_dim,
+        "sample_shape": feature_views_manifest[primary_feature_key]["sample_shape"],
         "default_feature_key": primary_feature_key,
         "feature_extraction": {
             "stage": feature_views[primary_feature_key].get("stage", "prefill"),

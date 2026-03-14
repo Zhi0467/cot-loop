@@ -122,6 +122,11 @@ def _resolve_feature_views(args: argparse.Namespace) -> tuple[str, dict[str, dic
             "Primary feature key must match [A-Za-z0-9_.-]+, "
             f"got '{primary_key}'."
         )
+    _validate_layer_for_pooling(
+        pooling=str(args.feature_pooling),
+        layer=int(args.feature_layer),
+        key=primary_key,
+    )
     feature_views: dict[str, dict[str, object]] = {
         primary_key: {
             "pooling": args.feature_pooling,
@@ -131,6 +136,11 @@ def _resolve_feature_views(args: argparse.Namespace) -> tuple[str, dict[str, dic
     }
     for raw in args.extra_feature_view:
         key, spec = _parse_feature_view(raw)
+        _validate_layer_for_pooling(
+            pooling=str(spec["pooling"]),
+            layer=int(spec["layer"]),
+            key=key,
+        )
         prior = feature_views.get(key)
         if prior is not None and prior != spec:
             raise SystemExit(
@@ -138,6 +148,31 @@ def _resolve_feature_views(args: argparse.Namespace) -> tuple[str, dict[str, dic
             )
         feature_views[key] = spec
     return primary_key, feature_views
+
+
+def _validate_layer_for_pooling(*, pooling: str, layer: int, key: str) -> None:
+    if pooling in (
+        "last_token_all_layers_mean",
+        "last_token_all_layers_concat",
+        "last_token_all_layers_stack",
+        "last16_all_layers_concat",
+        "last8_prev8_delta_all_layers_concat",
+        "last16_mid16_delta_all_layers_concat",
+        "last16_plus_delta8_all_layers_concat",
+    ) and layer != -1:
+        raise SystemExit(
+            "All-layer prefill pooling ignores --feature-layer and requires -1 for "
+            f"feature view '{key}', got {layer}."
+        )
+
+
+def _sample_shape_from_features(features: torch.Tensor) -> list[int]:
+    if features.ndim not in (2, 3):
+        raise SystemExit(
+            "Expected flat or stacked features when materializing the manifest, "
+            f"got shape {tuple(features.shape)}."
+        )
+    return [int(dim) for dim in features.shape[1:]]
 
 
 def _load_jsonl_rows(path: str) -> list[dict[str, object]]:
@@ -377,8 +412,16 @@ def main() -> None:
                 sample_ids=sample_ids,
                 shard_size=args.shard_size,
             )
+            sample_shape = _sample_shape_from_features(features)
+            prior_sample_shape = manifest_views[key].get("sample_shape")
+            if prior_sample_shape is not None and list(prior_sample_shape) != sample_shape:
+                raise SystemExit(
+                    f"Sample shape mismatch across splits for feature '{key}': "
+                    f"{prior_sample_shape} vs {sample_shape}"
+                )
             manifest_views[key][split] = split_meta
-            manifest_views[key]["input_dim"] = int(features.size(1))
+            manifest_views[key]["input_dim"] = int(sample_shape[-1])
+            manifest_views[key]["sample_shape"] = sample_shape
 
     payload = {
         "version": 4,
@@ -388,6 +431,7 @@ def main() -> None:
         "feature_stage": "prefill",
         "feature_pooling": feature_views[primary_key]["pooling"],
         "input_dim": int(manifest_views[primary_key]["input_dim"]),
+        "sample_shape": manifest_views[primary_key]["sample_shape"],
         "feature_views": manifest_views,
         "prompt_field": prompt_field,
         "prompt_template": {

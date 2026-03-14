@@ -18,8 +18,11 @@ def save_split_shards(
     if shard_size < 1:
         raise SystemExit("--shard-size must be >= 1.")
 
-    if features.ndim != 2:
-        raise SystemExit(f"Expected 2D features tensor, got shape {tuple(features.shape)}")
+    if features.ndim not in (2, 3):
+        raise SystemExit(
+            "Expected rank-2 or rank-3 features tensor, "
+            f"got shape {tuple(features.shape)}"
+        )
 
     num_samples = features.size(0)
     if num_samples != len(labels) or num_samples != len(sample_ids):

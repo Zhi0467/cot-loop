@@ -25,6 +25,10 @@ class ProbeConfig:
     hidden_dim: int = 1024
     dropout: float = 0.0
     depth: int = 1
+    classifier_mode: str = "last_layer"
+    classifier_layer: int = -1
+    vote_rule: str = "majority"
+    score_rule: str = "vote_fraction"
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
@@ -60,6 +64,7 @@ PROBE_DEFAULTS: dict[str, ProbeConfig] = {
         hidden_dim=128,
         dropout=0.1,
         depth=1,
+        classifier_mode="last_layer",
     ),
 }
 
@@ -126,6 +131,10 @@ def get_probe_config(
     hidden_dim: int | None = None,
     dropout: float | None = None,
     depth: int | None = None,
+    classifier_mode: str | None = None,
+    classifier_layer: int | None = None,
+    vote_rule: str | None = None,
+    score_rule: str | None = None,
 ) -> ProbeConfig:
     key = preset or "linear"
     if key not in PROBE_DEFAULTS:
@@ -139,10 +148,18 @@ def get_probe_config(
         cfg = replace(cfg, dropout=dropout)
     if depth is not None:
         cfg = replace(cfg, depth=depth)
+    if classifier_mode is not None:
+        cfg = replace(cfg, classifier_mode=classifier_mode)
+    if classifier_layer is not None:
+        cfg = replace(cfg, classifier_layer=classifier_layer)
+    if vote_rule is not None:
+        cfg = replace(cfg, vote_rule=vote_rule)
+    if score_rule is not None:
+        cfg = replace(cfg, score_rule=score_rule)
     return cfg
 
 
-def build_probe_model(input_dim: int, probe_cfg: ProbeConfig) -> nn.Module:
+def _build_base_probe_model(input_dim: int, probe_cfg: ProbeConfig) -> nn.Module:
     if input_dim < 1:
         raise ValueError("input_dim must be >= 1")
 
@@ -168,3 +185,47 @@ def build_probe_model(input_dim: int, probe_cfg: ProbeConfig) -> nn.Module:
         )
 
     raise ValueError(f"Unsupported probe_type '{probe_cfg.probe_type}'")
+
+
+def build_probe_model(
+    input_dim: int,
+    probe_cfg: ProbeConfig,
+    sample_shape: tuple[int, ...] | None = None,
+) -> nn.Module:
+    if sample_shape is None:
+        sample_shape = (input_dim,)
+    if len(sample_shape) not in (1, 2):
+        raise ValueError(
+            "sample_shape must describe flat [D] or stacked [L, D] features, "
+            f"got {sample_shape}"
+        )
+    if int(sample_shape[-1]) != input_dim:
+        raise ValueError(
+            f"input_dim={input_dim} does not match sample_shape={sample_shape}"
+        )
+
+    if probe_cfg.classifier_mode == "last_layer":
+        return _build_base_probe_model(input_dim=input_dim, probe_cfg=probe_cfg)
+
+    if probe_cfg.classifier_mode == "ensemble":
+        if len(sample_shape) != 2:
+            raise ValueError(
+                "classifier_mode='ensemble' requires stacked [L, D] features."
+            )
+        num_layers = int(sample_shape[0])
+        if num_layers < 1:
+            raise ValueError("stacked features must have at least one layer")
+
+        from .probes.layerwise_ensemble_probe import LayerwiseEnsembleProbe
+
+        return LayerwiseEnsembleProbe(
+            num_layers=num_layers,
+            probe_factory=lambda: _build_base_probe_model(
+                input_dim=input_dim,
+                probe_cfg=probe_cfg,
+            ),
+        )
+
+    raise ValueError(
+        f"Unsupported classifier_mode '{probe_cfg.classifier_mode}'"
+    )

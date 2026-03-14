@@ -69,6 +69,10 @@ def resolve_split_info(
 
 
 def resolve_input_dim(manifest: dict[str, object], feature_key: str | None) -> int:
+    sample_shape = resolve_sample_shape(manifest, feature_key)
+    if sample_shape:
+        return int(sample_shape[-1])
+
     resolved_feature_key = resolve_feature_key(manifest, feature_key)
     if resolved_feature_key is not None:
         feature_views = manifest.get("feature_views")
@@ -91,6 +95,38 @@ def resolve_input_dim(manifest: dict[str, object], feature_key: str | None) -> i
     if input_dim is None:
         raise SystemExit("Manifest missing required 'input_dim'.")
     return int(input_dim)
+
+
+def resolve_sample_shape(
+    manifest: dict[str, object],
+    feature_key: str | None,
+) -> tuple[int, ...]:
+    resolved_feature_key = resolve_feature_key(manifest, feature_key)
+    if resolved_feature_key is not None:
+        feature_views = manifest.get("feature_views")
+        if isinstance(feature_views, dict):
+            view_info = feature_views.get(resolved_feature_key)
+            if not isinstance(view_info, dict):
+                available = ", ".join(_available_feature_keys(manifest))
+                raise SystemExit(
+                    f"Feature key '{resolved_feature_key}' not found in manifest. "
+                    f"Available keys: [{available}]"
+                )
+            sample_shape = view_info.get("sample_shape")
+            if isinstance(sample_shape, list) and sample_shape:
+                return tuple(int(dim) for dim in sample_shape)
+            input_dim = view_info.get("input_dim")
+            if input_dim is not None:
+                return (int(input_dim),)
+
+    sample_shape = manifest.get("sample_shape")
+    if isinstance(sample_shape, list) and sample_shape:
+        return tuple(int(dim) for dim in sample_shape)
+
+    input_dim = manifest.get("input_dim")
+    if input_dim is None:
+        raise SystemExit("Manifest missing required 'input_dim'.")
+    return (int(input_dim),)
 
 
 class ActivationDataset(Dataset):

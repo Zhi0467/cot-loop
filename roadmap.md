@@ -25,7 +25,7 @@ Success criteria:
 Status: done (2026-03-05 18:45 UTC)
 Success criteria:
 - Consolidated findings doc and PDF reflect the k=5 three-view results.
-- PR #2 includes the multi-view, metrics, and RFM follow-up code paths.
+- PR #2 includes the stacked all-layer prefill, metrics, and metadata follow-up code paths.
 - Completion-view and prefill-view performance are directly comparable on shared labels.
 
 ## Milestone 3 - Metadata-aware prefill residual validation

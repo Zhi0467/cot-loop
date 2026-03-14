@@ -29,7 +29,13 @@ if SRC not in sys.path:
 
 from loop_probe.configs import build_probe_model, get_probe_config, probe_preset_choices
 from loop_probe.dataloader import ActivationDataset, read_manifest, resolve_feature_key
-from loop_probe.train_utils import choose_device, evaluate_binary_metrics, set_seed
+from loop_probe.train_utils import (
+    choose_device,
+    evaluate_probe_outputs,
+    probe_scores_and_predictions,
+    resolve_classifier_layer,
+    set_seed,
+)
 
 SUMMARY_METRICS = (
     "accuracy",
@@ -76,8 +82,11 @@ class ResidualDataset(Dataset):
         labels: torch.Tensor,
         group_ids: torch.Tensor | None = None,
     ) -> None:
-        if hidden_x.ndim != 2:
-            raise SystemExit(f"Expected 2D hidden features, got {tuple(hidden_x.shape)}")
+        if hidden_x.ndim not in (2, 3):
+            raise SystemExit(
+                "Expected flat or stacked hidden features, "
+                f"got {tuple(hidden_x.shape)}"
+            )
         if meta_logits.ndim != 1:
             raise SystemExit(f"Expected 1D metadata logits, got {tuple(meta_logits.shape)}")
         if labels.ndim != 1:
@@ -257,7 +266,6 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--eval-pool-jsonl", required=True)
     parser.add_argument("--prompt-field", default="problem")
     parser.add_argument("--feature-key", default=None)
-    parser.add_argument("--extra-feature-key", action="append", default=[])
     parser.add_argument("--tokenizer-model-id", required=True)
     parser.add_argument(
         "--metadata-feature-set",
@@ -283,6 +291,20 @@ def _parse_args() -> argparse.Namespace:
         "--probe-preset",
         choices=probe_preset_choices(),
         default="mlp",
+    )
+    parser.add_argument(
+        "--classifier-mode",
+        choices=("last_layer", "ensemble"),
+        default="last_layer",
+    )
+    parser.add_argument(
+        "--classifier-layer",
+        type=int,
+        default=-1,
+        help=(
+            "Layer index to use when --classifier-mode=last_layer and the "
+            "dataset stores stacked [layer, hidden] samples."
+        ),
     )
     parser.add_argument("--mlp-hidden-dim", type=int, default=512)
     parser.add_argument("--mlp-depth", type=int, default=2)
@@ -335,6 +357,10 @@ def _validate_args(args: argparse.Namespace) -> None:
         raise SystemExit("--num-length-bins must be >= 1.")
     if args.low_rank_dim < 0:
         raise SystemExit("--low-rank-dim must be >= 0.")
+    if args.classifier_mode != "last_layer" and args.classifier_layer != -1:
+        raise SystemExit(
+            "--classifier-layer is only valid when --classifier-mode=last_layer."
+        )
     if not 0.0 <= args.holdout_ratio < 1.0:
         raise SystemExit("--holdout-ratio must be in [0, 1).")
     if args.selection_split == "val" and args.holdout_ratio <= 0.0:
@@ -351,6 +377,10 @@ def _validate_args(args: argparse.Namespace) -> None:
         raise SystemExit("--rank-min-neg must be >= 1.")
     if args.rank_max_pairs_per_group < 0:
         raise SystemExit("--rank-max-pairs-per-group must be >= 0.")
+    if args.classifier_mode == "ensemble" and args.train_objective != "bce":
+        raise SystemExit(
+            "Metadata residual ensemble mode currently supports only --train-objective=bce."
+        )
     if args.train_objective != "group_bce_rank" and args.rank_lambda > 0.0:
         print(
             f"Ignoring --rank-lambda={args.rank_lambda} because --train-objective={args.train_objective}.",
@@ -428,8 +458,13 @@ def _metadata_rows_from_ids(
     return out
 
 
-def _evaluate_logits(labels: torch.Tensor, logits: torch.Tensor) -> dict[str, float]:
-    return evaluate_binary_metrics(labels, logits)
+def _evaluate_logits(
+    labels: torch.Tensor,
+    logits: torch.Tensor,
+    *,
+    classifier_mode: str,
+) -> dict[str, float]:
+    return evaluate_probe_outputs(labels, logits, classifier_mode=classifier_mode)
 
 
 def _subset_meta_rows(rows: list[PromptMetadata], indices: torch.Tensor) -> list[PromptMetadata]:
@@ -554,9 +589,11 @@ def _bin_metrics(
     labels: torch.Tensor,
     logits: torch.Tensor,
     num_length_bins: int,
+    classifier_mode: str,
 ) -> dict[str, float]:
     label_np = labels.detach().cpu().numpy().astype(int)
-    logits_np = logits.detach().cpu().numpy()
+    scores, _ = probe_scores_and_predictions(logits, classifier_mode=classifier_mode)
+    scores_np = scores.detach().cpu().numpy()
     lengths = np.asarray([row.token_length for row in rows], dtype=np.float64)
     sources = [row.source for row in rows]
 
@@ -584,9 +621,9 @@ def _bin_metrics(
             y_subset = label_np[subset_idx]
             if np.unique(y_subset).size < 2:
                 continue
-            probs_subset = 1.0 / (1.0 + np.exp(-logits_np[subset_idx]))
-            roc_vals.append(float(roc_auc_score(y_subset, probs_subset)))
-            pr_vals.append(float(average_precision_score(y_subset, probs_subset)))
+            score_subset = scores_np[subset_idx]
+            roc_vals.append(float(roc_auc_score(y_subset, score_subset)))
+            pr_vals.append(float(average_precision_score(y_subset, score_subset)))
             strata += 1
 
     if not roc_vals:
@@ -647,7 +684,35 @@ def _build_loader(
     )
 
 
-def _evaluate_loader(model, loader: DataLoader, device: torch.device) -> tuple[torch.Tensor, torch.Tensor]:
+def _combine_residual_and_metadata_logits(
+    residual_logits: torch.Tensor,
+    meta_logits: torch.Tensor,
+    *,
+    classifier_mode: str,
+) -> torch.Tensor:
+    if classifier_mode == "ensemble":
+        return residual_logits + meta_logits.unsqueeze(1)
+    return residual_logits + meta_logits
+
+
+def _loss_targets(
+    labels: torch.Tensor,
+    *,
+    logits: torch.Tensor,
+    classifier_mode: str,
+) -> torch.Tensor:
+    if classifier_mode == "ensemble":
+        return labels.unsqueeze(1).expand_as(logits)
+    return labels
+
+
+def _evaluate_loader(
+    model,
+    loader: DataLoader,
+    device: torch.device,
+    *,
+    classifier_mode: str,
+) -> tuple[torch.Tensor, torch.Tensor]:
     model.eval()
     all_logits = []
     all_labels = []
@@ -659,7 +724,11 @@ def _evaluate_loader(model, loader: DataLoader, device: torch.device) -> tuple[t
                 hidden_x, meta_logits, labels = batch
             hidden_x = hidden_x.to(device)
             meta_logits = meta_logits.to(device)
-            logits = model(hidden_x) + meta_logits
+            logits = _combine_residual_and_metadata_logits(
+                model(hidden_x),
+                meta_logits,
+                classifier_mode=classifier_mode,
+            )
             all_logits.append(logits.detach().cpu())
             all_labels.append(labels.detach().cpu())
     return torch.cat(all_labels, dim=0), torch.cat(all_logits, dim=0)
@@ -767,16 +836,25 @@ def _write_jsonl(path: str, row: dict[str, object]) -> None:
         f.write(json.dumps(row, sort_keys=True) + "\n")
 
 
-def _build_hidden_probe(args: argparse.Namespace, *, input_dim: int) -> tuple[nn.Module, dict[str, object]]:
+def _build_hidden_probe(
+    args: argparse.Namespace,
+    *,
+    input_dim: int,
+    sample_shape: tuple[int, ...],
+) -> tuple[nn.Module, dict[str, object]]:
     probe_cfg = get_probe_config(
         args.probe_preset,
         hidden_dim=args.mlp_hidden_dim,
         dropout=args.mlp_dropout,
         depth=args.mlp_depth,
+        classifier_mode=args.classifier_mode,
+        classifier_layer=args.classifier_layer,
     )
     if args.low_rank_dim > 0:
         if probe_cfg.probe_type != "mlp":
             raise SystemExit("--low-rank-dim currently requires --probe-preset=mlp.")
+        if probe_cfg.classifier_mode != "last_layer":
+            raise SystemExit("--low-rank-dim is only supported in last_layer mode.")
         model = LowRankMLPProbe(
             input_dim=input_dim,
             low_rank_dim=args.low_rank_dim,
@@ -788,59 +866,65 @@ def _build_hidden_probe(args: argparse.Namespace, *, input_dim: int) -> tuple[nn
         model_cfg["low_rank_dim"] = args.low_rank_dim
         model_cfg["probe_type"] = "low_rank_mlp"
         return model, model_cfg
-    return build_probe_model(input_dim=input_dim, probe_cfg=probe_cfg), probe_cfg.to_dict()
+    return (
+        build_probe_model(
+            input_dim=input_dim,
+            probe_cfg=probe_cfg,
+            sample_shape=sample_shape,
+        ),
+        probe_cfg.to_dict(),
+    )
 
 
-def _resolved_feature_keys(
+def _resolved_feature_key(
     manifest: dict[str, object],
     *,
     primary_key: str | None,
-    extra_keys: list[str],
-) -> list[str]:
-    keys: list[str] = []
+) -> str:
     if primary_key:
-        keys.append(primary_key)
-    keys.extend(key for key in extra_keys if key)
-    if keys:
-        return keys
+        return primary_key
     resolved = resolve_feature_key(manifest, None)
     if resolved is None:
         feature_key = manifest.get("feature_key")
         if isinstance(feature_key, str) and feature_key:
-            return [feature_key]
+            return feature_key
         raise SystemExit("Could not resolve default feature key from manifest.")
-    return [resolved]
+    return resolved
 
 
-def _load_feature_concat(
+def _load_stacked_feature_split(
     data_dir: str,
     split: str,
     *,
-    feature_keys: list[str],
-) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, list[str]]:
-    xs = []
-    labels: torch.Tensor | None = None
-    sample_ids: torch.Tensor | None = None
-    resolved_keys: list[str] = []
-    for feature_key in feature_keys:
-        ds = ActivationDataset(data_dir=data_dir, split=split, feature_key=feature_key)
-        if labels is None:
-            labels = ds.y.clone()
-            sample_ids = ds.sample_ids.clone()
-        else:
-            if not torch.equal(ds.y, labels):
-                raise SystemExit(
-                    f"Label mismatch while concatenating feature key '{feature_key}' on split '{split}'."
-                )
-            if sample_ids is None or not torch.equal(ds.sample_ids, sample_ids):
-                raise SystemExit(
-                    f"sample_id mismatch while concatenating feature key '{feature_key}' on split '{split}'."
-                )
-        xs.append(ds.x)
-        resolved_keys.append(ds.feature_key or feature_key)
-    if labels is None or sample_ids is None:
-        raise SystemExit("No feature tensors were loaded.")
-    return torch.cat(xs, dim=1), labels, sample_ids, resolved_keys
+    feature_key: str,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, str]:
+    ds = ActivationDataset(data_dir=data_dir, split=split, feature_key=feature_key)
+    if ds.x.ndim != 3:
+        raise SystemExit(
+            "Metadata residual training expects stacked [sample, layer, hidden] "
+            f"features, got {tuple(ds.x.shape)} for split '{split}'."
+        )
+    return ds.x, ds.y, ds.sample_ids, (ds.feature_key or feature_key)
+
+
+def _prepare_hidden_features(
+    hidden_x: torch.Tensor,
+    *,
+    classifier_mode: str,
+    resolved_classifier_layer: int | None,
+) -> torch.Tensor:
+    if hidden_x.ndim != 3:
+        raise SystemExit(
+            "Expected stacked [sample, layer, hidden] features, "
+            f"got {tuple(hidden_x.shape)}."
+        )
+    if classifier_mode == "last_layer":
+        if resolved_classifier_layer is None:
+            raise SystemExit("Missing resolved classifier layer for last_layer mode.")
+        return hidden_x[:, resolved_classifier_layer, :]
+    if classifier_mode == "ensemble":
+        return hidden_x
+    raise SystemExit(f"Unsupported classifier_mode '{classifier_mode}'.")
 
 
 def _aggregate_rows(rows: list[dict[str, object]]) -> dict[str, dict[str, float]]:
@@ -892,35 +976,62 @@ def main() -> None:
     )
 
     train_manifest = read_manifest(args.train_data_dir)
-    feature_keys = _resolved_feature_keys(
+    resolved_train_key = _resolved_feature_key(
         train_manifest,
         primary_key=args.feature_key,
-        extra_keys=args.extra_feature_key,
     )
-    train_x, train_y, train_sample_ids, resolved_train_keys = _load_feature_concat(
+    train_x_raw, train_y, train_sample_ids, resolved_train_key = _load_stacked_feature_split(
         args.train_data_dir,
         "train",
-        feature_keys=feature_keys,
+        feature_key=resolved_train_key,
     )
-    natural_x, natural_y, natural_sample_ids, resolved_natural_keys = _load_feature_concat(
+    natural_x_raw, natural_y, natural_sample_ids, resolved_natural_key = _load_stacked_feature_split(
         args.train_data_dir,
         "test",
-        feature_keys=feature_keys,
+        feature_key=resolved_train_key,
     )
     matched_manifest = read_manifest(args.matched_eval_data_dir)
-    matched_feature_keys = _resolved_feature_keys(
+    resolved_matched_key = _resolved_feature_key(
         matched_manifest,
         primary_key=args.feature_key,
-        extra_keys=args.extra_feature_key,
     )
-    matched_x, matched_y, matched_sample_ids, resolved_matched_keys = _load_feature_concat(
+    matched_x_raw, matched_y, matched_sample_ids, resolved_matched_key = _load_stacked_feature_split(
         args.matched_eval_data_dir,
         "test",
-        feature_keys=matched_feature_keys,
+        feature_key=resolved_matched_key,
     )
-    if resolved_train_keys != resolved_natural_keys or resolved_train_keys != resolved_matched_keys:
+    if resolved_train_key != resolved_natural_key or resolved_train_key != resolved_matched_key:
         raise SystemExit("Resolved feature keys do not match across train/natural/matched datasets.")
-    feature_key = "+".join(resolved_train_keys)
+    feature_key = resolved_train_key
+    train_sample_shape = tuple(int(dim) for dim in train_x_raw.shape[1:])
+    natural_sample_shape = tuple(int(dim) for dim in natural_x_raw.shape[1:])
+    matched_sample_shape = tuple(int(dim) for dim in matched_x_raw.shape[1:])
+    if natural_sample_shape != train_sample_shape or matched_sample_shape != train_sample_shape:
+        raise SystemExit(
+            "Stacked feature shape mismatch across train/natural/matched datasets: "
+            f"{train_sample_shape} vs {natural_sample_shape} vs {matched_sample_shape}"
+        )
+    resolved_classifier_layer: int | None = None
+    if args.classifier_mode == "last_layer":
+        resolved_classifier_layer = resolve_classifier_layer(
+            int(train_sample_shape[0]),
+            args.classifier_layer,
+        )
+    train_x = _prepare_hidden_features(
+        train_x_raw,
+        classifier_mode=args.classifier_mode,
+        resolved_classifier_layer=resolved_classifier_layer,
+    )
+    natural_x = _prepare_hidden_features(
+        natural_x_raw,
+        classifier_mode=args.classifier_mode,
+        resolved_classifier_layer=resolved_classifier_layer,
+    )
+    matched_x = _prepare_hidden_features(
+        matched_x_raw,
+        classifier_mode=args.classifier_mode,
+        resolved_classifier_layer=resolved_classifier_layer,
+    )
 
     train_pool_rows = _load_jsonl_rows(args.train_pool_jsonl)
     eval_pool_rows = _load_jsonl_rows(args.eval_pool_jsonl)
@@ -992,14 +1103,17 @@ def main() -> None:
             "train": _evaluate_logits(
                 model_train_y,
                 torch.tensor(meta_model.decision_function(model_train_meta_rows), dtype=torch.float32),
+                classifier_mode="last_layer",
             ),
             "natural": _evaluate_logits(
                 natural_y,
                 torch.tensor(meta_model.decision_function(natural_meta_rows), dtype=torch.float32),
+                classifier_mode="last_layer",
             ),
             "matched": _evaluate_logits(
                 matched_y,
                 torch.tensor(meta_model.decision_function(matched_meta_rows), dtype=torch.float32),
+                classifier_mode="last_layer",
             ),
             "params": meta_model.to_json(),
         }
@@ -1007,6 +1121,7 @@ def main() -> None:
             baseline_payload["val"] = _evaluate_logits(
                 holdout_y,
                 torch.tensor(meta_model.decision_function(holdout_meta_rows), dtype=torch.float32),
+                classifier_mode="last_layer",
             )
         metadata_baselines[feature_set] = baseline_payload
     _write_json(os.path.join(args.out_dir, "metadata_baselines.json"), metadata_baselines)
@@ -1086,7 +1201,11 @@ def main() -> None:
         with open(metrics_jsonl, "w", encoding="utf-8"):
             pass
 
-        model, probe_config_payload = _build_hidden_probe(args, input_dim=int(model_train_x.size(1)))
+        model, probe_config_payload = _build_hidden_probe(
+            args,
+            input_dim=int(train_sample_shape[-1]),
+            sample_shape=train_sample_shape,
+        )
         model = model.to(device)
         optimizer = torch.optim.AdamW(
             model.parameters(),
@@ -1141,10 +1260,18 @@ def main() -> None:
                     batch_group_ids = batch_group_ids.to(device)
 
                 residual_logits = model(hidden_x)
-                total_logits = residual_logits + meta_logits
+                total_logits = _combine_residual_and_metadata_logits(
+                    residual_logits,
+                    meta_logits,
+                    classifier_mode=args.classifier_mode,
+                )
                 pointwise_loss = F.binary_cross_entropy_with_logits(
                     total_logits,
-                    labels,
+                    _loss_targets(
+                        labels,
+                        logits=total_logits,
+                        classifier_mode=args.classifier_mode,
+                    ),
                     pos_weight=pos_weight,
                 )
                 group_bce_loss = pointwise_loss
@@ -1206,7 +1333,11 @@ def main() -> None:
 
             train_logits_cat = torch.cat(train_logits, dim=0)
             train_labels_cat = torch.cat(train_labels, dim=0)
-            train_metrics = _evaluate_logits(train_labels_cat, train_logits_cat)
+            train_metrics = _evaluate_logits(
+                train_labels_cat,
+                train_logits_cat,
+                classifier_mode=args.classifier_mode,
+            )
             train_loss_epoch = running_loss / max(seen, 1)
             train_pointwise_loss_epoch = running_pointwise_loss / max(seen, 1)
             train_group_bce_loss_epoch = running_group_bce_loss / max(seen, 1)
@@ -1223,35 +1354,65 @@ def main() -> None:
 
             val_metrics: dict[str, float] | None = None
             if holdout_loader is not None and holdout_meta_rows is not None:
-                val_labels, val_logits = _evaluate_loader(model, holdout_loader, device)
-                val_metrics = _evaluate_logits(val_labels, val_logits)
+                val_labels, val_logits = _evaluate_loader(
+                    model,
+                    holdout_loader,
+                    device,
+                    classifier_mode=args.classifier_mode,
+                )
+                val_metrics = _evaluate_logits(
+                    val_labels,
+                    val_logits,
+                    classifier_mode=args.classifier_mode,
+                )
                 val_metrics.update(
                     _bin_metrics(
                         rows=holdout_meta_rows,
                         labels=val_labels,
                         logits=val_logits,
                         num_length_bins=args.num_length_bins,
+                        classifier_mode=args.classifier_mode,
                     )
                 )
-            natural_labels, natural_logits = _evaluate_loader(model, natural_loader, device)
-            matched_labels, matched_logits = _evaluate_loader(model, matched_loader, device)
+            natural_labels, natural_logits = _evaluate_loader(
+                model,
+                natural_loader,
+                device,
+                classifier_mode=args.classifier_mode,
+            )
+            matched_labels, matched_logits = _evaluate_loader(
+                model,
+                matched_loader,
+                device,
+                classifier_mode=args.classifier_mode,
+            )
 
-            natural_metrics = _evaluate_logits(natural_labels, natural_logits)
+            natural_metrics = _evaluate_logits(
+                natural_labels,
+                natural_logits,
+                classifier_mode=args.classifier_mode,
+            )
             natural_metrics.update(
                 _bin_metrics(
                     rows=natural_meta_rows,
                     labels=natural_labels,
                     logits=natural_logits,
                     num_length_bins=args.num_length_bins,
+                    classifier_mode=args.classifier_mode,
                 )
             )
-            matched_metrics = _evaluate_logits(matched_labels, matched_logits)
+            matched_metrics = _evaluate_logits(
+                matched_labels,
+                matched_logits,
+                classifier_mode=args.classifier_mode,
+            )
             matched_metrics.update(
                 _bin_metrics(
                     rows=matched_meta_rows,
                     labels=matched_labels,
                     logits=matched_logits,
                     num_length_bins=args.num_length_bins,
+                    classifier_mode=args.classifier_mode,
                 )
             )
 
@@ -1260,6 +1421,11 @@ def main() -> None:
                 "epoch": epoch,
                 "step": global_step,
                 "lr": lr_now,
+                "feature_key": feature_key,
+                "sample_shape": list(train_sample_shape),
+                "classifier_mode": args.classifier_mode,
+                "classifier_layer": args.classifier_layer,
+                "resolved_classifier_layer": resolved_classifier_layer,
                 "train_loss": train_loss_epoch,
                 "train_pointwise_loss": train_pointwise_loss_epoch,
                 "train_group_bce_loss": train_group_bce_loss_epoch,
@@ -1300,7 +1466,10 @@ def main() -> None:
                         "step": global_step,
                         "state_dict": model.state_dict(),
                         "feature_key": feature_key,
-                        "feature_keys": resolved_train_keys,
+                        "sample_shape": list(train_sample_shape),
+                        "classifier_mode": args.classifier_mode,
+                        "classifier_layer": args.classifier_layer,
+                        "resolved_classifier_layer": resolved_classifier_layer,
                         "probe_config": probe_config_payload,
                         "metadata_feature_set": args.metadata_feature_set,
                         "metadata_model": active_meta_model.to_json(),

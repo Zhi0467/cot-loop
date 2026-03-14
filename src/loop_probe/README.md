@@ -1,10 +1,9 @@
 # loop_probe
 
 Purpose
-- Build a binary probe dataset from LLM runs to train a CoT loop detector:
-  - input feature = pooled prefill activation (configurable layer + pooling rule)
-  - target label = whether a rollout trajectory loops (`has_ngram_loop`)
-- Train a probe classifier (linear or MLP) on those features.
+- Build a binary probe dataset from LLM runs to train a CoT loop detector.
+- The canonical dataset stores the last-token activation from every transformer layer as a stacked `[layer, hidden]` tensor per prompt.
+- Train a probe classifier (linear or MLP) either on one selected layer or as a layerwise voting ensemble.
 
 High-level flow
 1. Load Hugging Face dataset rows and read prompt text from `--prompt-field`.
@@ -12,7 +11,7 @@ High-level flow
 3. Build train/test splits:
    - separate train/test dataset specs, or
    - identical train/test specs split deterministically with `--split-ratio`.
-4. Prefill pass (Transformers): extract one or more feature vectors per prompt.
+4. Prefill pass (Transformers): extract last-token activations from every layer and store them as a stacked tensor `[layer, hidden]` per prompt.
 5. Rollout pass (vLLM): generate one trajectory per prompt.
 6. Label with loop detector (`n`-gram repeated `k` times).
 7. Save tensors as `.pt` shards and write `manifest.json`.
@@ -51,39 +50,18 @@ python scripts/build_probe_dataset.py \
   --out-dir outputs/probe_data
 ```
 
-Build a shared multi-view dataset (one rollout-label pass for multiple feature views):
+The default `build_probe_dataset.py` feature view is
+`last_token_all_layers_stack_final`, a stacked `[layer, hidden]` tensor for the
+last token at every layer.
+
+Build the default stacked dataset:
 ```bash
 python scripts/build_probe_dataset.py \
   --train-dataset HuggingFaceH4/MATH-500 \
   --train-split test \
   --prompt-field problem \
   --model-preset openthinker3_1p5b \
-  --feature-key last_token_final \
-  --feature-pooling last_token \
-  --feature-layer -1 \
-  --extra-feature-view mean_pool_final:mean_pool:-1 \
-  --out-dir outputs/probe_data/shared_final_views
-```
-
-Build a three-view dataset with all-layer prefill features and rollout-completion features:
-```bash
-python scripts/build_probe_dataset.py \
-  --train-dataset my_org/train_pool \
-  --train-split train \
-  --train-max-samples 5000 \
-  --test-dataset my_org/eval_pool \
-  --test-split test \
-  --prompt-field problem \
-  --model-preset openthinker3_1p5b \
-  --max-tokens 15000 \
-  --loop-k 5 \
-  --feature-key rollout_lasttok_layers_mean \
-  --feature-pooling rollout_last_token_all_layers_mean \
-  --feature-layer -1 \
-  --extra-feature-view prefill_lasttok_layers_mean:last_token_all_layers_mean:-1 \
-  --extra-feature-view prefill_lasttok_layers_concat:last_token_all_layers_concat:-1 \
-  --completion-batch-size 1 \
-  --out-dir outputs/probe_data/three_view_k5
+  --out-dir outputs/probe_data/layers_stack
 ```
 
 Omit `--test-dataset` to use local `data/aime_2024_2025.jsonl` as test set
@@ -104,10 +82,18 @@ Train probe
 python scripts/train_probe.py \
   --data-dir outputs/probe_data \
   --out-dir outputs/probe_runs/run1 \
-  --feature-key mean_pool_final \
-  --probe-preset mlp \
-  --mlp-hidden-dim 256 \
-  --mlp-depth 2 \
+  --wandb-project cot-loop-probe
+```
+
+Default training uses an MLP in `last_layer` mode and slices the final layer
+from a stacked `[layer, hidden]` feature view.
+
+Train an ensemble over all layers
+```bash
+python scripts/train_probe.py \
+  --data-dir outputs/probe_data \
+  --out-dir outputs/probe_runs/run1_ensemble \
+  --classifier-mode ensemble \
   --wandb-project cot-loop-probe
 ```
 
@@ -115,7 +101,6 @@ Outputs
 - Dataset build:
   - `out_dir/train/shard-*.pt`
   - `out_dir/test/shard-*.pt`
-  - `out_dir/features/<feature_key>/{train,test}/shard-*.pt` (for extra views)
   - `out_dir/manifest.json`
 - Training:
   - `out_dir/best.pt`
@@ -129,4 +114,5 @@ Notes
 - Training script loads `.env` and expects `WANDB_API_KEY`.
 - `train_probe.py` supports optional MLP overrides:
   `--mlp-hidden-dim`, `--mlp-depth`, `--mlp-dropout`.
+- Ensemble mode uses per-layer hard votes, with ties resolving negative.
 - Install deps with `uv sync` before running.
