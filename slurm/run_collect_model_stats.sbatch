@@ -61,6 +61,10 @@ export VLLM_CACHE_ROOT="${VLLM_CACHE_ROOT:-${DEFAULT_CACHE_BASE}/vllm}"
 export TORCH_HOME="${TORCH_HOME:-${DEFAULT_CACHE_BASE}/torch}"
 export XDG_CACHE_HOME="${XDG_CACHE_HOME:-${DEFAULT_CACHE_BASE}}"
 
+if [[ -n "${MANUAL_CUDA_VISIBLE_DEVICES:-}" ]]; then
+  export CUDA_VISIBLE_DEVICES="${MANUAL_CUDA_VISIBLE_DEVICES}"
+fi
+
 mkdir -p \
   "${HF_HOME}" \
   "${HUGGINGFACE_HUB_CACHE}" \
@@ -77,6 +81,9 @@ echo "[collect-model-stats] HF_DATASETS_CACHE=${HF_DATASETS_CACHE}"
 echo "[collect-model-stats] VLLM_CACHE_ROOT=${VLLM_CACHE_ROOT}"
 echo "[collect-model-stats] TORCH_HOME=${TORCH_HOME}"
 echo "[collect-model-stats] XDG_CACHE_HOME=${XDG_CACHE_HOME}"
+if [[ -n "${CUDA_VISIBLE_DEVICES:-}" ]]; then
+  echo "[collect-model-stats] CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}"
+fi
 
 TASK_KIND="${TASK_KIND:-math_freeform}"
 DATASET="${DATASET:-data/aime_2024_2025.jsonl}"
