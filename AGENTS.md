@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Focus
-This repository builds a chain-of-thought (CoT) loop detector from configurable activation views. The current focus is a mixed-view workflow: completion features remain the strongest overall arm, while the 2026-03-13 prefill follow-up is stress-testing metadata-aware prefill residual signal and anchor-plus-boundary augmentations on the active PR branch.
+This repository builds a chain-of-thought (CoT) loop detector from configurable activation views. The current focus is the repaired cross-dataset rollout-statistics rerun: `MATH-500`, `AIME`, `GPQA`, and capped `MMLU-Pro` are already complete, and the only live blocker is the final capped `LiveCodeBench` leg while the prefill/completion probe conclusions remain stable in the background.
 
 ## Project Structure & Module Organization
 - `src/loop_probe/`: Core library for prompt loading, prefill extraction, rollout generation, loop labeling, probe architectures, and training utilities.

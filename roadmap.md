@@ -1,6 +1,6 @@
 # Roadmap - CoT Loop Detection
 
-Last updated: 2026-03-15 00:22 UTC
+Last updated: 2026-03-15 12:15 UTC
 
 Scope:
 - Build and validate a probe pipeline for CoT loop detection across prefill and completion feature views.
@@ -11,9 +11,11 @@ Scope:
 - Milestone 2 gate: complete.
 - Milestone 3 gate: complete.
 - Active milestone: Milestone 4 (cross-dataset validation).
-- Latest result: the metadata-aware prefill line has stopped moving. After the later representation and horizon-label rounds, the best prefill-only arm is still the Round 6 all-layer last-token anchor, so the active question is now how the rollout/loop behavior transfers across datasets rather than how to squeeze more from the one-bit prefill label.
-- Active experiment: none. The five-dataset bundle is complete, and the current executable work is a pre-rerun repair pass on the rollout-statistics module rather than another active Slurm chain.
-- Active review surface: the rollout-statistics contract patch is now local-only on a follow-up branch derived from the earlier PR #4 line; before the next experiment sweep, the branch needs one more project commit plus human approval to rerun the datasets under the repaired contract.
+- Latest result: under the repaired rollout-statistics v2 contract, `MATH-500`, `AIME`, `GPQA`, and capped `MMLU-Pro` are complete and reported. The only remaining blocker is the final capped `LiveCodeBench release_v6` leg, which was still running cleanly at `402 / 800` prompts on the pinned seven-GPU path at `2026-03-15 12:15 UTC`.
+- Active experiment: the capped `LiveCodeBench` finish watch on Slurm job `1330`. The authoritative scratch stats dir still has no `livecodebench_release_v6__test__Qwen_Qwen3-1.7B.json` or paired `__lcb_records.json`, so the project remains in monitor/report mode rather than a new training or repair round.
+- Active review surfaces:
+  - Upstream PR #4 (`Zhi0467/cot-loop`, branch `task/1773451376-rollout-stats`) remains `OPEN` / `DRAFT` at head `d0796c3`, but it no longer covers the current local branch state.
+  - The local follow-up branch already carries the stale-artifact fix (`d941986`) plus the post-rerun doc state; bounded `review_project.sh --base main` still does not reach a terminal verdict here, so the branch is not locally review-cleared yet.
 
 ## Milestone 1 - Pipeline and multi-view infrastructure
 Status: done (2026-03-05 18:45 UTC)
