@@ -140,6 +140,37 @@ def _derive_output_path(args: argparse.Namespace) -> str:
     return os.path.join(ROOT, "outputs", "model_stats", filename)
 
 
+def _lcb_records_checkpoint_path(out_path: str) -> str:
+    base, ext = os.path.splitext(out_path)
+    return f"{base}__lcb_records{ext or '.json'}"
+
+
+def _archive_preexisting_output(path: str) -> None:
+    if not os.path.exists(path):
+        return
+    stem, ext = os.path.splitext(path)
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    archived_path = f"{stem}__preexisting_{timestamp}{ext}"
+    counter = 1
+    while os.path.exists(archived_path):
+        archived_path = f"{stem}__preexisting_{timestamp}_{counter}{ext}"
+        counter += 1
+    out_dir = os.path.dirname(path)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
+    os.replace(path, archived_path)
+    print(
+        f"Archived preexisting output from {path} to {archived_path}",
+        flush=True,
+    )
+
+
+def _prepare_output_paths(args: argparse.Namespace, out_path: str) -> None:
+    _archive_preexisting_output(out_path)
+    if args.task_kind == "livecodebench_codegen":
+        _archive_preexisting_output(_lcb_records_checkpoint_path(out_path))
+
+
 def _normalize_finish_reason(reason: object) -> str:
     if hasattr(reason, "value"):
         reason = getattr(reason, "value")
@@ -833,8 +864,7 @@ def _apply_lcb_grades(
 
 
 def _write_lcb_records_checkpoint(agg: WorkerAggregator, out_path: str) -> str:
-    base, ext = os.path.splitext(out_path)
-    checkpoint_path = f"{base}__lcb_records{ext or '.json'}"
+    checkpoint_path = _lcb_records_checkpoint_path(out_path)
     checkpoint_dir = os.path.dirname(checkpoint_path)
     if checkpoint_dir:
         os.makedirs(checkpoint_dir, exist_ok=True)
@@ -869,6 +899,8 @@ def main() -> None:
     _run_dependency_preflight(args)
     rollout_cfg = _build_rollout_config(args)
     statistics = _parse_statistics(args.statistics)
+    out_path = args.out or _derive_output_path(args)
+    _prepare_output_paths(args, out_path)
 
     tokenizer = AutoTokenizer.from_pretrained(
         rollout_cfg.model_id,
@@ -895,7 +927,6 @@ def main() -> None:
         loop_n=args.loop_n,
         loop_k=args.loop_k,
     )
-    out_path = args.out or _derive_output_path(args)
     lcb_native_metrics: dict[str, float | None] = {}
     if args.task_kind == "livecodebench_codegen":
         _write_lcb_records_checkpoint(agg, out_path)
