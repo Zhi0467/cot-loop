@@ -39,6 +39,10 @@ if [[ -f "${HOME}/.env" ]]; then
   set +a
 fi
 
+if [[ -z "${HF_TOKEN:-}" && -n "${HUGGINGFACE_TOKEN:-}" ]]; then
+  export HF_TOKEN="${HUGGINGFACE_TOKEN}"
+fi
+
 export VLLM_SUPPRESS_SEM_UNLINK_ERRORS=1
 export HF_HUB_CONNECT_TIMEOUT=30
 export HF_HUB_READ_TIMEOUT=120

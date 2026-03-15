@@ -179,10 +179,14 @@ def _run_dataset_preflight(args: argparse.Namespace) -> None:
         raise SystemExit(f"Dataset path does not exist: {args.dataset}")
 
     if args.task_kind == "multiple_choice_gpqa" and not os.path.isfile(args.dataset):
-        if not os.environ.get("HF_TOKEN", "").strip():
+        hf_token = os.environ.get("HF_TOKEN", "").strip() or os.environ.get(
+            "HUGGINGFACE_TOKEN", ""
+        ).strip()
+        if not hf_token:
             raise SystemExit(
                 "multiple_choice_gpqa requires HF_TOKEN for gated dataset access."
             )
+        os.environ.setdefault("HF_TOKEN", hf_token)
 
     if args.task_kind == "livecodebench_codegen":
         if not os.environ.get("HF_DATASETS_CACHE", "").strip():
