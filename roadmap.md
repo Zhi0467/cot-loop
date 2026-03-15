@@ -1,6 +1,6 @@
 # Roadmap - CoT Loop Detection
 
-Last updated: 2026-03-15 12:15 UTC
+Last updated: 2026-03-15 21:56 UTC
 
 Scope:
 - Build and validate a probe pipeline for CoT loop detection across prefill and completion feature views.
@@ -11,8 +11,8 @@ Scope:
 - Milestone 2 gate: complete.
 - Milestone 3 gate: complete.
 - Active milestone: Milestone 4 (cross-dataset validation).
-- Latest result: under the repaired rollout-statistics v2 contract, `MATH-500`, `AIME`, `GPQA`, and capped `MMLU-Pro` are complete and reported. The only remaining blocker is the final capped `LiveCodeBench release_v6` leg, which was still running cleanly at `402 / 800` prompts on the pinned seven-GPU path at `2026-03-15 12:15 UTC`.
-- Active experiment: the capped `LiveCodeBench` finish watch on Slurm job `1330`. The authoritative scratch stats dir still has no `livecodebench_release_v6__test__Qwen_Qwen3-1.7B.json` or paired `__lcb_records.json`, so the project remains in monitor/report mode rather than a new training or repair round.
+- Latest result: under the repaired rollout-statistics v2 contract, `MATH-500`, `AIME`, `GPQA`, `MMLU-Pro`, and capped `LiveCodeBench release_v6` are all now reportable. The crashed `LiveCodeBench` leg was recovered by checkpoint regrade at `2026-03-15 21:53 UTC`, yielding the final correctness / loop / max-length / native `pass@k` block for the capped `800`-prompt run.
+- Remaining caveat: the original `LiveCodeBench` job crashed after grading and before writing its final JSON, and replay-based repair did not reproduce the stored checkpoint exactly enough to recover `avg_first_loop_prefix_length`. That one metric remains `null` in the recovered capped bundle; a fresh rerun would be required if exact prefix-length telemetry is still needed.
 - Active review surfaces:
   - Upstream PR #4 (`Zhi0467/cot-loop`, branch `task/1773451376-rollout-stats`) remains `OPEN` / `DRAFT` at head `d0796c3`, but it no longer covers the current local branch state.
   - The local follow-up branch already carries the stale-artifact fix (`d941986`) plus the post-rerun doc state; bounded `review_project.sh --base main` still does not reach a terminal verdict here, so the branch is not locally review-cleared yet.

@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Focus
-This repository builds a chain-of-thought (CoT) loop detector from configurable activation views. The current focus is the repaired cross-dataset rollout-statistics rerun: `MATH-500`, `AIME`, `GPQA`, and capped `MMLU-Pro` are already complete, and the only live blocker is the final capped `LiveCodeBench` leg while the prefill/completion probe conclusions remain stable in the background.
+This repository builds a chain-of-thought (CoT) loop detector from configurable activation views. The current focus is the repaired cross-dataset rollout-statistics rerun: `MATH-500`, `AIME`, `GPQA`, `MMLU-Pro`, and capped `LiveCodeBench release_v6` are now all recovered and reportable, with one explicit caveat that the crashed `LiveCodeBench` run left `avg_first_loop_prefix_length` irrecoverable even though the correctness / loop / max-length / native `pass@k` block was recovered.
 
 ## Project Structure & Module Organization
 - `src/loop_probe/`: Core library for prompt loading, prefill extraction, rollout generation, loop labeling, probe architectures, and training utilities.

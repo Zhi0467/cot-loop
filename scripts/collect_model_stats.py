@@ -92,6 +92,14 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--livecodebench-repo", default="")
     parser.add_argument("--release-version", default="release_v6")
     parser.add_argument("--lm-style-override", default=None)
+    parser.add_argument(
+        "--resume-lcb-records-checkpoint",
+        default="",
+        help=(
+            "Reuse an existing LiveCodeBench __lcb_records checkpoint and skip "
+            "generation. Only valid with --task-kind livecodebench_codegen."
+        ),
+    )
     parser.add_argument("--trust-remote-code", action="store_true", default=True)
     parser.add_argument(
         "--no-trust-remote-code",
@@ -165,10 +173,20 @@ def _archive_preexisting_output(path: str) -> None:
     )
 
 
-def _prepare_output_paths(args: argparse.Namespace, out_path: str) -> None:
+def _prepare_output_paths(
+    args: argparse.Namespace,
+    out_path: str,
+    *,
+    preserve_lcb_checkpoint_path: str | None = None,
+) -> None:
     _archive_preexisting_output(out_path)
     if args.task_kind == "livecodebench_codegen":
-        _archive_preexisting_output(_lcb_records_checkpoint_path(out_path))
+        checkpoint_path = _lcb_records_checkpoint_path(out_path)
+        if preserve_lcb_checkpoint_path and os.path.abspath(
+            checkpoint_path
+        ) == os.path.abspath(preserve_lcb_checkpoint_path):
+            return
+        _archive_preexisting_output(checkpoint_path)
 
 
 def _normalize_finish_reason(reason: object) -> str:
@@ -234,13 +252,18 @@ def _run_dataset_preflight(args: argparse.Namespace) -> None:
             )
 
 
-def _run_dependency_preflight(args: argparse.Namespace) -> None:
-    try:
-        import vllm  # noqa: F401
-    except Exception as exc:
-        raise SystemExit(
-            "vLLM is required for collect_model_stats. Install vLLM first."
-        ) from exc
+def _run_dependency_preflight(
+    args: argparse.Namespace,
+    *,
+    require_vllm: bool = True,
+) -> None:
+    if require_vllm:
+        try:
+            import vllm  # noqa: F401
+        except Exception as exc:
+            raise SystemExit(
+                "vLLM is required for collect_model_stats. Install vLLM first."
+            ) from exc
 
     if args.task_kind == "math_freeform":
         math_freeform.preflight()
@@ -289,7 +312,7 @@ def _build_rollout_config(args: argparse.Namespace) -> RolloutConfig:
 
 def _load_prompt_items(
     args: argparse.Namespace,
-    tokenizer,
+    tokenizer: Any | None,
 ) -> tuple[list[PromptWorkItem], dict[str, object], Any]:
     spec = DatasetSpec(
         dataset=args.dataset,
@@ -299,6 +322,8 @@ def _load_prompt_items(
     )
 
     if args.task_kind == "math_freeform":
+        if tokenizer is None:
+            raise SystemExit("Tokenizer is required for math_freeform prompt building.")
         samples = math_freeform.load_samples(
             spec,
             question_field=args.question_field,
@@ -315,6 +340,10 @@ def _load_prompt_items(
         return items, {}, None
 
     if args.task_kind == "multiple_choice_gpqa":
+        if tokenizer is None:
+            raise SystemExit(
+                "Tokenizer is required for multiple_choice_gpqa prompt building."
+            )
         samples = multiple_choice_gpqa.load_and_shuffle(spec, args.seed)
         items = [
             PromptWorkItem(
@@ -337,6 +366,10 @@ def _load_prompt_items(
         return items, metadata, None
 
     if args.task_kind == "multiple_choice_mmlupro":
+        if tokenizer is None:
+            raise SystemExit(
+                "Tokenizer is required for multiple_choice_mmlupro prompt building."
+            )
         samples = multiple_choice_mmlupro.load_samples(spec)
         items = [
             PromptWorkItem(
@@ -523,6 +556,7 @@ def _collect_worker_stats(
                             max_length_hit=False,
                             finish_reason="prompt_too_long",
                             prompt_too_long=True,
+                            first_loop_prefix_length=None,
                         )
                     )
                 continue
@@ -583,6 +617,7 @@ def _collect_worker_stats(
                         agg.num_looped += 1
                         agg.loop_length_sum += token_count
                         agg.first_loop_prefix_sum += first_loop_prefix
+                        agg.first_loop_prefix_count += 1
                     if max_length_hit:
                         agg.num_max_length_hits += 1
                     if loop_flag and max_length_hit:
@@ -608,6 +643,7 @@ def _collect_worker_stats(
                                 max_length_hit=max_length_hit,
                                 finish_reason=finish_reason,
                                 prompt_too_long=False,
+                                first_loop_prefix_length=first_loop_prefix,
                             )
                         )
                     else:
@@ -810,13 +846,98 @@ def _run_collection(
             pass
 
 
+def _load_lcb_records_checkpoint(checkpoint_path: str) -> WorkerAggregator:
+    if not checkpoint_path:
+        raise SystemExit("Missing --resume-lcb-records-checkpoint path.")
+    if not os.path.isfile(checkpoint_path):
+        raise SystemExit(
+            f"LiveCodeBench checkpoint path does not exist: {checkpoint_path}"
+        )
+
+    with open(checkpoint_path, encoding="utf-8") as handle:
+        payload = json.load(handle)
+    if not isinstance(payload, dict):
+        raise SystemExit(
+            f"LiveCodeBench checkpoint must contain a JSON object: {checkpoint_path}"
+        )
+
+    raw_records = payload.get("records")
+    if not isinstance(raw_records, list):
+        raise SystemExit(
+            f"LiveCodeBench checkpoint is missing a records list: {checkpoint_path}"
+        )
+
+    agg = WorkerAggregator()
+    agg.lcb_sample_records = [
+        LcbSampleRecord.from_dict(record) for record in raw_records
+    ]
+
+    prompt_lengths: dict[str, int] = {}
+    for index, record in enumerate(agg.lcb_sample_records):
+        if not record.question_id:
+            raise SystemExit(
+                "LiveCodeBench checkpoint record is missing question_id at "
+                f"records[{index}]."
+            )
+        existing_prompt_length = prompt_lengths.get(record.question_id)
+        if existing_prompt_length is None:
+            prompt_lengths[record.question_id] = record.prompt_token_count
+        elif existing_prompt_length != record.prompt_token_count:
+            raise SystemExit(
+                "LiveCodeBench checkpoint has inconsistent prompt_token_count for "
+                f"question_id {record.question_id!r}."
+            )
+
+        if record.prompt_too_long:
+            agg.num_prompt_too_long += 1
+            continue
+
+        agg.num_generated += 1
+        agg.length_sum += record.token_count
+        agg.length_sq_sum += record.token_count * record.token_count
+        if record.loop_flag:
+            agg.num_looped += 1
+            agg.loop_length_sum += record.token_count
+            if record.first_loop_prefix_length is not None:
+                agg.first_loop_prefix_sum += record.first_loop_prefix_length
+                agg.first_loop_prefix_count += 1
+        if record.max_length_hit:
+            agg.num_max_length_hits += 1
+        if record.loop_flag and record.max_length_hit:
+            agg.num_looped_and_max_length_hit += 1
+
+    agg.num_samples_seen = len(prompt_lengths)
+    agg.prompt_length_sum = sum(prompt_lengths.values())
+    if prompt_lengths:
+        prompt_length_values = list(prompt_lengths.values())
+        agg.prompt_length_min = min(prompt_length_values)
+        agg.prompt_length_max = max(prompt_length_values)
+
+    expected_counts = {
+        "num_samples": agg.num_samples_seen,
+        "num_generated": agg.num_generated,
+        "num_prompt_too_long": agg.num_prompt_too_long,
+    }
+    for field_name, actual in expected_counts.items():
+        expected = payload.get(field_name)
+        if expected is None:
+            continue
+        if int(expected) != actual:
+            raise SystemExit(
+                f"LiveCodeBench checkpoint {checkpoint_path} has inconsistent "
+                f"{field_name}: payload={expected} reconstructed={actual}."
+            )
+
+    return agg
+
+
 def _apply_lcb_grades(
     agg: WorkerAggregator,
     benchmark,
     *,
     repo_path: str,
     release_version: str,
-) -> dict[str, float | None]:
+) -> dict[str, Any]:
     native_metrics, grading_by_record_key = livecodebench_codegen.evaluate_records(
         benchmark,
         agg.lcb_sample_records,
@@ -895,18 +1016,35 @@ def _prompt_token_summary(agg: WorkerAggregator) -> dict[str, float | int | None
 
 def main() -> None:
     args = _parse_args()
+    resume_lcb_checkpoint = args.resume_lcb_records_checkpoint.strip()
+    if resume_lcb_checkpoint and args.task_kind != "livecodebench_codegen":
+        raise SystemExit(
+            "--resume-lcb-records-checkpoint is only valid with "
+            "--task-kind livecodebench_codegen."
+        )
     _run_dataset_preflight(args)
-    _run_dependency_preflight(args)
+    _run_dependency_preflight(
+        args,
+        require_vllm=not bool(resume_lcb_checkpoint),
+    )
     rollout_cfg = _build_rollout_config(args)
     statistics = _parse_statistics(args.statistics)
     out_path = args.out or _derive_output_path(args)
-    _prepare_output_paths(args, out_path)
-
-    tokenizer = AutoTokenizer.from_pretrained(
-        rollout_cfg.model_id,
-        trust_remote_code=rollout_cfg.trust_remote_code,
-        use_fast=True,
+    _prepare_output_paths(
+        args,
+        out_path,
+        preserve_lcb_checkpoint_path=resume_lcb_checkpoint or None,
     )
+
+    tokenizer = None
+    if not (
+        resume_lcb_checkpoint and args.task_kind == "livecodebench_codegen"
+    ):
+        tokenizer = AutoTokenizer.from_pretrained(
+            rollout_cfg.model_id,
+            trust_remote_code=rollout_cfg.trust_remote_code,
+            use_fast=True,
+        )
     items, task_metadata, lcb_benchmark = _load_prompt_items(args, tokenizer)
     if not items:
         raise SystemExit("No prompt items were loaded for collection.")
@@ -921,15 +1059,34 @@ def main() -> None:
         lm_style_override=args.lm_style_override,
     )
 
-    agg = _run_collection(
-        items,
-        collector_cfg,
-        loop_n=args.loop_n,
-        loop_k=args.loop_k,
-    )
-    lcb_native_metrics: dict[str, float | None] = {}
+    if resume_lcb_checkpoint:
+        agg = _load_lcb_records_checkpoint(resume_lcb_checkpoint)
+        if agg.num_samples_seen != len(items):
+            raise SystemExit(
+                "LiveCodeBench checkpoint prompt count does not match the current "
+                f"dataset selection ({agg.num_samples_seen} vs {len(items)})."
+            )
+        task_metadata = {
+            **task_metadata,
+            "resumed_from_lcb_records_checkpoint": True,
+        }
+        if agg.first_loop_prefix_count != agg.num_looped:
+            task_metadata = {
+                **task_metadata,
+                "lcb_checkpoint_missing_first_loop_prefix_length": True,
+            }
+    else:
+        agg = _run_collection(
+            items,
+            collector_cfg,
+            loop_n=args.loop_n,
+            loop_k=args.loop_k,
+        )
+
+    lcb_native_metrics: dict[str, Any] = {}
     if args.task_kind == "livecodebench_codegen":
-        _write_lcb_records_checkpoint(agg, out_path)
+        if not resume_lcb_checkpoint:
+            _write_lcb_records_checkpoint(agg, out_path)
         lcb_native_metrics = _apply_lcb_grades(
             agg,
             lcb_benchmark,

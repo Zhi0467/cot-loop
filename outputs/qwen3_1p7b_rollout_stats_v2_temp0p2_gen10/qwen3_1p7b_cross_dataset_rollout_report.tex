@@ -1,0 +1,154 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{tabularx}
+\usepackage{float}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{longtable}
+\usepackage{array}
+\hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+
+\title{Cross-Dataset Rollout Statistics Report for Qwen/Qwen3-1.7B}
+\author{Murphy}
+\date{2026-03-15T21:53:46.153379+00:00}
+
+\begin{document}
+\maketitle
+
+\section*{Scope}
+This report consolidates the full math $\rightarrow$ GPQA $\rightarrow$ MMLU-Pro $\rightarrow$ LiveCodeBench rollout-stat sweep for \texttt{Qwen/Qwen3-1.7B}. The collector uses the n-gram loop detector with \texttt{n=30} and \texttt{k=20} and records both prompt-level counts and rollout-level event rates, including overlap statistics between looping, max-model-length termination, and correctness.
+
+The math block was evaluated as two separate datasets under the same freeform prompt contract: \texttt{MATH-500} (500 samples) and \texttt{AIME 2024/2025} (60 samples). The downstream multiple-choice and code-generation blocks were evaluated on \texttt{GPQA Diamond}, \texttt{MMLU-Pro}, and \texttt{LiveCodeBench release\_v6} in the same rollout pipeline.
+
+\section*{Datasets and Prompt Formats}
+\paragraph{MATH-500}
+\textbf{Task kind.} \texttt{math\_freeform}
+\textbf{Dataset.} 500 free-form math problems from the HuggingFaceH4 MATH-500 test split.
+\textbf{Chat / prompt format.} Tokenizer chat template with one user turn: the raw problem text followed by 'You must put your final answer within \textbackslash{}\textbackslash{}boxed\{\}.'
+
+\paragraph{AIME 2024/2025}
+\textbf{Task kind.} \texttt{math\_freeform}
+\textbf{Dataset.} A local 60-row JSONL made by concatenating the AIME 2024 and 2025 test splits into question/answer records.
+\textbf{Chat / prompt format.} The same math-freeform Qwen chat template as MATH-500: one user turn with the problem plus a final-answer-in-box instruction.
+
+\paragraph{GPQA Diamond}
+\textbf{Task kind.} \texttt{multiple\_choice\_gpqa}
+\textbf{Dataset.} A local staged GPQA Diamond CSV with 198 graduate-level science questions and shuffled four-way answer options.
+\textbf{Chat / prompt format.} Tokenizer chat template with one user turn containing the question, a shuffled A-D answer block, and the instruction that the final non-empty line must be exactly 'Answer: X'.
+
+\paragraph{MMLU-Pro}
+\textbf{Task kind.} \texttt{multiple\_choice\_mmlupro}
+\textbf{Dataset.} The TIGER-Lab MMLU-Pro test split, capped to 800 examples for this rollout pass. Requested cap: at most 800 samples.
+\textbf{Chat / prompt format.} Tokenizer chat template with one user turn containing the question, an A-J answer list, and the instruction that the final non-empty line must be exactly 'Answer: X'.
+
+\paragraph{LiveCodeBench release\_v6}
+\textbf{Task kind.} \texttt{livecodebench\_codegen}
+\textbf{Dataset.} A question-id-sorted slice of the LiveCodeBench release\_v6 code-generation benchmark, capped to 800 problems for this rollout pass. Requested cap: at most 800 samples.
+\textbf{Chat / prompt format.} LiveCodeBench's format\_prompt\_generation pipeline with LM style CodeQwenInstruct, producing raw string prompts rather than a tokenizer chat-template wrapper.
+
+\section*{Generation Configuration}
+The common collector configuration across all runs is:
+\begin{itemize}[leftmargin=1.5em]
+\item Model: \texttt{Qwen/Qwen3-1.7B}
+\item Seed: \texttt{0}
+\item Loop detector: \texttt{n=30, k=20}
+\item Common settings shared by every dataset JSON: \texttt{temperature=0.2}, \texttt{num\_generations=10}, \texttt{max\_tokens=81920}, \texttt{max\_model\_len=40960}, \texttt{dtype=bfloat16}, and \texttt{trust\_remote\_code=True}
+\end{itemize}
+
+Per-dataset runtime settings are:
+\begin{tabular}{lrrrrr}
+\toprule
+Dataset & Sample cap & TP & DP & Max seqs & Batch toks \\
+\midrule
+MATH-500 & full & 1 & 8 & 10 & 4096 \\
+AIME 2024/2025 & full & 1 & 8 & 10 & 4096 \\
+GPQA Diamond & full & 1 & 7 & 10 & 4096 \\
+MMLU-Pro & 800 & 1 & 7 & 10 & 4096 \\
+LiveCodeBench release\_v6 & 800 & 1 & 7 & 10 & 4096 \\
+\bottomrule
+\end{tabular}
+
+\section*{Statistics Logged}
+The refreshed collector contract tracks the following metrics across the bundle (13 named metrics in the union):
+\begin{itemize}[leftmargin=1.5em]
+\item \texttt{avg\_correct\_generation\_length}: Average generated length restricted to correct rollouts.
+\item \texttt{avg\_first\_loop\_prefix\_length}: Average prefix length before the first detected loop.
+\item \texttt{avg\_generation\_length}: Average number of generated tokens per rollout.
+\item \texttt{avg\_loop\_generation\_length}: Average generated length restricted to looped rollouts.
+\item \texttt{avg\_wrong\_generation\_length}: Average generated length restricted to wrong rollouts.
+\item \texttt{generation\_length\_variance}: Variance of generated token counts across generated rollouts.
+\item \texttt{loop\_fraction}: Fraction of generated rollouts flagged by the n-gram loop detector.
+\item \texttt{loop\_max\_length\_hit\_fraction}: Among looped rollouts, fraction whose prompt-plus-generation length also hit max\_model\_len.
+\item \texttt{loop\_success\_fraction}: Among looped rollouts, fraction that were still correct.
+\item \texttt{max\_length\_hit\_fraction}: Fraction of generated rollouts whose prompt-plus-generation length hit max\_model\_len.
+\item \texttt{max\_length\_hit\_loop\_fraction}: Among max-length-hit rollouts, fraction that were also looped.
+\item \texttt{max\_length\_hit\_success\_fraction}: Among max-length-hit rollouts, fraction that were correct.
+\item \texttt{success\_fraction}: Fraction of graded rollouts with the correct answer.
+\end{itemize}
+
+The JSON payloads also retain the raw event counts for prompts, graded/generated rollouts, looped rollouts, max-length hits, prompt-too-long exclusions, and their pairwise intersections. For \texttt{LiveCodeBench}, the collector also stores the native benchmark metrics separately from rollout-level success.
+
+\section*{Results Summary}
+\begin{tabular}{lrrrrr}
+\toprule
+Dataset & Prompts & Rollouts & Rollout success & Looped & Max length \\
+\midrule
+MATH-500 & 500 & 5000 & 72.6\% & 2.9\% & 1.5\% \\
+AIME 2024/2025 & 60 & 600 & 38.5\% & 15.0\% & 12.7\% \\
+GPQA Diamond & 198 & 1980 & 3.1\% & 22.3\% & 10.2\% \\
+MMLU-Pro & 800 & 8000 & 14.2\% & 5.6\% & 1.2\% \\
+LiveCodeBench release\_v6 & 800 & 8000 & 58.1\% & 15.0\% & 10.8\% \\
+\bottomrule
+\end{tabular}
+
+\begin{itemize}[leftmargin=1.5em]
+\item MATH-500: rollout success 3628/5000 (72.6\%) graded rollouts; looped 147/5000 (2.9\%) generated rollouts; max-length hits 73/5000 (1.5\%) generated rollouts; looped and max-length 71/147 (48.3\%); max-length and looped 71/73 (97.3\%); looped and correct 47/147 (32.0\%); prompt-too-long 0/500 (0.0\%) prompts.
+\item AIME 2024/2025: rollout success 231/600 (38.5\%) graded rollouts; looped 90/600 (15.0\%) generated rollouts; max-length hits 76/600 (12.7\%) generated rollouts; looped and max-length 69/90 (76.7\%); max-length and looped 69/76 (90.8\%); looped and correct 2/90 (2.2\%); prompt-too-long 0/60 (0.0\%) prompts.
+\item GPQA Diamond: rollout success 62/1980 (3.1\%) graded rollouts; looped 442/1980 (22.3\%) generated rollouts; max-length hits 202/1980 (10.2\%) generated rollouts; looped and max-length 201/442 (45.5\%); max-length and looped 201/202 (99.5\%); looped and correct 4/442 (0.9\%); prompt-too-long 0/198 (0.0\%) prompts.
+\item MMLU-Pro: rollout success 1133/8000 (14.2\%) graded rollouts; looped 445/8000 (5.6\%) generated rollouts; max-length hits 93/8000 (1.2\%) generated rollouts; looped and max-length 93/445 (20.9\%); max-length and looped 93/93 (100.0\%); looped and correct 1/445 (0.2\%); prompt-too-long 0/800 (0.0\%) prompts.
+\item LiveCodeBench release\_v6: rollout success 4647/8000 (58.1\%) graded rollouts; looped 1198/8000 (15.0\%) generated rollouts; max-length hits 865/8000 (10.8\%) generated rollouts; looped and max-length 864/1198 (72.1\%); max-length and looped 864/865 (99.9\%); looped and correct 68/1198 (5.7\%); prompt-too-long 0/800 (0.0\%) prompts. Native LiveCodeBench metrics: pass@1 58.1\textbackslash{}\%; pass@5 71.1\textbackslash{}\%; pass@10 73.8\textbackslash{}\%.
+\end{itemize}
+
+\subsection*{Headline observations}
+The largest raw loop rate appears on GPQA Diamond at 22.3\%, while MATH-500 is the most stable dataset in this bundle at 2.9\%.
+The longest looped generations also appear on AIME 2024/2025: 36756.9 tokens on average. The first detected loop appears after 13824.5 tokens on average.
+Prompt-plus-generation max-length termination is almost synonymous with looping on the hardest long-form settings: MMLU-Pro reaches 100.0\% for the max-length-hit loop conditional.
+The most forgiving loop regime is MATH-500, where 32.0\% of looped rollouts still end in a correct answer.
+
+
+\subsection*{Recovery caveat}
+\begin{itemize}[leftmargin=1.5em]
+\item LiveCodeBench release\_v6: the recovered checkpoint contains the final correctness, loop, max-length, and native pass@k metrics, but the original collector crashed after grading and before it wrote an exact \texttt{avg\_first\_loop\_prefix\_length}. That field is intentionally left missing rather than repaired from a non-exact replay.
+\end{itemize}
+
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/cross_dataset_rates.png}
+\caption{Rollout-level success, loop rate, and max-length-hit rate for each evaluated dataset.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/cross_dataset_overlap.png}
+\caption{Overlap statistics: among looped rollouts, how many hit max model length; among max-length-hit rollouts, how many looped; and among looped rollouts, how many still answered correctly.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/cross_dataset_lengths.png}
+\caption{Average generation lengths, average looped-generation lengths, and average first-loop-prefix lengths in thousands of tokens.}
+\end{figure}
+
+\section*{Interpretation}
+Across the math, science, broad-knowledge, and coding settings, the same pattern repeats: long generation tails are where looping lives. The strongest evidence is in the overlap panel: once a rollout's prompt-plus-generation length reaches \texttt{max\_model\_len}, it is often also a detected loop. The converse is weaker but still substantial: in several datasets, a large fraction of looped rollouts also terminate at that full-context ceiling.
+
+The length panel shows that looped generations are substantially longer than the dataset-wide average everywhere in the bundle. The average first-loop-prefix length also varies meaningfully by dataset, which indicates that not every loop is an immediate degeneration: some settings enter the repeated n-gram regime only after a long reasoning or coding prefix.
+
+Rollout success under looping is dataset-dependent rather than uniform. Some tasks retain a noticeable fraction of correct answers even inside looped rollouts, which suggests the model can sometimes reach the right answer before it starts repeating. For \texttt{LiveCodeBench}, the native benchmark metrics should be read from the separate \texttt{pass@k} values rather than from the rollout-success column.
+
+\end{document}

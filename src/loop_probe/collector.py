@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Iterable
+from typing import Any, Iterable, Mapping
 
 from .configs import RolloutConfig
 
@@ -47,6 +47,29 @@ class LcbSampleRecord:
     max_length_hit: bool
     finish_reason: str
     prompt_too_long: bool
+    first_loop_prefix_length: int | None = None
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "LcbSampleRecord":
+        return cls(
+            question_id=str(payload["question_id"]),
+            generation_index=int(payload["generation_index"]),
+            code_output=str(payload["code_output"]),
+            token_count=int(payload["token_count"]),
+            prompt_token_count=int(payload["prompt_token_count"]),
+            total_token_count=int(payload["total_token_count"]),
+            effective_max_tokens=int(payload["effective_max_tokens"]),
+            max_model_len=int(payload["max_model_len"]),
+            loop_flag=bool(payload["loop_flag"]),
+            max_length_hit=bool(payload["max_length_hit"]),
+            finish_reason=str(payload["finish_reason"]),
+            prompt_too_long=bool(payload["prompt_too_long"]),
+            first_loop_prefix_length=(
+                int(payload["first_loop_prefix_length"])
+                if payload.get("first_loop_prefix_length") is not None
+                else None
+            ),
+        )
 
 
 @dataclass
@@ -68,6 +91,7 @@ class WorkerAggregator:
     correct_length_sum: int = 0
     wrong_length_sum: int = 0
     first_loop_prefix_sum: int = 0
+    first_loop_prefix_count: int = 0
     prompt_length_sum: int = 0
     prompt_length_min: int | None = None
     prompt_length_max: int | None = None
@@ -94,6 +118,7 @@ def merge_aggregators(aggregators: Iterable[WorkerAggregator]) -> WorkerAggregat
         merged.correct_length_sum += int(agg.correct_length_sum)
         merged.wrong_length_sum += int(agg.wrong_length_sum)
         merged.first_loop_prefix_sum += int(agg.first_loop_prefix_sum)
+        merged.first_loop_prefix_count += int(agg.first_loop_prefix_count)
         merged.prompt_length_sum += int(agg.prompt_length_sum)
         if agg.prompt_length_min is not None:
             merged.prompt_length_min = (
@@ -141,7 +166,13 @@ def compute_metrics(
         elif name == "avg_loop_generation_length":
             metrics[name] = _safe_div(agg.loop_length_sum, agg.num_looped)
         elif name == "avg_first_loop_prefix_length":
-            metrics[name] = _safe_div(agg.first_loop_prefix_sum, agg.num_looped)
+            if agg.first_loop_prefix_count != agg.num_looped:
+                metrics[name] = None
+            else:
+                metrics[name] = _safe_div(
+                    agg.first_loop_prefix_sum,
+                    agg.first_loop_prefix_count,
+                )
         elif name == "max_length_hit_fraction":
             metrics[name] = _safe_div(agg.num_max_length_hits, agg.num_generated)
         elif name == "loop_max_length_hit_fraction":

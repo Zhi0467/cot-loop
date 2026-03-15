@@ -6,6 +6,7 @@ import csv
 import json
 import math
 import subprocess
+from datetime import datetime
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -623,9 +624,9 @@ def _find_row(rows: list[dict[str, Any]], key: str) -> dict[str, Any]:
 
 def build_results_table(rows: list[dict[str, Any]]) -> str:
     lines = [
-        r"\begin{tabular}{lrrrrrrr}",
+        r"\begin{tabular}{lrrrrr}",
         r"\toprule",
-        r"Dataset & Prompts & Rollouts & Rollout success & Looped & Max length & Loop+Max & Loop+Correct \\",
+        r"Dataset & Prompts & Rollouts & Rollout success & Looped & Max length \\",
         r"\midrule",
     ]
     for row in rows:
@@ -638,8 +639,6 @@ def build_results_table(rows: list[dict[str, Any]]) -> str:
                     format_percent(row["success_fraction"]),
                     format_percent(row["loop_fraction"]),
                     format_percent(row["max_length_hit_fraction"]),
-                    format_percent(row["loop_max_length_hit_fraction"]),
-                    format_percent(row["loop_success_fraction"]),
                 ]
             )
             + r" \\"
@@ -659,12 +658,14 @@ def _native_lcb_metrics_text(row: dict[str, Any]) -> str:
     ordered_keys = ("pass@1", "pass@5", "pass@10")
     parts = []
     for key in ordered_keys:
-        if key in metrics and metrics[key] is not None:
-            parts.append(f"{key} {format_percent(metrics[key])}")
+        value = metrics.get(key)
+        if isinstance(value, (int, float)):
+            parts.append(f"{key} {format_percent(value)}")
     for key in sorted(metrics):
-        if key in ordered_keys or metrics[key] is None:
+        value = metrics[key]
+        if key in ordered_keys or value is None or not isinstance(value, (int, float)):
             continue
-        parts.append(f"{key} {format_percent(metrics[key])}")
+        parts.append(f"{key} {format_percent(value)}")
     return "; ".join(parts)
 
 
@@ -716,21 +717,19 @@ def build_dataset_profiles(rows: list[dict[str, Any]]) -> str:
 
 def build_generation_table(rows: list[dict[str, Any]]) -> str:
     lines = [
-        r"\begin{tabular}{lrrrrrrrr}",
+        r"\begin{tabular}{lrrrrr}",
         r"\toprule",
-        r"Dataset & Temp & Gens/prompt & Max tokens & Max model len & TP & DP & Max seqs & Batch toks \\",
+        r"Dataset & Sample cap & TP & DP & Max seqs & Batch toks \\",
         r"\midrule",
     ]
     for row in rows:
         cfg = row["generation_config"]
+        sample_cap = "full" if row.get("max_samples") is None else format_int(row["max_samples"])
         lines.append(
             " & ".join(
                 [
                     latex_escape(row["display_name"]),
-                    format_float(cfg.get("temperature"), decimals=1),
-                    format_int(cfg.get("num_generations")),
-                    format_int(cfg.get("max_tokens")),
-                    format_int(cfg.get("max_model_len")),
+                    sample_cap,
                     format_int(cfg.get("tp")),
                     format_int(cfg.get("dp")),
                     format_int(cfg.get("max_num_seqs")),
@@ -795,9 +794,20 @@ def build_key_findings(rows: list[dict[str, Any]]) -> str:
             ),
             (
                 f"The longest looped generations also appear on {latex_escape(longest_loop['display_name'])}: "
-                f"{format_float(longest_loop['avg_loop_generation_length'])} tokens on average, "
-                f"with the first detected loop not appearing until "
-                f"{format_float(longest_loop['avg_first_loop_prefix_length'])} tokens."
+                f"{format_float(longest_loop['avg_loop_generation_length'])} tokens on average."
+                + (
+                    " "
+                    + (
+                        f"The first detected loop appears after "
+                        f"{format_float(longest_loop['avg_first_loop_prefix_length'])} tokens on average."
+                    )
+                    if longest_loop["avg_first_loop_prefix_length"] is not None
+                    else (
+                        " The exact average first-loop-prefix length is unavailable in this "
+                        "bundle because that metric could not be recovered from the "
+                        "post-grading LiveCodeBench crash."
+                    )
+                )
             ),
             (
                 f"Prompt-plus-generation max-length termination is almost synonymous with looping on the hardest long-form "
@@ -814,6 +824,42 @@ def build_key_findings(rows: list[dict[str, Any]]) -> str:
     )
 
 
+def build_bundle_caveats(rows: list[dict[str, Any]]) -> str:
+    bullets = []
+    for row in rows:
+        if row["avg_first_loop_prefix_length"] is None:
+            if row["task_kind"] == "livecodebench_codegen":
+                bullets.append(
+                    r"\item "
+                    f"{latex_escape(row['display_name'])}: "
+                    "the recovered checkpoint contains the final correctness, loop, "
+                    "max-length, and native pass@k metrics, but the original collector "
+                    "crashed after grading and before it wrote an exact "
+                    r"\texttt{avg\_first\_loop\_prefix\_length}. "
+                    "That field is intentionally left missing rather than repaired from "
+                    "a non-exact replay."
+                )
+            else:
+                bullets.append(
+                    r"\item "
+                    f"{latex_escape(row['display_name'])}: "
+                    r"\texttt{avg\_first\_loop\_prefix\_length} is missing in the source JSON."
+                )
+    return "\n".join(bullets)
+
+
+def bundle_timestamp(rows: list[dict[str, Any]]) -> str:
+    parsed: list[tuple[datetime, str]] = []
+    for row in rows:
+        value = row.get("timestamp")
+        if not value:
+            continue
+        parsed.append((datetime.fromisoformat(value), value))
+    if not parsed:
+        return "Generated from collector outputs"
+    return max(parsed, key=lambda item: item[0])[1]
+
+
 def build_tex(rows: list[dict[str, Any]], out_dir: Path, report_stem: str) -> Path:
     math_row = _find_row(rows, "math500")
     aime_row = _find_row(rows, "aime")
@@ -821,6 +867,7 @@ def build_tex(rows: list[dict[str, Any]], out_dir: Path, report_stem: str) -> Pa
     common_cfg = summarize_generation_config(rows)
     loop_n = rows[0]["loop_detector"].get("n")
     loop_k = rows[0]["loop_detector"].get("k")
+    bundle_caveats = build_bundle_caveats(rows)
     figures = {
         "rates": f"{FIGURES_DIRNAME}/cross_dataset_rates.png",
         "overlap": f"{FIGURES_DIRNAME}/cross_dataset_overlap.png",
@@ -843,7 +890,7 @@ def build_tex(rows: list[dict[str, Any]], out_dir: Path, report_stem: str) -> Pa
 
 \title{{Cross-Dataset Rollout Statistics Report for Qwen/Qwen3-1.7B}}
 \author{{Murphy}}
-\date{{{latex_escape(rows[0]["timestamp"] or "Generated from collector outputs")}}}
+\date{{{latex_escape(bundle_timestamp(rows))}}}
 
 \begin{{document}}
 \maketitle
@@ -862,7 +909,7 @@ The common collector configuration across all runs is:
 \item Model: \texttt{{{latex_escape(rows[0]["model_id"])}}}
 \item Seed: \texttt{{{latex_escape(rows[0].get("seed"))}}}
 \item Loop detector: \texttt{{n={loop_n}, k={loop_k}}}
-\item Common settings shared by every dataset JSON: \texttt{{temperature={latex_escape(common_cfg.get("temperature"))}}}, \texttt{{num\_generations={latex_escape(common_cfg.get("num_generations"))}}}, \texttt{{dtype={latex_escape(common_cfg.get("dtype"))}}}, and \texttt{{trust\_remote\_code={latex_escape(common_cfg.get("trust_remote_code"))}}}
+\item Common settings shared by every dataset JSON: \texttt{{temperature={latex_escape(common_cfg.get("temperature"))}}}, \texttt{{num\_generations={latex_escape(common_cfg.get("num_generations"))}}}, \texttt{{max\_tokens={latex_escape(common_cfg.get("max_tokens"))}}}, \texttt{{max\_model\_len={latex_escape(common_cfg.get("max_model_len"))}}}, \texttt{{dtype={latex_escape(common_cfg.get("dtype"))}}}, and \texttt{{trust\_remote\_code={latex_escape(common_cfg.get("trust_remote_code"))}}}
 \end{{itemize}}
 
 Per-dataset runtime settings are:
@@ -885,6 +932,17 @@ The JSON payloads also retain the raw event counts for prompts, graded/generated
 
 \subsection*{{Headline observations}}
 {build_key_findings(rows)}
+
+"""
+    if bundle_caveats:
+        tex += rf"""
+\subsection*{{Recovery caveat}}
+\begin{{itemize}}[leftmargin=1.5em]
+{bundle_caveats}
+\end{{itemize}}
+"""
+
+    tex += rf"""
 
 \begin{{figure}}[H]
 \centering

@@ -194,6 +194,33 @@ def _get_lm_style(model_id: str, override: str | None = None, repo_path: str = "
     return lm_style_cls.CodeQwenInstruct
 
 
+def _normalize_metric_value(value: Any) -> Any:
+    if value is None or isinstance(value, (str, bool)):
+        return value
+    if isinstance(value, int):
+        return int(value)
+    if isinstance(value, float):
+        return float(value)
+    if isinstance(value, dict):
+        return {
+            str(key): _normalize_metric_value(nested_value)
+            for key, nested_value in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [_normalize_metric_value(item) for item in value]
+    if hasattr(value, "tolist"):
+        try:
+            return _normalize_metric_value(value.tolist())
+        except Exception:
+            pass
+    if hasattr(value, "item"):
+        try:
+            return _normalize_metric_value(value.item())
+        except Exception:
+            pass
+    return str(value)
+
+
 def preflight(repo_path: str, release_version: str) -> None:
     _load_codegen_benchmark(repo_path, release_version)
 
@@ -257,7 +284,7 @@ def evaluate_records(
     *,
     repo_path: str,
     release_version: str,
-) -> tuple[dict[str, float | None], dict[tuple[str, int], bool]]:
+) -> tuple[dict[str, Any], dict[tuple[str, int], bool]]:
     symbols = _import_lcb_symbols(repo_path)
     args_ns = build_lcb_args(release_version, repo_path)
 
@@ -335,7 +362,7 @@ def evaluate_records(
             grading_by_record_key[record_key] = bool(passed)
 
     native_metrics = {
-        str(name): float(value) if value is not None else None
+        str(name): _normalize_metric_value(value)
         for name, value in metrics[0].items()
     }
     return native_metrics, grading_by_record_key
