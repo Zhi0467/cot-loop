@@ -190,6 +190,15 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _normalize_local_dataset_id(value: Any) -> Any:
+    if not isinstance(value, str):
+        return value
+    suffix = Path(value).suffix.lower()
+    if suffix in {".csv", ".json", ".jsonl", ".parquet", ".tsv"}:
+        return Path(value).name
+    return value
+
+
 def load_dataset_record(stats_dir: Path, info: DatasetInfo) -> dict[str, Any]:
     path = stats_dir / info.filename
     if not path.exists():
@@ -209,7 +218,6 @@ def load_dataset_record(stats_dir: Path, info: DatasetInfo) -> dict[str, Any]:
 
     expected_pairs = {
         "task_kind": info.task_kind,
-        "dataset": info.expected_dataset,
         "config": info.expected_dataset_config,
         "split": info.expected_split,
         "model_id": info.expected_model_id,
@@ -220,6 +228,14 @@ def load_dataset_record(stats_dir: Path, info: DatasetInfo) -> dict[str, Any]:
             raise ValueError(
                 f"{path} has unexpected metadata.{key}={actual!r}; expected {expected!r}."
             )
+    actual_dataset = metadata.get("dataset")
+    normalized_actual_dataset = _normalize_local_dataset_id(actual_dataset)
+    normalized_expected_dataset = _normalize_local_dataset_id(info.expected_dataset)
+    if normalized_actual_dataset != normalized_expected_dataset:
+        raise ValueError(
+            f"{path} has unexpected metadata.dataset={actual_dataset!r}; "
+            f"expected {info.expected_dataset!r}."
+        )
 
     row: dict[str, Any] = {
         "key": info.key,
