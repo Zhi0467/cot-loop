@@ -81,7 +81,7 @@ DATASETS: tuple[DatasetInfo, ...] = (
         chat_format=(
             "Tokenizer chat template with one user turn containing the question, "
             "a shuffled A-D answer block, and the instruction that the final "
-            "non-empty line must be exactly 'Answer: X'."
+            "non-empty line must be a JSON object like '{\"answer\": \"X\"}'."
         ),
     ),
     DatasetInfo(
@@ -95,7 +95,7 @@ DATASETS: tuple[DatasetInfo, ...] = (
         chat_format=(
             "Tokenizer chat template with one user turn containing the question, "
             "an A-J answer list, and the instruction that the final non-empty line "
-            "must be exactly 'Answer: X'."
+            "must be a JSON object like '{\"answer\": \"X\"}'."
         ),
     ),
     DatasetInfo(

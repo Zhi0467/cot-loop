@@ -6,7 +6,7 @@ import random
 from datasets import load_dataset
 
 from ._common import (
-    extract_answer_letter_from_last_lines,
+    extract_structured_answer_letter_from_last_lines,
     load_local_rows,
     resolve_sample_id,
 )
@@ -96,8 +96,8 @@ def build_mcq_prompt(tokenizer, question: str, options: list[str]) -> str:
         f"{question}\n\n"
         f"Answer choices:\n{option_block}\n\n"
         "Think through the problem carefully if needed. "
-        "The final non-empty line must be exactly `Answer: X`, "
-        "where X is one of A, B, C, or D."
+        "On the final non-empty line, output only a JSON object of the form "
+        '`{"answer": "X"}` where X is one of A, B, C, or D.'
     )
     return tokenizer.apply_chat_template(
         [{"role": "user", "content": user_msg}],
@@ -107,7 +107,7 @@ def build_mcq_prompt(tokenizer, question: str, options: list[str]) -> str:
 
 
 def grade(response: str, gold_letter: str) -> bool:
-    predicted = extract_answer_letter_from_last_lines(
+    predicted = extract_structured_answer_letter_from_last_lines(
         response,
         GPQA_LETTERS,
     )
