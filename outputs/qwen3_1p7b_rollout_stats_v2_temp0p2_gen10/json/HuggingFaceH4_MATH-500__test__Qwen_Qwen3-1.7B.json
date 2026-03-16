@@ -1,0 +1,77 @@
+{
+  "metadata": {
+    "dataset": "HuggingFaceH4/MATH-500",
+    "config": null,
+    "split": "test",
+    "task_kind": "math_freeform",
+    "model_id": "Qwen/Qwen3-1.7B",
+    "generation_config": {
+      "model_id": "Qwen/Qwen3-1.7B",
+      "temperature": 0.2,
+      "num_generations": 10,
+      "max_tokens": 81920,
+      "tp": 1,
+      "dp": 8,
+      "dtype": "bfloat16",
+      "max_model_len": 40960,
+      "max_num_seqs": 10,
+      "max_num_batched_tokens": 4096,
+      "trust_remote_code": true
+    },
+    "stats_contract_version": "rollout_stats_v2",
+    "seed": 0,
+    "statistics": [
+      "success_fraction",
+      "loop_fraction",
+      "avg_generation_length",
+      "avg_loop_generation_length",
+      "avg_first_loop_prefix_length",
+      "max_length_hit_fraction",
+      "loop_max_length_hit_fraction",
+      "max_length_hit_loop_fraction",
+      "generation_length_variance",
+      "max_length_hit_success_fraction",
+      "loop_success_fraction",
+      "avg_correct_generation_length",
+      "avg_wrong_generation_length"
+    ],
+    "loop_detector": {
+      "n": 30,
+      "k": 20
+    },
+    "prompt_token_summary": {
+      "avg_prompt_token_count": 89.158,
+      "min_prompt_token_count": 27,
+      "max_prompt_token_count": 809
+    },
+    "timestamp": "2026-03-15T02:54:53.887369+00:00"
+  },
+  "counts": {
+    "num_samples": 500,
+    "num_generated": 5000,
+    "num_graded": 5000,
+    "num_correct": 3628,
+    "num_wrong": 1372,
+    "num_looped": 147,
+    "num_max_length_hits": 73,
+    "num_prompt_too_long": 0,
+    "num_looped_and_max_length_hit": 71,
+    "num_correct_and_looped": 47,
+    "num_correct_and_max_length_hit": 15
+  },
+  "metrics": {
+    "success_fraction": 0.7256,
+    "loop_fraction": 0.0294,
+    "avg_generation_length": 6227.6302,
+    "avg_loop_generation_length": 27811.01360544218,
+    "avg_first_loop_prefix_length": 10965.21088435374,
+    "max_length_hit_fraction": 0.0146,
+    "loop_max_length_hit_fraction": 0.48299319727891155,
+    "max_length_hit_loop_fraction": 0.9726027397260274,
+    "generation_length_variance": 47711298.72344797,
+    "max_length_hit_success_fraction": 0.2054794520547945,
+    "loop_success_fraction": 0.3197278911564626,
+    "avg_correct_generation_length": 5020.485391400221,
+    "avg_wrong_generation_length": 9419.701166180757
+  }
+}

@@ -1,0 +1,220 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  urlcolor=blue,
+  pdftitle={Rollout Statistics Module Audit},
+  pdfauthor={Murphy}
+}
+
+\title{Rollout Statistics Module Audit}
+\author{Murphy}
+\date{2026-03-14 22:35 UTC}
+
+\begin{document}
+\maketitle
+\sloppy
+
+\section*{Scope}
+This audit covers the dataset-rollout statistics path that produced the five-dataset
+Qwen/Qwen3-1.7B bundle: \texttt{scripts/collect\_model\_stats.py}, the math / GPQA /
+MMLU-Pro / LiveCodeBench adapters under \texttt{src/loop\_probe/adapters/},
+\texttt{src/loop\_probe/prompt\_builder.py}, \texttt{src/loop\_probe/collector.py},
+and \texttt{slurm/run\_collect\_model\_stats.sbatch}. I also asked Athena for an
+independent audit of the same module and cross-checked the returned claims against the
+local code and the generated summary bundle.
+
+\section*{Executive Assessment}
+Athena and the local read converge on the same conclusion: the current collector is
+useful for descriptive loop-vs-length overlap analysis, but it is not yet a clean,
+benchmark-faithful measurement stack for Qwen/Qwen3-1.7B. Three issues are definite
+bugs or semantics bugs:
+
+\begin{enumerate}
+\item The math / GPQA / MMLU-Pro adapters leave Qwen3 in default thinking mode while
+the rollout launch stays greedy (\texttt{temperature=0.0}).
+\item The reported \texttt{max\_length\_hit} statistic is really an
+``effective remaining context budget exhausted'' signal, not an unambiguous
+``hit the model's native max length'' signal.
+\item Prompt-too-long samples are counted differently on QA tasks versus
+LiveCodeBench.
+\end{enumerate}
+
+A fourth high-confidence issue is the multiple-choice grader: GPQA and MMLU-Pro score
+the \emph{last} standalone answer letter anywhere in the completion, which is brittle
+when the model emits thought traces or extra commentary. The math verifier itself
+looks sound.
+
+\section*{Current Bundle Facts}
+The regenerated five-dataset summary confirms that the active run used one common
+generation policy: Qwen/Qwen3-1.7B, \texttt{temperature=0.0},
+\texttt{max\_tokens=81920}, and \texttt{max\_model\_len=40960}. All five dataset rows
+in \texttt{cross\_dataset\_rollout\_summary.json} report
+\texttt{prompt\_too\_long = 0}, so the prompt-too-long inconsistency did not fire in
+the shipped bundle; it is still a real latent bug for future runs.
+
+\section*{Findings}
+\begin{enumerate}
+\item \textbf{Definite bug: Qwen3 default thinking-mode prompts are paired with greedy
+decoding on the chat-template adapters.}
+
+The math, GPQA, and MMLU-Pro prompt builders all call
+\texttt{tokenizer.apply\_chat\_template(..., add\_generation\_prompt=True)} without
+explicitly setting \texttt{enable\_thinking=False}
+(\texttt{src/loop\_probe/prompt\_builder.py:4-10},
+\texttt{src/loop\_probe/adapters/multiple\_choice\_gpqa.py:87-102},
+\texttt{src/loop\_probe/adapters/multiple\_choice\_mmlupro.py:94-112}). The rollout
+path then samples with \texttt{temperature=0.0}
+(\texttt{scripts/collect\_model\_stats.py:450-458}), and the Slurm wrapper keeps that
+as the default (\texttt{slurm/run\_collect\_model\_stats.sbatch:94-100}). The Qwen3
+model card says reasoning/thinking is enabled by default and explicitly warns against
+greedy decoding in thinking mode.\footnote{\url{https://huggingface.co/Qwen/Qwen3-1.7B}}
+
+Why it matters: these three datasets can overstate loopiness or depress accuracy for
+configuration reasons rather than task reasons. This is not a cosmetic prompt issue;
+it changes the measurement contract itself.
+
+Recommended fix: either set \texttt{enable\_thinking=False} for this collector family,
+or switch the collector to a Qwen-recommended non-greedy decoding policy and document
+it as intentional.
+
+\item \textbf{Definite semantics bug: \texttt{max\_length\_hit} does not mean what the
+report language suggests.}
+
+The collector defines
+\[
+\texttt{effective\_max} = \min(\texttt{max\_tokens},\ \texttt{max\_model\_len} - \texttt{prompt\_len})
+\]
+in \texttt{scripts/collect\_model\_stats.py:152-153}, and marks a hit only when
+\texttt{finish\_reason == "length"} and \texttt{token\_count == effective\_max}
+(\texttt{scripts/collect\_model\_stats.py:479-490}). With the shipped defaults
+\texttt{max\_tokens=81920} and \texttt{max\_model\_len=40960}
+(\texttt{slurm/run\_collect\_model\_stats.sbatch:99-100}), the operative cap is
+usually the configured remaining context budget, not the nominal \texttt{max\_tokens}.
+vLLM's own docs define \texttt{max\_model\_len} as the model context length for
+prompt plus output.\footnote{\url{https://docs.vllm.ai/en/latest/serving/engine_args.html}}
+
+Why it matters: the current report wording ``hit max model length'' can be read as
+``the model hit its native context limit'' even though the implementation is only
+detecting exhaustion of the configured local cap. This is especially risky because the
+Qwen3-1.7B model card advertises a 32{,}768-token context window, while the collector
+is configured to 40{,}960.
+
+Recommended fix: rename the metric to something like
+\texttt{effective\_context\_cap\_hit}, log both prompt length and configured cap, and
+either justify the 40{,}960 override or reduce it to a validated value.
+
+\item \textbf{Definite bug: prompt-too-long rows are scored inconsistently across
+tasks.}
+
+When \texttt{effective\_max < 1}, QA tasks increment
+\texttt{num\_prompt\_too\_long} and then skip grading entirely
+(\texttt{scripts/collect\_model\_stats.py:426-447}). Since
+\texttt{success\_fraction = num\_correct / num\_graded}
+(\texttt{src/loop\_probe/collector.py:115-116}), those rows vanish from QA accuracy.
+LiveCodeBench does something different: it still writes an
+\texttt{LcbSampleRecord} with empty code and passes that record into native grading
+(\texttt{scripts/collect\_model\_stats.py:433-445},
+\texttt{src/loop\_probe/adapters/livecodebench\_codegen.py:253-300}), which
+effectively counts the row as wrong.
+
+Why it matters: the same failure mode inflates QA success rates but not
+LiveCodeBench success rates. Even though this branch's current bundle had zero such
+rows, the cross-task comparison contract is inconsistent in code.
+
+Recommended fix: either exclude prompt-too-long rows from grading on \emph{all}
+tasks, or count them as wrong on \emph{all} tasks. The branch should pick one policy
+and serialize it in the report metadata.
+
+\item \textbf{High-confidence grading bug path: GPQA and MMLU-Pro parse the last
+standalone option letter anywhere in the response.}
+
+Both graders regex the completion for option letters and score \texttt{matches[-1]}
+(\texttt{src/loop\_probe/adapters/multiple\_choice\_gpqa.py:105-109},
+\texttt{src/loop\_probe/adapters/multiple\_choice\_mmlupro.py:115-135}). The prompts
+only ask for ``the single best answer letter'' and do not force a structured terminal
+field (\texttt{src/loop\_probe/adapters/multiple\_choice\_gpqa.py:93-102},
+\texttt{src/loop\_probe/adapters/multiple\_choice\_mmlupro.py:103-112}).
+
+Why it matters: if the model emits reasoning, re-lists options, or leaves a thought
+trace before the final answer, the scorer can assign the wrong label even when the
+model ``meant'' the correct option. The earlier thinking-mode bug increases the
+chance of exactly this failure mode.
+
+Recommended fix: require a structured final field (for example a terminal
+\texttt{Final answer: X} or JSON answer slot) and parse only that field. One caveat:
+the current collector does not checkpoint raw MCQ completions, so this bug path is
+proven by the parser logic but cannot be quantified retroactively on the shipped
+bundle.
+
+\item \textbf{Risk / assumption: the LiveCodeBench path is intentionally non-canonical
+but is easy to read as canonical.}
+
+The adapter maps every \texttt{qwen/*} model to
+\texttt{LMStyle.CodeQwenInstruct}
+(\texttt{src/loop\_probe/adapters/livecodebench\_codegen.py:181-193}), which is a
+reasonable guess but still a local assumption for Qwen3-1.7B. The collector also
+hard-codes one sample per prompt (\texttt{n=1}) and the current launch policy keeps
+\texttt{temperature=0.0}
+(\texttt{scripts/collect\_model\_stats.py:450-458},
+\texttt{slurm/run\_collect\_model\_stats.sbatch:94-100}). Upstream LiveCodeBench code
+generation instructions instead use \texttt{n=10}, \texttt{temperature=0.2}, and the
+parser defaults to \texttt{num\_process\_evaluate=12} and \texttt{timeout=6}; the
+local adapter defaults to \texttt{1} and \texttt{5}
+(\texttt{src/loop\_probe/adapters/livecodebench\_codegen.py:100-118}).\footnote{\url{https://github.com/LiveCodeBench/LiveCodeBench/blob/main/README.md}}
+\footnote{\url{https://github.com/LiveCodeBench/LiveCodeBench/blob/main/lcb_runner/runner/parser.py}}
+
+Why it matters: the current LiveCodeBench number is perfectly usable as deterministic
+task-local telemetry, but it is not benchmark-canonical. The report should say so
+explicitly.
+
+Recommended fix: either align generation and evaluation with the upstream benchmark
+contract, or label the output as a local single-rollout deterministic variant.
+\end{enumerate}
+
+\section*{What Looks Correct}
+\begin{itemize}
+\item \textbf{Math verification is in good shape.} The math prompt asks for a boxed
+final answer (\texttt{src/loop\_probe/prompt\_builder.py:4-10}), and
+\texttt{math\_freeform.py} uses \texttt{math\_verify} with boxed-priority extraction
+plus expression fallback (\texttt{src/loop\_probe/adapters/math\_freeform.py:24-91}).
+The verifier call order is also correct: \texttt{verify(parsed\_gold, parsed\_pred)}
+at \texttt{src/loop\_probe/adapters/math\_freeform.py:83-85}.
+\item \textbf{The overlap counters themselves are straightforward.} Once a completion
+is generated, the bookkeeping for loop counts, length sums, and overlap counts in
+\texttt{scripts/collect\_model\_stats.py:492-531} and
+\texttt{src/loop\_probe/collector.py:114-156} is internally coherent. The dominant
+risks are in the prompt/decode/grading contract around those counters, not in the
+counter arithmetic.
+\end{itemize}
+
+\section*{Recommended Repair Order}
+\begin{enumerate}
+\item Fix the Qwen3 prompt/decode contract first. This is the highest-impact issue for
+all chat-template datasets.
+\item Rename and re-document the ``max length hit'' metric before anyone treats it as
+a literal native-model ceiling statistic.
+\item Unify prompt-too-long handling across QA and LiveCodeBench.
+\item Replace MCQ letter scraping with a structured terminal-answer parser and add raw
+completion checkpointing for auditability.
+\item Decide whether LiveCodeBench is meant to be canonical benchmark evaluation or a
+local deterministic telemetry variant, then encode that decision in the report text
+and runtime defaults.
+\end{enumerate}
+
+\section*{Bottom Line}
+The current five-dataset bundle is still informative for one descriptive claim:
+looped rollouts and effective context-cap terminations overlap strongly under this
+runtime. What it does \emph{not} yet provide is a clean apples-to-apples statement of
+Qwen3-1.7B task accuracy or canonical benchmark performance, because the prompt,
+decode, and grading contracts are not yet consistent enough for that stronger claim.
+
+\end{document}

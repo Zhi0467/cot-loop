@@ -1,0 +1,78 @@
+{
+  "metadata": {
+    "dataset": "TIGER-Lab/MMLU-Pro",
+    "config": null,
+    "split": "test",
+    "task_kind": "multiple_choice_mmlupro",
+    "model_id": "Qwen/Qwen3-1.7B",
+    "generation_config": {
+      "model_id": "Qwen/Qwen3-1.7B",
+      "temperature": 0.2,
+      "num_generations": 10,
+      "max_tokens": 81920,
+      "tp": 1,
+      "dp": 7,
+      "dtype": "bfloat16",
+      "max_model_len": 40960,
+      "max_num_seqs": 10,
+      "max_num_batched_tokens": 4096,
+      "trust_remote_code": true
+    },
+    "stats_contract_version": "rollout_stats_v2",
+    "seed": 0,
+    "statistics": [
+      "success_fraction",
+      "loop_fraction",
+      "avg_generation_length",
+      "avg_loop_generation_length",
+      "avg_first_loop_prefix_length",
+      "max_length_hit_fraction",
+      "loop_max_length_hit_fraction",
+      "max_length_hit_loop_fraction",
+      "generation_length_variance",
+      "max_length_hit_success_fraction",
+      "loop_success_fraction",
+      "avg_correct_generation_length",
+      "avg_wrong_generation_length"
+    ],
+    "loop_detector": {
+      "n": 30,
+      "k": 20
+    },
+    "prompt_token_summary": {
+      "avg_prompt_token_count": 230.89875,
+      "min_prompt_token_count": 91,
+      "max_prompt_token_count": 885
+    },
+    "timestamp": "2026-03-15T08:40:34.368376+00:00",
+    "max_samples": 800
+  },
+  "counts": {
+    "num_samples": 800,
+    "num_generated": 8000,
+    "num_graded": 8000,
+    "num_correct": 1133,
+    "num_wrong": 6867,
+    "num_looped": 445,
+    "num_max_length_hits": 93,
+    "num_prompt_too_long": 0,
+    "num_looped_and_max_length_hit": 93,
+    "num_correct_and_looped": 1,
+    "num_correct_and_max_length_hit": 0
+  },
+  "metrics": {
+    "success_fraction": 0.141625,
+    "loop_fraction": 0.055625,
+    "avg_generation_length": 4866.775,
+    "avg_loop_generation_length": 17451.177528089887,
+    "avg_first_loop_prefix_length": 7731.7932584269665,
+    "max_length_hit_fraction": 0.011625,
+    "loop_max_length_hit_fraction": 0.20898876404494382,
+    "max_length_hit_loop_fraction": 1.0,
+    "generation_length_variance": 33422533.608375005,
+    "max_length_hit_success_fraction": 0.0,
+    "loop_success_fraction": 0.0022471910112359553,
+    "avg_correct_generation_length": 1535.279788172992,
+    "avg_wrong_generation_length": 5416.44502694044
+  }
+}

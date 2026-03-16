@@ -1,6 +1,6 @@
 # Roadmap - CoT Loop Detection
 
-Last updated: 2026-03-14 15:52 UTC
+Last updated: 2026-03-15 21:56 UTC
 
 Scope:
 - Build and validate a probe pipeline for CoT loop detection across prefill and completion feature views.
@@ -11,9 +11,11 @@ Scope:
 - Milestone 2 gate: complete.
 - Milestone 3 gate: complete.
 - Active milestone: Milestone 4 (cross-dataset validation).
-- Latest result: the metadata-aware prefill line has stopped moving. After the later representation and horizon-label rounds, the best prefill-only arm is still the Round 6 all-layer last-token anchor, so the active question is now how the rollout/loop behavior transfers across datasets rather than how to squeeze more from the one-bit prefill label.
-- Active experiment: the repaired `LiveCodeBench` rerun `1292` is still running on the pinned 4-GPU path after the earlier `1283` pass failed during post-generation grading; at the 2026-03-14 15:52 UTC checkpoint it had reached `880/1055` processed problems.
-- Active review surface: upstream PR #4 (`task/1773451376-rollout-stats`) is `OPEN` / `CLEAN` / `DRAFT` at head `24524fa` with `0` unresolved non-outdated review threads, but local review still lacks a terminal verdict, so merge remains held.
+- Latest result: under the repaired rollout-statistics v2 contract, `MATH-500`, `AIME`, `GPQA`, `MMLU-Pro`, and capped `LiveCodeBench release_v6` are all now reportable. The crashed `LiveCodeBench` leg was recovered by checkpoint regrade at `2026-03-15 21:53 UTC`, yielding the final correctness / loop / max-length / native `pass@k` block for the capped `800`-prompt run.
+- Remaining caveat: the original `LiveCodeBench` job crashed after grading and before writing its final JSON, and replay-based repair did not reproduce the stored checkpoint exactly enough to recover `avg_first_loop_prefix_length`. That one metric remains `null` in the recovered capped bundle; a fresh rerun would be required if exact prefix-length telemetry is still needed.
+- Active review surfaces:
+  - Upstream PR #4 (`Zhi0467/cot-loop`, branch `task/1773451376-rollout-stats`) remains `OPEN` / `DRAFT` at head `d0796c3`, but it no longer covers the current local branch state.
+  - The local follow-up branch already carries the stale-artifact fix (`d941986`) plus the post-rerun doc state; bounded `review_project.sh --base main` still does not reach a terminal verdict here, so the branch is not locally review-cleared yet.
 
 ## Milestone 1 - Pipeline and multi-view infrastructure
 Status: done (2026-03-05 18:45 UTC)

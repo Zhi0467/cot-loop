@@ -39,6 +39,10 @@ if [[ -f "${HOME}/.env" ]]; then
   set +a
 fi
 
+if [[ -z "${HF_TOKEN:-}" && -n "${HUGGINGFACE_TOKEN:-}" ]]; then
+  export HF_TOKEN="${HUGGINGFACE_TOKEN}"
+fi
+
 export VLLM_SUPPRESS_SEM_UNLINK_ERRORS=1
 export HF_HUB_CONNECT_TIMEOUT=30
 export HF_HUB_READ_TIMEOUT=120
@@ -92,6 +96,8 @@ SPLIT="${SPLIT:-test}"
 QUESTION_FIELD="${QUESTION_FIELD:-}"
 ANSWER_FIELD="${ANSWER_FIELD:-}"
 MODEL_ID="${MODEL_ID:-Qwen/Qwen3-1.7B}"
+TEMPERATURE="${TEMPERATURE:-0.2}"
+NUM_GENERATIONS="${NUM_GENERATIONS:-10}"
 STATISTICS="${STATISTICS:-success_fraction,loop_fraction,avg_generation_length,avg_loop_generation_length,avg_first_loop_prefix_length,max_length_hit_fraction,loop_max_length_hit_fraction,max_length_hit_loop_fraction,generation_length_variance,max_length_hit_success_fraction,loop_success_fraction,avg_correct_generation_length,avg_wrong_generation_length}"
 MAX_SAMPLES="${MAX_SAMPLES:-}"
 TP="${TP:-1}"
@@ -141,6 +147,8 @@ ARGS=(
   --dataset "$DATASET"
   --split "$SPLIT"
   --model-id "$MODEL_ID"
+  --temperature "$TEMPERATURE"
+  --num-generations "$NUM_GENERATIONS"
   --statistics "$STATISTICS"
   --tp "$TP"
   --dp "$DP"

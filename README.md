@@ -1,13 +1,18 @@
 # CoT Loop Detection via Probe Classifiers
 
-This repository trains probe classifiers to predict whether a language model will enter a repetitive loop during chain-of-thought reasoning. The canonical workflow stores prompt-prefill last-token activations from every transformer layer as a stacked `[layer, hidden]` tensor, then trains either on a selected layer or an ensemble over all layers.
+This repository studies whether chain-of-thought loop risk is predictable from internal activations and rollout telemetry. The original workflow centered on prompt-prefill last-token probes, and the current active phase extends that line with repaired cross-dataset rollout-statistics audits so the prefill/completion findings can be checked against real loop behavior across multiple benchmark families.
 
 ## Overview
 
-The active workflow focuses on whether loop risk is detectable from stacked prompt-prefill activations, either by slicing one layer or by voting across all layers.
+The project now has two active evidence streams:
+- the probe line asks whether loop risk is detectable from stacked prompt-prefill activations, either by slicing one layer or by voting across all layers;
+- the rollout-statistics line measures how often looping and max-length hits actually occur under the repaired v2 collector contract across `MATH-500`, `AIME`, `GPQA`, `MMLU-Pro`, and `LiveCodeBench`.
 
 Latest status:
-- Round G (k=5, three-view) found the completion-view feature set outperforming the tested prefill variants.
+- the best prefill-only arm is still the Round 6 all-layer last-token anchor; later metadata-aware prefill rounds did not overturn the completion-view advantage.
+- under the repaired rollout-statistics v2 contract, `MATH-500`, `AIME`, `GPQA`, and capped `MMLU-Pro` are complete and reported.
+- the capped `LiveCodeBench release_v6` checkpoint has now been regraded and reported, so the repaired rollout-statistics v2 sweep is complete for correctness / loop / max-length / native `pass@k` analysis across all five datasets.
+- one explicit caveat remains on that recovered `LiveCodeBench` block: the original job crashed after grading and before writing the final JSON, and replay-based repair did not reproduce the stored generations exactly enough to recover `avg_first_loop_prefix_length`. That single metric therefore remains `null` for the recovered capped run.
 
 **Workflow:**
 1. Build model-formatted chat prompts (shared `utils.build_prompt` source)
@@ -15,6 +20,7 @@ Latest status:
 3. Generate rollout trajectories and label them (looped vs not-looped)
 4. Train a binary probe classifier on the precomputed features
 5. Evaluate the probe's ability to predict looping behavior
+6. For cross-dataset validation, run the rollout-statistics collector and rebuild the cross-dataset report from the authoritative stats bundle; the current repaired v2 bundle includes a recovered capped `LiveCodeBench` block with the prefix-length caveat noted above
 
 ## Quick Start
 
