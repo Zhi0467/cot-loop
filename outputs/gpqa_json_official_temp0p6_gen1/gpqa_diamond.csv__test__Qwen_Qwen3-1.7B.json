@@ -1,0 +1,81 @@
+{
+  "metadata": {
+    "dataset": "data/gpqa_diamond.csv",
+    "config": null,
+    "split": "test",
+    "task_kind": "multiple_choice_gpqa",
+    "model_id": "Qwen/Qwen3-1.7B",
+    "generation_config": {
+      "model_id": "Qwen/Qwen3-1.7B",
+      "temperature": 0.6,
+      "num_generations": 1,
+      "max_tokens": 38912,
+      "tp": 1,
+      "dp": 1,
+      "dtype": "bfloat16",
+      "max_model_len": 40960,
+      "max_num_seqs": null,
+      "max_num_batched_tokens": null,
+      "trust_remote_code": true
+    },
+    "stats_contract_version": "rollout_stats_v2",
+    "seed": 0,
+    "statistics": [
+      "success_fraction",
+      "loop_fraction",
+      "avg_generation_length",
+      "avg_loop_generation_length",
+      "avg_first_loop_prefix_length",
+      "max_length_hit_fraction",
+      "loop_max_length_hit_fraction",
+      "max_length_hit_loop_fraction",
+      "generation_length_variance",
+      "max_length_hit_success_fraction",
+      "loop_success_fraction",
+      "avg_correct_generation_length",
+      "avg_wrong_generation_length"
+    ],
+    "loop_detector": {
+      "n": 30,
+      "k": 20
+    },
+    "prompt_token_summary": {
+      "avg_prompt_token_count": 269.6060606060606,
+      "min_prompt_token_count": 95,
+      "max_prompt_token_count": 2822
+    },
+    "timestamp": "2026-03-16T06:20:45.297328+00:00",
+    "shuffle_policy": {
+      "kind": "seed_xor_sample_id",
+      "base_seed": 0
+    }
+  },
+  "counts": {
+    "num_samples": 198,
+    "num_generated": 198,
+    "num_graded": 198,
+    "num_correct": 78,
+    "num_wrong": 120,
+    "num_looped": 4,
+    "num_max_length_hits": 0,
+    "num_prompt_too_long": 0,
+    "num_looped_and_max_length_hit": 0,
+    "num_correct_and_looped": 3,
+    "num_correct_and_max_length_hit": 0
+  },
+  "metrics": {
+    "success_fraction": 0.3939393939393939,
+    "loop_fraction": 0.020202020202020204,
+    "avg_generation_length": 7302.732323232323,
+    "avg_loop_generation_length": 12365.75,
+    "avg_first_loop_prefix_length": 7199.25,
+    "max_length_hit_fraction": 0.0,
+    "loop_max_length_hit_fraction": 0.0,
+    "max_length_hit_loop_fraction": null,
+    "generation_length_variance": 15673672.923298642,
+    "max_length_hit_success_fraction": null,
+    "loop_success_fraction": 0.75,
+    "avg_correct_generation_length": 6657.692307692308,
+    "avg_wrong_generation_length": 7722.008333333333
+  }
+}

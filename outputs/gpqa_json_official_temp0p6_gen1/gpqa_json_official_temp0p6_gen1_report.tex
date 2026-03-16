@@ -1,0 +1,73 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{booktabs}
+\usepackage{hyperref}
+
+\title{GPQA Calibration Under the Repaired JSON MC Contract}
+\date{2026-03-16 UTC}
+
+\begin{document}
+\maketitle
+
+\section*{Bottom Line}
+The GPQA evaluation path is back in the expected range once the run uses the repaired
+JSON-answer contract together with a benchmark-style decode policy instead of the
+bounded 4096-token pilot. The full \texttt{GPQA Diamond} pass landed at
+\textbf{78 / 198 = 39.39\%}, which is close to Qwen's own reported
+\textbf{40.1} for \texttt{Qwen3-1.7B} in thinking / BF16 mode.\footnote{\url{https://huggingface.co/Qwen/Qwen3-GPTQ-Int8}}
+
+\section*{Run Configuration}
+I reran the full local \texttt{gpqa\_diamond.csv} mirror under the repaired rollout
+collector contract with:
+\begin{itemize}
+\item model \texttt{Qwen/Qwen3-1.7B}
+\item repaired terminal JSON answer contract
+\item \texttt{temperature=0.6}
+\item \texttt{num\_generations=1}
+\item \texttt{max\_tokens=38912}
+\item \texttt{max\_model\_len=40960}
+\item single-GPU BF16 decode on \texttt{wth-gpu-01}
+\end{itemize}
+
+These settings intentionally target the benchmark-style configuration Qwen recommends
+for thinking mode: \texttt{temperature=0.6}, \texttt{top\_p=0.95},
+\texttt{top\_k=20}, and a long output budget for difficult problems.\footnote{\url{https://huggingface.co/Qwen/Qwen3-1.7B}}
+
+\section*{Result}
+\begin{center}
+\begin{tabular}{lrr}
+\toprule
+Quantity & Value & Note \\
+\midrule
+Correct & 78 / 198 & 39.39\% accuracy \\
+Looped & 4 / 198 & 2.02\% \\
+Max-length hits & 0 / 198 & 0.00\% \\
+Average generation length & 7302.73 & tokens \\
+Average looped generation length & 12365.75 & tokens \\
+Average first-loop prefix length & 7199.25 & tokens \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section*{Why This Matters}
+The earlier bounded parser pilot was never benchmark-comparable for GPQA because it
+used \texttt{max\_tokens=4096}; under that pilot contract the corrected JSON parser
+still reached only \texttt{33 / 160 = 20.63\%} on the 16-prompt / 160-rollout slice,
+with \texttt{101 / 160} responses ending by \texttt{length}. By contrast, the full
+calibration run above eliminates max-length failures entirely and lands within about
+\texttt{0.7} percentage points of Qwen's own published GPQA number.
+
+\section*{Interpretation}
+\begin{itemize}
+\item The repaired JSON-answer contract is good enough to keep.
+\item The 4096-token truncation concern belongs to the bounded parser pilots, not to
+the benchmark-style GPQA evaluation path.
+\item For GPQA, the evaluation now looks benchmark-comparable rather than chance-level.
+\item The remaining distinction to preserve is methodological: this benchmark-style
+GPQA check used \texttt{num\_generations=1}, while the rollout-stat bundle used
+multi-sample settings for loop telemetry.
+\end{itemize}
+
+\end{document}
