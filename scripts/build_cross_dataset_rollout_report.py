@@ -6,7 +6,7 @@ import csv
 import json
 import math
 import subprocess
-from datetime import datetime
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -14,7 +14,7 @@ from typing import Any
 import matplotlib.pyplot as plt
 
 
-DEFAULT_STATS_DIR = Path("outputs/qwen3_1p7b_cross_dataset_rollout_stats")
+DEFAULT_STATS_DIR = Path("outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/json")
 FIGURES_DIRNAME = "figures"
 EXPECTED_STATS_CONTRACT_VERSION = "rollout_stats_v2"
 
@@ -857,7 +857,8 @@ def bundle_timestamp(rows: list[dict[str, Any]]) -> str:
         parsed.append((datetime.fromisoformat(value), value))
     if not parsed:
         return "Generated from collector outputs"
-    return max(parsed, key=lambda item: item[0])[1]
+    latest = max(parsed, key=lambda item: item[0])[0]
+    return latest.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
 
 def build_tex(rows: list[dict[str, Any]], out_dir: Path, report_stem: str) -> Path:
@@ -899,6 +900,8 @@ def build_tex(rows: list[dict[str, Any]], out_dir: Path, report_stem: str) -> Pa
 This report consolidates the full math $\rightarrow$ GPQA $\rightarrow$ MMLU-Pro $\rightarrow$ LiveCodeBench rollout-stat sweep for \texttt{{Qwen/Qwen3-1.7B}}. The collector uses the n-gram loop detector with \texttt{{n={loop_n}}} and \texttt{{k={loop_k}}} and records both prompt-level counts and rollout-level event rates, including overlap statistics between looping, max-model-length termination, and correctness.
 
 The math block was evaluated as two separate datasets under the same freeform prompt contract: \texttt{{MATH-500}} ({format_int(math_row["samples"])} samples) and \texttt{{AIME 2024/2025}} ({format_int(aime_row["samples"])} samples). The downstream multiple-choice and code-generation blocks were evaluated on \texttt{{GPQA Diamond}}, \texttt{{MMLU-Pro}}, and \texttt{{LiveCodeBench release\_v6}} in the same rollout pipeline.
+
+These rows should be read as a common-policy rollout-telemetry bundle under shared low-temperature multi-sample decoding, not as benchmark-optimized single-generation accuracy. The separate GPQA benchmark-style calibration (\texttt{{temperature=0.6}}, \texttt{{num\_generations=1}}) answers a different question and should be compared to Qwen's published reference instead of to this cross-dataset table.
 
 \section*{{Datasets and Prompt Formats}}
 {build_dataset_profiles(rows)}

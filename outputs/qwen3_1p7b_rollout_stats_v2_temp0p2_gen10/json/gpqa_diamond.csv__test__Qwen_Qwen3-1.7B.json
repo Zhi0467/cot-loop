@@ -11,7 +11,7 @@
       "num_generations": 10,
       "max_tokens": 81920,
       "tp": 1,
-      "dp": 7,
+      "dp": 4,
       "dtype": "bfloat16",
       "max_model_len": 40960,
       "max_num_seqs": 10,
@@ -40,11 +40,11 @@
       "k": 20
     },
     "prompt_token_summary": {
-      "avg_prompt_token_count": 259.6060606060606,
-      "min_prompt_token_count": 85,
-      "max_prompt_token_count": 2812
+      "avg_prompt_token_count": 269.6060606060606,
+      "min_prompt_token_count": 95,
+      "max_prompt_token_count": 2822
     },
-    "timestamp": "2026-03-15T06:10:41.302081+00:00",
+    "timestamp": "2026-03-16T11:34:00.735241+00:00",
     "shuffle_policy": {
       "kind": "seed_xor_sample_id",
       "base_seed": 0
@@ -54,28 +54,28 @@
     "num_samples": 198,
     "num_generated": 1980,
     "num_graded": 1980,
-    "num_correct": 62,
-    "num_wrong": 1918,
-    "num_looped": 442,
-    "num_max_length_hits": 202,
+    "num_correct": 683,
+    "num_wrong": 1297,
+    "num_looped": 325,
+    "num_max_length_hits": 137,
     "num_prompt_too_long": 0,
-    "num_looped_and_max_length_hit": 201,
-    "num_correct_and_looped": 4,
-    "num_correct_and_max_length_hit": 0
+    "num_looped_and_max_length_hit": 137,
+    "num_correct_and_looped": 62,
+    "num_correct_and_max_length_hit": 2
   },
   "metrics": {
-    "success_fraction": 0.031313131313131314,
-    "loop_fraction": 0.22323232323232323,
-    "avg_generation_length": 12276.210101010101,
-    "avg_loop_generation_length": 25091.423076923078,
-    "avg_first_loop_prefix_length": 6975.56108597285,
-    "max_length_hit_fraction": 0.10202020202020202,
-    "loop_max_length_hit_fraction": 0.45475113122171945,
-    "max_length_hit_loop_fraction": 0.995049504950495,
-    "generation_length_variance": 110072014.95484746,
-    "max_length_hit_success_fraction": 0.0,
-    "loop_success_fraction": 0.00904977375565611,
-    "avg_correct_generation_length": 4265.145161290323,
-    "avg_wrong_generation_length": 12535.170490093848
+    "success_fraction": 0.34494949494949495,
+    "loop_fraction": 0.16414141414141414,
+    "avg_generation_length": 9687.158585858586,
+    "avg_loop_generation_length": 23493.572307692306,
+    "avg_first_loop_prefix_length": 6968.052307692307,
+    "max_length_hit_fraction": 0.0691919191919192,
+    "loop_max_length_hit_fraction": 0.42153846153846153,
+    "max_length_hit_loop_fraction": 1.0,
+    "generation_length_variance": 87513241.20717375,
+    "max_length_hit_success_fraction": 0.014598540145985401,
+    "loop_success_fraction": 0.19076923076923077,
+    "avg_correct_generation_length": 6617.238653001464,
+    "avg_wrong_generation_length": 11303.777949113339
   }
 }

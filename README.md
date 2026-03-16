@@ -10,8 +10,9 @@ The project now has two active evidence streams:
 
 Latest status:
 - the best prefill-only arm is still the Round 6 all-layer last-token anchor; later metadata-aware prefill rounds did not overturn the completion-view advantage.
-- under the repaired rollout-statistics v2 contract, `MATH-500`, `AIME`, `GPQA`, and capped `MMLU-Pro` are complete and reported.
-- the capped `LiveCodeBench release_v6` checkpoint has now been regraded and reported, so the repaired rollout-statistics v2 sweep is complete for correctness / loop / max-length / native `pass@k` analysis across all five datasets.
+- the common-policy rollout-statistics bundle is now refreshed under one shared decode policy (`temperature=0.2`, `num_generations=10`, and `max prompts <= 800` where applicable) across `MATH-500`, `AIME`, `GPQA`, capped `MMLU-Pro`, and capped `LiveCodeBench release_v6`.
+- the repaired MC rows are materially different from the stale pre-refresh bundle: `GPQA` now reports `34.5%` rollout success instead of `3.1%`, and `MMLU-Pro` now reports `65.2%` instead of `14.2%`, both under the terminal JSON-answer contract.
+- the readable common-policy artifact is `outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/qwen3_1p7b_cross_dataset_rollout_report.pdf`, while the separate benchmark-style `GPQA` calibration lives in `outputs/gpqa_json_official_temp0p6_gen1/` and should not be conflated with the shared-policy table.
 - one explicit caveat remains on that recovered `LiveCodeBench` block: the original job crashed after grading and before writing the final JSON, and replay-based repair did not reproduce the stored generations exactly enough to recover `avg_first_loop_prefix_length`. That single metric therefore remains `null` for the recovered capped run.
 
 **Workflow:**
@@ -20,7 +21,7 @@ Latest status:
 3. Generate rollout trajectories and label them (looped vs not-looped)
 4. Train a binary probe classifier on the precomputed features
 5. Evaluate the probe's ability to predict looping behavior
-6. For cross-dataset validation, run the rollout-statistics collector and rebuild the cross-dataset report from the authoritative stats bundle; the current repaired v2 bundle includes a recovered capped `LiveCodeBench` block with the prefix-length caveat noted above
+6. For cross-dataset validation, run the rollout-statistics collector and rebuild the cross-dataset report from the authoritative stats bundle; the current repaired v2 bundle includes refreshed `GPQA` / `MMLU-Pro` JSON-answer rows plus the recovered capped `LiveCodeBench` block with the prefix-length caveat noted above
 
 ## Quick Start
 
