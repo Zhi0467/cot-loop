@@ -15,7 +15,7 @@ Scope:
 - Remaining caveat: the original `LiveCodeBench` job crashed after grading and before writing its final JSON, and replay-based repair did not reproduce the stored checkpoint exactly enough to recover `avg_first_loop_prefix_length`. That one metric remains `null` in the recovered capped bundle; a fresh rerun would be required if exact prefix-length telemetry is still needed.
 - Active review surfaces:
   - Upstream PR #4 (`Zhi0467/cot-loop`, branch `task/1773451376-rollout-stats`) remains `OPEN` / `DRAFT` at head `d0796c3`, but it no longer covers the current local branch state.
-  - PR #5 is already merged, so the refreshed common-policy bundle now needs a fresh follow-up review surface rather than another update to the old contract-fix PR.
+  - Upstream PR #6 (`Zhi0467/cot-loop`, branch `task/1773451376-common-policy-refresh`) is now the live review surface for the refreshed common-policy bundle and the report-generator LaTeX fix.
 
 ## Milestone 1 - Pipeline and multi-view infrastructure
 Status: done (2026-03-05 18:45 UTC)
