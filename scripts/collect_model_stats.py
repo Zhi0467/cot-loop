@@ -11,7 +11,7 @@ import signal
 import sys
 import time
 import traceback
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any
 
@@ -69,10 +69,10 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--max-samples", type=int, default=None)
     parser.add_argument("--question-field", default="question")
     parser.add_argument("--answer-field", default="answer")
-    parser.add_argument("--model-id", default="Qwen/Qwen3.5-2B")
+    parser.add_argument("--model-id", default="Qwen/Qwen3-1.7B")
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--max-tokens", type=int, default=81920)
-    parser.add_argument("--max-model-len", type=int, default=262144)
+    parser.add_argument("--max-model-len", type=int, default=40960)
     parser.add_argument("--tp", type=int, default=1)
     parser.add_argument("--dp", type=int, default=1)
     parser.add_argument("--dtype", default="bfloat16")
@@ -498,6 +498,8 @@ def _collect_worker_stats(
                     agg.first_loop_prefix_sum += first_loop_prefix
                 if max_length_hit:
                     agg.num_max_length_hits += 1
+                if loop_flag and max_length_hit:
+                    agg.num_looped_and_max_length_hit += 1
 
                 if collector_cfg.task_kind == "livecodebench_codegen":
                     agg.lcb_sample_records.append(
@@ -758,6 +760,24 @@ def _apply_lcb_grades(
     return pass_at_1
 
 
+def _write_lcb_records_checkpoint(agg: WorkerAggregator, out_path: str) -> str:
+    base, ext = os.path.splitext(out_path)
+    checkpoint_path = f"{base}__lcb_records{ext or '.json'}"
+    checkpoint_dir = os.path.dirname(checkpoint_path)
+    if checkpoint_dir:
+        os.makedirs(checkpoint_dir, exist_ok=True)
+    payload = {
+        "num_samples": agg.num_samples_seen,
+        "num_generated": agg.num_generated,
+        "num_prompt_too_long": agg.num_prompt_too_long,
+        "records": [asdict(record) for record in agg.lcb_sample_records],
+    }
+    with open(checkpoint_path, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2)
+    print(f"Wrote LiveCodeBench records checkpoint to {checkpoint_path}", flush=True)
+    return checkpoint_path
+
+
 def main() -> None:
     args = _parse_args()
     _run_dataset_preflight(args)
@@ -790,8 +810,10 @@ def main() -> None:
         loop_n=args.loop_n,
         loop_k=args.loop_k,
     )
+    out_path = args.out or _derive_output_path(args)
     lcb_pass_at_1: float | None = None
     if args.task_kind == "livecodebench_codegen":
+        _write_lcb_records_checkpoint(agg, out_path)
         lcb_pass_at_1 = _apply_lcb_grades(
             agg,
             lcb_benchmark,
@@ -826,13 +848,15 @@ def main() -> None:
             "num_looped": agg.num_looped,
             "num_max_length_hits": agg.num_max_length_hits,
             "num_prompt_too_long": agg.num_prompt_too_long,
+            "num_looped_and_max_length_hit": agg.num_looped_and_max_length_hit,
+            "num_correct_and_looped": agg.num_correct_and_looped,
+            "num_correct_and_max_length_hit": agg.num_correct_and_max_length_hit,
         },
         "metrics": metrics,
     }
     if lcb_pass_at_1 is not None:
         payload["metadata"]["lcb_native_pass_at_1"] = lcb_pass_at_1
 
-    out_path = args.out or _derive_output_path(args)
     out_dir = os.path.dirname(out_path)
     if out_dir:
         os.makedirs(out_dir, exist_ok=True)
