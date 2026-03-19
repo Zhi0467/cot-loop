@@ -198,6 +198,32 @@ def _load_reference_manifest(reference_data_dir: str) -> dict[str, object]:
         return json.load(f)
 
 
+def _resolve_reference_target_kind(
+    manifest: dict[str, object],
+    *,
+    split: str,
+) -> str:
+    split_info = manifest.get(split)
+    if isinstance(split_info, dict):
+        split_target_kind = split_info.get("target_kind")
+        if isinstance(split_target_kind, str) and split_target_kind:
+            target_kind = split_target_kind
+        else:
+            target_spec = manifest.get("target_spec")
+            target_kind = (
+                str(target_spec.get("kind", "binary"))
+                if isinstance(target_spec, dict)
+                else "binary"
+            )
+    else:
+        target_kind = "binary"
+    if target_kind not in ("binary", "probability"):
+        raise SystemExit(
+            f"Unsupported target kind '{target_kind}' in reference split '{split}'."
+        )
+    return target_kind
+
+
 def _resolve_built_splits(
     manifest: dict[str, object],
     requested_splits: list[str] | tuple[str, ...] | None,
@@ -232,6 +258,7 @@ def _load_reference_split(
     split_info = manifest.get(split)
     if not isinstance(split_info, dict):
         raise SystemExit(f"Reference manifest missing split '{split}'.")
+    target_kind = _resolve_reference_target_kind(manifest, split=split)
     shard_paths = split_info.get("shards")
     if not isinstance(shard_paths, list) or not shard_paths:
         raise SystemExit(f"Reference split '{split}' has no shard files.")
@@ -242,7 +269,8 @@ def _load_reference_split(
         if not isinstance(rel_path, str):
             raise SystemExit(f"Invalid shard path entry for split '{split}'.")
         shard = torch.load(os.path.join(reference_data_dir, rel_path), map_location="cpu")
-        labels.append(shard["y"].to(dtype=torch.uint8))
+        label_dtype = torch.float32 if target_kind == "probability" else torch.uint8
+        labels.append(shard["y"].to(dtype=label_dtype))
         sample_ids.append(shard["sample_ids"].to(dtype=torch.int64))
     return torch.cat(labels, dim=0), torch.cat(sample_ids, dim=0)
 
@@ -289,6 +317,7 @@ def _save_view_split(
     labels: torch.Tensor,
     sample_ids: torch.Tensor,
     shard_size: int,
+    target_kind: str,
 ) -> dict[str, object]:
     if feature_key == primary_key:
         view_dir = out_dir
@@ -303,6 +332,7 @@ def _save_view_split(
         labels.tolist(),
         sample_ids.tolist(),
         shard_size=shard_size,
+        target_kind=target_kind,
     )
     if prefix:
         split_meta["shards"] = [
@@ -378,6 +408,7 @@ def main() -> None:
     )
 
     for split in built_splits:
+        target_kind = _resolve_reference_target_kind(reference_manifest, split=split)
         labels, sample_ids = _load_reference_split(
             reference_data_dir=args.reference_data_dir,
             manifest=reference_manifest,
@@ -411,6 +442,7 @@ def main() -> None:
                 labels=labels,
                 sample_ids=sample_ids,
                 shard_size=args.shard_size,
+                target_kind=target_kind,
             )
             sample_shape = _sample_shape_from_features(features)
             prior_sample_shape = manifest_views[key].get("sample_shape")

@@ -1110,8 +1110,12 @@ def _resolve_target_spec(
         }
     if target_kind != "probability":
         raise SystemExit(f"Unsupported --target-kind '{target_kind}'.")
-    if rollout_cfg.num_generations < 1:
-        raise SystemExit("--num-generations must be >= 1 for prompt-profile targets.")
+    if rollout_cfg.num_generations < 2:
+        raise SystemExit(
+            "--target-kind=probability requires --num-generations >= 2 so the "
+            "target is estimated from repeated rollouts rather than collapsing "
+            "back to a single binary sample."
+        )
     tail_threshold = float(args.profile_tail_threshold)
     if not 0.0 < tail_threshold <= 1.0:
         raise SystemExit("--profile-tail-threshold must be in (0, 1].")
