@@ -4,6 +4,7 @@ Purpose
 - Build a binary probe dataset from LLM runs to train a CoT loop detector.
 - The canonical dataset stores the last-token activation from every transformer layer as a stacked `[layer, hidden]` tensor per prompt.
 - Train a probe classifier (linear or MLP) either on one selected layer or as a layerwise voting ensemble.
+- The same builder/trainer path now also supports prompt-level soft targets such as `s_0.9 = P(L / E >= 0.9)` from repeated rollouts of the same prompt.
 
 High-level flow
 1. Load Hugging Face dataset rows and read prompt text from `--prompt-field`.
@@ -13,9 +14,9 @@ High-level flow
    - identical train/test specs split deterministically with `--split-ratio`.
 4. Prefill pass (Transformers): extract last-token activations from every layer and store them as a stacked tensor `[layer, hidden]` per prompt.
 5. Rollout pass (vLLM): generate one trajectory per prompt.
-6. Label with loop detector (`n`-gram repeated `k` times).
+6. Either label with the loop detector (`n`-gram repeated `k` times) or aggregate repeated rollouts into a prompt-level tail target.
 7. Save tensors as `.pt` shards and write `manifest.json`.
-8. Train/eval a probe classifier with weighted BCE and W&B logging.
+8. Train/eval a probe classifier with weighted BCE for binary targets or soft BCE for prompt-level probability targets, and log metrics to W&B.
 
 Key modules
 - `configs.py`: rollout + probe config dataclasses, presets, and probe model factory.
@@ -95,6 +96,19 @@ python scripts/train_probe.py \
   --out-dir outputs/probe_runs/run1_ensemble \
   --classifier-mode ensemble \
   --wandb-project cot-loop-probe
+```
+
+Build a prompt-level `s_0.9` dataset from repeated rollouts
+```bash
+python scripts/build_probe_dataset.py \
+  --train-dataset HuggingFaceH4/MATH-500 \
+  --train-split test \
+  --prompt-field problem \
+  --model-preset openthinker3_1p5b \
+  --target-kind probability \
+  --num-generations 10 \
+  --profile-tail-threshold 0.9 \
+  --out-dir outputs/probe_data/s09
 ```
 
 Outputs

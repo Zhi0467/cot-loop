@@ -83,12 +83,16 @@ SEEDS="${SEEDS:-}"
 DATASET_SEED="${DATASET_SEED:-}"
 
 MAX_NUM_SEQS="${MAX_NUM_SEQS:-}"
+NUM_GENERATIONS="${NUM_GENERATIONS:-}"
 MAX_TOKENS="${MAX_TOKENS:-}"
 PREFILL_BATCH_SIZE="${PREFILL_BATCH_SIZE:-32}"
 COMPLETION_BATCH_SIZE="${COMPLETION_BATCH_SIZE:-1}"
 FEATURE_POOLING="${FEATURE_POOLING:-last_token_all_layers_stack}"
 FEATURE_LAYER="${FEATURE_LAYER:--1}"
 FEATURE_KEY="${FEATURE_KEY:-}"
+TARGET_KIND="${TARGET_KIND:-binary}"
+PROFILE_TAIL_THRESHOLD="${PROFILE_TAIL_THRESHOLD:-0.9}"
+SCORE_RULE="${SCORE_RULE:-}"
 
 LOOP_N="${LOOP_N:-30}"
 LOOP_K="${LOOP_K:-10}"
@@ -134,6 +138,8 @@ echo "[probe-e2e] model_preset=${MODEL_PRESET} train=${TRAIN_DATASET}:${TRAIN_SP
 echo "[probe-e2e] probe_preset=${PROBE_PRESET}"
 echo "[probe-e2e] feature_pooling=${FEATURE_POOLING} feature_layer=${FEATURE_LAYER}"
 echo "[probe-e2e] feature_key=${FEATURE_KEY}"
+echo "[probe-e2e] target_kind=${TARGET_KIND} profile_tail_threshold=${PROFILE_TAIL_THRESHOLD}"
+echo "[probe-e2e] score_rule=${SCORE_RULE}"
 echo "[probe-e2e] prefill_batch_size=${PREFILL_BATCH_SIZE} completion_batch_size=${COMPLETION_BATCH_SIZE}"
 echo "[probe-e2e] resolved seeds: ${SEED_LIST[*]}"
 
@@ -145,6 +151,8 @@ BUILD_ARGS=(
   --seed "${DATASET_SEED}"
   --loop-n "${LOOP_N}"
   --loop-k "${LOOP_K}"
+  --target-kind "${TARGET_KIND}"
+  --profile-tail-threshold "${PROFILE_TAIL_THRESHOLD}"
   --shard-size "${SHARD_SIZE}"
   --prefill-batch-size "${PREFILL_BATCH_SIZE}"
   --completion-batch-size "${COMPLETION_BATCH_SIZE}"
@@ -174,6 +182,9 @@ if [[ -n "${TEST_DATASET}" && -n "${TEST_MAX_SAMPLES}" ]]; then
 fi
 if [[ -n "${MAX_NUM_SEQS}" ]]; then
   BUILD_ARGS+=(--max-num-seqs "${MAX_NUM_SEQS}")
+fi
+if [[ -n "${NUM_GENERATIONS}" ]]; then
+  BUILD_ARGS+=(--num-generations "${NUM_GENERATIONS}")
 fi
 if [[ -n "${MAX_TOKENS}" ]]; then
   BUILD_ARGS+=(--max-tokens "${MAX_TOKENS}")
@@ -212,6 +223,9 @@ for RUN_SEED in "${SEED_LIST[@]}"; do
   )
   if [[ -n "${FEATURE_KEY}" ]]; then
     TRAIN_ARGS+=(--feature-key "${FEATURE_KEY}")
+  fi
+  if [[ -n "${SCORE_RULE}" ]]; then
+    TRAIN_ARGS+=(--score-rule "${SCORE_RULE}")
   fi
 
   echo "[probe-e2e] seed=${RUN_SEED}: train probe data_dir=${OUT_DATA_DIR} out_dir=${SEED_RUN_DIR} probe_preset=${PROBE_PRESET}"

@@ -424,7 +424,7 @@ def main() -> None:
             manifest_views[key]["sample_shape"] = sample_shape
 
     payload = {
-        "version": 4,
+        "version": 5,
         "created_from": args.reference_data_dir,
         "default_feature_key": primary_key,
         "feature_key": primary_key,
@@ -457,6 +457,7 @@ def main() -> None:
         "split_ratio",
         "split_source",
         "test_spec",
+        "target_spec",
         "train_spec",
     ):
         value = reference_manifest.get(key)

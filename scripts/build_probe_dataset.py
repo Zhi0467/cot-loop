@@ -21,13 +21,17 @@ if SRC not in sys.path:
 
 from loop_probe.configs import get_rollout_config, preset_choices
 from loop_probe.hf_data import load_prompt_records, specs_equal, split_records
-from loop_probe.labeling import LABEL_TARGET_CHOICES, labels_from_rollouts
+from loop_probe.labeling import (
+    LABEL_TARGET_CHOICES,
+    aggregate_prompt_profile,
+    labels_from_rollouts,
+)
 from loop_probe.prefill import (
     FEATURE_POOLING_CHOICES,
     extract_prefill_features_multi,
     load_prefill_model_and_tokenizer,
 )
-from loop_probe.rollout import generate_rollout_token_ids
+from loop_probe.rollout import generate_grouped_rollouts, generate_rollout_token_ids
 from loop_probe.serialization import save_split_shards, write_manifest
 from loop_probe.types import DatasetSpec, SampleRecord
 from utils import build_prompt
@@ -44,6 +48,7 @@ BALANCE_CHOICES = ("none", "downsample")
 ROLLOUT_LAST_TOKEN_ALL_LAYERS_MEAN = "rollout_last_token_all_layers_mean"
 COMPLETION_POOLING_CHOICES = (ROLLOUT_LAST_TOKEN_ALL_LAYERS_MEAN,)
 ALL_FEATURE_POOLING_CHOICES = FEATURE_POOLING_CHOICES + COMPLETION_POOLING_CHOICES
+TARGET_KIND_CHOICES = ("binary", "probability")
 
 
 def _parse_args() -> argparse.Namespace:
@@ -80,6 +85,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--model-preset", choices=preset_choices(), default=None)
     parser.add_argument("--model-id", default=None)
     parser.add_argument("--temperature", type=float, default=None)
+    parser.add_argument("--num-generations", type=int, default=None)
     parser.add_argument("--max-tokens", type=int, default=None)
     parser.add_argument("--tp", type=int, default=None)
     parser.add_argument("--dp", type=int, default=None)
@@ -99,6 +105,16 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--loop-n", type=int, default=30)
     parser.add_argument("--loop-k", type=int, default=20)
     parser.add_argument(
+        "--target-kind",
+        choices=TARGET_KIND_CHOICES,
+        default="binary",
+        help=(
+            "Target family to build. 'binary' preserves the legacy rollout-level "
+            "loop label; 'probability' aggregates repeated rollouts into a prompt-level "
+            "soft target."
+        ),
+    )
+    parser.add_argument(
         "--label-target",
         choices=LABEL_TARGET_CHOICES,
         default="eventual_loop",
@@ -115,6 +131,15 @@ def _parse_args() -> argparse.Namespace:
         default=None,
         help=(
             "Positive token horizon used when --label-target=loop_by_horizon."
+        ),
+    )
+    parser.add_argument(
+        "--profile-tail-threshold",
+        type=float,
+        default=0.9,
+        help=(
+            "Tail threshold used when --target-kind=probability. "
+            "The emitted soft target is s_t = P(L / E >= t)."
         ),
     )
     parser.add_argument("--shard-size", type=int, default=2048)
@@ -345,6 +370,20 @@ def _prompts(records: list[SampleRecord]) -> list[str]:
     return [rec.prompt for rec in records]
 
 
+def _prompt_token_lengths(tokenizer, records: list[SampleRecord]) -> list[int]:
+    if not records:
+        return []
+    encoded = tokenizer(
+        [rec.prompt for rec in records],
+        add_special_tokens=False,
+    )["input_ids"]
+    if len(encoded) != len(records):
+        raise RuntimeError(
+            "Tokenizer returned a mismatched number of prompt tokenizations."
+        )
+    return [len(token_ids) for token_ids in encoded]
+
+
 def _apply_chat_prompt(
     tokenizer,
     records: list[SampleRecord],
@@ -544,6 +583,7 @@ def _probe_cache_status(
     split_ratio: float,
     loop_n: int,
     loop_k: int,
+    target_spec: dict[str, object],
     label_spec: dict[str, object],
     rollout_config: dict[str, object],
     requested_primary_feature_key: str,
@@ -577,15 +617,26 @@ def _probe_cache_status(
         if manifest.get(key) != value:
             return False, f"manifest mismatch on '{key}'"
 
-    manifest_label_spec = manifest.get(
-        "label_spec",
-        {
-            "target": "eventual_loop",
-            "horizon": None,
-        },
-    )
-    if manifest_label_spec != label_spec:
-        return False, "manifest mismatch on 'label_spec'"
+    manifest_target_spec = manifest.get("target_spec")
+    if manifest_target_spec is None:
+        manifest_target_spec = {
+            "kind": "binary",
+            "name": label_spec.get("target", "eventual_loop"),
+            "horizon": label_spec.get("horizon"),
+        }
+    if manifest_target_spec != target_spec:
+        return False, "manifest mismatch on 'target_spec'"
+
+    if target_spec["kind"] == "binary":
+        manifest_label_spec = manifest.get(
+            "label_spec",
+            {
+                "target": "eventual_loop",
+                "horizon": None,
+            },
+        )
+        if manifest_label_spec != label_spec:
+            return False, "manifest mismatch on 'label_spec'"
 
     expected_balancing = {
         "train": balance_train,
@@ -754,6 +805,92 @@ def _label_split(
     return labels, rollout_token_ids
 
 
+def _build_prompt_profile_targets(
+    split_name: str,
+    prompts: list[str],
+    prompt_token_lengths: list[int],
+    sample_ids: list[int],
+    *,
+    rollout_cfg,
+    seed: int,
+    loop_n: int,
+    loop_k: int,
+    tail_threshold: float,
+) -> tuple[list[float], list[dict[str, object]]]:
+    if len(prompts) != len(prompt_token_lengths) or len(prompts) != len(sample_ids):
+        raise SystemExit(
+            "Prompt-profile target builder got mismatched prompt/length/sample_id counts."
+        )
+    print(
+        f"[{split_name}] running grouped rollouts for {len(prompts)} prompts "
+        f"(n={rollout_cfg.num_generations})",
+        flush=True,
+    )
+    grouped_rollouts = generate_grouped_rollouts(
+        prompts,
+        rollout_cfg,
+        seed=seed,
+    )
+    if len(grouped_rollouts) != len(prompts):
+        raise RuntimeError(
+            "Grouped rollout generator returned a mismatched number of prompt groups."
+        )
+
+    target_name = _profile_target_name(tail_threshold)
+    targets: list[float] = []
+    rows: list[dict[str, object]] = []
+    for sample_id, prompt_len, prompt_rollouts in zip(
+        sample_ids,
+        prompt_token_lengths,
+        grouped_rollouts,
+        strict=True,
+    ):
+        effective_max_tokens = int(rollout_cfg.max_tokens)
+        if rollout_cfg.max_model_len is not None and rollout_cfg.max_model_len > 0:
+            effective_max_tokens = min(
+                effective_max_tokens,
+                int(rollout_cfg.max_model_len) - int(prompt_len),
+            )
+        if effective_max_tokens < 1:
+            raise SystemExit(
+                "Prompt exceeds the available generation budget under the current "
+                "max_model_len / max_tokens setting."
+            )
+
+        profile = aggregate_prompt_profile(
+            [rollout.token_ids for rollout in prompt_rollouts],
+            effective_max_tokens=effective_max_tokens,
+            loop_n=loop_n,
+            loop_k=loop_k,
+            tail_threshold=tail_threshold,
+        )
+        target_value = float(profile["s_tail"])
+        targets.append(target_value)
+        rows.append(
+            {
+                "sample_id": int(sample_id),
+                "prompt_token_count": int(prompt_len),
+                "effective_max_tokens": int(effective_max_tokens),
+                "target_name": target_name,
+                target_name: target_value,
+                "p_cap": float(profile["p_cap"]),
+                "p_loop": float(profile["p_loop"]),
+                "mu_log_rel": float(profile["mu_log_rel"]),
+                "mean_length": float(profile["mean_length"]),
+                "mean_relative_length": float(profile["mean_relative_length"]),
+                "tail_threshold": float(profile["tail_threshold"]),
+                "num_rollouts": int(profile["num_rollouts"]),
+                "lengths": profile["lengths"],
+                "relative_lengths": profile["relative_lengths"],
+                "cap_hits": profile["cap_hits"],
+                "loop_flags": profile["loop_flags"],
+                "first_loop_prefix_lengths": profile["first_loop_prefix_lengths"],
+                "finish_reasons": [rollout.finish_reason for rollout in prompt_rollouts],
+            }
+        )
+    return targets, rows
+
+
 def _extract_completion_features(
     split_name: str,
     records: list[SampleRecord],
@@ -913,6 +1050,22 @@ def _subset_list(values: list[int], keep_indices: list[int]) -> list[int]:
     return [values[idx] for idx in keep_indices]
 
 
+def _subset_float_list(values: list[float], keep_indices: list[int]) -> list[float]:
+    return [float(values[idx]) for idx in keep_indices]
+
+
+def _profile_target_name(tail_threshold: float) -> str:
+    threshold_text = format(float(tail_threshold), "g")
+    return f"s_{threshold_text}"
+
+
+def _write_jsonl_rows(path: str, rows: list[dict[str, object]]) -> None:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        for row in rows:
+            f.write(json.dumps(row, sort_keys=True) + "\n")
+
+
 def _sample_shape_from_features(features: torch.Tensor) -> list[int]:
     if features.ndim not in (2, 3):
         raise SystemExit(
@@ -942,6 +1095,35 @@ def _resolve_label_spec(args: argparse.Namespace) -> dict[str, object]:
     }
 
 
+def _resolve_target_spec(
+    args: argparse.Namespace,
+    *,
+    rollout_cfg,
+    label_spec: dict[str, object],
+) -> dict[str, object]:
+    target_kind = str(args.target_kind)
+    if target_kind == "binary":
+        return {
+            "kind": "binary",
+            "name": str(label_spec["target"]),
+            "horizon": label_spec["horizon"],
+        }
+    if target_kind != "probability":
+        raise SystemExit(f"Unsupported --target-kind '{target_kind}'.")
+    if rollout_cfg.num_generations < 1:
+        raise SystemExit("--num-generations must be >= 1 for prompt-profile targets.")
+    tail_threshold = float(args.profile_tail_threshold)
+    if not 0.0 < tail_threshold <= 1.0:
+        raise SystemExit("--profile-tail-threshold must be in (0, 1].")
+    return {
+        "kind": "probability",
+        "name": _profile_target_name(tail_threshold),
+        "tail_threshold": tail_threshold,
+        "num_generations": int(rollout_cfg.num_generations),
+        "loss": "soft_bce",
+    }
+
+
 def main() -> None:
     args = _parse_args()
 
@@ -950,6 +1132,7 @@ def main() -> None:
             args.model_preset,
             model_id=args.model_id,
             temperature=args.temperature,
+            num_generations=args.num_generations,
             max_tokens=args.max_tokens,
             tp=args.tp,
             dp=args.dp,
@@ -969,7 +1152,26 @@ def main() -> None:
         feature_views
     )
     label_spec = _resolve_label_spec(args)
+    target_spec = _resolve_target_spec(
+        args,
+        rollout_cfg=rollout_cfg,
+        label_spec=label_spec,
+    )
     balance_seed = args.seed if args.balance_seed is None else args.balance_seed
+    if target_spec["kind"] != "binary":
+        if completion_feature_views:
+            raise SystemExit(
+                "--target-kind=probability currently supports prefill feature views only."
+            )
+        if args.balance_train != "none" or args.balance_test != "none":
+            raise SystemExit(
+                "Balancing is only supported for binary targets in this builder."
+            )
+    elif rollout_cfg.num_generations != 1:
+        raise SystemExit(
+            "Binary targets currently require --num-generations=1. "
+            "Use --target-kind=probability for repeated-rollout prompt targets."
+        )
 
     if args.reuse_if_compatible:
         cache_hit, reason = _probe_cache_status(
@@ -981,6 +1183,7 @@ def main() -> None:
             split_ratio=args.split_ratio,
             loop_n=args.loop_n,
             loop_k=args.loop_k,
+            target_spec=target_spec,
             label_spec=label_spec,
             rollout_config=rollout_cfg.to_dict(),
             requested_primary_feature_key=primary_feature_key,
@@ -1002,15 +1205,15 @@ def main() -> None:
         )
 
     train_records, test_records, split_source = _resolve_splits(args, train_spec, test_spec)
-    label_desc = str(label_spec["target"])
-    if label_spec["horizon"] is not None:
-        label_desc = f"{label_desc}@{label_spec['horizon']}"
+    target_desc = str(target_spec["name"])
+    if target_spec["kind"] == "binary" and target_spec.get("horizon") is not None:
+        target_desc = f"{target_desc}@{target_spec['horizon']}"
 
     print(
         f"Building probe dataset with model={rollout_cfg.model_id}, "
         f"train={len(train_records)}, test={len(test_records)}, "
         f"feature_views={list(feature_views.keys())}, "
-        f"label_target={label_desc}",
+        f"target={target_desc}",
         flush=True,
     )
 
@@ -1025,6 +1228,8 @@ def main() -> None:
 
     train_ids = _sample_ids(train_records)
     test_ids = _sample_ids(test_records)
+    train_prompt_token_lengths = _prompt_token_lengths(tokenizer, train_records)
+    test_prompt_token_lengths = _prompt_token_lengths(tokenizer, test_records)
     train_features_by_key: dict[str, torch.Tensor] = {}
     test_features_by_key: dict[str, torch.Tensor] = {}
 
@@ -1061,92 +1266,124 @@ def main() -> None:
     train_prompts = _prompts(train_records)
     test_prompts = _prompts(test_records)
     all_prompts = train_prompts + test_prompts
-    need_rollout_tokens = bool(completion_feature_views)
-    all_labels, all_rollout_token_ids = _label_split(
-        "all",
-        all_prompts,
-        rollout_cfg=rollout_cfg,
-        seed=args.seed,
-        loop_n=args.loop_n,
-        loop_k=args.loop_k,
-        label_target=str(label_spec["target"]),
-        label_horizon=(
-            int(label_spec["horizon"])
-            if label_spec["horizon"] is not None
-            else None
-        ),
-        return_rollout_token_ids=need_rollout_tokens,
-    )
     split_at = len(train_prompts)
-    train_labels = all_labels[:split_at]
-    test_labels = all_labels[split_at:]
+    train_profile_rows: list[dict[str, object]] = []
+    test_profile_rows: list[dict[str, object]] = []
 
-    if completion_feature_views:
-        if all_rollout_token_ids is None:
-            raise RuntimeError(
-                "Completion views requested but rollout token IDs were not retained."
+    if target_spec["kind"] == "binary":
+        need_rollout_tokens = bool(completion_feature_views)
+        all_labels, all_rollout_token_ids = _label_split(
+            "all",
+            all_prompts,
+            rollout_cfg=rollout_cfg,
+            seed=args.seed,
+            loop_n=args.loop_n,
+            loop_k=args.loop_k,
+            label_target=str(label_spec["target"]),
+            label_horizon=(
+                int(label_spec["horizon"])
+                if label_spec["horizon"] is not None
+                else None
+            ),
+            return_rollout_token_ids=need_rollout_tokens,
+        )
+        train_labels: list[int | float] = all_labels[:split_at]
+        test_labels: list[int | float] = all_labels[split_at:]
+
+        if completion_feature_views:
+            if all_rollout_token_ids is None:
+                raise RuntimeError(
+                    "Completion views requested but rollout token IDs were not retained."
+                )
+            train_rollout_token_ids = all_rollout_token_ids[:split_at]
+            test_rollout_token_ids = all_rollout_token_ids[split_at:]
+            completion_model, completion_tokenizer, completion_device = (
+                load_prefill_model_and_tokenizer(
+                    rollout_cfg.model_id,
+                    trust_remote_code=rollout_cfg.trust_remote_code,
+                )
             )
-        train_rollout_token_ids = all_rollout_token_ids[:split_at]
-        test_rollout_token_ids = all_rollout_token_ids[split_at:]
-        completion_model, completion_tokenizer, completion_device = (
-            load_prefill_model_and_tokenizer(
-                rollout_cfg.model_id,
-                trust_remote_code=rollout_cfg.trust_remote_code,
+            train_completion_features_by_key = _extract_completion_features(
+                "train",
+                train_records,
+                train_rollout_token_ids,
+                model=completion_model,
+                tokenizer=completion_tokenizer,
+                device=completion_device,
+                feature_views=completion_feature_views,
+                batch_size=args.completion_batch_size,
+                max_model_len=rollout_cfg.max_model_len,
             )
-        )
-        train_completion_features_by_key = _extract_completion_features(
-            "train",
-            train_records,
-            train_rollout_token_ids,
-            model=completion_model,
-            tokenizer=completion_tokenizer,
-            device=completion_device,
-            feature_views=completion_feature_views,
-            batch_size=args.completion_batch_size,
-            max_model_len=rollout_cfg.max_model_len,
-        )
-        test_completion_features_by_key = _extract_completion_features(
-            "test",
-            test_records,
-            test_rollout_token_ids,
-            model=completion_model,
-            tokenizer=completion_tokenizer,
-            device=completion_device,
-            feature_views=completion_feature_views,
-            batch_size=args.completion_batch_size,
-            max_model_len=rollout_cfg.max_model_len,
-        )
-        train_features_by_key.update(train_completion_features_by_key)
-        test_features_by_key.update(test_completion_features_by_key)
+            test_completion_features_by_key = _extract_completion_features(
+                "test",
+                test_records,
+                test_rollout_token_ids,
+                model=completion_model,
+                tokenizer=completion_tokenizer,
+                device=completion_device,
+                feature_views=completion_feature_views,
+                batch_size=args.completion_batch_size,
+                max_model_len=rollout_cfg.max_model_len,
+            )
+            train_features_by_key.update(train_completion_features_by_key)
+            test_features_by_key.update(test_completion_features_by_key)
 
-        del train_rollout_token_ids
-        del test_rollout_token_ids
-        del all_rollout_token_ids
+            del train_rollout_token_ids
+            del test_rollout_token_ids
+            del all_rollout_token_ids
 
-        del completion_model
-        del completion_tokenizer
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.synchronize()
-            torch.cuda.empty_cache()
-            torch.cuda.ipc_collect()
+            del completion_model
+            del completion_tokenizer
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+                torch.cuda.empty_cache()
+                torch.cuda.ipc_collect()
 
-    train_keep_idx = _balanced_indices(
-        train_labels,
-        split_name="train",
-        mode=args.balance_train,
-        seed=balance_seed,
-    )
-    test_keep_idx = _balanced_indices(
-        test_labels,
-        split_name="test",
-        mode=args.balance_test,
-        seed=balance_seed + 1,
-    )
-    train_labels = _subset_list(train_labels, train_keep_idx)
-    test_labels = _subset_list(test_labels, test_keep_idx)
+        train_keep_idx = _balanced_indices(
+            train_labels,
+            split_name="train",
+            mode=args.balance_train,
+            seed=balance_seed,
+        )
+        test_keep_idx = _balanced_indices(
+            test_labels,
+            split_name="test",
+            mode=args.balance_test,
+            seed=balance_seed + 1,
+        )
+        train_labels = _subset_list(train_labels, train_keep_idx)
+        test_labels = _subset_list(test_labels, test_keep_idx)
+    else:
+        all_prompt_token_lengths = train_prompt_token_lengths + test_prompt_token_lengths
+        all_ids = train_ids + test_ids
+        all_targets, all_profile_rows = _build_prompt_profile_targets(
+            "all",
+            all_prompts,
+            all_prompt_token_lengths,
+            all_ids,
+            rollout_cfg=rollout_cfg,
+            seed=args.seed,
+            loop_n=args.loop_n,
+            loop_k=args.loop_k,
+            tail_threshold=float(target_spec["tail_threshold"]),
+        )
+        train_labels = all_targets[:split_at]
+        test_labels = all_targets[split_at:]
+        train_profile_rows = all_profile_rows[:split_at]
+        test_profile_rows = all_profile_rows[split_at:]
+        train_keep_idx = list(range(len(train_labels)))
+        test_keep_idx = list(range(len(test_labels)))
+
     train_ids = _subset_list(train_ids, train_keep_idx)
     test_ids = _subset_list(test_ids, test_keep_idx)
+    train_prompt_token_lengths = _subset_list(train_prompt_token_lengths, train_keep_idx)
+    test_prompt_token_lengths = _subset_list(test_prompt_token_lengths, test_keep_idx)
+    if target_spec["kind"] == "probability":
+        train_labels = _subset_float_list(train_labels, train_keep_idx)
+        test_labels = _subset_float_list(test_labels, test_keep_idx)
+        train_profile_rows = [train_profile_rows[idx] for idx in train_keep_idx]
+        test_profile_rows = [test_profile_rows[idx] for idx in test_keep_idx]
     train_keep_idx_t = torch.tensor(train_keep_idx, dtype=torch.long)
     test_keep_idx_t = torch.tensor(test_keep_idx, dtype=torch.long)
 
@@ -1198,6 +1435,7 @@ def main() -> None:
             train_labels,
             train_ids,
             shard_size=args.shard_size,
+            target_kind=str(target_spec["kind"]),
         )
         test_meta = save_split_shards(
             args.out_dir,
@@ -1206,6 +1444,7 @@ def main() -> None:
             test_labels,
             test_ids,
             shard_size=args.shard_size,
+            target_kind=str(target_spec["kind"]),
         )
 
         feature_views_manifest[feature_key] = {
@@ -1226,8 +1465,25 @@ def main() -> None:
     if primary_train_meta is None or primary_test_meta is None or primary_input_dim is None:
         raise SystemExit(f"Primary feature view '{primary_feature_key}' was not materialized.")
 
+    prompt_profile_files: dict[str, str] = {}
+    if target_spec["kind"] == "probability":
+        train_profile_path = os.path.join("diagnostics", "train_prompt_profile.jsonl")
+        test_profile_path = os.path.join("diagnostics", "test_prompt_profile.jsonl")
+        _write_jsonl_rows(
+            os.path.join(args.out_dir, train_profile_path),
+            train_profile_rows,
+        )
+        _write_jsonl_rows(
+            os.path.join(args.out_dir, test_profile_path),
+            test_profile_rows,
+        )
+        prompt_profile_files = {
+            "train": train_profile_path,
+            "test": test_profile_path,
+        }
+
     manifest = {
-        "version": 4,
+        "version": 5,
         "input_dim": primary_input_dim,
         "sample_shape": feature_views_manifest[primary_feature_key]["sample_shape"],
         "default_feature_key": primary_feature_key,
@@ -1250,13 +1506,15 @@ def main() -> None:
             "n": args.loop_n,
             "k": args.loop_k,
         },
-        "label_spec": label_spec,
+        "target_spec": target_spec,
+        "label_spec": label_spec if target_spec["kind"] == "binary" else None,
         "balancing": {
             "train": args.balance_train,
             "test": args.balance_test,
             "seed": balance_seed,
         },
         "rollout_config": rollout_cfg.to_dict(),
+        "prompt_profile_files": prompt_profile_files or None,
         "train_spec": asdict(train_spec),
         "test_spec": asdict(test_spec) if test_spec else None,
         "train": primary_train_meta,
