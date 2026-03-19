@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-03-15 21:56 UTC
+Last updated: 2026-03-16 14:22 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -14,4 +14,4 @@ Current docs and references:
 - Rollout-statistics module audit PDF: ../outputs/rollout_stats_module_audit/rollout_stats_module_audit.pdf
 
 Current live status note:
-- The repaired cross-dataset rerun is now reportable across all five datasets. Follow the root project report (`../../projects/cot-loop-detection.md`) for the recovered capped `LiveCodeBench` numbers and the explicit note that `avg_first_loop_prefix_length` remained irrecoverable after the crash.
+- The refreshed common-policy cross-dataset bundle is now reportable across all five datasets, with repaired `GPQA` / `MMLU-Pro` JSON-answer rows and a regenerated PDF in `../outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/`. Follow the root project report (`../../projects/cot-loop-detection.md`) for the separate benchmark-style `GPQA` calibration note and the explicit reminder that recovered capped `LiveCodeBench` still leaves `avg_first_loop_prefix_length` missing after the crash.

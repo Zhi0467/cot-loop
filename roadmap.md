@@ -1,6 +1,6 @@
 # Roadmap - CoT Loop Detection
 
-Last updated: 2026-03-15 21:56 UTC
+Last updated: 2026-03-16 14:22 UTC
 
 Scope:
 - Build and validate a probe pipeline for CoT loop detection across prefill and completion feature views.
@@ -11,11 +11,11 @@ Scope:
 - Milestone 2 gate: complete.
 - Milestone 3 gate: complete.
 - Active milestone: Milestone 4 (cross-dataset validation).
-- Latest result: under the repaired rollout-statistics v2 contract, `MATH-500`, `AIME`, `GPQA`, `MMLU-Pro`, and capped `LiveCodeBench release_v6` are all now reportable. The crashed `LiveCodeBench` leg was recovered by checkpoint regrade at `2026-03-15 21:53 UTC`, yielding the final correctness / loop / max-length / native `pass@k` block for the capped `800`-prompt run.
+- Latest result: the common-policy rollout-statistics bundle has now been refreshed under one shared decode policy (`temperature=0.2`, `num_generations=10`, `max prompts <= 800` where applicable) across `MATH-500`, `AIME`, `GPQA`, `MMLU-Pro`, and capped `LiveCodeBench release_v6`. The repaired MC rows now report `GPQA = 34.49%` and `MMLU-Pro = 65.2%` rollout success instead of the stale pre-refresh rows, and the regenerated cross-dataset PDF is published in `outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/`.
 - Remaining caveat: the original `LiveCodeBench` job crashed after grading and before writing its final JSON, and replay-based repair did not reproduce the stored checkpoint exactly enough to recover `avg_first_loop_prefix_length`. That one metric remains `null` in the recovered capped bundle; a fresh rerun would be required if exact prefix-length telemetry is still needed.
 - Active review surfaces:
   - Upstream PR #4 (`Zhi0467/cot-loop`, branch `task/1773451376-rollout-stats`) remains `OPEN` / `DRAFT` at head `d0796c3`, but it no longer covers the current local branch state.
-  - The local follow-up branch already carries the stale-artifact fix (`d941986`) plus the post-rerun doc state; bounded `review_project.sh --base main` still does not reach a terminal verdict here, so the branch is not locally review-cleared yet.
+  - Upstream PR #6 (`Zhi0467/cot-loop`, branch `task/1773451376-common-policy-refresh`) is now the live review surface for the refreshed common-policy bundle and the report-generator LaTeX fix.
 
 ## Milestone 1 - Pipeline and multi-view infrastructure
 Status: done (2026-03-05 18:45 UTC)

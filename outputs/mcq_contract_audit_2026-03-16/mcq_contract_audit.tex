@@ -1,0 +1,119 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{array}
+\usepackage{longtable}
+
+\title{MCQ Contract Audit for the Qwen3-1.7B Rollout Bundle}
+\date{2026-03-16 UTC}
+
+\begin{document}
+\maketitle
+
+\section*{Bottom Line}
+The current \texttt{GPQA} and \texttt{MMLU-Pro} numbers in the rollout report are
+not trustworthy as multiple-choice accuracy estimates. A bounded live audit on the
+same prompt/decode contract shows that the current scorer materially undercounts
+answer-bearing outputs because it requires the final non-empty line to be exactly
+\texttt{Answer: X}. The same raw completions frequently end with boxed letters,
+\texttt{Final Answer:}, or freeform tail text like ``the answer is I'', all of which
+the old scorer marks wrong.
+
+The \texttt{LiveCodeBench} concern is separate: its recovered number is still useful as
+task-local telemetry, but it is not benchmark-comparable because the current run uses
+a question-id-sorted 800-problem slice plus a local prompt/style mapping rather than
+the benchmark-native protocol.\footnote{\url{https://github.com/LiveCodeBench/LiveCodeBench}}
+
+\section*{Subset Audit}
+I ran two bounded one-GPU audits under the \emph{old} MC contract and saved the raw
+completions to
+\texttt{outputs/mcq\_contract\_audit\_2026-03-16/}. The audits used
+\texttt{Qwen/Qwen3-1.7B}, \texttt{temperature=0.2}, \texttt{num\_generations=10},
+\texttt{max\_tokens=4096}, and the same chat-template MC prompts as the shipped
+bundle. Qwen's own model card recommends standardizing MC evaluation with a JSON
+\texttt{answer} field rather than an ad hoc terminal string.\footnote{\url{https://huggingface.co/Qwen/Qwen3-1.7B}}
+
+\begin{center}
+\begin{tabular}{lrrrrrr}
+\toprule
+Dataset & Prompts & Rollouts & Strict Correct & Obvious Correct & Strict Stop Correct & Obvious Stop Correct \\
+\midrule
+GPQA subset & 16 & 160 & 11 & 24 & 11/39 & 20/39 \\
+MMLU-Pro subset & 8 & 80 & 9 & 23 & 9/50 & 16/50 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+``Strict'' means the old collector policy: only accept a terminal line exactly equal
+to \texttt{Answer: X}. ``Obvious'' means a bounded tail heuristic over the same raw
+outputs that recovers boxed answers, \texttt{Answer: X} variants, and ``the answer is
+X'' endings. This is intentionally conservative; it still undercounts some long
+truncated outputs that visibly commit to an option before running on.
+
+\section*{Representative Misses}
+\textbf{GPQA stop completions mis-scored as wrong under the old parser.}
+\begin{itemize}
+\item A stopped rollout ended with \texttt{\textbackslash boxed\{D\}} after a
+\texttt{Final Answer:} header. Gold was \texttt{D}; strict score was wrong.
+\item Another stopped rollout ended with
+\texttt{\textbackslash boxed\{\textbackslash text\{Answer: A\}\}}. Gold was
+\texttt{A}; strict score was wrong.
+\item A length-truncated rollout explicitly said ``the answer is B'' before continuing
+to revisit the options. Gold was \texttt{B}; strict score was wrong.
+\end{itemize}
+
+\textbf{MMLU-Pro shows the same pathology.}
+\begin{itemize}
+\item A stopped rollout ended with \texttt{\textbackslash boxed\{I\}} after an
+\texttt{Answer:} header. Gold was \texttt{I}; strict score was wrong.
+\item Another stopped rollout ended with
+\texttt{\textbackslash boxed\{\textbackslash text\{F\}\}}. Gold was \texttt{F};
+strict score was wrong.
+\item Multiple length-truncated rollouts explicitly said ``the answer is I'' in the
+tail while the strict parser still returned no answer.
+\end{itemize}
+
+\section*{Interpretation}
+Two failure modes are active at once.
+\begin{enumerate}
+\item \textbf{Parser loss is real and material.} Even among \emph{stopped} outputs,
+the old parser leaves many answer-bearing generations on the floor. On the bounded
+GPQA subset it recovers only 11 obviously correct stopped generations, while the tail
+audit finds 20. On the bounded MMLU subset it recovers only 9, while the tail audit
+finds 16.
+\item \textbf{The prompt/decode contract still produces long unfinished thought
+traces.} Many subset rollouts also hit the 4096-token forensic cap before reaching a
+clean final line, so the old parser is not the entire story. But the audit proves the
+old MC report is not merely ``low because the model failed''; a nontrivial slice of
+the collapse is scoring-contract loss.
+\end{enumerate}
+
+\section*{Code Repair}
+The project code is patched locally but not yet rerun on the full bundle.
+\begin{itemize}
+\item GPQA and MMLU-Pro prompts now request a final JSON object
+\texttt{\{"answer": "X"\}} rather than the brittle \texttt{Answer: X} line.
+\item The MC parser now reads structured tail answers more robustly, including JSON
+\texttt{answer} fields, \texttt{Final Answer:}, boxed letters, and bare terminal
+choice letters in the final lines.
+\item The report builder text has been updated so future rebuilt PDFs describe the new
+MC contract rather than the old one.
+\end{itemize}
+
+\section*{Implications for the Existing Report}
+\begin{itemize}
+\item Treat the existing \texttt{GPQA} and \texttt{MMLU-Pro} accuracy claims as
+invalid under the old MC contract.
+\item Treat the recovered \texttt{LiveCodeBench} number as local telemetry, not a
+benchmark-comparable claim.
+\item The math datasets are unaffected by this specific MC parsing bug.
+\item The next trustworthy step is to rerun \texttt{GPQA} and \texttt{MMLU-Pro} under
+the patched MC contract, then decide separately whether \texttt{LiveCodeBench} should
+also be rerun under a benchmark-native representative protocol.
+\end{itemize}
+
+\end{document}

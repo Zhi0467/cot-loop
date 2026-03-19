@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from datasets import load_dataset
 
 from ._common import (
-    extract_answer_letter_from_last_lines,
+    extract_structured_answer_letter_from_last_lines,
     load_local_rows,
     resolve_sample_id,
 )
@@ -107,8 +107,8 @@ def build_mcq_prompt(tokenizer, question: str, options: list[str]) -> str:
         f"{question}\n\n"
         f"Answer choices:\n{option_block}\n\n"
         "Think through the problem carefully if needed. "
-        "The final non-empty line must be exactly `Answer: X`, "
-        f"where X is one of {', '.join(valid_letters)}."
+        "On the final non-empty line, output only a JSON object of the form "
+        f'{{"answer": "X"}} where X is one of {", ".join(valid_letters)}.'
     )
     return tokenizer.apply_chat_template(
         [{"role": "user", "content": user_msg}],
@@ -122,7 +122,7 @@ def grade(
     gold_answer: str,
     gold_index: int | None,
 ) -> bool:
-    predicted = extract_answer_letter_from_last_lines(
+    predicted = extract_structured_answer_letter_from_last_lines(
         response,
         MMLUPRO_LETTERS,
     )
@@ -132,7 +132,7 @@ def grade(
     gold_candidates = set()
     gold_answer = gold_answer.strip().upper()
     if gold_answer:
-        parsed_gold = extract_answer_letter_from_last_lines(
+        parsed_gold = extract_structured_answer_letter_from_last_lines(
             gold_answer,
             MMLUPRO_LETTERS,
             max_lines=1,
