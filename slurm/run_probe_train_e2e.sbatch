@@ -53,19 +53,32 @@ mkdir -p "${DEFAULT_CACHE_BASE}"
 export HF_HOME="${HF_HOME:-${DEFAULT_CACHE_BASE}/huggingface}"
 export HUGGINGFACE_HUB_CACHE="${HUGGINGFACE_HUB_CACHE:-${HF_HOME}/hub}"
 export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-${HF_HOME}/transformers}"
+export TORCH_HOME="${TORCH_HOME:-${DEFAULT_CACHE_BASE}/torch}"
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-${DEFAULT_CACHE_BASE}}"
 
 if [[ -z "${VLLM_CACHE_ROOT:-}" ]]; then
   export VLLM_CACHE_ROOT="${DEFAULT_CACHE_BASE}/vllm"
 fi
 
-mkdir -p "${HF_HOME}" "${HUGGINGFACE_HUB_CACHE}" "${TRANSFORMERS_CACHE}" "${VLLM_CACHE_ROOT}"
+mkdir -p "${HF_HOME}" "${HUGGINGFACE_HUB_CACHE}" "${TRANSFORMERS_CACHE}" "${VLLM_CACHE_ROOT}" "${TORCH_HOME}" "${XDG_CACHE_HOME}"
 echo "[probe-e2e] HF_HOME=${HF_HOME}"
 echo "[probe-e2e] HUGGINGFACE_HUB_CACHE=${HUGGINGFACE_HUB_CACHE}"
 echo "[probe-e2e] TRANSFORMERS_CACHE=${TRANSFORMERS_CACHE}"
 echo "[probe-e2e] VLLM_CACHE_ROOT=${VLLM_CACHE_ROOT}"
+echo "[probe-e2e] TORCH_HOME=${TORCH_HOME}"
+echo "[probe-e2e] XDG_CACHE_HOME=${XDG_CACHE_HOME}"
 
-MODEL_PRESET="${MODEL_PRESET:-openthinker3_1p5b}"
+MODEL_PRESET="${MODEL_PRESET-}"
+MODEL_ID="${MODEL_ID:-}"
+if [[ -z "${MODEL_PRESET}" && -z "${MODEL_ID}" ]]; then
+  MODEL_PRESET="openthinker3_1p5b"
+fi
+MODEL_TAG="${MODEL_PRESET}"
+if [[ -z "${MODEL_TAG}" ]]; then
+  MODEL_TAG="$(printf '%s' "${MODEL_ID}" | tr '/:' '__')"
+fi
 PROMPT_FIELD="${PROMPT_FIELD:-problem}"
+TASK_KIND="${TASK_KIND:-math_freeform}"
 
 TRAIN_DATASET="${TRAIN_DATASET:-HuggingFaceH4/MATH-500}"
 TRAIN_CONFIG="${TRAIN_CONFIG:-}"
@@ -82,7 +95,12 @@ SEED="${SEED:-}"
 SEEDS="${SEEDS:-}"
 DATASET_SEED="${DATASET_SEED:-}"
 
+TEMPERATURE="${TEMPERATURE:-}"
+TP="${TP:-}"
+DP="${DP:-}"
 MAX_NUM_SEQS="${MAX_NUM_SEQS:-}"
+MAX_MODEL_LEN="${MAX_MODEL_LEN:-}"
+MAX_NUM_BATCHED_TOKENS="${MAX_NUM_BATCHED_TOKENS:-}"
 NUM_GENERATIONS="${NUM_GENERATIONS:-}"
 MAX_TOKENS="${MAX_TOKENS:-}"
 PREFILL_BATCH_SIZE="${PREFILL_BATCH_SIZE:-32}"
@@ -98,8 +116,8 @@ LOOP_N="${LOOP_N:-30}"
 LOOP_K="${LOOP_K:-10}"
 SHARD_SIZE="${SHARD_SIZE:-2048}"
 
-OUT_DATA_DIR="${OUT_DATA_DIR:-outputs/probe_data/${MODEL_PRESET}}"
-RUN_NAME="${RUN_NAME:-${MODEL_PRESET}-${SLURM_JOB_ID}}"
+OUT_DATA_DIR="${OUT_DATA_DIR:-outputs/probe_data/${MODEL_TAG}}"
+RUN_NAME="${RUN_NAME:-${MODEL_TAG}-${SLURM_JOB_ID}}"
 OUT_RUN_DIR="${OUT_RUN_DIR:-outputs/probe_runs/${RUN_NAME}}"
 
 WANDB_PROJECT="${WANDB_PROJECT:-cot-loop-probe}"
@@ -135,18 +153,22 @@ if [[ -z "${DATASET_SEED}" ]]; then
 fi
 
 echo "[probe-e2e] model_preset=${MODEL_PRESET} train=${TRAIN_DATASET}:${TRAIN_SPLIT} test=${TEST_DATASET}:${TEST_SPLIT}"
+echo "[probe-e2e] model_id=${MODEL_ID}"
+echo "[probe-e2e] task_kind=${TASK_KIND}"
 echo "[probe-e2e] probe_preset=${PROBE_PRESET}"
 echo "[probe-e2e] feature_pooling=${FEATURE_POOLING} feature_layer=${FEATURE_LAYER}"
 echo "[probe-e2e] feature_key=${FEATURE_KEY}"
 echo "[probe-e2e] target_kind=${TARGET_KIND} profile_tail_threshold=${PROFILE_TAIL_THRESHOLD}"
 echo "[probe-e2e] score_rule=${SCORE_RULE}"
 echo "[probe-e2e] prefill_batch_size=${PREFILL_BATCH_SIZE} completion_batch_size=${COMPLETION_BATCH_SIZE}"
+echo "[probe-e2e] temperature=${TEMPERATURE} tp=${TP} dp=${DP} max_model_len=${MAX_MODEL_LEN} max_num_batched_tokens=${MAX_NUM_BATCHED_TOKENS}"
 echo "[probe-e2e] resolved seeds: ${SEED_LIST[*]}"
 
 BUILD_ARGS=(
   --train-dataset "${TRAIN_DATASET}"
   --train-split "${TRAIN_SPLIT}"
   --prompt-field "${PROMPT_FIELD}"
+  --task-kind "${TASK_KIND}"
   --split-ratio "${SPLIT_RATIO}"
   --seed "${DATASET_SEED}"
   --loop-n "${LOOP_N}"
@@ -163,6 +185,12 @@ BUILD_ARGS=(
 
 if [[ -n "${MODEL_PRESET}" ]]; then
   BUILD_ARGS+=(--model-preset "${MODEL_PRESET}")
+fi
+if [[ -n "${MODEL_ID}" ]]; then
+  BUILD_ARGS+=(--model-id "${MODEL_ID}")
+fi
+if [[ -n "${TEMPERATURE}" ]]; then
+  BUILD_ARGS+=(--temperature "${TEMPERATURE}")
 fi
 if [[ -n "${TEST_DATASET}" ]]; then
   BUILD_ARGS+=(--test-dataset "${TEST_DATASET}" --test-split "${TEST_SPLIT}")
@@ -182,6 +210,18 @@ if [[ -n "${TEST_DATASET}" && -n "${TEST_MAX_SAMPLES}" ]]; then
 fi
 if [[ -n "${MAX_NUM_SEQS}" ]]; then
   BUILD_ARGS+=(--max-num-seqs "${MAX_NUM_SEQS}")
+fi
+if [[ -n "${TP}" ]]; then
+  BUILD_ARGS+=(--tp "${TP}")
+fi
+if [[ -n "${DP}" ]]; then
+  BUILD_ARGS+=(--dp "${DP}")
+fi
+if [[ -n "${MAX_MODEL_LEN}" ]]; then
+  BUILD_ARGS+=(--max-model-len "${MAX_MODEL_LEN}")
+fi
+if [[ -n "${MAX_NUM_BATCHED_TOKENS}" ]]; then
+  BUILD_ARGS+=(--max-num-batched-tokens "${MAX_NUM_BATCHED_TOKENS}")
 fi
 if [[ -n "${NUM_GENERATIONS}" ]]; then
   BUILD_ARGS+=(--num-generations "${NUM_GENERATIONS}")

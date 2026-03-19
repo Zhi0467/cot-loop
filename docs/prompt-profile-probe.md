@@ -9,6 +9,7 @@ The repo now has a first runnable path for the Athena-backed single-head prompt-
 - repeated rollouts per prompt via `--num-generations`;
 - prompt-level soft target build via `--target-kind probability`;
 - first target family implemented as `s_t = P(L / E >= t)` with `--profile-tail-threshold` (use `0.9` for `s_0.9`);
+- task-aware prompt formatting via `--task-kind`, so `GPQA` and `MMLU-Pro` use their multiple-choice prompt templates instead of the boxed-answer math prompt;
 - prompt-profile diagnostics written to `diagnostics/train_prompt_profile.jsonl` and `diagnostics/test_prompt_profile.jsonl`;
 - trainer/eval support for soft targets with Brier / MAE / Spearman / top-bucket capture metrics;
 - ensemble scoring can use mean layer probability (`--score-rule mean_prob`) instead of only hard-vote fraction.
@@ -41,12 +42,15 @@ Dataset build:
 ```bash
 python scripts/build_probe_dataset.py \
   --train-dataset <gpqa-source> \
+  --train-config gpqa_diamond \
   --train-split train \
   --test-dataset <gpqa-source> \
+  --test-config gpqa_diamond \
   --test-split train \
   --train-max-samples <train_n> \
   --test-max-samples <test_n> \
-  --prompt-field <prompt_field> \
+  --prompt-field Question \
+  --task-kind multiple_choice_gpqa \
   --model-id Qwen/Qwen3-1.7B \
   --temperature 0.2 \
   --num-generations 10 \
@@ -75,6 +79,11 @@ python scripts/train_probe.py \
 
 `slurm/run_probe_train_e2e.sbatch` now accepts:
 
+- `MODEL_ID=Qwen/Qwen3-1.7B` for non-preset models
+- `TASK_KIND=multiple_choice_gpqa`
+- `TEMPERATURE=0.2`
+- `MAX_MODEL_LEN=<ctx>`
+- `TP=...`, `DP=...`, `MAX_NUM_BATCHED_TOKENS=...`
 - `TARGET_KIND=probability`
 - `PROFILE_TAIL_THRESHOLD=0.9`
 - `NUM_GENERATIONS=10`
@@ -83,13 +92,19 @@ python scripts/train_probe.py \
 Example:
 
 ```bash
+MODEL_ID=Qwen/Qwen3-1.7B \
+TASK_KIND=multiple_choice_gpqa \
 TARGET_KIND=probability \
 PROFILE_TAIL_THRESHOLD=0.9 \
 NUM_GENERATIONS=10 \
+TEMPERATURE=0.2 \
 TRAIN_DATASET=<gpqa-source> \
+TRAIN_CONFIG=gpqa_diamond \
 TEST_DATASET=<gpqa-source> \
-PROMPT_FIELD=<prompt_field> \
+TEST_CONFIG=gpqa_diamond \
+PROMPT_FIELD=Question \
 MAX_TOKENS=<cap> \
+MAX_MODEL_LEN=<ctx> \
 TRAIN_EXTRA_ARGS="--classifier-mode ensemble" \
 SCORE_RULE=mean_prob \
 sbatch slurm/run_probe_train_e2e.sbatch

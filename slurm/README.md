@@ -17,9 +17,11 @@ This directory contains SLURM workflows for the CoT loop detector project.
 - `#SBATCH --gres=gpu:8` (job requests 8 GPUs by default)
 - rollout `tp/dp` comes from `src/loop_probe/configs.py` preset defaults
 - optional rollout concurrency override: `MAX_NUM_SEQS=...`
+- explicit rollout/runtime overrides: `MODEL_ID=...`, `TEMPERATURE=...`, `TP=...`, `DP=...`, `MAX_MODEL_LEN=...`, `MAX_NUM_BATCHED_TOKENS=...`
 - optional repeated-rollout override for prompt-level targets: `NUM_GENERATIONS=...`
 - optional prefill throughput override (single GPU): `PREFILL_BATCH_SIZE=...` (default: `32`)
 - optional rollout-completion feature throughput override: `COMPLETION_BATCH_SIZE=...` (default: `1`)
+- task-aware prompt formatting: `TASK_KIND=math_freeform|multiple_choice_gpqa|multiple_choice_mmlupro`
 - prompt-level target controls:
   - `TARGET_KIND=binary` (legacy loop bit) or `TARGET_KIND=probability` (prompt-level soft target)
   - `PROFILE_TAIL_THRESHOLD=0.9` for `s_0.9`
@@ -55,9 +57,15 @@ sbatch slurm/run_probe_train_e2e.sbatch
 
 Example: run the prompt-level `s_0.9` GPQA-style path with per-layer ensemble averaging:
 ```bash
+MODEL_ID=Qwen/Qwen3-1.7B \
+TASK_KIND=multiple_choice_gpqa \
 TARGET_KIND=probability \
 PROFILE_TAIL_THRESHOLD=0.9 \
 NUM_GENERATIONS=10 \
+TEMPERATURE=0.2 \
+TRAIN_CONFIG=gpqa_diamond \
+TEST_CONFIG=gpqa_diamond \
+PROMPT_FIELD=Question \
 TRAIN_EXTRA_ARGS="--classifier-mode ensemble" \
 SCORE_RULE=mean_prob \
 sbatch slurm/run_probe_train_e2e.sbatch

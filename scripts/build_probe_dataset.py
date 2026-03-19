@@ -26,6 +26,7 @@ from loop_probe.labeling import (
     aggregate_prompt_profile,
     labels_from_rollouts,
 )
+from loop_probe.adapters import multiple_choice_gpqa, multiple_choice_mmlupro
 from loop_probe.prefill import (
     FEATURE_POOLING_CHOICES,
     extract_prefill_features_multi,
@@ -49,6 +50,7 @@ ROLLOUT_LAST_TOKEN_ALL_LAYERS_MEAN = "rollout_last_token_all_layers_mean"
 COMPLETION_POOLING_CHOICES = (ROLLOUT_LAST_TOKEN_ALL_LAYERS_MEAN,)
 ALL_FEATURE_POOLING_CHOICES = FEATURE_POOLING_CHOICES + COMPLETION_POOLING_CHOICES
 TARGET_KIND_CHOICES = ("binary", "probability")
+TASK_KIND_CHOICES = ("math_freeform", "multiple_choice_gpqa", "multiple_choice_mmlupro")
 
 
 def _parse_args() -> argparse.Namespace:
@@ -72,6 +74,16 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--test-max-samples", type=int, default=None)
 
     parser.add_argument("--prompt-field", required=True)
+    parser.add_argument(
+        "--task-kind",
+        choices=TASK_KIND_CHOICES,
+        default="math_freeform",
+        help=(
+            "Prompt/task formatting path. Use the multiple-choice modes so "
+            "GPQA or MMLU-Pro prompts include answer options instead of the "
+            "boxed-answer math template."
+        ),
+    )
     parser.add_argument(
         "--split-ratio",
         type=float,
@@ -392,14 +404,78 @@ def _apply_chat_prompt(
 ) -> list[SampleRecord]:
     formatted: list[SampleRecord] = []
     for rec in records:
+        if rec.prompt_style == "math_freeform":
+            prompt_text = build_prompt(tokenizer, rec.prompt, num_repetition)
+        elif rec.prompt_style == "multiple_choice_gpqa":
+            if not rec.choices:
+                raise SystemExit("GPQA record is missing answer choices.")
+            if num_repetition != 1:
+                raise SystemExit("GPQA prompt formatting does not support num_repetition != 1.")
+            prompt_text = multiple_choice_gpqa.build_mcq_prompt(
+                tokenizer,
+                rec.prompt,
+                list(rec.choices),
+            )
+        elif rec.prompt_style == "multiple_choice_mmlupro":
+            if not rec.choices:
+                raise SystemExit("MMLU-Pro record is missing answer choices.")
+            if num_repetition != 1:
+                raise SystemExit(
+                    "MMLU-Pro prompt formatting does not support num_repetition != 1."
+                )
+            prompt_text = multiple_choice_mmlupro.build_mcq_prompt(
+                tokenizer,
+                rec.prompt,
+                list(rec.choices),
+            )
+        else:
+            raise SystemExit(f"Unsupported prompt_style '{rec.prompt_style}'.")
         formatted.append(
             SampleRecord(
                 sample_id=rec.sample_id,
-                prompt=build_prompt(tokenizer, rec.prompt, num_repetition),
+                prompt=prompt_text,
                 source_split=rec.source_split,
+                prompt_style=rec.prompt_style,
+                choices=rec.choices,
             )
         )
     return formatted
+
+
+def _load_task_records(
+    spec: DatasetSpec,
+    *,
+    prompt_field: str,
+    task_kind: str,
+    seed: int,
+) -> list[SampleRecord]:
+    if task_kind == "math_freeform":
+        return load_prompt_records(spec, prompt_field)
+    if task_kind == "multiple_choice_gpqa":
+        raw_records = multiple_choice_gpqa.load_and_shuffle(spec, seed)
+        return [
+            SampleRecord(
+                sample_id=record.sample_id,
+                prompt=record.prompt,
+                source_split=record.source_split,
+                prompt_style="multiple_choice_gpqa",
+                choices=tuple(options),
+            )
+            for record, options, _gold_letter in raw_records
+        ]
+    if task_kind == "multiple_choice_mmlupro":
+        raw_records = multiple_choice_mmlupro.load_samples(spec)
+        return [
+            SampleRecord(
+                sample_id=record.sample_id,
+                prompt=record.prompt,
+                source_split=record.source_split,
+                prompt_style="multiple_choice_mmlupro",
+                choices=tuple(options),
+            )
+            for record, options, _gold_answer, _gold_index in raw_records
+        ]
+    raise SystemExit(f"Unsupported --task-kind '{task_kind}'.")
 
 
 def _same_data_source(a: DatasetSpec, b: DatasetSpec) -> bool:
@@ -459,7 +535,12 @@ def _resolve_splits(
     test_spec: DatasetSpec | None,
 ) -> tuple[list[SampleRecord], list[SampleRecord], str]:
     if test_spec is None:
-        merged_records = load_prompt_records(train_spec, args.prompt_field)
+        merged_records = _load_task_records(
+            train_spec,
+            prompt_field=args.prompt_field,
+            task_kind=str(args.task_kind),
+            seed=args.seed,
+        )
         train_records, test_records = split_records(
             merged_records,
             test_ratio=args.split_ratio,
@@ -469,7 +550,12 @@ def _resolve_splits(
         return train_records, test_records, split_source
 
     if specs_equal(train_spec, test_spec):
-        merged_records = load_prompt_records(train_spec, args.prompt_field)
+        merged_records = _load_task_records(
+            train_spec,
+            prompt_field=args.prompt_field,
+            task_kind=str(args.task_kind),
+            seed=args.seed,
+        )
         train_records, test_records = split_records(
             merged_records,
             test_ratio=args.split_ratio,
@@ -487,7 +573,12 @@ def _resolve_splits(
         if train_max is not None and test_max is not None:
             requested_total = train_max + test_max
             merged_spec = _with_max_samples(train_spec, requested_total)
-            merged_records = load_prompt_records(merged_spec, args.prompt_field)
+            merged_records = _load_task_records(
+                merged_spec,
+                prompt_field=args.prompt_field,
+                task_kind=str(args.task_kind),
+                seed=args.seed,
+            )
             if len(merged_records) < requested_total:
                 raise SystemExit(
                     "Requested disjoint split sizes exceed available rows: "
@@ -503,7 +594,12 @@ def _resolve_splits(
             return train_records, test_records, split_source
 
         merged_spec = _with_max_samples(train_spec, None)
-        merged_records = load_prompt_records(merged_spec, args.prompt_field)
+        merged_records = _load_task_records(
+            merged_spec,
+            prompt_field=args.prompt_field,
+            task_kind=str(args.task_kind),
+            seed=args.seed,
+        )
         train_records, test_records = split_records(
             merged_records,
             test_ratio=args.split_ratio,
@@ -520,8 +616,18 @@ def _resolve_splits(
         split_source = "same_train_test_source_ratio_split"
         return train_records, test_records, split_source
 
-    train_records = load_prompt_records(train_spec, args.prompt_field)
-    test_records = load_prompt_records(test_spec, args.prompt_field)
+    train_records = _load_task_records(
+        train_spec,
+        prompt_field=args.prompt_field,
+        task_kind=str(args.task_kind),
+        seed=args.seed,
+    )
+    test_records = _load_task_records(
+        test_spec,
+        prompt_field=args.prompt_field,
+        task_kind=str(args.task_kind),
+        seed=args.seed,
+    )
     if not train_records:
         raise SystemExit("Train split is empty.")
     if not test_records:
@@ -579,6 +685,7 @@ def _probe_cache_status(
     train_spec: DatasetSpec,
     test_spec: DatasetSpec | None,
     prompt_field: str,
+    task_kind: str,
     split_source: str,
     split_ratio: float,
     loop_n: int,
@@ -605,6 +712,7 @@ def _probe_cache_status(
 
     expected = {
         "prompt_field": prompt_field,
+        "task_kind": task_kind,
         "split_source": split_source,
         "loop_detector": {"n": loop_n, "k": loop_k},
         "rollout_config": rollout_config,
@@ -1183,6 +1291,7 @@ def main() -> None:
             train_spec=train_spec,
             test_spec=test_spec,
             prompt_field=args.prompt_field,
+            task_kind=str(args.task_kind),
             split_source=split_source,
             split_ratio=args.split_ratio,
             loop_n=args.loop_n,
@@ -1217,7 +1326,8 @@ def main() -> None:
         f"Building probe dataset with model={rollout_cfg.model_id}, "
         f"train={len(train_records)}, test={len(test_records)}, "
         f"feature_views={list(feature_views.keys())}, "
-        f"target={target_desc}",
+        f"target={target_desc}, "
+        f"task_kind={args.task_kind}",
         flush=True,
     )
 
@@ -1497,9 +1607,18 @@ def main() -> None:
             "layer": feature_views[primary_feature_key]["layer"],
         },
         "feature_views": feature_views_manifest,
+        "task_kind": str(args.task_kind),
         "prompt_field": args.prompt_field,
         "prompt_template": {
-            "source": "utils.build_prompt",
+            "source": (
+                "loop_probe.adapters.multiple_choice_gpqa.build_mcq_prompt"
+                if args.task_kind == "multiple_choice_gpqa"
+                else (
+                    "loop_probe.adapters.multiple_choice_mmlupro.build_mcq_prompt"
+                    if args.task_kind == "multiple_choice_mmlupro"
+                    else "utils.build_prompt"
+                )
+            ),
             "num_repetition": 1,
             "chat_template": True,
         },
