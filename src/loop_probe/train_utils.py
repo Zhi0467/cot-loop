@@ -173,6 +173,36 @@ def evaluate_probability_metrics_from_scores(
     }
 
 
+def evaluate_regression_metrics_from_scores(
+    y_true: torch.Tensor,
+    scores: torch.Tensor,
+) -> dict[str, float]:
+    y_true_np = y_true.detach().cpu().numpy().astype(float)
+    scores_np = scores.detach().cpu().numpy().astype(float)
+    errors = scores_np - y_true_np
+    mse = float(np.mean(np.square(errors)))
+    mae = float(np.mean(np.abs(errors)))
+    rmse = float(np.sqrt(np.mean(np.square(errors))))
+    return {
+        "mse": mse,
+        "mae": mae,
+        "rmse": rmse,
+        "target_mean": float(np.mean(y_true_np)),
+        "pred_mean": float(np.mean(scores_np)),
+        "spearman": _safe_spearman(y_true_np, scores_np),
+        "top_10p_capture": _top_capture_fraction(
+            y_true_np,
+            scores_np,
+            fraction=0.10,
+        ),
+        "top_20p_capture": _top_capture_fraction(
+            y_true_np,
+            scores_np,
+            fraction=0.20,
+        ),
+    }
+
+
 def probe_scores_and_predictions(
     logits: torch.Tensor,
     *,
@@ -229,4 +259,6 @@ def evaluate_probe_outputs(
         return evaluate_binary_metrics_from_scores(y_true, scores, predictions)
     if target_kind == "probability":
         return evaluate_probability_metrics_from_scores(y_true, scores)
+    if target_kind == "regression":
+        return evaluate_regression_metrics_from_scores(y_true, scores)
     raise SystemExit(f"Unsupported target_kind '{target_kind}'.")

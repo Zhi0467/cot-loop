@@ -224,6 +224,8 @@ def main() -> None:
             "name": label_spec.get("target", "eventual_loop") if isinstance(label_spec, dict) else "eventual_loop",
         }
     target_kind = str(target_spec.get("kind", "binary"))
+    if target_kind not in ("binary", "probability", "regression"):
+        raise SystemExit(f"Unsupported manifest target kind '{target_kind}'.")
     resolved_feature_key_arg = args.feature_key
     if (
         (resolved_feature_key_arg is None or resolved_feature_key_arg == "")

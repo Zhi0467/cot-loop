@@ -1,0 +1,370 @@
+{
+  "gpqa": {
+    "rows": 160,
+    "finish_reason_counts": {
+      "length": 121,
+      "stop": 39
+    },
+    "strict_parse": 16,
+    "strict_correct": 11,
+    "strict_stop_parse": 16,
+    "strict_stop_correct": 11,
+    "obvious_parse": 50,
+    "obvious_correct": 24,
+    "obvious_stop_parse": 38,
+    "obvious_stop_correct": 20,
+    "obvious_mode_counts": {
+      "answer_is": 12,
+      "boxed": 18,
+      "answer_field": 20
+    },
+    "top_last_lines": [
+      {
+        "line": "$$",
+        "count": 21
+      },
+      {
+        "line": "Answer: D",
+        "count": 15
+      },
+      {
+        "line": "But",
+        "count": 2
+      },
+      {
+        "line": "Alternatively,",
+        "count": 2
+      },
+      {
+        "line": "Answer: **D**",
+        "count": 2
+      },
+      {
+        "line": "\\Delta E_2 = \\frac{\\hbar}{2 \\cdot 10^{-8}} \\approx",
+        "count": 1
+      },
+      {
+        "line": "So,",
+        "count": 1
+      },
+      {
+        "line": "Convert to eV: 6.626e-26 / 1.602e-19 \u2248 4.13",
+        "count": 1
+      },
+      {
+        "line": "To **clearly distinguish** the two energy levels, the **energy difference** $ \\Delta E = E_1 - E_2 $ must be **greater than the maximum energy uncertainty** of the two states. That",
+        "count": 1
+      },
+      {
+        "line": "- $ \\Delta E_1 = \\frac{\\hbar}{\\tau_1} \\approx \\frac{6.58 \\times 10^{-16} \\, \\text{e",
+        "count": 1
+      }
+    ],
+    "examples_strict_missed_but_obvious_correct": [
+      {
+        "sample_id": 0,
+        "generation_index": 1,
+        "finish_reason": "length",
+        "gold_candidates": [
+          "B"
+        ],
+        "obvious_mode": "answer_is",
+        "obvious_prediction": "B",
+        "tail_lines": [
+          "So, the answer is B.",
+          "But wait, the answer options are in eV. Let me check the options again.",
+          "Wait, the answer choices are:",
+          "A. 10^-8 eV",
+          "B. 10^-4 eV",
+          "C. 10^-11 eV",
+          "D. 10^-9 eV",
+          "So,"
+        ]
+      },
+      {
+        "sample_id": 2,
+        "generation_index": 1,
+        "finish_reason": "stop",
+        "gold_candidates": [
+          "D"
+        ],
+        "obvious_mode": "boxed",
+        "obvious_prediction": "D",
+        "tail_lines": [
+          "$$",
+          "\\boxed{-0.7}",
+          "$$",
+          "---",
+          "### Final Answer:",
+          "$$",
+          "\\boxed{D}",
+          "$$"
+        ]
+      },
+      {
+        "sample_id": 2,
+        "generation_index": 4,
+        "finish_reason": "stop",
+        "gold_candidates": [
+          "D"
+        ],
+        "obvious_mode": "boxed",
+        "obvious_prediction": "D",
+        "tail_lines": [
+          "$$",
+          "-0.67 \\approx -0.7.",
+          "$$",
+          "---",
+          "**Answer:**",
+          "$$",
+          "\\boxed{D}",
+          "$$"
+        ]
+      },
+      {
+        "sample_id": 2,
+        "generation_index": 6,
+        "finish_reason": "stop",
+        "gold_candidates": [
+          "D"
+        ],
+        "obvious_mode": "boxed",
+        "obvious_prediction": "D",
+        "tail_lines": [
+          "$$",
+          "\\langle 10\\sigma_z + 5\\sigma_x \\rangle \\approx -5 + 4.33 = -0.67",
+          "$$",
+          "### Final Answer:",
+          "Rounded to one decimal place, the expectation value is $ -0.7 $.",
+          "$$",
+          "\\boxed{D}",
+          "$$"
+        ]
+      },
+      {
+        "sample_id": 9,
+        "generation_index": 4,
+        "finish_reason": "stop",
+        "gold_candidates": [
+          "A"
+        ],
+        "obvious_mode": "boxed",
+        "obvious_prediction": "A",
+        "tail_lines": [
+          "---",
+          "### **Conclusion**",
+          "Among all the options, **Option c** has the **highest density** when assuming the same composition as Earth and the same radius as Earth. This results in a density of **27.5 g/cm\u00b3**, which is significantly higher than the other options.",
+          "---",
+          "**Answer:**",
+          "$$",
+          "\\boxed{A}",
+          "$$"
+        ]
+      },
+      {
+        "sample_id": 9,
+        "generation_index": 9,
+        "finish_reason": "stop",
+        "gold_candidates": [
+          "A"
+        ],
+        "obvious_mode": "answer_field",
+        "obvious_prediction": "A",
+        "tail_lines": [
+          "| c)           | 5 Earth  | 27.5           |",
+          "| d)           | 0.5 Earth| 2.75           |",
+          "---",
+          "### **Conclusion**:",
+          "Among the options, **Option c** has the **highest density** (27.5 g/cm\u00b3), assuming the radius is the same as Earth. This is because the mass is 5 times greater, and the volume (and thus density) is proportional to mass when the radius is constant.",
+          "$$",
+          "\\boxed{\\text{Answer: A}}",
+          "$$"
+        ]
+      }
+    ]
+  },
+  "mmlu": {
+    "rows": 80,
+    "finish_reason_counts": {
+      "length": 30,
+      "stop": 50
+    },
+    "strict_parse": 33,
+    "strict_correct": 9,
+    "strict_stop_parse": 33,
+    "strict_stop_correct": 9,
+    "obvious_parse": 65,
+    "obvious_correct": 23,
+    "obvious_stop_parse": 50,
+    "obvious_stop_correct": 16,
+    "obvious_mode_counts": {
+      "answer_is": 15,
+      "boxed": 10,
+      "answer_field": 40
+    },
+    "top_last_lines": [
+      {
+        "line": "Answer: B",
+        "count": 15
+      },
+      {
+        "line": "$$",
+        "count": 10
+      },
+      {
+        "line": "Answer: D",
+        "count": 8
+      },
+      {
+        "line": "Answer: H",
+        "count": 7
+      },
+      {
+        "line": "Answer: J",
+        "count": 3
+      },
+      {
+        "line": "Answer: Ethics of care",
+        "count": 2
+      },
+      {
+        "line": "**Answer: D. Customer participation and environmental relationship.**",
+        "count": 2
+      },
+      {
+        "line": "But the question is about what the regulatory bodies suggest. If the answer is I, then the second and third blanks",
+        "count": 1
+      },
+      {
+        "line": "But \"Wants\" is",
+        "count": 1
+      },
+      {
+        "line": "3. **Or** \u2014 another negative effect (e",
+        "count": 1
+      }
+    ],
+    "examples_strict_missed_but_obvious_correct": [
+      {
+        "sample_id": 0,
+        "generation_index": 0,
+        "finish_reason": "length",
+        "gold_candidates": [
+          "I"
+        ],
+        "obvious_mode": "answer_is",
+        "obvious_prediction": "I",
+        "tail_lines": [
+          "But why would the ad cause unnecessary wants? That's a bit strange, but maybe. However, the other options have \"Distress\" and \"Fear\" as the second and third blanks, which are more directly related to emotional distress and fear.",
+          "So, considering that, the answer is likely I: Unsafe practices, Distress, Fear, Serious.",
+          "But wait, the last blank in option I is \"Serious\", which is the fourth word. So the sentence would be: must not encourage Unsafe practices, cause unnecessary Distress or Fear, and must not cause Serious offence.",
+          "But is \"Serious\" the correct term for an offence? Well, \"Serious offence\" is a term used in legal contexts, so it's possible. However, the question is about what the regulatory bodies suggest. If the answer is I, then that's the correct answer.",
+          "Alternatively, if the answer is H, then the last blank is Trivial, which is also possible.",
+          "But I need to check if the answer options have any other clues.",
+          "Another thought: the answer choices for the third blank in option I is Fear, and in option H it's Fear. So both have Fear as the third blank. The second blank in option I is Distress, and in option H it's Wants.",
+          "But the question is about what the regulatory bodies suggest. If the answer is I, then the second and third blanks"
+        ]
+      },
+      {
+        "sample_id": 0,
+        "generation_index": 2,
+        "finish_reason": "length",
+        "gold_candidates": [
+          "I"
+        ],
+        "obvious_mode": "answer_is",
+        "obvious_prediction": "I",
+        "tail_lines": [
+          "But I'm not 100% sure. However, based on the structure and typical regulatory points, I think the answer is I.",
+          "</think>",
+          "To determine the correct answer, we must align the structure of the original statement with the provided answer choices. The statement reads:",
+          "> \"Typical advertising regulatory bodies suggest, for example that adverts must not: encourage _________, cause unnecessary ________ or _____, and must not cause _______ offence.\"",
+          "This structure implies:",
+          "1. **Encourage** \u2014 a negative action (e.g., unsafe practices, wants, etc.)",
+          "2. **Cause unnecessary** \u2014 a negative effect (e.g., distress, fear, etc.)",
+          "3. **Or** \u2014 another negative effect (e"
+        ]
+      },
+      {
+        "sample_id": 0,
+        "generation_index": 6,
+        "finish_reason": "stop",
+        "gold_candidates": [
+          "I"
+        ],
+        "obvious_mode": "boxed",
+        "obvious_prediction": "I",
+        "tail_lines": [
+          "---",
+          "### **Conclusion:**",
+          "Only **Option I** provides a coherent and logically consistent set of words that align with the structure and intent of advertising regulations.",
+          "---",
+          "**Answer:**",
+          "$$",
+          "\\boxed{I}",
+          "$$"
+        ]
+      },
+      {
+        "sample_id": 0,
+        "generation_index": 8,
+        "finish_reason": "stop",
+        "gold_candidates": [
+          "I"
+        ],
+        "obvious_mode": "boxed",
+        "obvious_prediction": "I",
+        "tail_lines": [
+          "- Third blank: **Fear** \u2013 correct (unnecessary fear)",
+          "- Fourth blank: **Trivial** \u2013 correct (adverts must not cause trivial offense)",
+          "This option fits all parts of the sentence logically and aligns with the intended meaning of advertising regulations.",
+          "---",
+          "### Final Answer:",
+          "$$",
+          "\\boxed{I}",
+          "$$"
+        ]
+      },
+      {
+        "sample_id": 0,
+        "generation_index": 9,
+        "finish_reason": "length",
+        "gold_candidates": [
+          "I"
+        ],
+        "obvious_mode": "answer_is",
+        "obvious_prediction": "I",
+        "tail_lines": [
+          "But let's think again. The question is about what the regulations say. For example, in advertising, there are regulations against causing fear or distress. For example, the FTC in the US has regulations against false advertising, but also about causing fear. So if an ad encourages unsafe practices, then causing unnecessary fear or distress. So the second blank is \"Distress\" or \"Fear\", and the third blank is \"Trivial\" or \"Serious\".",
+          "If the ad is causing unnecessary distress or fear, then the offence is trivial. So the fourth blank is \"Trivial\". So if the first blank is \"Unsafe practices\", second is \"Distress\", third is \"Fear\", fourth is \"Trivial\", then that would be option I: Unsafe practices, Distress, Fear, Trivial. Wait, no. Let me check the options again.",
+          "Option I: Unsafe practices, Distress, Fear, Serious. So the fourth blank is \"Serious\". So the sentence would be: \"must not cause Serious offence.\" But that would mean that the regulations are not allowing the ad to cause serious offence. But if the ad is causing unnecessary distress or fear, then the offence is serious. But that's not necessarily the case. So maybe the answer is I.",
+          "Alternatively, if the third blank is \"Trivial\", then the answer would be option D. But in option D, the third blank is \"Trivial\" and the fourth is \"Trivial\" as well? No, option D is Safe practices, Distress, Fear, Trivial. So the fourth blank is Trivial. So the sentence would be: \"must not cause Trivial offence.\" That would mean that the ad is not supposed to cause trivial offence. But if the ad is causing unnecessary distress or fear, then the offence is trivial. But that's not necessarily the case. So maybe the answer is I.",
+          "But I'm not sure. Another angle: the second blank is \"cause unnecessary ________ or _____\". So the ad is causing unnecessary [X] or [Y]. For example, if the ad is encouraging unsafe practices, then causing unnecessary distress or fear. So the second blank is \"Distress\" or \"Fear\".",
+          "If the answer is option I: Unsafe practices, Distress, Fear, Serious. Then the sentence would be: \"Adverts must not: encourage Unsafe practices, cause unnecessary Distress or Fear, and must not cause Serious offence.\" That seems plausible. Because if the ad is encouraging unsafe practices, then causing unnecessary distress or fear, and not causing serious offence. But the regulations might not want to cause serious offence, but the question is about what the regulations say. So maybe the answer is I.",
+          "Alternatively, if the third blank is \"Trivial\", then the answer would be option D. But in that case, the sentence would be: \"must not cause Trivial offence.\" But that would mean that the ad is not supposed to cause trivial offence, which is not a typical regulation. So I think the answer is I.",
+          "Wait, but let me check the other options again. Option H: Unsafe practices, Wants, Fear, Trivial. So the sentence would be: \"Adverts must not: encourage Unsafe practices"
+        ]
+      },
+      {
+        "sample_id": 1,
+        "generation_index": 3,
+        "finish_reason": "stop",
+        "gold_candidates": [
+          "F"
+        ],
+        "obvious_mode": "boxed",
+        "obvious_prediction": "F",
+        "tail_lines": [
+          "- **Option J:** *Stakeholder, Care and Skill, Diligence*",
+          "- Incorrect: The first blank is \"Stakeholder,\" which is a broader group, and the question seems to imply a **primary stakeholder** rather than a **broader group**.",
+          "---",
+          "### **Conclusion:**",
+          "The most accurate and contextually appropriate answer is:",
+          "$$",
+          "\\boxed{\\text{F}}",
+          "$$"
+        ]
+      }
+    ]
+  }
+}

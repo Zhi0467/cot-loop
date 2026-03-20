@@ -11,7 +11,7 @@
       "num_generations": 10,
       "max_tokens": 81920,
       "tp": 1,
-      "dp": 7,
+      "dp": 4,
       "dtype": "bfloat16",
       "max_model_len": 40960,
       "max_num_seqs": 10,
@@ -40,39 +40,39 @@
       "k": 20
     },
     "prompt_token_summary": {
-      "avg_prompt_token_count": 230.89875,
-      "min_prompt_token_count": 91,
-      "max_prompt_token_count": 885
+      "avg_prompt_token_count": 238.89875,
+      "min_prompt_token_count": 99,
+      "max_prompt_token_count": 893
     },
-    "timestamp": "2026-03-15T08:40:34.368376+00:00",
+    "timestamp": "2026-03-16T14:19:24.437212+00:00",
     "max_samples": 800
   },
   "counts": {
     "num_samples": 800,
     "num_generated": 8000,
     "num_graded": 8000,
-    "num_correct": 1133,
-    "num_wrong": 6867,
-    "num_looped": 445,
-    "num_max_length_hits": 93,
+    "num_correct": 5216,
+    "num_wrong": 2784,
+    "num_looped": 365,
+    "num_max_length_hits": 76,
     "num_prompt_too_long": 0,
-    "num_looped_and_max_length_hit": 93,
-    "num_correct_and_looped": 1,
-    "num_correct_and_max_length_hit": 0
+    "num_looped_and_max_length_hit": 76,
+    "num_correct_and_looped": 73,
+    "num_correct_and_max_length_hit": 2
   },
   "metrics": {
-    "success_fraction": 0.141625,
-    "loop_fraction": 0.055625,
-    "avg_generation_length": 4866.775,
-    "avg_loop_generation_length": 17451.177528089887,
-    "avg_first_loop_prefix_length": 7731.7932584269665,
-    "max_length_hit_fraction": 0.011625,
-    "loop_max_length_hit_fraction": 0.20898876404494382,
+    "success_fraction": 0.652,
+    "loop_fraction": 0.045625,
+    "avg_generation_length": 3702.358125,
+    "avg_loop_generation_length": 16285.14794520548,
+    "avg_first_loop_prefix_length": 7105.482191780822,
+    "max_length_hit_fraction": 0.0095,
+    "loop_max_length_hit_fraction": 0.20821917808219179,
     "max_length_hit_loop_fraction": 1.0,
-    "generation_length_variance": 33422533.608375005,
-    "max_length_hit_success_fraction": 0.0,
-    "loop_success_fraction": 0.0022471910112359553,
-    "avg_correct_generation_length": 1535.279788172992,
-    "avg_wrong_generation_length": 5416.44502694044
+    "generation_length_variance": 26694543.19937148,
+    "max_length_hit_success_fraction": 0.02631578947368421,
+    "loop_success_fraction": 0.2,
+    "avg_correct_generation_length": 2360.379792944785,
+    "avg_wrong_generation_length": 6216.639367816092
   }
 }

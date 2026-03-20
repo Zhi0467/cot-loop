@@ -1,17 +1,21 @@
 # Prompt-Profile Probe Path
 
-Last updated: 2026-03-19 23:05 UTC
+Last updated: 2026-03-20 05:36 UTC
 
 ## What Landed
 
-The repo now has a first runnable path for the Athena-backed single-head prompt-level target:
+The repo now has a first runnable path for the current prompt-level target plan:
 
 - repeated rollouts per prompt via `--num-generations`;
-- prompt-level soft target build via `--target-kind probability`;
+- prompt-level soft-target build via `--target-kind probability`;
+- prompt-level regression build via `--target-kind regression --profile-target mean_relative_length`;
 - first target family implemented as `s_t = P(L / E >= t)` with `--profile-tail-threshold` (use `0.9` for `s_0.9`);
+- second single-head objective implemented as `mean_relative_length = E[L / E]` across repeated rollouts;
 - task-aware prompt formatting via `--task-kind`, so `GPQA` and `MMLU-Pro` use their multiple-choice prompt templates instead of the boxed-answer math prompt;
 - prompt-profile diagnostics written to `diagnostics/train_prompt_profile.jsonl` and `diagnostics/test_prompt_profile.jsonl`;
-- trainer/eval support for soft targets with Brier / MAE / Spearman / top-bucket capture metrics;
+- one combined repeated-rollout archive written to `diagnostics/prompt_rollout_archive.jsonl`, with prompt text, prompt token IDs, rollout texts, and the precomputed aggregate labels/metadata for each prompt;
+- trainer/eval support for probability targets with Brier / MAE / Spearman / top-bucket capture metrics;
+- trainer/eval support for regression targets with MSE / MAE / Spearman / top-bucket capture metrics;
 - ensemble scoring can use mean layer probability (`--score-rule mean_prob`) instead of only hard-vote fraction.
 
 ## Current Scope
@@ -21,7 +25,7 @@ This v1 path is intentionally narrow:
 - prefill feature views only;
 - one scalar head only;
 - no completion-view repeated-rollout support yet;
-- no multi-head `s_0.9 + mu_log_rel` trainer yet;
+- no joint multi-head trainer yet;
 - binary downsampling is disabled for prompt-profile targets.
 
 ## Recommended First GPQA Run
@@ -34,8 +38,13 @@ Decode policy:
 - `num_generations=10`
 
 Feature views:
-- one selected layer: `--classifier-mode last_layer --classifier-layer <L>`
+- one selected layer: `--classifier-mode last_layer --classifier-layer -1`
 - per-layer ensemble: `--classifier-mode ensemble --score-rule mean_prob`
+
+Evaluation boundary:
+- train and evaluate `s_0.9` directly;
+- keep `p(max_length_hit)` as diagnostic-only if desired, not the headline target;
+- benchmark against prompt-token-count and `E = max_model_len - prompt_len` leakage baselines outside the probe.
 
 Dataset build:
 
@@ -75,6 +84,38 @@ python scripts/train_probe.py \
   --wandb-project cot-loop-probe
 ```
 
+## Second Objective
+
+The second single-head path is dense regression on the mean realized fraction:
+
+- target: `mean_relative_length = E[L / E]`;
+- CLI: `--target-kind regression --profile-target mean_relative_length`;
+- trainer loss: sigmoid-MSE on the repeated-rollout aggregate.
+
+Example dataset build:
+
+```bash
+python scripts/build_probe_dataset.py \
+  --train-dataset <gpqa-source> \
+  --train-config gpqa_diamond \
+  --train-split train \
+  --test-dataset <gpqa-source> \
+  --test-config gpqa_diamond \
+  --test-split train \
+  --prompt-field Question \
+  --task-kind multiple_choice_gpqa \
+  --model-id Qwen/Qwen3-1.7B \
+  --temperature 0.2 \
+  --num-generations 10 \
+  --max-tokens <cap> \
+  --max-model-len <ctx> \
+  --target-kind regression \
+  --profile-target mean_relative_length \
+  --feature-pooling last_token_all_layers_stack \
+  --feature-layer -1 \
+  --out-dir outputs/gpqa_mean_rel_prefill_dataset
+```
+
 ## SLURM Launch Surface
 
 `slurm/run_probe_train_e2e.sbatch` now accepts:
@@ -84,8 +125,9 @@ python scripts/train_probe.py \
 - `TEMPERATURE=0.2`
 - `MAX_MODEL_LEN=<ctx>`
 - `TP=...`, `DP=...`, `MAX_NUM_BATCHED_TOKENS=...`
-- `TARGET_KIND=probability`
+- `TARGET_KIND=probability|regression`
 - `PROFILE_TAIL_THRESHOLD=0.9`
+- `PROFILE_TARGET=mean_relative_length` for the regression head
 - `NUM_GENERATIONS=10`
 - `SCORE_RULE=mean_prob`
 
@@ -109,6 +151,9 @@ TRAIN_EXTRA_ARGS="--classifier-mode ensemble" \
 SCORE_RULE=mean_prob \
 sbatch slurm/run_probe_train_e2e.sbatch
 ```
+
+Repeated-rollout runs now also leave a single reusable archive at
+`diagnostics/prompt_rollout_archive.jsonl`, so later prefill-activation plots can reuse the same prompts and prompt-level labels without generating a second rollout bundle.
 
 ## Validation Caveat
 

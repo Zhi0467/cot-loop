@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from collections.abc import Iterable
 
 LABEL_TARGET_CHOICES = ("eventual_loop", "loop_by_horizon")
+PROMPT_PROFILE_TARGET_CHOICES = ("s_tail", "mean_relative_length")
 
 
 @dataclass(frozen=True)
@@ -177,3 +178,34 @@ def aggregate_prompt_profile(
         "tail_threshold": float(tail_threshold),
         "s_tail": sum(tail_hits) / float(num_rollouts),
     }
+
+
+def profile_target_name(
+    profile_target: str,
+    *,
+    tail_threshold: float,
+) -> str:
+    if profile_target == "s_tail":
+        threshold_text = format(float(tail_threshold), "g")
+        return f"s_{threshold_text}"
+    if profile_target == "mean_relative_length":
+        return "mean_relative_length"
+    raise ValueError(
+        f"Unknown prompt-profile target '{profile_target}'. "
+        f"Valid: {PROMPT_PROFILE_TARGET_CHOICES}"
+    )
+
+
+def profile_target_value(
+    profile: dict[str, object],
+    *,
+    profile_target: str,
+) -> float:
+    if profile_target == "s_tail":
+        return float(profile["s_tail"])
+    if profile_target == "mean_relative_length":
+        return float(profile["mean_relative_length"])
+    raise ValueError(
+        f"Unknown prompt-profile target '{profile_target}'. "
+        f"Valid: {PROMPT_PROFILE_TARGET_CHOICES}"
+    )

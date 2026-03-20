@@ -1,0 +1,105 @@
+{
+  "task_kind": "multiple_choice_mmlupro",
+  "dataset": "TIGER-Lab/MMLU-Pro",
+  "model_id": "Qwen/Qwen3-1.7B",
+  "temperature": 0.2,
+  "num_generations": 10,
+  "max_samples": 8,
+  "max_tokens": 4096,
+  "max_model_len": 40960,
+  "rows_written": 80,
+  "strict_parse_fraction": 0.0,
+  "strict_correct_fraction": 0.0,
+  "relaxed_parse_fraction": 0.8375,
+  "relaxed_correct_fraction": 0.325,
+  "finish_reason_counts": {
+    "stop": 60,
+    "length": 20
+  },
+  "relaxed_mode_counts": {
+    "json_answer": 60,
+    "answer_is": 7
+  },
+  "top_last_lines": [
+    {
+      "line": "{\"answer\": \"D\"}",
+      "count": 21
+    },
+    {
+      "line": "{\"answer\": \"B\"}",
+      "count": 13
+    },
+    {
+      "line": "{\"answer\": \"J\"}",
+      "count": 10
+    },
+    {
+      "line": "{\"answer\": \"H\"}",
+      "count": 6
+    },
+    {
+      "line": "{\"answer\": \"G\"}",
+      "count": 5
+    },
+    {
+      "line": "{\"answer\": \"F\"}",
+      "count": 2
+    },
+    {
+      "line": "{\"answer\": \"A\"}",
+      "count": 2
+    },
+    {
+      "line": "So if the fourth blank is \"Trivial\", then the sentence would be: must not cause Trivial offence. That's possible, but the question is whether the answer is D or I",
+      "count": 1
+    },
+    {
+      "line": "But if the first blank is Unsafe practices, then the answer would be H or I. Let's think again. The correct answer is likely I: Unsafe practices, Distress, Fear, Serious. Because the ad must not encourage unsafe practices, cause unnecessary distress or",
+      "count": 1
+    },
+    {
+      "line": "Option **I** is the most accurate and logically consistent with the structure and intent of the regulatory",
+      "count": 1
+    },
+    {
+      "line": "If the ad must not cause unnecessary distress or fear, then the second blank is \"Distress\" or \"Fear,\" and the third is another thing",
+      "count": 1
+    },
+    {
+      "line": "{\"answer\": \"I\"}",
+      "count": 1
+    },
+    {
+      "line": "Option I: Unsafe practices, Distress, Fear, Serious. So the third blank is \"Serious\" as the offence. So the sentence would be: \"must not encourage unsafe practices, cause unnecessary distress or fear, and must not cause serious offence.\" That seems possible. But why would the ad not cause serious offence? Maybe because the regulatory body is",
+      "count": 1
+    },
+    {
+      "line": "The original sentence says \"",
+      "count": 1
+    },
+    {
+      "line": "Option D: Safe practices, Distress",
+      "count": 1
+    },
+    {
+      "line": "But why would",
+      "count": 1
+    },
+    {
+      "line": "But then the third term is \"Autonomy,\" which is the second issue. But",
+      "count": 1
+    },
+    {
+      "line": "2. Compensation (remuneration and",
+      "count": 1
+    },
+    {
+      "line": "Wait, maybe the second blank is \"Uncertain\" and the third is \"Speculative,\" and the fourth is \"Both tangible and intangible assets.\" So the answer would be option J, but",
+      "count": 1
+    },
+    {
+      "line": "Islamic finance prohibits riba (interest), and it prohibits speculative transactions (like derivatives, which are high-risk and involve leverage). So the two prohibitions are riba and speculative transactions. Therefore, the second and third blanks",
+      "count": 1
+    }
+  ]
+}

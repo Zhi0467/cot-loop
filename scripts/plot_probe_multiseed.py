@@ -256,6 +256,16 @@ def main() -> None:
             "train_spearman",
             "eval_spearman",
         )
+    elif _has_metric(by_seed, "eval_mse"):
+        _plot_metric(axes[0, 0], by_seed, "MSE", "train_mse", "eval_mse")
+        _plot_metric(axes[0, 1], by_seed, "MAE", "train_mae", "eval_mae")
+        _plot_metric(
+            axes[1, 0],
+            by_seed,
+            "Spearman",
+            "train_spearman",
+            "eval_spearman",
+        )
     else:
         eval_accuracy_key = "eval_accuracy" if _has_metric(by_seed, "eval_accuracy") else "accuracy"
         eval_macro_f1_key = "eval_macro_f1" if _has_metric(by_seed, "eval_macro_f1") else "macro_f1"

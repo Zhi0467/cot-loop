@@ -272,6 +272,17 @@ def _metric_bundle(
             f"{prefix}/top_10p_capture": metrics["top_10p_capture"],
             f"{prefix}/top_20p_capture": metrics["top_20p_capture"],
         }
+    if target_kind == "regression":
+        return {
+            f"{prefix}/mse": metrics["mse"],
+            f"{prefix}/mae": metrics["mae"],
+            f"{prefix}/rmse": metrics["rmse"],
+            f"{prefix}/target_mean": metrics["target_mean"],
+            f"{prefix}/pred_mean": metrics["pred_mean"],
+            f"{prefix}/spearman": metrics["spearman"],
+            f"{prefix}/top_10p_capture": metrics["top_10p_capture"],
+            f"{prefix}/top_20p_capture": metrics["top_20p_capture"],
+        }
     raise SystemExit(f"Unsupported target_kind '{target_kind}'.")
 
 
@@ -319,23 +330,45 @@ def _print_metric_summary(
             )
         return " ".join(parts)
 
-    parts.extend(
-        [
-            f"train_brier={train_metrics['brier']:.4f}",
-            f"train_mae={train_metrics['mae']:.4f}",
-            f"train_spear={train_metrics['spearman']:.4f}",
-        ]
-    )
-    if eval_metrics is not None:
+    if target_kind == "probability":
         parts.extend(
             [
-                f"eval_brier={eval_metrics['brier']:.4f}",
-                f"eval_mae={eval_metrics['mae']:.4f}",
-                f"eval_spear={eval_metrics['spearman']:.4f}",
-                f"eval_top10={eval_metrics['top_10p_capture']:.4f}",
+                f"train_brier={train_metrics['brier']:.4f}",
+                f"train_mae={train_metrics['mae']:.4f}",
+                f"train_spear={train_metrics['spearman']:.4f}",
             ]
         )
-    return " ".join(parts)
+        if eval_metrics is not None:
+            parts.extend(
+                [
+                    f"eval_brier={eval_metrics['brier']:.4f}",
+                    f"eval_mae={eval_metrics['mae']:.4f}",
+                    f"eval_spear={eval_metrics['spearman']:.4f}",
+                    f"eval_top10={eval_metrics['top_10p_capture']:.4f}",
+                ]
+            )
+        return " ".join(parts)
+
+    if target_kind == "regression":
+        parts.extend(
+            [
+                f"train_mse={train_metrics['mse']:.4f}",
+                f"train_mae={train_metrics['mae']:.4f}",
+                f"train_spear={train_metrics['spearman']:.4f}",
+            ]
+        )
+        if eval_metrics is not None:
+            parts.extend(
+                [
+                    f"eval_mse={eval_metrics['mse']:.4f}",
+                    f"eval_mae={eval_metrics['mae']:.4f}",
+                    f"eval_spear={eval_metrics['spearman']:.4f}",
+                    f"eval_top10={eval_metrics['top_10p_capture']:.4f}",
+                ]
+            )
+        return " ".join(parts)
+
+    raise SystemExit(f"Unsupported target_kind '{target_kind}'.")
 
 
 def _cosine_lr_factor(
@@ -414,7 +447,7 @@ def main() -> None:
     manifest = read_manifest(args.data_dir)
     target_spec = _resolve_target_spec(manifest)
     target_kind = str(target_spec.get("kind", "binary"))
-    if target_kind not in ("binary", "probability"):
+    if target_kind not in ("binary", "probability", "regression"):
         raise SystemExit(f"Unsupported manifest target kind '{target_kind}'.")
     train_info, resolved_feature_key = resolve_split_info(
         manifest,
@@ -434,7 +467,7 @@ def main() -> None:
             score_rule=(
                 args.score_rule
                 if args.score_rule is not None
-                else ("mean_prob" if target_kind == "probability" else None)
+                else ("mean_prob" if target_kind != "binary" else None)
             ),
         )
     except ValueError as exc:
@@ -487,8 +520,10 @@ def main() -> None:
     ).to(device)
     if target_kind == "binary":
         criterion = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
-    else:
+    elif target_kind == "probability":
         criterion = torch.nn.BCEWithLogitsLoss()
+    else:
+        criterion = torch.nn.MSELoss()
     optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=args.lr,
@@ -541,10 +576,14 @@ def main() -> None:
         best_primary = float("-inf")
         best_secondary = float("-inf")
         selection_rule = "max(roc_auc), tie_break=max(macro_f1)"
-    else:
+    elif target_kind == "probability":
         best_primary = float("inf")
         best_secondary = float("-inf")
         selection_rule = "min(brier), tie_break=max(spearman)"
+    else:
+        best_primary = float("inf")
+        best_secondary = float("-inf")
+        selection_rule = "min(mse), tie_break=max(spearman)"
     best_eval_row: dict[str, object] | None = None
     global_step = 0
 
@@ -576,8 +615,11 @@ def main() -> None:
             y = y.to(device)
 
             logits = model(x)
+            loss_inputs = logits
+            if target_kind == "regression":
+                loss_inputs = torch.sigmoid(logits)
             loss = criterion(
-                logits,
+                loss_inputs,
                 _loss_targets(
                     y,
                     logits=logits,
@@ -715,8 +757,24 @@ def main() -> None:
                 is_better = (primary_rank > best_primary) or (
                     primary_rank == best_primary and secondary_rank > best_secondary
                 )
-            else:
+            elif target_kind == "probability":
                 primary_metric = eval_metrics["brier"]
+                primary_rank = (
+                    primary_metric
+                    if not math.isnan(primary_metric)
+                    else float("inf")
+                )
+                secondary_rank = eval_metrics["spearman"]
+                secondary_rank = (
+                    secondary_rank
+                    if not math.isnan(secondary_rank)
+                    else float("-inf")
+                )
+                is_better = (primary_rank < best_primary) or (
+                    primary_rank == best_primary and secondary_rank > best_secondary
+                )
+            else:
+                primary_metric = eval_metrics["mse"]
                 primary_rank = (
                     primary_metric
                     if not math.isnan(primary_metric)

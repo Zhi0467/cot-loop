@@ -1,6 +1,6 @@
 # Roadmap - CoT Loop Detection
 
-Last updated: 2026-03-19 23:05 UTC
+Last updated: 2026-03-20 05:36 UTC
 
 Scope:
 - Build and validate a probe pipeline for CoT loop detection across prefill and completion feature views.
@@ -11,11 +11,13 @@ Scope:
 - Milestone 2 gate: complete.
 - Milestone 3 gate: complete.
 - Active milestone: Milestone 4 (cross-dataset validation).
-- Latest result: the common-policy rollout-statistics bundle remains refreshed under one shared decode policy (`temperature=0.2`, `num_generations=10`, `max prompts <= 800` where applicable) across `MATH-500`, `AIME`, `GPQA`, `MMLU-Pro`, and capped `LiveCodeBench release_v6`. The live objective remains an in-distribution prompt-level rollout-profile predictor around a cap-robust normalized-length tail target plus dense normalized-length regression, with `p(max_length_hit)` kept as an operational eval or diagnostic head. A 2026-03-19 Athena cross-check sharpened the fallback choice: if only one head ships first, use `s_0.9 = P(L / E >= 0.9)` rather than `mu_log_rel`, keep correctness out of the first loss, and control the first GPQA pass so `E` is nearly constant enough that the target does not reduce to prompt length. That single-head path is now implemented in the repo for prefill views: repeated rollouts can be aggregated into prompt-level `s_t` soft targets, the builder now supports task-aware `GPQA` / `MMLU-Pro` prompt formatting, and the canonical SLURM launcher exposes the needed model/task/decode knobs. The first remote GPQA prompt-profile pilot was staged on the corrected PR #7 head with a local `gpqa_diamond.csv` mirror, `temperature=0.2`, `num_generations=10`, `max_tokens=30000`, and per-layer ensemble scoring, but it was canceled rather than left pending because `wth-gpu-01` is currently fully allocated to another user's 8-GPU job through the scheduled end time `2026-03-21 20:18 UTC`.
+- Latest result: the common-policy rollout-statistics bundle remains refreshed under one shared decode policy (`temperature=0.2`, `num_generations=10`, `max prompts <= 800` where applicable) across `MATH-500`, `AIME`, `GPQA`, `MMLU-Pro`, and capped `LiveCodeBench release_v6`. The repaired MC rows now report `GPQA = 34.49%` and `MMLU-Pro = 65.2%` rollout success instead of the stale pre-refresh rows, and the regenerated cross-dataset PDF is published in `outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/`.
+- Prompt-profile direction: the live in-distribution objective is now explicit. Train and evaluate direct prompt-level `s_0.9 = P(L / E >= 0.9)` labels first; keep `p(max_length_hit)` diagnostic-only; use prompt-token-count and/or effective budget `E` as leakage baselines rather than extra probe heads; default any single-layer probe to the last layer. The second single-head objective is regression on `mean_relative_length = E[L / E]`, and the builder now writes one reusable `diagnostics/prompt_rollout_archive.jsonl` bundle so later plots/probes can reuse the same repeated rollouts.
+- Runtime status: the first remote GPQA prompt-profile pilot was staged on PR #7 with a local `gpqa_diamond.csv` mirror, `temperature=0.2`, `num_generations=10`, `max_tokens=30000`, and per-layer ensemble scoring, but it was canceled rather than left pending because `wth-gpu-01` is currently fully allocated to another user's 8-GPU job through the scheduled end time `2026-03-21 20:18 UTC`.
 - Remaining caveat: the original `LiveCodeBench` job crashed after grading and before writing its final JSON, and replay-based repair did not reproduce the stored checkpoint exactly enough to recover `avg_first_loop_prefix_length`. That one metric remains `null` in the recovered capped bundle; a fresh rerun would be required if exact prefix-length telemetry is still needed.
 - Immediate implementation caveat: this workspace still did not have a local Torch runtime / project virtualenv, so the code path was syntax-checked locally and the first real Torch-backed build/train execution still needs the remote pilot window to open.
 - Active review surfaces:
-  - Upstream PR #7 (`Zhi0467/cot-loop`, branch `task/1773870804-prompt-profile-probe`) is the live review surface for the prompt-profile implementation at head `48b81cb`, with the probability-target fixes, GPQA prompt-path fix, and launcher updates all published together.
+  - Upstream PR #7 (`Zhi0467/cot-loop`, branch `task/1773870804-prompt-profile-probe`) is the live review surface for the prompt-profile implementation.
   - Upstream PR #6 (`Zhi0467/cot-loop`, branch `task/1773451376-common-policy-refresh`) remains the published review surface for the common-policy rollout bundle.
 
 ## Milestone 1 - Pipeline and multi-view infrastructure
@@ -47,6 +49,9 @@ Success criteria:
 - Separate true robustness gains from prompt-length or source-composition effects.
 - Establish a useful in-distribution prompt-level predictor objective for fixed model+policy behavior, with metadata-controlled evaluation.
 - Make that objective less brittle to the chosen decode ceiling than a pure max-length-hit label.
+
+Activity log:
+- 2026-03-20 05:36 UTC: rebased the prompt-profile branch onto the newer upstream `main` state, resolved the docs-layer merge drift, and extended the implementation so repeated-rollout builds can supervise either direct `s_0.9` or `mean_relative_length` while emitting one reusable `diagnostics/prompt_rollout_archive.jsonl` bundle per dataset build.
 
 ## Milestone 5 - Deployment readiness
 Status: future (set 2026-03-13 13:05 UTC)

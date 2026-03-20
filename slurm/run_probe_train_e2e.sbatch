@@ -110,6 +110,7 @@ FEATURE_LAYER="${FEATURE_LAYER:--1}"
 FEATURE_KEY="${FEATURE_KEY:-}"
 TARGET_KIND="${TARGET_KIND:-binary}"
 PROFILE_TAIL_THRESHOLD="${PROFILE_TAIL_THRESHOLD:-0.9}"
+PROFILE_TARGET="${PROFILE_TARGET:-}"
 SCORE_RULE="${SCORE_RULE:-}"
 
 LOOP_N="${LOOP_N:-30}"
@@ -158,7 +159,7 @@ echo "[probe-e2e] task_kind=${TASK_KIND}"
 echo "[probe-e2e] probe_preset=${PROBE_PRESET}"
 echo "[probe-e2e] feature_pooling=${FEATURE_POOLING} feature_layer=${FEATURE_LAYER}"
 echo "[probe-e2e] feature_key=${FEATURE_KEY}"
-echo "[probe-e2e] target_kind=${TARGET_KIND} profile_tail_threshold=${PROFILE_TAIL_THRESHOLD}"
+echo "[probe-e2e] target_kind=${TARGET_KIND} profile_tail_threshold=${PROFILE_TAIL_THRESHOLD} profile_target=${PROFILE_TARGET}"
 echo "[probe-e2e] score_rule=${SCORE_RULE}"
 echo "[probe-e2e] prefill_batch_size=${PREFILL_BATCH_SIZE} completion_batch_size=${COMPLETION_BATCH_SIZE}"
 echo "[probe-e2e] temperature=${TEMPERATURE} tp=${TP} dp=${DP} max_model_len=${MAX_MODEL_LEN} max_num_batched_tokens=${MAX_NUM_BATCHED_TOKENS}"
@@ -231,6 +232,9 @@ if [[ -n "${MAX_TOKENS}" ]]; then
 fi
 if [[ -n "${FEATURE_KEY}" ]]; then
   BUILD_ARGS+=(--feature-key "${FEATURE_KEY}")
+fi
+if [[ -n "${PROFILE_TARGET}" ]]; then
+  BUILD_ARGS+=(--profile-target "${PROFILE_TARGET}")
 fi
 
 echo "[probe-e2e] validating/reusing dataset at ${OUT_DATA_DIR} with dataset_seed=${DATASET_SEED}"

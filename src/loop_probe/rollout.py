@@ -11,6 +11,7 @@ from .configs import RolloutConfig
 @dataclass(frozen=True)
 class GeneratedRollout:
     token_ids: list[int]
+    text: str
     finish_reason: str | None
 
 
@@ -189,6 +190,7 @@ def _generate_grouped_rollouts_single_process(
                 prompt_rollouts.append(
                     GeneratedRollout(
                         token_ids=list(token_ids),
+                        text=str(sample.text),
                         finish_reason=getattr(sample, "finish_reason", None),
                     )
                 )

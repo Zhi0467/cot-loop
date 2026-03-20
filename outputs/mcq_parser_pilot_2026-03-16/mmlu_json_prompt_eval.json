@@ -1,0 +1,160 @@
+{
+  "input_jsonl": "projects/cot-loop-detection/outputs/mcq_parser_pilot_2026-03-16/mmlu_json_prompt_raw.jsonl",
+  "rows": 80,
+  "finish_reason_counts": {
+    "length": 20,
+    "stop": 60
+  },
+  "structured_mode_counts": {
+    "json_answer": 60
+  },
+  "legacy_strict": {
+    "parsed": 0,
+    "correct": 0,
+    "stop_parsed": 0,
+    "stop_correct": 0,
+    "length_parsed": 0,
+    "length_correct": 0,
+    "prompt_count": 8,
+    "sample0_correct_fraction": 0.0,
+    "prompt_any_correct_fraction": 0.0,
+    "prompt_majority_correct_fraction": 0.0,
+    "prompt_mean_rollout_accuracy": 0.0,
+    "parse_fraction": 0.0,
+    "correct_fraction": 0.0
+  },
+  "json_only": {
+    "parsed": 60,
+    "correct": 25,
+    "stop_parsed": 60,
+    "stop_correct": 25,
+    "length_parsed": 0,
+    "length_correct": 0,
+    "prompt_count": 8,
+    "sample0_correct_fraction": 0.25,
+    "prompt_any_correct_fraction": 0.75,
+    "prompt_majority_correct_fraction": 0.125,
+    "prompt_mean_rollout_accuracy": 0.3125,
+    "parse_fraction": 0.75,
+    "correct_fraction": 0.3125
+  },
+  "terminal_structured": {
+    "parsed": 60,
+    "correct": 25,
+    "stop_parsed": 60,
+    "stop_correct": 25,
+    "length_parsed": 0,
+    "length_correct": 0,
+    "prompt_count": 8,
+    "sample0_correct_fraction": 0.25,
+    "prompt_any_correct_fraction": 0.75,
+    "prompt_majority_correct_fraction": 0.125,
+    "prompt_mean_rollout_accuracy": 0.3125,
+    "parse_fraction": 0.75,
+    "correct_fraction": 0.3125
+  },
+  "structured_only_over_json_examples": [],
+  "structured_only_over_legacy_examples": [
+    {
+      "sample_id": 0,
+      "generation_index": 5,
+      "finish_reason": "stop",
+      "gold_candidates": [
+        "I"
+      ],
+      "prediction": "I",
+      "mode": "json_answer",
+      "tail_lines": [
+        "So the first blank is \"encourage\" something. If the ad is not supposed to encourage Unsafe practices, then the first blank is Unsafe practices. Then the second blank is \"cause unnecessary ________\". If the answer is Distress, then the second blank is Distress. Then the third blank is \"or _____\", which would be Fear. Then the fourth blank is \"must not cause _______ offence\", which is Trivial. So that would be option I.",
+        "Alternatively, if the third blank is Fear, then the answer is I.",
+        "But let's check the options again. Option I is: Unsafe practices, Distress, Fear, Trivial. So the answer would be I.",
+        "But let me check if there's any other possible answer. For example, option D: Safe practices, Distress, Fear, Trivial. But the first blank is Safe practices, which is not correct. So D is invalid.",
+        "Another thought: the ad must not cause unnecessary distress or fear. So the second blank is Distress, third is Fear. Then the fourth is Trivial. So that would be option I.",
+        "Yes, that makes sense. So the answer is I.",
+        "</think>",
+        "{\"answer\": \"I\"}"
+      ]
+    },
+    {
+      "sample_id": 1,
+      "generation_index": 5,
+      "finish_reason": "stop",
+      "gold_candidates": [
+        "F"
+      ],
+      "prediction": "F",
+      "mode": "json_answer",
+      "tail_lines": [
+        "But let me check other options. Option D is Stakeholders, Diligence, Care and Skill. So the first blank is Stakeholders, then Diligence, then Care and Skill. But the first part of the question is \"in the best interest of ________.\" If it's Stakeholders, then that's possible. But the question says \"the best interest of ________,\" which could be shareholders. However, in corporate governance, the primary interest is shareholders, but stakeholders include others. But the answer options have both Shareholders and Stakeholders. So which is correct?",
+        "The question is from a standard test, so I need to recall the standard answer. In many cases, the answer is that managers are entrusted to run the company in the best interest of shareholders, and they have a duty of diligence and care and skill. So the first blank is Shareholders, then the second and third are diligence and care and skill. So the answer would be F: Shareholders, Care and Skill, Diligence. But wait, the answer options for F are Shareholders, Care and Skill, Diligence. So the order is first blank is Shareholders, then the second is Care and Skill, third is Diligence. But the question says \"a duty of ________ and of ________.\" So the two duties are Care and Skill and Diligence. So the answer would be F.",
+        "But let me check the other options. Option D is Stakeholders, Diligence, Care and Skill. So the first blank is Stakeholders. Then Diligence and Care and Skill. But the question says \"the best interest of ________,\" which would be Stakeholders. But the company's best interest is often considered to be shareholders. However, in some contexts, stakeholders include shareholders, employees, customers, etc. So if the question is about the company's best interest, then it's shareholders. But if the question is about the company's best interest in general, then stakeholders. But the answer options have both.",
+        "But the question says \"managers are entrusted to run the company in the best interest of ________.\" So the answer is likely Shareholders. Therefore, the correct answer would be F: Shareholders, Care and Skill, Diligence. But wait, the answer options for F are Shareholders, Care and Skill, Diligence. So the first blank is Shareholders, then the second and third are Care and Skill and Diligence. But the question says \"a duty of ________ and of ________.\" So the two duties are Care and Skill and Diligence. So the answer is F.",
+        "But wait, the answer options for D are Stakeholders, Diligence, Care and Skill. So the first blank is Stakeholders, then Diligence, then Care and Skill. But the question says \"the best interest of ________,\" which would be Stakeholders if that's the case. But I think the correct answer is F. However, I need to check if the duties are for the company and then the two other duties. So the first part is \"in the best interest of ________,\" which is shareholders. Then the duties are diligence and care and skill. So the answer is F.",
+        "But another thought: the question says \"they have a duty to act for the benefit of the company, as well as a duty of ________ and of ________.\" So the duties are for the company (which is the company itself) and then two other duties. So the first part is about the company's best interest, which is shareholders. Then the two duties are diligence and care and skill. So the answer is F.",
+        "</think>",
+        "{\"answer\": \"F\"}"
+      ]
+    },
+    {
+      "sample_id": 1,
+      "generation_index": 9,
+      "finish_reason": "stop",
+      "gold_candidates": [
+        "F"
+      ],
+      "prediction": "F",
+      "mode": "json_answer",
+      "tail_lines": [
+        "But let me check the options again. Option F is Shareholders, Care and Skill, Diligence. Yes. So the answer is F.",
+        "Alternatively, option D is Stakeholders, Diligence, Care and Skill. But the first blank is Stakeholders, which would be incorrect if the question is about the best interest of the company. But maybe the answer is D.",
+        "Wait, the question says \"the best interest of ________.\" If the answer is Stakeholders, then the first blank is Stakeholders. But the question says \"the best interest of ________.\" So the answer would be Stakeholders. But why? Because the company's best interest includes stakeholders. However, in some contexts, the primary is shareholders.",
+        "But the question is from a test, so the answer is likely to be F. Because in the options, F is Shareholders, Care and Skill, Diligence.",
+        "Alternatively, maybe the answer is D. Let me think again. The question says \"a duty to act for the benefit of the company, as well as a duty of ________ and of _______.\" So the two duties are care and skill and diligence. So the answer would be F.",
+        "Yes, I think F is correct. So the answer is F.",
+        "</think>",
+        "{\"answer\": \"F\"}"
+      ]
+    },
+    {
+      "sample_id": 2,
+      "generation_index": 1,
+      "finish_reason": "stop",
+      "gold_candidates": [
+        "J"
+      ],
+      "prediction": "J",
+      "mode": "json_answer",
+      "tail_lines": [
+        "Alternatively, maybe the answer is F: Down, Independence, Autonomy, Compensation. But that doesn't fit the key issue.",
+        "Wait, the key issue is the right to know, which is about \"Involvement\" or \"Autonomy\". If the answer is B: Down, Involvement, Independence, Benefit. But the second issue is the package, which is \"Benefit\". But the key issue is \"Involvement\", which is the second blank. So the answer would be B, but the third blank is \"Independence\" as the second issue? No, the third blank is the package. So if the answer is B, then the third blank is \"Benefit\", which is the package. So the answer would be B: Down, Involvement, Independence, Benefit. But the third blank is \"Independence\" as the second issue? That doesn't make sense. The second issue is the package, which is \"Benefit\".",
+        "So I think the correct answer is J: Down, Involvement, Remuneration, Compensation. Because the key issue is \"Involvement\" (second blank), and the second issue is the package, which is \"Remuneration\" or \"Compensation\". But I'm not sure. Alternatively, maybe the answer is F: Down, Independence, Autonomy, Compensation. But that doesn't fit the key issue.",
+        "Wait, the key issue is the right to know, which is about \"Involvement\" (since employees are involved in the process). So the second blank is \"Involvement\". The third blank is the package, which is \"Compensation\". So the answer would be J: Down, Involvement, Remuneration, Compensation. But \"Remuneration\" is part of the package. So maybe the answer is J.",
+        "Alternatively, maybe the answer is H: Up, Privacy, Remuneration, Severance. But the first blank is \"Down\" because it's about downsizing. So H is incorrect.",
+        "After considering all options, I think the correct answer is J: Down, Involvement, Remuneration, Compensation. But I'm not entirely sure. However, based on the information given, the key issue is \"Involvement\" and the package is \"Remuneration\" or \"Compensation\".",
+        "</think>",
+        "{\"answer\": \"J\"}"
+      ]
+    },
+    {
+      "sample_id": 2,
+      "generation_index": 3,
+      "finish_reason": "stop",
+      "gold_candidates": [
+        "J"
+      ],
+      "prediction": "J",
+      "mode": "json_answer",
+      "tail_lines": [
+        "The first part of the question says: \"There are two main issues associated with _____ sizing. _______ is a key issue as due to the information policy of the corporation it can be argued that employees have a right to know if they are being made redundant. _______ is a second issue, particularly the ________ package that employees receive when laid off.\"",
+        "So the first blank is the term for the sizing (downsizing or upscaling?), and the second blank is the first issue (involvement), and the third is the second issue (the package).",
+        "The first issue is about the right to know, which is related to involvement. So the first blank is \"Down\" (since downsizing is the process), the second blank is \"Involvement\", and the third is \"Remuneration\" or \"Compensation\" as the package.",
+        "Looking at the answer choices, option J is \"Down, Involvement, Remuneration, Compensation\". So the answer would be J.",
+        "But let me check other options again. For example, option F: Down, Independence, Autonomy, Compensation. The first issue is about involvement, not independence or autonomy. So that's not right.",
+        "So the correct answer is J.",
+        "</think>",
+        "{\"answer\": \"J\"}"
+      ]
+    }
+  ],
+  "structured_length_correct_examples": []
+}

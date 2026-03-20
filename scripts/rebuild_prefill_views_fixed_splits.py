@@ -217,7 +217,7 @@ def _resolve_reference_target_kind(
             )
     else:
         target_kind = "binary"
-    if target_kind not in ("binary", "probability"):
+    if target_kind not in ("binary", "probability", "regression"):
         raise SystemExit(
             f"Unsupported target kind '{target_kind}' in reference split '{split}'."
         )
@@ -269,7 +269,9 @@ def _load_reference_split(
         if not isinstance(rel_path, str):
             raise SystemExit(f"Invalid shard path entry for split '{split}'.")
         shard = torch.load(os.path.join(reference_data_dir, rel_path), map_location="cpu")
-        label_dtype = torch.float32 if target_kind == "probability" else torch.uint8
+        label_dtype = (
+            torch.float32 if target_kind in ("probability", "regression") else torch.uint8
+        )
         labels.append(shard["y"].to(dtype=label_dtype))
         sample_ids.append(shard["sample_ids"].to(dtype=torch.int64))
     return torch.cat(labels, dim=0), torch.cat(sample_ids, dim=0)

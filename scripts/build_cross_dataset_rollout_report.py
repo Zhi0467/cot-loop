@@ -6,7 +6,7 @@ import csv
 import json
 import math
 import subprocess
-from datetime import datetime
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -14,7 +14,7 @@ from typing import Any
 import matplotlib.pyplot as plt
 
 
-DEFAULT_STATS_DIR = Path("outputs/qwen3_1p7b_cross_dataset_rollout_stats")
+DEFAULT_STATS_DIR = Path("outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/json")
 FIGURES_DIRNAME = "figures"
 EXPECTED_STATS_CONTRACT_VERSION = "rollout_stats_v2"
 
@@ -81,7 +81,7 @@ DATASETS: tuple[DatasetInfo, ...] = (
         chat_format=(
             "Tokenizer chat template with one user turn containing the question, "
             "a shuffled A-D answer block, and the instruction that the final "
-            "non-empty line must be exactly 'Answer: X'."
+            "non-empty line must be a JSON object like '{\"answer\": \"X\"}'."
         ),
     ),
     DatasetInfo(
@@ -95,7 +95,7 @@ DATASETS: tuple[DatasetInfo, ...] = (
         chat_format=(
             "Tokenizer chat template with one user turn containing the question, "
             "an A-J answer list, and the instruction that the final non-empty line "
-            "must be exactly 'Answer: X'."
+            "must be a JSON object like '{\"answer\": \"X\"}'."
         ),
     ),
     DatasetInfo(
@@ -586,19 +586,19 @@ def build_length_plot(rows: list[dict[str, Any]], figures_dir: Path) -> Path:
     width = 0.24
     avg_len = [_nan_or_float(row["avg_generation_length"]) / 1000.0 for row in rows]
     avg_loop_len = [_nan_or_float(row["avg_loop_generation_length"]) / 1000.0 for row in rows]
-    avg_prefix = [_nan_or_float(row["avg_first_loop_prefix_length"]) / 1000.0 for row in rows]
+    avg_wrong_len = [_nan_or_float(row["avg_wrong_generation_length"]) / 1000.0 for row in rows]
 
     fig, ax = plt.subplots(figsize=(10.5, 5.8))
     bars1 = ax.bar([i - width for i in x], avg_len, width=width, label="Average generation", color="#6d597a")
     bars2 = ax.bar(x, avg_loop_len, width=width, label="Average looped generation", color="#b56576")
-    bars3 = ax.bar([i + width for i in x], avg_prefix, width=width, label="Average first-loop prefix", color="#355070")
+    bars3 = ax.bar([i + width for i in x], avg_wrong_len, width=width, label="Average wrong generation", color="#355070")
     _annotate_bars(ax, bars1, "k")
     _annotate_bars(ax, bars2, "k")
     _annotate_bars(ax, bars3, "k")
     ax.set_ylabel("Tokens (thousands)")
     ax.set_title("Generation-length profile by dataset")
     ax.set_xticks(x, labels)
-    ax.set_ylim(0, _finite_max(avg_len, avg_loop_len, avg_prefix) * 1.18)
+    ax.set_ylim(0, _finite_max(avg_len, avg_loop_len, avg_wrong_len) * 1.18)
     ax.legend(frameon=False, ncol=3)
     ax.grid(axis="y", alpha=0.25)
     fig.tight_layout()
@@ -768,6 +768,14 @@ def build_key_findings(rows: list[dict[str, Any]]) -> str:
             else row["avg_loop_generation_length"]
         ),
     )
+    longest_wrong = max(
+        rows,
+        key=lambda row: (
+            float("-inf")
+            if row["avg_wrong_generation_length"] is None
+            else row["avg_wrong_generation_length"]
+        ),
+    )
     tightest_overlap = max(
         rows,
         key=lambda row: (
@@ -794,20 +802,9 @@ def build_key_findings(rows: list[dict[str, Any]]) -> str:
             ),
             (
                 f"The longest looped generations also appear on {latex_escape(longest_loop['display_name'])}: "
-                f"{format_float(longest_loop['avg_loop_generation_length'])} tokens on average."
-                + (
-                    " "
-                    + (
-                        f"The first detected loop appears after "
-                        f"{format_float(longest_loop['avg_first_loop_prefix_length'])} tokens on average."
-                    )
-                    if longest_loop["avg_first_loop_prefix_length"] is not None
-                    else (
-                        " The exact average first-loop-prefix length is unavailable in this "
-                        "bundle because that metric could not be recovered from the "
-                        "post-grading LiveCodeBench crash."
-                    )
-                )
+                f"{format_float(longest_loop['avg_loop_generation_length'])} tokens on average. "
+                f"The longest wrong generations appear on {latex_escape(longest_wrong['display_name'])} "
+                f"at {format_float(longest_wrong['avg_wrong_generation_length'])} tokens on average."
             ),
             (
                 f"Prompt-plus-generation max-length termination is almost synonymous with looping on the hardest long-form "
@@ -857,7 +854,8 @@ def bundle_timestamp(rows: list[dict[str, Any]]) -> str:
         parsed.append((datetime.fromisoformat(value), value))
     if not parsed:
         return "Generated from collector outputs"
-    return max(parsed, key=lambda item: item[0])[1]
+    latest = max(parsed, key=lambda item: item[0])[0]
+    return latest.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
 
 def build_tex(rows: list[dict[str, Any]], out_dir: Path, report_stem: str) -> Path:
@@ -889,7 +887,7 @@ def build_tex(rows: list[dict[str, Any]], out_dir: Path, report_stem: str) -> Pa
 \setlength{{\parskip}}{{0.6em}}
 
 \title{{Cross-Dataset Rollout Statistics Report for Qwen/Qwen3-1.7B}}
-\author{{Murphy}}
+\author{{}}
 \date{{{latex_escape(bundle_timestamp(rows))}}}
 
 \begin{{document}}
@@ -899,6 +897,8 @@ def build_tex(rows: list[dict[str, Any]], out_dir: Path, report_stem: str) -> Pa
 This report consolidates the full math $\rightarrow$ GPQA $\rightarrow$ MMLU-Pro $\rightarrow$ LiveCodeBench rollout-stat sweep for \texttt{{Qwen/Qwen3-1.7B}}. The collector uses the n-gram loop detector with \texttt{{n={loop_n}}} and \texttt{{k={loop_k}}} and records both prompt-level counts and rollout-level event rates, including overlap statistics between looping, max-model-length termination, and correctness.
 
 The math block was evaluated as two separate datasets under the same freeform prompt contract: \texttt{{MATH-500}} ({format_int(math_row["samples"])} samples) and \texttt{{AIME 2024/2025}} ({format_int(aime_row["samples"])} samples). The downstream multiple-choice and code-generation blocks were evaluated on \texttt{{GPQA Diamond}}, \texttt{{MMLU-Pro}}, and \texttt{{LiveCodeBench release\_v6}} in the same rollout pipeline.
+
+These rows should be read as a common-policy rollout-telemetry bundle under shared low-temperature multi-sample decoding, not as benchmark-optimized single-generation accuracy. The separate GPQA benchmark-style calibration (\texttt{{temperature=0.6}}, \texttt{{num\_generations=1}}) answers a different question and should be compared to Qwen's published reference instead of to this cross-dataset table.
 
 \section*{{Datasets and Prompt Formats}}
 {build_dataset_profiles(rows)}
@@ -959,13 +959,13 @@ The JSON payloads also retain the raw event counts for prompts, graded/generated
 \begin{{figure}}[H]
 \centering
 \includegraphics[width=\textwidth]{{{figures["lengths"]}}}
-\caption{{Average generation lengths, average looped-generation lengths, and average first-loop-prefix lengths in thousands of tokens.}}
+\caption{{Average generation lengths, average looped-generation lengths, and average wrong-generation lengths in thousands of tokens.}}
 \end{{figure}}
 
 \section*{{Interpretation}}
 Across the math, science, broad-knowledge, and coding settings, the same pattern repeats: long generation tails are where looping lives. The strongest evidence is in the overlap panel: once a rollout's prompt-plus-generation length reaches \texttt{{max\_model\_len}}, it is often also a detected loop. The converse is weaker but still substantial: in several datasets, a large fraction of looped rollouts also terminate at that full-context ceiling.
 
-The length panel shows that looped generations are substantially longer than the dataset-wide average everywhere in the bundle. The average first-loop-prefix length also varies meaningfully by dataset, which indicates that not every loop is an immediate degeneration: some settings enter the repeated n-gram regime only after a long reasoning or coding prefix.
+The length panel shows that both looped generations and wrong generations are substantially longer than the dataset-wide average everywhere in the bundle. In the harder reasoning and coding settings, wrong rollouts become long well before they are reliably correct, which is consistent with the overall loop-heavy tail behavior in this sweep.
 
 Rollout success under looping is dataset-dependent rather than uniform. Some tasks retain a noticeable fraction of correct answers even inside looped rollouts, which suggests the model can sometimes reach the right answer before it starts repeating. For \texttt{{LiveCodeBench}}, the native benchmark metrics should be read from the separate \texttt{{pass@k}} values rather than from the rollout-success column.
 

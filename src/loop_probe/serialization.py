@@ -35,7 +35,7 @@ def save_split_shards(
     x = features.to(dtype=torch.float16).cpu()
     if target_kind == "binary":
         y = torch.tensor(labels, dtype=torch.uint8)
-    elif target_kind == "probability":
+    elif target_kind in ("probability", "regression"):
         y = torch.tensor(labels, dtype=torch.float32)
     else:
         raise SystemExit(f"Unsupported target_kind '{target_kind}'.")
