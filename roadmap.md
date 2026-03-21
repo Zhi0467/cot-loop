@@ -1,6 +1,6 @@
 # Roadmap - CoT Loop Detection
 
-Last updated: 2026-03-20 05:36 UTC
+Last updated: 2026-03-21 17:24 UTC
 
 Scope:
 - Build and validate a probe pipeline for CoT loop detection across prefill and completion feature views.
@@ -12,8 +12,8 @@ Scope:
 - Milestone 3 gate: complete.
 - Active milestone: Milestone 4 (cross-dataset validation).
 - Latest result: the common-policy rollout-statistics bundle remains refreshed under one shared decode policy (`temperature=0.2`, `num_generations=10`, `max prompts <= 800` where applicable) across `MATH-500`, `AIME`, `GPQA`, `MMLU-Pro`, and capped `LiveCodeBench release_v6`. The repaired MC rows now report `GPQA = 34.49%` and `MMLU-Pro = 65.2%` rollout success instead of the stale pre-refresh rows, and the regenerated cross-dataset PDF is published in `outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/`.
-- Prompt-profile direction: the live in-distribution objective is now explicit. Train and evaluate direct prompt-level `s_0.9 = P(L / E >= 0.9)` labels first; keep `p(max_length_hit)` diagnostic-only; use prompt-token-count and/or effective budget `E` as leakage baselines rather than extra probe heads; default any single-layer probe to the last layer. The second single-head objective is regression on `mean_relative_length = E[L / E]`, and the builder now writes one reusable `diagnostics/prompt_rollout_archive.jsonl` bundle so later plots/probes can reuse the same repeated rollouts.
-- Runtime status: the first remote GPQA prompt-profile pilot was staged on PR #7 with a local `gpqa_diamond.csv` mirror, `temperature=0.2`, `num_generations=10`, `max_tokens=30000`, and per-layer ensemble scoring, but it was canceled rather than left pending because `wth-gpu-01` is currently fully allocated to another user's 8-GPU job through the scheduled end time `2026-03-21 20:18 UTC`.
+- Prompt-profile direction: the live in-distribution objective is no longer just a pre-pilot choice. The first real GPQA `s_0.9` pilot finished cleanly and exposed a narrower problem: on this `GPQA` / `max_tokens=30000` surface, `s_0.9` collapses exactly to `p(max_length_hit)` on the pilot prompts, so the next main head should shift to a denser terminal statistic (`mean_relative_length` first, or a lower-threshold `s_t`) while still keeping cap-hit/correctness diagnostic-only. A same-archive `mean_relative_length` retrain is already directionally better (`eval_spearman +0.0647` instead of `-0.2799`) but still loses on MSE/MAE to trivial baselines, so the next round needs more prompts as well as the denser target. Prompt-token-count and/or effective budget `E` remain the leakage baselines, and any single-layer probe should still default to the last layer.
+- Runtime status: the resumed GPQA prompt-profile pilot (`1477`) is now complete rather than pending. It finished in `37m22s` on GPUs `0-2`, wrote the full prompt-profile archive plus probe checkpoints, and showed that the 3-GPU runtime path is viable. The blocker is now objective usefulness, not Slurm/runtime feasibility.
 - Remaining caveat: the original `LiveCodeBench` job crashed after grading and before writing its final JSON, and replay-based repair did not reproduce the stored checkpoint exactly enough to recover `avg_first_loop_prefix_length`. That one metric remains `null` in the recovered capped bundle; a fresh rerun would be required if exact prefix-length telemetry is still needed.
 - Immediate implementation caveat: this workspace still did not have a local Torch runtime / project virtualenv, so the code path was syntax-checked locally and the first real Torch-backed build/train execution still needs the remote pilot window to open.
 - Active review surfaces:
@@ -52,6 +52,8 @@ Success criteria:
 
 Activity log:
 - 2026-03-20 05:36 UTC: rebased the prompt-profile branch onto the newer upstream `main` state, resolved the docs-layer merge drift, and extended the implementation so repeated-rollout builds can supervise either direct `s_0.9` or `mean_relative_length` while emitting one reusable `diagnostics/prompt_rollout_archive.jsonl` bundle per dataset build.
+- 2026-03-21 17:18 UTC: the first real GPQA `s_0.9` pilot finished end to end on the 3-GPU path (`37m22s`) and materially changed the recommendation. The runtime path is fine, but the target is not: on this `32 / 16` pilot, `s_0.9` equals `p(max_length_hit)` for every prompt, the probe's eval Brier (`0.03456`) is slightly worse than a constant baseline (`0.03434`), and eval Spearman is negative (`-0.2799`). The next run should therefore keep the same prefill/data-view design but switch the main head to `mean_relative_length` (or lower the tail threshold) instead of treating `s_0.9` as the settled first objective.
+- 2026-03-21 17:24 UTC: reused the finished rollout archive and prefill shards to train `mean_relative_length` on the exact same prompts with no second rollout. This confirms the direction but not success yet: the best regression run improves eval Spearman to `+0.0647`, but its eval MSE/MAE (`0.0503 / 0.1549`) still trail both a constant baseline (`0.0311 / 0.1342`) and a prompt-length-only linear fit (`0.0422 / 0.1425`). The next experiment therefore needs a denser target plus a larger prompt count, not only a label swap on the same 48-prompt slice.
 
 ## Milestone 5 - Deployment readiness
 Status: future (set 2026-03-13 13:05 UTC)
