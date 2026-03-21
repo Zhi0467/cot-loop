@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-03-21 17:24 UTC
+Last updated: 2026-03-21 23:53 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -10,6 +10,7 @@ Current docs and references:
 - Project roadmap: ../roadmap.md
 - Terminal-objective design note: terminal-objective.md
 - Prompt-profile implementation note: prompt-profile-probe.md
+- Prefill-activation visualization note: prefill-activation-visualization.md
 - Rollout text visualization note: rollout-text-visualization.md
 - Consolidated findings: ../outputs/pr2_experiment_findings_consolidated.md
 - Consolidated findings PDF: ../outputs/pr2_experiment_findings_consolidated_pdf/pr2_experiment_findings_consolidated.pdf
@@ -29,3 +30,4 @@ Current live status note:
 - The resumed 2026-03-21 pilot on GPUs `0-2` is no longer only a feasibility note: it finished end to end in `37m22s`, wrote the prompt-profile archive plus probe checkpoints, and showed that runtime is acceptable on the 3-GPU path. A same-archive `mean_relative_length` retrain also landed immediately afterward, so the current status is tighter still: the remaining issue is not rollout/runtime plumbing but predictor quality versus trivial baselines on a too-small `48`-prompt slice.
 - The GPQA rollout-text visualization note now has a binary-figure follow-up on top of the original pilot: the raw geometry still shows strong prompt dominance, quantified by same-prompt `5`-NN purity dropping from `0.934` to `0.444` after prompt-centering; the clearest visible binary split remains `stop` vs `length`, while exact loops still appear as a sparse subset inside the broader length-hit cloud.
 - A larger-prompt GPQA rerun (`48` prompts x `4` rollouts) was attempted on 2026-03-19, but the shared GPU node queued that bounded job for `2026-03-21` and it was canceled instead of being left unattended. The current published visualization therefore remains the improved binary view on the checked-in `16 x 10` slice.
+- A corrected activation-based GPQA visualization now exists on top of the finished 2026-03-21 prompt-profile pilot. It uses the saved prefill feature shards plus the rollout/profile JSONLs rather than rollout text, projects the final-layer last-prefill-token activations with one shared PCA plane, and shows that correctness is the strongest large-scale gradient while `max_length` risk appears in several prompt islands rather than one clean failure lobe.

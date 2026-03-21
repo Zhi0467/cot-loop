@@ -1,6 +1,6 @@
 # Roadmap - CoT Loop Detection
 
-Last updated: 2026-03-21 17:24 UTC
+Last updated: 2026-03-21 23:53 UTC
 
 Scope:
 - Build and validate a probe pipeline for CoT loop detection across prefill and completion feature views.
@@ -54,6 +54,7 @@ Activity log:
 - 2026-03-20 05:36 UTC: rebased the prompt-profile branch onto the newer upstream `main` state, resolved the docs-layer merge drift, and extended the implementation so repeated-rollout builds can supervise either direct `s_0.9` or `mean_relative_length` while emitting one reusable `diagnostics/prompt_rollout_archive.jsonl` bundle per dataset build.
 - 2026-03-21 17:18 UTC: the first real GPQA `s_0.9` pilot finished end to end on the 3-GPU path (`37m22s`) and materially changed the recommendation. The runtime path is fine, but the target is not: on this `32 / 16` pilot, `s_0.9` equals `p(max_length_hit)` for every prompt, the probe's eval Brier (`0.03456`) is slightly worse than a constant baseline (`0.03434`), and eval Spearman is negative (`-0.2799`). The next run should therefore keep the same prefill/data-view design but switch the main head to `mean_relative_length` (or lower the tail threshold) instead of treating `s_0.9` as the settled first objective.
 - 2026-03-21 17:24 UTC: reused the finished rollout archive and prefill shards to train `mean_relative_length` on the exact same prompts with no second rollout. This confirms the direction but not success yet: the best regression run improves eval Spearman to `+0.0647`, but its eval MSE/MAE (`0.0503 / 0.1549`) still trail both a constant baseline (`0.0311 / 0.1342`) and a prompt-length-only linear fit (`0.0422 / 0.1425`). The next experiment therefore needs a denser target plus a larger prompt count, not only a label swap on the same 48-prompt slice.
+- 2026-03-21 23:53 UTC: generated the first corrected activation-based visualization from the saved GPQA prompt-profile pilot rather than from rollout text. The exporter now joins `manifest.json`, saved prefill shards, prompt-profile JSONLs, and `prompt_rollout_archive.jsonl` into one prompt/rollout projection table; the rendered PCA panels show that correctness is the clearest broad gradient in last-layer prefill space, while `max_length` hits remain visible but fragmented across several prompt islands and loop labels stay broader and more mixed than cap hits.
 
 ## Milestone 5 - Deployment readiness
 Status: future (set 2026-03-13 13:05 UTC)

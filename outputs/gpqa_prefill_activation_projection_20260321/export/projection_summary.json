@@ -1,0 +1,32 @@
+{
+  "data_dir": "/data/scratch/murphy/outputs/cot-loop-detection/gpqa_s09_prob_pilot_20260321/data",
+  "explained_variance_ratio": [
+    0.1586686223745346,
+    0.09713225811719894
+  ],
+  "manifest_default_feature_key": "last_token_all_layers_stack_final",
+  "num_prompts": 48,
+  "num_rollouts": 480,
+  "projection_view": "last_layer",
+  "prompt_stats": {
+    "mean_mean_relative_length": 0.2901211805555555,
+    "mean_p_cap": 0.07083333333333333,
+    "mean_p_loop": 0.375
+  },
+  "rollout_stats": {
+    "cap_hit_rate": 0.07083333333333333,
+    "correct_rate": 0.3541666666666667,
+    "loop_rate": 0.375
+  },
+  "split_counts": {
+    "prompts": {
+      "test": 16,
+      "train": 32
+    },
+    "rollouts": {
+      "test": 160,
+      "train": 320
+    }
+  },
+  "task_kind": "multiple_choice_gpqa"
+}
