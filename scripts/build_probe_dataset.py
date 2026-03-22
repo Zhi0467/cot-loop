@@ -29,7 +29,11 @@ from loop_probe.labeling import (
     profile_target_name,
     profile_target_value,
 )
-from loop_probe.adapters import multiple_choice_gpqa, multiple_choice_mmlupro
+from loop_probe.adapters import (
+    livecodebench_codegen,
+    multiple_choice_gpqa,
+    multiple_choice_mmlupro,
+)
 from loop_probe.prefill import (
     FEATURE_POOLING_CHOICES,
     extract_prefill_features_multi,
@@ -54,7 +58,12 @@ COMPLETION_POOLING_CHOICES = (ROLLOUT_LAST_TOKEN_ALL_LAYERS_MEAN,)
 ALL_FEATURE_POOLING_CHOICES = FEATURE_POOLING_CHOICES + COMPLETION_POOLING_CHOICES
 TARGET_KIND_CHOICES = ("binary", "probability", "regression")
 BINARY_TARGET_MODE_CHOICES = ("rollout_label", "prompt_majority_tail")
-TASK_KIND_CHOICES = ("math_freeform", "multiple_choice_gpqa", "multiple_choice_mmlupro")
+TASK_KIND_CHOICES = (
+    "math_freeform",
+    "multiple_choice_gpqa",
+    "multiple_choice_mmlupro",
+    "livecodebench_codegen",
+)
 PROFILE_TARGET_CHOICES = PROMPT_PROFILE_TARGET_CHOICES
 
 
@@ -98,6 +107,9 @@ def _parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--livecodebench-repo", default="")
+    parser.add_argument("--release-version", default="release_v6")
+    parser.add_argument("--lm-style-override", default=None)
 
     parser.add_argument("--model-preset", choices=preset_choices(), default=None)
     parser.add_argument("--model-id", default=None)
@@ -462,6 +474,12 @@ def _apply_chat_prompt(
                 rec.prompt,
                 list(rec.choices),
             )
+        elif rec.prompt_style == "livecodebench_codegen":
+            if num_repetition != 1:
+                raise SystemExit(
+                    "LiveCodeBench prompt formatting does not support num_repetition != 1."
+                )
+            prompt_text = rec.prompt
         else:
             raise SystemExit(f"Unsupported prompt_style '{rec.prompt_style}'.")
         formatted.append(
@@ -482,6 +500,10 @@ def _load_task_records(
     prompt_field: str,
     task_kind: str,
     seed: int,
+    rollout_model_id: str,
+    livecodebench_repo: str,
+    release_version: str,
+    lm_style_override: str | None,
 ) -> list[SampleRecord]:
     if task_kind == "math_freeform":
         return load_prompt_records(spec, prompt_field)
@@ -508,6 +530,32 @@ def _load_task_records(
                 choices=tuple(options),
             )
             for record, options, _gold_answer, _gold_index in raw_records
+        ]
+    if task_kind == "livecodebench_codegen":
+        if not livecodebench_repo:
+            raise SystemExit(
+                "--livecodebench-repo is required when --task-kind=livecodebench_codegen."
+            )
+        benchmark, format_prompt = livecodebench_codegen.load_benchmark(
+            livecodebench_repo,
+            release_version,
+        )
+        prompt_records, _lm_style = livecodebench_codegen.build_prompts(
+            benchmark,
+            format_prompt,
+            repo_path=livecodebench_repo,
+            model_id=rollout_model_id,
+            lm_style_override=lm_style_override,
+            max_samples=spec.max_samples,
+        )
+        return [
+            SampleRecord(
+                sample_id=idx,
+                prompt=prompt,
+                source_split=spec.split,
+                prompt_style="livecodebench_codegen",
+            )
+            for idx, (_question_id, prompt) in enumerate(prompt_records)
         ]
     raise SystemExit(f"Unsupported --task-kind '{task_kind}'.")
 
@@ -567,6 +615,8 @@ def _resolve_splits(
     args: argparse.Namespace,
     train_spec: DatasetSpec,
     test_spec: DatasetSpec | None,
+    *,
+    rollout_model_id: str,
 ) -> tuple[list[SampleRecord], list[SampleRecord], str]:
     if test_spec is None:
         merged_records = _load_task_records(
@@ -574,6 +624,10 @@ def _resolve_splits(
             prompt_field=args.prompt_field,
             task_kind=str(args.task_kind),
             seed=args.seed,
+            rollout_model_id=rollout_model_id,
+            livecodebench_repo=str(args.livecodebench_repo),
+            release_version=str(args.release_version),
+            lm_style_override=args.lm_style_override,
         )
         train_records, test_records = split_records(
             merged_records,
@@ -589,6 +643,10 @@ def _resolve_splits(
             prompt_field=args.prompt_field,
             task_kind=str(args.task_kind),
             seed=args.seed,
+            rollout_model_id=rollout_model_id,
+            livecodebench_repo=str(args.livecodebench_repo),
+            release_version=str(args.release_version),
+            lm_style_override=args.lm_style_override,
         )
         train_records, test_records = split_records(
             merged_records,
@@ -612,6 +670,10 @@ def _resolve_splits(
                 prompt_field=args.prompt_field,
                 task_kind=str(args.task_kind),
                 seed=args.seed,
+                rollout_model_id=rollout_model_id,
+                livecodebench_repo=str(args.livecodebench_repo),
+                release_version=str(args.release_version),
+                lm_style_override=args.lm_style_override,
             )
             if len(merged_records) < requested_total:
                 raise SystemExit(
@@ -633,6 +695,10 @@ def _resolve_splits(
             prompt_field=args.prompt_field,
             task_kind=str(args.task_kind),
             seed=args.seed,
+            rollout_model_id=rollout_model_id,
+            livecodebench_repo=str(args.livecodebench_repo),
+            release_version=str(args.release_version),
+            lm_style_override=args.lm_style_override,
         )
         train_records, test_records = split_records(
             merged_records,
@@ -655,12 +721,20 @@ def _resolve_splits(
         prompt_field=args.prompt_field,
         task_kind=str(args.task_kind),
         seed=args.seed,
+        rollout_model_id=rollout_model_id,
+        livecodebench_repo=str(args.livecodebench_repo),
+        release_version=str(args.release_version),
+        lm_style_override=args.lm_style_override,
     )
     test_records = _load_task_records(
         test_spec,
         prompt_field=args.prompt_field,
         task_kind=str(args.task_kind),
         seed=args.seed,
+        rollout_model_id=rollout_model_id,
+        livecodebench_repo=str(args.livecodebench_repo),
+        release_version=str(args.release_version),
+        lm_style_override=args.lm_style_override,
     )
     if not train_records:
         raise SystemExit("Train split is empty.")
@@ -1526,7 +1600,12 @@ def main() -> None:
             flush=True,
         )
 
-    train_records, test_records, split_source = _resolve_splits(args, train_spec, test_spec)
+    train_records, test_records, split_source = _resolve_splits(
+        args,
+        train_spec,
+        test_spec,
+        rollout_model_id=rollout_cfg.model_id,
+    )
     target_desc = str(target_spec["name"])
     if target_spec["kind"] == "binary" and target_spec.get("horizon") is not None:
         target_desc = f"{target_desc}@{target_spec['horizon']}"
@@ -1854,14 +1933,18 @@ def main() -> None:
         "prompt_field": args.prompt_field,
         "prompt_template": {
             "source": (
-                "loop_probe.adapters.multiple_choice_gpqa.build_mcq_prompt"
-                if args.task_kind == "multiple_choice_gpqa"
+            "loop_probe.adapters.multiple_choice_gpqa.build_mcq_prompt"
+            if args.task_kind == "multiple_choice_gpqa"
+            else (
+                "loop_probe.adapters.multiple_choice_mmlupro.build_mcq_prompt"
+                if args.task_kind == "multiple_choice_mmlupro"
                 else (
-                    "loop_probe.adapters.multiple_choice_mmlupro.build_mcq_prompt"
-                    if args.task_kind == "multiple_choice_mmlupro"
+                    "loop_probe.adapters.livecodebench_codegen.build_prompts"
+                    if args.task_kind == "livecodebench_codegen"
                     else "utils.build_prompt"
                 )
-            ),
+            )
+        ),
             "num_repetition": 1,
             "chat_template": True,
         },

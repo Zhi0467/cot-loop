@@ -18,6 +18,7 @@ This directory contains SLURM workflows for the CoT loop detector project.
 - rollout `tp/dp` comes from `src/loop_probe/configs.py` preset defaults
 - optional rollout concurrency override: `MAX_NUM_SEQS=...`
 - explicit rollout/runtime overrides: `MODEL_ID=...`, `TEMPERATURE=...`, `TP=...`, `DP=...`, `MAX_MODEL_LEN=...`, `MAX_NUM_BATCHED_TOKENS=...`
+- LiveCodeBench prompt inputs: `LIVECODEBENCH_REPO=...`, `RELEASE_VERSION=release_v6`, optional `LM_STYLE_OVERRIDE=...`
 - optional repeated-rollout override for prompt-level targets: `NUM_GENERATIONS=...`
 - optional prefill throughput override (single GPU): `PREFILL_BATCH_SIZE=...` (default: `32`)
 - optional rollout-completion feature throughput override: `COMPLETION_BATCH_SIZE=...` (default: `1`)

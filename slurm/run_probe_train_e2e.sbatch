@@ -79,6 +79,9 @@ if [[ -z "${MODEL_TAG}" ]]; then
 fi
 PROMPT_FIELD="${PROMPT_FIELD:-problem}"
 TASK_KIND="${TASK_KIND:-math_freeform}"
+LIVECODEBENCH_REPO="${LIVECODEBENCH_REPO:-}"
+RELEASE_VERSION="${RELEASE_VERSION:-release_v6}"
+LM_STYLE_OVERRIDE="${LM_STYLE_OVERRIDE:-}"
 
 TRAIN_DATASET="${TRAIN_DATASET:-HuggingFaceH4/MATH-500}"
 TRAIN_CONFIG="${TRAIN_CONFIG:-}"
@@ -157,6 +160,7 @@ fi
 echo "[probe-e2e] model_preset=${MODEL_PRESET} train=${TRAIN_DATASET}:${TRAIN_SPLIT} test=${TEST_DATASET}:${TEST_SPLIT}"
 echo "[probe-e2e] model_id=${MODEL_ID}"
 echo "[probe-e2e] task_kind=${TASK_KIND}"
+echo "[probe-e2e] livecodebench_repo=${LIVECODEBENCH_REPO} release_version=${RELEASE_VERSION} lm_style_override=${LM_STYLE_OVERRIDE}"
 echo "[probe-e2e] probe_preset=${PROBE_PRESET}"
 echo "[probe-e2e] feature_pooling=${FEATURE_POOLING} feature_layer=${FEATURE_LAYER}"
 echo "[probe-e2e] feature_key=${FEATURE_KEY}"
@@ -171,6 +175,8 @@ BUILD_ARGS=(
   --train-split "${TRAIN_SPLIT}"
   --prompt-field "${PROMPT_FIELD}"
   --task-kind "${TASK_KIND}"
+  --livecodebench-repo "${LIVECODEBENCH_REPO}"
+  --release-version "${RELEASE_VERSION}"
   --split-ratio "${SPLIT_RATIO}"
   --seed "${DATASET_SEED}"
   --loop-n "${LOOP_N}"
@@ -237,6 +243,9 @@ if [[ -n "${FEATURE_KEY}" ]]; then
 fi
 if [[ -n "${PROFILE_TARGET}" ]]; then
   BUILD_ARGS+=(--profile-target "${PROFILE_TARGET}")
+fi
+if [[ -n "${LM_STYLE_OVERRIDE}" ]]; then
+  BUILD_ARGS+=(--lm-style-override "${LM_STYLE_OVERRIDE}")
 fi
 
 echo "[probe-e2e] validating/reusing dataset at ${OUT_DATA_DIR} with dataset_seed=${DATASET_SEED}"

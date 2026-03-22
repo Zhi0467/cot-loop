@@ -13,7 +13,7 @@ The repo now has a first runnable path for the current prompt-level target plan:
 - first target family implemented as `s_t = P(L / E >= t)` with `--profile-tail-threshold` (use `0.9` for `s_0.9`);
 - binary-majority head implemented as `majority_s_t = 1[\sum_r 1[L_r / E >= t] > n / 2]`;
 - second single-head objective implemented as `mean_relative_length = E[L / E]` across repeated rollouts;
-- task-aware prompt formatting via `--task-kind`, so `GPQA` and `MMLU-Pro` use their multiple-choice prompt templates instead of the boxed-answer math prompt;
+- task-aware prompt formatting via `--task-kind`, so `GPQA` and `MMLU-Pro` use their multiple-choice prompt templates, while `LiveCodeBench` can reuse its codegen prompt builder through `--livecodebench-repo`;
 - prompt-profile diagnostics written to `diagnostics/train_prompt_profile.jsonl` and `diagnostics/test_prompt_profile.jsonl`;
 - one combined repeated-rollout archive written to `diagnostics/prompt_rollout_archive.jsonl`, with prompt text, prompt token IDs, rollout texts, and the precomputed aggregate labels/metadata for each prompt;
 - trainer/eval support for probability targets with Brier / MAE / Spearman / top-bucket capture metrics;
@@ -179,6 +179,7 @@ python scripts/build_probe_dataset.py \
 
 - `MODEL_ID=Qwen/Qwen3-1.7B` for non-preset models
 - `TASK_KIND=multiple_choice_gpqa`
+- `LIVECODEBENCH_REPO=/path/to/LiveCodeBench` plus `RELEASE_VERSION=release_v6` when `TASK_KIND=livecodebench_codegen`
 - `TEMPERATURE=0.2`
 - `MAX_MODEL_LEN=<ctx>`
 - `TP=...`, `DP=...`, `MAX_NUM_BATCHED_TOKENS=...`
