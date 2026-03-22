@@ -453,6 +453,185 @@ def continuous_projection_metrics(values: np.ndarray, coords: np.ndarray) -> dic
     }
 
 
+def binary_roc_auc(y_true: np.ndarray, scores: np.ndarray) -> float | None:
+    positives = int(np.sum(y_true == 1))
+    negatives = int(np.sum(y_true == 0))
+    if positives < 1 or negatives < 1:
+        return None
+    ranks = rankdata(scores.astype(float))
+    positive_ranks = float(np.sum(ranks[y_true == 1]))
+    numerator = positive_ranks - (positives * (positives + 1) / 2.0)
+    denominator = float(positives * negatives)
+    if denominator <= 0.0:
+        return None
+    return float(numerator / denominator)
+
+
+def binary_pr_auc(y_true: np.ndarray, scores: np.ndarray) -> float | None:
+    positives = int(np.sum(y_true == 1))
+    if positives < 1:
+        return None
+    order = np.argsort(-scores, kind="mergesort")
+    ranked_true = y_true[order].astype(int)
+    tp = np.cumsum(ranked_true)
+    fp = np.cumsum(1 - ranked_true)
+    precision = tp / np.maximum(tp + fp, 1)
+    recall = tp / float(positives)
+    recall_prev = np.concatenate(([0.0], recall[:-1]))
+    return float(np.sum((recall - recall_prev) * precision))
+
+
+def binary_threshold_metrics(y_true: np.ndarray, predictions: np.ndarray) -> dict[str, float | None]:
+    y_true = y_true.astype(int)
+    predictions = predictions.astype(int)
+    tp = int(np.sum((y_true == 1) & (predictions == 1)))
+    tn = int(np.sum((y_true == 0) & (predictions == 0)))
+    fp = int(np.sum((y_true == 0) & (predictions == 1)))
+    fn = int(np.sum((y_true == 1) & (predictions == 0)))
+
+    def safe_div(numerator: float, denominator: float) -> float:
+        if denominator <= 0.0:
+            return 0.0
+        return float(numerator / denominator)
+
+    positive_precision = safe_div(tp, tp + fp)
+    positive_recall = safe_div(tp, tp + fn)
+    negative_precision = safe_div(tn, tn + fn)
+    negative_recall = safe_div(tn, tn + fp)
+    positive_f1 = (
+        0.0
+        if (positive_precision + positive_recall) <= 0.0
+        else float(2.0 * positive_precision * positive_recall / (positive_precision + positive_recall))
+    )
+    negative_f1 = (
+        0.0
+        if (negative_precision + negative_recall) <= 0.0
+        else float(2.0 * negative_precision * negative_recall / (negative_precision + negative_recall))
+    )
+    macro_f1 = float((positive_f1 + negative_f1) / 2.0)
+    return {
+        "accuracy": float(np.mean(predictions == y_true)),
+        "macro_f1": macro_f1,
+        "positive_precision": positive_precision,
+        "positive_recall": positive_recall,
+        "positive_f1": positive_f1,
+        "prevalence": float(np.mean(y_true)),
+    }
+
+
+def select_orientation_and_threshold(
+    y_train: np.ndarray,
+    raw_scores: np.ndarray,
+) -> tuple[np.ndarray, str, float]:
+    orientations = [
+        ("higher_is_more_positive", raw_scores.astype(float)),
+        ("lower_is_more_positive", (-raw_scores).astype(float)),
+    ]
+    best_orientation: tuple[np.ndarray, str] | None = None
+    best_orientation_key: tuple[float, float] | None = None
+    for direction, scores in orientations:
+        pr_auc = binary_pr_auc(y_train, scores)
+        roc_auc = binary_roc_auc(y_train, scores)
+        key = (
+            -math.inf if pr_auc is None else float(pr_auc),
+            -math.inf if roc_auc is None else float(roc_auc),
+        )
+        if best_orientation_key is None or key > best_orientation_key:
+            best_orientation_key = key
+            best_orientation = (scores, direction)
+    if best_orientation is None:
+        raise RuntimeError("Failed to choose score orientation.")
+
+    oriented_scores, direction = best_orientation
+    thresholds = np.unique(oriented_scores)
+    candidate_thresholds = [float(value) for value in thresholds.tolist()]
+    candidate_thresholds.append(float(np.max(oriented_scores)) + 1.0)
+
+    best_threshold = candidate_thresholds[0]
+    best_metrics: dict[str, float | None] | None = None
+    best_key: tuple[float, float, float] | None = None
+    for threshold in candidate_thresholds:
+        predictions = (oriented_scores >= threshold).astype(int)
+        metrics = binary_threshold_metrics(y_train, predictions)
+        key = (
+            -math.inf if metrics["macro_f1"] is None else float(metrics["macro_f1"]),
+            -math.inf if metrics["positive_f1"] is None else float(metrics["positive_f1"]),
+            -math.inf if metrics["accuracy"] is None else float(metrics["accuracy"]),
+        )
+        if best_key is None or key > best_key:
+            best_key = key
+            best_metrics = metrics
+            best_threshold = threshold
+
+    if best_metrics is None:
+        raise RuntimeError("Failed to select threshold.")
+    return oriented_scores, direction, float(best_threshold)
+
+
+def summarize_binary_baseline(
+    y_train: np.ndarray,
+    train_values: np.ndarray,
+    y_test: np.ndarray,
+    test_values: np.ndarray,
+) -> dict[str, Any]:
+    train_unique = np.unique(train_values.astype(float))
+    test_unique = np.unique(test_values.astype(float))
+    summary: dict[str, Any] = {
+        "train_unique_values": int(len(train_unique)),
+        "test_unique_values": int(len(test_unique)),
+    }
+    if len(train_unique) <= 1:
+        summary["constant_train_value"] = float(train_unique[0])
+        summary["selection_rule"] = (
+            "orientation=max(train_pr_auc), tie_break=max(train_roc_auc); "
+            "threshold=max(train_macro_f1), tie_break=max(train_positive_f1), max(train_accuracy)"
+        )
+        constant_candidates = []
+        for prediction_value in (0, 1):
+            train_predictions = np.full_like(y_train, prediction_value)
+            train_metrics = binary_threshold_metrics(y_train, train_predictions)
+            key = (
+                -math.inf if train_metrics["macro_f1"] is None else float(train_metrics["macro_f1"]),
+                -math.inf if train_metrics["positive_f1"] is None else float(train_metrics["positive_f1"]),
+                -math.inf if train_metrics["accuracy"] is None else float(train_metrics["accuracy"]),
+            )
+            constant_candidates.append((key, prediction_value, train_metrics))
+        _best_key, prediction_value, train_metrics = max(constant_candidates, key=lambda item: item[0])
+        test_predictions = np.full_like(y_test, prediction_value)
+        summary["constant_prediction"] = int(prediction_value)
+        summary["train"] = {**train_metrics, "pr_auc": None, "roc_auc": None}
+        summary["test"] = {
+            **binary_threshold_metrics(y_test, test_predictions),
+            "pr_auc": None,
+            "roc_auc": None,
+        }
+        return summary
+
+    train_scores, direction, threshold = select_orientation_and_threshold(y_train, train_values)
+    test_scores = test_values.astype(float) if direction == "higher_is_more_positive" else (-test_values).astype(float)
+
+    train_predictions = (train_scores >= threshold).astype(int)
+    test_predictions = (test_scores >= threshold).astype(int)
+
+    summary["direction"] = direction
+    summary["threshold"] = float(threshold)
+    summary["selection_rule"] = (
+        "orientation=max(train_pr_auc), tie_break=max(train_roc_auc); "
+        "threshold=max(train_macro_f1), tie_break=max(train_positive_f1), max(train_accuracy)"
+    )
+    summary["train"] = {
+        **binary_threshold_metrics(y_train, train_predictions),
+        "pr_auc": binary_pr_auc(y_train, train_scores),
+        "roc_auc": binary_roc_auc(y_train, train_scores),
+    }
+    summary["test"] = {
+        **binary_threshold_metrics(y_test, test_predictions),
+        "pr_auc": binary_pr_auc(y_test, test_scores),
+        "roc_auc": binary_roc_auc(y_test, test_scores),
+    }
+    return summary
+
+
 def detect_dataset_name(manifest: dict[str, Any]) -> str:
     spec = manifest.get("train_spec") or manifest.get("test_spec") or {}
     dataset = spec.get("dataset")
@@ -705,6 +884,46 @@ def main() -> None:
         metrics["cluster_r2"] = continuous_cluster_r2(values, cluster_array)
         continuous_metrics[label_name] = metrics
 
+    leakage_baselines: dict[str, Any] = {}
+    target_values = np.array([float(row["target_value"]) for row in prompt_rows], dtype=float)
+    unique_targets = sorted(set(target_values.tolist()))
+    if set(unique_targets).issubset({0.0, 1.0}):
+        split_arrays = {
+            split_name: np.array(
+                [row for row in prompt_rows if row["split"] == split_name],
+                dtype=object,
+            )
+            for split_name in ("train", "test")
+        }
+        if len(split_arrays["train"]) and len(split_arrays["test"]):
+            y_train = np.array(
+                [int(float(row["target_value"])) for row in split_arrays["train"]],
+                dtype=int,
+            )
+            y_test = np.array(
+                [int(float(row["target_value"])) for row in split_arrays["test"]],
+                dtype=int,
+            )
+            baseline_fields = {
+                "prompt_token_count": "prompt_token_count",
+                "effective_max_tokens": "effective_max_tokens",
+            }
+            for baseline_name, field_name in baseline_fields.items():
+                train_values = np.array(
+                    [float(row[field_name]) for row in split_arrays["train"]],
+                    dtype=float,
+                )
+                test_values = np.array(
+                    [float(row[field_name]) for row in split_arrays["test"]],
+                    dtype=float,
+                )
+                leakage_baselines[baseline_name] = summarize_binary_baseline(
+                    y_train,
+                    train_values,
+                    y_test,
+                    test_values,
+                )
+
     summary = {
         "data_dir": str(data_dir),
         "dataset_name": detect_dataset_name(manifest),
@@ -742,6 +961,7 @@ def main() -> None:
         },
         "binary_label_alignment": binary_metrics,
         "continuous_signal": continuous_metrics,
+        "leakage_baselines": leakage_baselines,
     }
     write_json(out_dir / "projection_summary.json", summary)
 

@@ -1,6 +1,6 @@
 # Roadmap - CoT Loop Detection
 
-Last updated: 2026-03-22 05:02 UTC
+Last updated: 2026-03-22 05:21 UTC
 
 Scope:
 - Build and validate a probe pipeline for CoT loop detection across prefill and completion feature views.
@@ -60,6 +60,7 @@ Activity log:
 - 2026-03-22 00:52 UTC: added the dedicated prompt-level projection path requested in-thread. `export_prompt_profile_projection.py` now keeps one point per prompt, recomputes prompt-majority and `s_t` labels directly from `diagnostics/prompt_rollout_archive.jsonl`, and scores each label against one unsupervised KMeans partition on the shared PCA plane. `run_prompt_profile_projection.sbatch` launches the whole build/export path on `1` GPU. A saved-GPQA validation export already shows that correctness aligns with the prompt clusters much more than prompt-majority loop / cap labels, while `s_0.5` and `s_0.6` are almost unchanged on that slice. The corrected all-dataset serial chain is now `1539`-`1543`.
 - 2026-03-22 05:02 UTC: the resumed one-GPU probe queue exposed a second hidden config bug: prompt-profile builders were on `LOOP_K=20` while `run_probe_train_e2e.sbatch` still defaulted to `LOOP_K=10`, so the supposed reuse jobs were silently regenerating rollout bundles. The live queue was rebuilt with explicit `LOOP_K=20` throughout, one stale `s09` scratch worktree was pruned, and the corrected GPQA last-layer run immediately reused the cached dataset and finished in `17s` with `PR-AUC 0.2262`, `ROC-AUC 0.8684`, `F1 0.6571`, `acc 0.85` on the `40`-prompt split.
 - 2026-03-22 05:04 UTC: the corrected GPQA ensemble finished too, so the first arm-to-arm comparison on the same reused dataset now exists. On the `40`-prompt GPQA split (`5%` positives), last-layer reached `PR-AUC 0.2262` / `ROC-AUC 0.8684` / `macro-F1 0.6571`, while the per-layer vote ensemble reached `PR-AUC 0.6667` / `ROC-AUC 0.9671` / `macro-F1 0.5671`. The ensemble is materially better on ranking metrics, while the last-layer arm still looks better on thresholded metrics in the tiny-positive regime.
+- 2026-03-22 05:21 UTC: the projection/export path now writes the leakage baselines directly into each prompt-profile summary rather than leaving them as an external reminder. `export_prompt_profile_projection.py` now scores prompt-token-count and effective-budget controls using train-chosen orientation and threshold, and the patched exporter was synced onto the live remote worktrees before the running `AIME` / `MATH-500` jobs reach their export phase. The refreshed `GPQA` summary makes one point explicit: on this `max_tokens=30000` surface, effective budget is constant at `30000` for every prompt and therefore useless as a ranking baseline, while prompt length is weak (`test PR-AUC 0.0817`, `ROC-AUC 0.5526`) compared with both finished probes.
 
 ## Milestone 5 - Deployment readiness
 Status: future (set 2026-03-13 13:05 UTC)
