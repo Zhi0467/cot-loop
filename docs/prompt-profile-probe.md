@@ -22,10 +22,10 @@ The repo now has one runnable prompt-level repeated-rollout path for prefill pro
 
 ## Current Recommendation
 
-The next prompt-profile heads should be treated in two tiers:
+The next prompt-profile heads should be treated as a two-head default:
 
 - current shipped utility head: `mean_relative_length = E[L / E]`;
-- cleaner loop-prox study head: `p_loop = E[1{rollout loops}]`;
+- default loop-prox companion head: `p_loop = E[1{rollout loops}]`;
 - keep `p_cap` diagnostic-first, not the headline target;
 - keep `majority_s_t` as a sparse pilot label, not the main objective.
 
@@ -35,7 +35,9 @@ Why this is the current recommendation:
 - `majority_s_0.5` does show real activation signal, but with `n = 4` it throws away most of the rollout-count information and on `AIME` is already mostly explained by prompt length;
 - `p_loop` is already computed in the archive, stays closer to the failure mode we care about than raw length, and on both saved `GPQA` and `AIME` slices it is less prompt-length-correlated than `mean_relative_length`;
 - the 2026-03-22 direct-head relabel check on the same `GPQA` archive showed that `p_loop` is not yet the most reliable *useful* head under the current training/selection rules: its ensemble run had a decent early ranking epoch (`eval Spearman 0.320`, top-20% capture `0.364`) but the default Brier-first checkpoint rule drifted toward near-constant predictions;
+- the same-day same-archive `AIME` relabel check showed that `p_loop` should not be dropped because of the GPQA read: the ensemble reached `eval Spearman 0.538` at the Brier-selected checkpoint and `0.584` at the best ranking epoch, with `top-20% capture = 0.8` on that slice;
 - the same relabel check showed that `mean_relative_length` is currently the stronger deployable head on this surface: the ensemble reached `eval Spearman 0.433` at the default MSE-selected checkpoint, and `0.658` at the best ranking epoch, both above the prompt-length-only baseline on that test split.
+- the corresponding `AIME` relabel check still says `mean_relative_length` is the steadier utility head under the default selector (`ensemble MSE 0.0461`, `Spearman 0.629`), but it is much more prompt-length-shaped than `p_loop` on that slice.
 
 ## Scope
 
@@ -51,8 +53,9 @@ This path is still intentionally narrow:
 
 Target:
 
-- ship `mean_relative_length = E[L / E]` first;
-- run `p_loop = E[1{loop}]` in parallel when the goal is cleaner loop-prox supervision rather than immediate utility.
+- train `mean_relative_length = E[L / E]` and `p_loop = E[1{loop}]` from the same repeated-rollout archive by default;
+- use `mean_relative_length` as the shipped utility score;
+- keep `p_loop` as the default failure-prox companion score rather than a dropped ablation.
 
 Decode policy:
 
