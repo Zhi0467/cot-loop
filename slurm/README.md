@@ -7,6 +7,7 @@ This directory contains SLURM workflows for the CoT loop detector project.
 - `run_vllm_generate.sbatch`: Generate trajectories used for loop-label collection and detector analysis.
 - `analyze_prefill_stability.sbatch`: Prefill-loop sanity check and stability checks with greedy rollouts.
 - `run_probe_train_e2e.sbatch`: End-to-end probe pipeline for the canonical stacked prefill dataset (build + probe training, including optional multi-seed runs).
+- `run_prompt_profile_projection.sbatch`: One-GPU prompt-profile visualization path (build + prompt-level projection export, with optional render when `matplotlib` is available).
 - `run_k5_threeview_dataset.sbatch`: Historical multi-view dataset build for the k=5 / max_tokens=15000 ablation study.
 - `run_k5_threeview_ablation.sbatch`: Historical MLP sweep over the k=5 three-view ablation dataset.
 
@@ -106,6 +107,43 @@ PROMPT_FIELD=Question \
 TRAIN_EXTRA_ARGS="--classifier-mode last_layer --classifier-layer -1" \
 SCORE_RULE=mean_prob \
 sbatch slurm/run_probe_train_e2e.sbatch
+```
+
+## Prompt-Level Projection Defaults
+
+`run_prompt_profile_projection.sbatch` defaults to:
+
+- `#SBATCH --gres=gpu:1`
+- prompt-profile build only (no probe training)
+- `PROFILE_TAIL_THRESHOLD=0.5` as the primary saved majority label
+- additional export thresholds `0.5 0.6 0.9`
+- prompt-level projection outputs under `OUT_PROJECTION_DIR/export` and figures under `OUT_PROJECTION_DIR/figures`
+
+Example: build and export the one-dot-per-prompt GPQA view:
+
+```bash
+MODEL_ID=Qwen/Qwen3-1.7B \
+TASK_KIND=multiple_choice_gpqa \
+TRAIN_DATASET=data/gpqa_diamond.csv \
+TEST_DATASET=data/gpqa_diamond.csv \
+TRAIN_SPLIT=train \
+TEST_SPLIT=train \
+TRAIN_MAX_SAMPLES=158 \
+TEST_MAX_SAMPLES=40 \
+PROMPT_FIELD=Question \
+NUM_GENERATIONS=4 \
+TEMPERATURE=0.2 \
+MAX_TOKENS=30000 \
+MAX_MODEL_LEN=40960 \
+TP=1 \
+DP=1 \
+PREFILL_BATCH_SIZE=8 \
+MAX_NUM_SEQS=4 \
+MAX_NUM_BATCHED_TOKENS=1024 \
+OUT_DATA_DIR=outputs/prompt_profile_projection_gpqa/data \
+OUT_PROJECTION_DIR=outputs/prompt_profile_projection_gpqa \
+FIGURE_LABEL=GPQA \
+sbatch slurm/run_prompt_profile_projection.sbatch
 ```
 
 ## Optional Trajectory Generation

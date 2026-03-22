@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-03-21 23:53 UTC
+Last updated: 2026-03-22 00:52 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -10,6 +10,7 @@ Current docs and references:
 - Project roadmap: ../roadmap.md
 - Terminal-objective design note: terminal-objective.md
 - Prompt-profile implementation note: prompt-profile-probe.md
+- Prompt-level projection note: prompt-profile-projection.md
 - Prefill-activation visualization note: prefill-activation-visualization.md
 - Rollout text visualization note: rollout-text-visualization.md
 - Consolidated findings: ../outputs/pr2_experiment_findings_consolidated.md
@@ -31,3 +32,5 @@ Current live status note:
 - The GPQA rollout-text visualization note now has a binary-figure follow-up on top of the original pilot: the raw geometry still shows strong prompt dominance, quantified by same-prompt `5`-NN purity dropping from `0.934` to `0.444` after prompt-centering; the clearest visible binary split remains `stop` vs `length`, while exact loops still appear as a sparse subset inside the broader length-hit cloud.
 - A larger-prompt GPQA rerun (`48` prompts x `4` rollouts) was attempted on 2026-03-19, but the shared GPU node queued that bounded job for `2026-03-21` and it was canceled instead of being left unattended. The current published visualization therefore remains the improved binary view on the checked-in `16 x 10` slice.
 - A corrected activation-based GPQA visualization now exists on top of the finished 2026-03-21 prompt-profile pilot. It uses the saved prefill feature shards plus the rollout/profile JSONLs rather than rollout text, projects the final-layer last-prefill-token activations with one shared PCA plane, and shows that correctness is the strongest large-scale gradient while `max_length` risk appears in several prompt islands rather than one clean failure lobe.
+- There is now a separate prompt-level projection path for the repeated-rollout prompt-profile bundles. It keeps one point per prompt, can recolor that same plane by prompt-majority labels and threshold-derived rates (`s_0.5`, `s_0.6`, `s_0.9`), and adds a quantitative separability table from one unsupervised cluster fit on the 2D plane. The implementation note is `prompt-profile-projection.md`.
+- The old `2`-GPU all-dataset queue was canceled to match the newer `1`-GPU ceiling from the thread. The corrected serial visualization chain now runs through `slurm/run_prompt_profile_projection.sbatch`; the first GPQA validation export already shows that correctness aligns with the prompt clusters much more than prompt-majority loop / cap labels, and that `s_0.5` and `s_0.6` are nearly indistinguishable on that saved slice.
