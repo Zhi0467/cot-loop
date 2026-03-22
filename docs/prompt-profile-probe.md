@@ -1,6 +1,6 @@
 # Prompt-Profile Probe Path
 
-Last updated: 2026-03-22 07:30 UTC
+Last updated: 2026-03-22 08:22 UTC
 
 ## What Landed
 
@@ -75,6 +75,14 @@ Evaluation boundary:
 - for `mean_relative_length`, prefer the ensemble view and do not rely only on MSE when the downstream goal is ranking or top-bucket capture;
 - for `p_loop`, treat the current default Brier-first checkpoint rule as provisional because it can hide the better ranking epoch on small pilot splits;
 - keep `p_cap`, correctness, and the prompt-majority controls as downstream diagnostics on the same prompts.
+
+Checkpoint selection:
+
+- keep the current loss-best checkpoint as `best_loss` for calibration-style reporting;
+- add a ranking-oriented `best_rank` selector on a prompt-disjoint validation carveout from train;
+- for `mean_relative_length`, restrict to epochs within `10%` of the best validation MSE, then pick the epoch with the best validation Spearman; break ties with better validation top-20% capture, then lower validation MSE;
+- for `p_loop`, restrict to epochs within `10%` of the best validation Brier score, then pick the epoch with the best validation top-20% capture; break ties with better validation Spearman, then lower validation Brier;
+- only treat a checkpoint as shipped-useful if it beats the stronger non-degenerate metadata baseline on that same validation slice in the head's primary ranking metric.
 
 Example dataset build:
 
@@ -207,4 +215,4 @@ second feature-extraction pass.
 
 ## Validation Caveat
 
-The pure-Python target aggregation path has been smoke-checked locally, and the archive-relabel path has now been exercised remotely on the saved `GPQA` prompt-profile dataset. The remaining open issue is not target math or relabel plumbing; it is which checkpoint-selection rule best matches the desired notion of usefulness for prompt-level heads on small pilot splits.
+The pure-Python target aggregation path has been smoke-checked locally, and the archive-relabel path has now been exercised remotely on the saved `GPQA` and `AIME` prompt-profile datasets. The remaining open issue is no longer target math or relabel plumbing; it is making the shipped checkpoint rule match the intended downstream use. Small pilot splits can let `min(Brier)` / `min(MSE)` choose nearly constant checkpoints even when an earlier epoch has much stronger ranking utility.
