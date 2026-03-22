@@ -1,6 +1,6 @@
 # Roadmap - CoT Loop Detection
 
-Last updated: 2026-03-22 05:47 UTC
+Last updated: 2026-03-22 05:53 UTC
 
 Scope:
 - Build and validate a probe pipeline for CoT loop detection across prefill and completion feature views.
@@ -63,6 +63,7 @@ Activity log:
 - 2026-03-22 05:21 UTC: the projection/export path now writes the leakage baselines directly into each prompt-profile summary rather than leaving them as an external reminder. `export_prompt_profile_projection.py` now scores prompt-token-count and effective-budget controls using train-chosen orientation and threshold, and the patched exporter was synced onto the live remote worktrees before the running `AIME` / `MATH-500` jobs reach their export phase. The refreshed `GPQA` summary makes one point explicit: on this `max_tokens=30000` surface, effective budget is constant at `30000` for every prompt and therefore useless as a ranking baseline, while prompt length is weak (`test PR-AUC 0.0817`, `ROC-AUC 0.5526`) compared with both finished probes.
 - 2026-03-22 05:42 UTC: the resumed sweep was still leaving GPUs `3` and `5` idle even though `MMLU-Pro` and `LiveCodeBench` were independent of the live `AIME` / `MATH-500` builders. I split those datasets onto their own pinned lanes, hit one immediate launch-surface mistake (`1615` / `1618` failed because the ad hoc submissions missed `CONDA_ENV=swe311`, and the dependent train jobs still carried the launcher default `--gres=gpu:8`), then corrected it in the next requeue. The live node is now a real four-lane run: `1561` (`AIME`) on GPU `1`, `1609` (`MATH-500`) on GPU `0`, `1621` (`MMLU-Pro`) on GPU `3`, and `1624` (`LiveCodeBench`) on GPU `5`; `MMLU-Pro` is already through train prefill and into test prefill, while `LiveCodeBench` is already at `350 / 640` train-prefill prompts on the conservative batch-`2` path.
 - 2026-03-22 05:47 UTC: added a small analysis helper for the live prompt-majority pilot, `scripts/summarize_prompt_majority_pilot.py`. It scans one output root for `prompt_profile_projection_*` bundles plus matching `prompt_majority05_*_{last_layer,ensemble}_seed*` runs, then emits one dataset/seed summary row carrying the leakage baselines and the learned probe metrics together. A real GPQA fixture check already reproduces the known `PR-AUC` table (`0.0817` prompt length, `0.2262` last-layer, `0.6667` ensemble), so once the long builders land the cross-dataset scoreboard can be regenerated without another manual merge pass.
+- 2026-03-22 05:53 UTC: the first GPU-`5` `LiveCodeBench` retry (`1624`) turned out not to be a resource problem. It finished all prefill (`640 / 160`) and then failed exactly at grouped-rollout startup because I had lowered `MAX_NUM_SEQS` to `2` while still using `NUM_GENERATIONS=4`; repeated-rollout mode enforces `max_num_seqs >= num_generations`. I canceled the dead dependent tails, removed the partial LCB output roots, and requeued the lane as `1627 -> 1629` with `MAX_NUM_SEQS=4` restored and the safer `PREFILL_BATCH_SIZE=2` kept. The overall four-lane node shape is unchanged; only the GPU-`5` lane was recycled.
 
 ## Milestone 5 - Deployment readiness
 Status: future (set 2026-03-13 13:05 UTC)
