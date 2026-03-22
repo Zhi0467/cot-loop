@@ -55,6 +55,9 @@ export XDG_CACHE_HOME="${XDG_CACHE_HOME:-${DEFAULT_CACHE_BASE}}"
 if [[ -z "${VLLM_CACHE_ROOT:-}" ]]; then
   export VLLM_CACHE_ROOT="${DEFAULT_CACHE_BASE}/vllm"
 fi
+if [[ -n "${PINNED_VISIBLE_DEVICES:-}" ]]; then
+  export CUDA_VISIBLE_DEVICES="${PINNED_VISIBLE_DEVICES}"
+fi
 mkdir -p "${HF_HOME}" "${HUGGINGFACE_HUB_CACHE}" "${TRANSFORMERS_CACHE}" "${VLLM_CACHE_ROOT}" "${TORCH_HOME}" "${XDG_CACHE_HOME}"
 
 echo "[prompt-profile-proj] HF_HOME=${HF_HOME}"
@@ -63,6 +66,9 @@ echo "[prompt-profile-proj] TRANSFORMERS_CACHE=${TRANSFORMERS_CACHE}"
 echo "[prompt-profile-proj] VLLM_CACHE_ROOT=${VLLM_CACHE_ROOT}"
 echo "[prompt-profile-proj] TORCH_HOME=${TORCH_HOME}"
 echo "[prompt-profile-proj] XDG_CACHE_HOME=${XDG_CACHE_HOME}"
+if [[ -n "${CUDA_VISIBLE_DEVICES:-}" ]]; then
+  echo "[prompt-profile-proj] CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}"
+fi
 
 MODEL_PRESET="${MODEL_PRESET-}"
 MODEL_ID="${MODEL_ID:-}"
