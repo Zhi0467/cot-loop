@@ -5,7 +5,13 @@ from dataclasses import dataclass
 from collections.abc import Iterable
 
 LABEL_TARGET_CHOICES = ("eventual_loop", "loop_by_horizon")
-PROMPT_PROFILE_TARGET_CHOICES = ("s_tail", "mean_relative_length", "majority_tail")
+PROMPT_PROFILE_TARGET_CHOICES = (
+    "s_tail",
+    "p_loop",
+    "p_cap",
+    "mean_relative_length",
+    "majority_tail",
+)
 
 
 @dataclass(frozen=True)
@@ -193,6 +199,10 @@ def profile_target_name(
         return f"s_{threshold_text}"
     if profile_target == "mean_relative_length":
         return "mean_relative_length"
+    if profile_target == "p_loop":
+        return "p_loop"
+    if profile_target == "p_cap":
+        return "p_cap"
     if profile_target == "majority_tail":
         threshold_text = format(float(tail_threshold), "g")
         return f"majority_s_{threshold_text}"
@@ -211,6 +221,10 @@ def profile_target_value(
         return float(profile["s_tail"])
     if profile_target == "mean_relative_length":
         return float(profile["mean_relative_length"])
+    if profile_target == "p_loop":
+        return float(profile["p_loop"])
+    if profile_target == "p_cap":
+        return float(profile["p_cap"])
     if profile_target == "majority_tail":
         return float(profile["majority_tail"])
     raise ValueError(

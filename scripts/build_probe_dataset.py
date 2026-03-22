@@ -179,7 +179,9 @@ def _parse_args() -> argparse.Namespace:
         default=0.9,
         help=(
             "Tail threshold used by prompt-profile targets. "
-            "For probability targets the emitted scalar is s_t = P(L / E >= t); "
+            "For probability targets it applies when "
+            "--profile-target=s_tail and the emitted scalar is s_t = P(L / E >= t); "
+            "it is ignored by direct rate targets such as p_loop / p_cap. "
             "for prompt-profile binary targets it defines the per-rollout "
             "tail event used by the strict-majority label."
         ),
@@ -193,7 +195,8 @@ def _parse_args() -> argparse.Namespace:
             "'probability'/'regression' or when --binary-target-mode switches "
             "binary labels onto a prompt-profile head. Defaults to "
             "'majority_tail' for prompt-profile binary, 's_tail' for probability, "
-            "and 'mean_relative_length' for regression."
+            "and 'mean_relative_length' for regression. Probability heads also "
+            "support direct prompt-level rates such as 'p_loop' and 'p_cap'."
         ),
     )
     parser.add_argument("--shard-size", type=int, default=2048)
@@ -1489,9 +1492,14 @@ def _resolve_target_spec(
             f"Unsupported --profile-target '{profile_target}'. "
             f"Valid: {PROFILE_TARGET_CHOICES}"
         )
-    if target_kind == "probability" and profile_target != "s_tail":
+    if target_kind == "probability" and profile_target not in {
+        "s_tail",
+        "p_loop",
+        "p_cap",
+    }:
         raise SystemExit(
-            "--target-kind=probability currently expects --profile-target=s_tail."
+            "--target-kind=probability currently expects "
+            "--profile-target in {s_tail, p_loop, p_cap}."
         )
     if target_kind == "regression" and profile_target != "mean_relative_length":
         raise SystemExit(

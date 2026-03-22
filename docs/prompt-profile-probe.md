@@ -1,109 +1,74 @@
 # Prompt-Profile Probe Path
 
-Last updated: 2026-03-22 00:28 UTC
+Last updated: 2026-03-22 06:50 UTC
 
 ## What Landed
 
-The repo now has a first runnable path for the current prompt-level target plan:
+The repo now has one runnable prompt-level repeated-rollout path for prefill probes:
 
 - repeated rollouts per prompt via `--num-generations`;
 - prompt-level binary-majority targets via `--target-kind binary --binary-target-mode prompt_majority_tail`;
-- prompt-level soft-target build via `--target-kind probability`;
-- prompt-level regression build via `--target-kind regression --profile-target mean_relative_length`;
-- first target family implemented as `s_t = P(L / E >= t)` with `--profile-tail-threshold` (use `0.9` for `s_0.9`);
-- binary-majority head implemented as `majority_s_t = 1[\sum_r 1[L_r / E >= t] > n / 2]`;
-- second single-head objective implemented as `mean_relative_length = E[L / E]` across repeated rollouts;
-- task-aware prompt formatting via `--task-kind`, so `GPQA` and `MMLU-Pro` use their multiple-choice prompt templates, while `LiveCodeBench` can reuse its codegen prompt builder through `--livecodebench-repo`;
+- prompt-level probability targets via `--target-kind probability`;
+- prompt-level regression targets via `--target-kind regression --profile-target mean_relative_length`;
+- tail-probability targets `s_t = P(L / E >= t)` with `--profile-target s_tail` and `--profile-tail-threshold`;
+- direct rate targets `p_loop` and `p_cap` from the same prompt-level rollout archive;
+- dense realized-length regression via `mean_relative_length = E[L / E]`;
+- task-aware prompt formatting via `--task-kind`, so `GPQA` / `MMLU-Pro` use multiple-choice prompt templates and `LiveCodeBench` can reuse its codegen prompt builder through `--livecodebench-repo`;
 - prompt-profile diagnostics written to `diagnostics/train_prompt_profile.jsonl` and `diagnostics/test_prompt_profile.jsonl`;
-- one combined repeated-rollout archive written to `diagnostics/prompt_rollout_archive.jsonl`, with prompt text, prompt token IDs, rollout texts, and the precomputed aggregate labels/metadata for each prompt;
+- one combined repeated-rollout archive written to `diagnostics/prompt_rollout_archive.jsonl`, with prompt text, prompt token IDs, rollout texts, and per-rollout terminal stats so later relabels do not require rerollout;
 - trainer/eval support for probability targets with Brier / MAE / Spearman / top-bucket capture metrics;
 - trainer/eval support for regression targets with MSE / MAE / Spearman / top-bucket capture metrics;
-- ensemble scoring can use mean layer probability (`--score-rule mean_prob`) instead of only hard-vote fraction.
+- ensemble scoring with mean layer probability via `--score-rule mean_prob`.
 
-## Current Scope
+## Current Recommendation
 
-This v1 path is intentionally narrow:
+The next prompt-profile head should be:
+
+- primary: `p_loop = E[1{rollout loops}]`;
+- backup: `mean_relative_length = E[L / E]`;
+- keep `p_cap` diagnostic-first, not the headline target;
+- keep `majority_s_t` as a sparse pilot label, not the main objective.
+
+Why this is the current recommendation:
+
+- `s_0.9` already failed on the first real `GPQA` pilot because it collapsed to `p_cap` on that slice;
+- `majority_s_0.5` does show real activation signal, but with `n = 4` it throws away most of the rollout-count information;
+- `p_loop` is already computed in the archive, stays closer to the failure mode we care about than raw length, and on the saved `GPQA` slice it is less prompt-length-correlated than `mean_relative_length`.
+
+## Scope
+
+This path is still intentionally narrow:
 
 - prefill feature views only;
 - one scalar head only;
 - no completion-view repeated-rollout support yet;
 - no joint multi-head trainer yet;
-- balancing remains available only for binary targets; the soft-target and regression prompt-profile heads still do not support downsampling.
+- balancing remains available only for binary targets; the prompt-profile probability and regression heads still run on the natural prompt-disjoint split.
 
-## Prompt-Majority Binary Pilot
-
-The current all-dataset pilot head is:
-
-- `majority_s_0.5 = 1[\sum_r 1[L / E >= 0.5] > n / 2]`
-- shared decode policy: `temperature=0.2`, `num_generations=4`
-- feature surface: last prompt-token prefill activations only
-- probe comparison: final-layer MLP vs per-layer ensemble MLP with majority vote
-
-Example dataset build:
-
-```bash
-python scripts/build_probe_dataset.py \
-  --train-dataset <dataset-source> \
-  --train-split <split> \
-  --test-dataset <dataset-source> \
-  --test-split <split> \
-  --train-max-samples <train_n> \
-  --test-max-samples <test_n> \
-  --prompt-field <field> \
-  --task-kind <task-kind> \
-  --model-id Qwen/Qwen3-1.7B \
-  --temperature 0.2 \
-  --num-generations 4 \
-  --max-tokens 30000 \
-  --max-model-len 40960 \
-  --target-kind binary \
-  --binary-target-mode prompt_majority_tail \
-  --profile-target majority_tail \
-  --profile-tail-threshold 0.5 \
-  --feature-pooling last_token_all_layers_stack \
-  --feature-layer -1 \
-  --out-dir outputs/prompt_majority_binary_dataset
-```
-
-Training examples:
-
-```bash
-python scripts/train_probe.py \
-  --data-dir outputs/prompt_majority_binary_dataset \
-  --out-dir outputs/prompt_majority_last_layer \
-  --probe-preset mlp \
-  --classifier-mode last_layer \
-  --classifier-layer -1 \
-  --wandb-project cot-loop-probe
-
-python scripts/train_probe.py \
-  --data-dir outputs/prompt_majority_binary_dataset \
-  --out-dir outputs/prompt_majority_layerwise_vote \
-  --probe-preset mlp \
-  --classifier-mode ensemble \
-  --score-rule vote_fraction \
-  --wandb-project cot-loop-probe
-```
-
-## Recommended First GPQA Run
+## Recommended First ID Run
 
 Target:
-- `s_0.9 = P(L / E >= 0.9)`
+
+- `p_loop = E[1{loop}]`
 
 Decode policy:
-- `temperature=0.2`
-- `num_generations=10`
+
+- `temperature = 0.2`
+- fixed `num_generations` per dataset (`4` for the current prompt-majority pilot surface, `10` for denser GPQA-style runs)
+- fixed `max_tokens` / `max_model_len`
 
 Feature views:
+
 - one selected layer: `--classifier-mode last_layer --classifier-layer -1`
 - per-layer ensemble: `--classifier-mode ensemble --score-rule mean_prob`
 
 Evaluation boundary:
-- train and evaluate `s_0.9` directly;
-- keep `p(max_length_hit)` as diagnostic-only if desired, not the headline target;
-- benchmark against prompt-token-count and `E = max_model_len - prompt_len` leakage baselines outside the probe.
 
-Dataset build:
+- train and evaluate `p_loop` directly;
+- always benchmark against prompt-token-count-only and effective-budget-only baselines;
+- keep `p_cap`, `mean_relative_length`, and correctness as downstream diagnostics on the same prompts.
+
+Example dataset build:
 
 ```bash
 python scripts/build_probe_dataset.py \
@@ -123,31 +88,31 @@ python scripts/build_probe_dataset.py \
   --max-tokens <cap> \
   --max-model-len <ctx> \
   --target-kind probability \
-  --profile-tail-threshold 0.9 \
+  --profile-target p_loop \
   --feature-pooling last_token_all_layers_stack \
   --feature-layer -1 \
-  --out-dir outputs/gpqa_s09_prefill_dataset
+  --out-dir outputs/gpqa_p_loop_prefill_dataset
 ```
 
 Training:
 
 ```bash
 python scripts/train_probe.py \
-  --data-dir outputs/gpqa_s09_prefill_dataset \
-  --out-dir outputs/gpqa_s09_prefill_run \
+  --data-dir outputs/gpqa_p_loop_prefill_dataset \
+  --out-dir outputs/gpqa_p_loop_prefill_run \
   --probe-preset mlp \
   --classifier-mode ensemble \
   --score-rule mean_prob \
   --wandb-project cot-loop-probe
 ```
 
-## Second Objective
+## Backup Objective
 
-The second single-head path is dense regression on the mean realized fraction:
+If the direct loop-rate head still fails to beat prompt-length / effective-budget baselines, fall back to:
 
-- target: `mean_relative_length = E[L / E]`;
-- CLI: `--target-kind regression --profile-target mean_relative_length`;
-- trainer loss: sigmoid-MSE on the repeated-rollout aggregate.
+- `mean_relative_length = E[L / E]`
+
+That is the best no-plumbing backup because it is dense, stable, and already implemented. It remains a proxy rather than the preferred main head because it mixes correct long reasoning, wrong long reasoning, and looped long reasoning.
 
 Example dataset build:
 
@@ -173,6 +138,17 @@ python scripts/build_probe_dataset.py \
   --out-dir outputs/gpqa_mean_rel_prefill_dataset
 ```
 
+## Prompt-Majority Binary Pilot
+
+The current all-dataset pilot head is still useful as a sparse control:
+
+- `majority_s_0.5 = 1[\sum_r 1[L / E >= 0.5] > n / 2]`
+- shared decode policy: `temperature = 0.2`, `num_generations = 4`
+- feature surface: last prompt-token prefill activations only
+- probe comparison: final-layer MLP vs per-layer ensemble MLP with vote aggregation
+
+Keep it because it already showed that the prefill signal is above the prompt-length baseline on `GPQA`; do not treat it as the best next scalar objective.
+
 ## SLURM Launch Surface
 
 `slurm/run_probe_train_e2e.sbatch` now accepts:
@@ -185,9 +161,9 @@ python scripts/build_probe_dataset.py \
 - `TP=...`, `DP=...`, `MAX_NUM_BATCHED_TOKENS=...`
 - `TARGET_KIND=binary|probability|regression`
 - `BINARY_TARGET_MODE=rollout_label|prompt_majority_tail`
-- `PROFILE_TAIL_THRESHOLD=0.9`
-- `PROFILE_TARGET=mean_relative_length` for the regression head
-- `NUM_GENERATIONS=10`
+- `PROFILE_TAIL_THRESHOLD=<t>` for `s_t` heads
+- `PROFILE_TARGET=s_tail|p_loop|p_cap|mean_relative_length|majority_tail`
+- `NUM_GENERATIONS=...`
 - `SCORE_RULE=mean_prob`
 
 Example:
@@ -196,7 +172,7 @@ Example:
 MODEL_ID=Qwen/Qwen3-1.7B \
 TASK_KIND=multiple_choice_gpqa \
 TARGET_KIND=probability \
-PROFILE_TAIL_THRESHOLD=0.9 \
+PROFILE_TARGET=p_loop \
 NUM_GENERATIONS=10 \
 TEMPERATURE=0.2 \
 TRAIN_DATASET=<gpqa-source> \
@@ -211,28 +187,10 @@ SCORE_RULE=mean_prob \
 sbatch slurm/run_probe_train_e2e.sbatch
 ```
 
-Prompt-majority binary example:
-
-```bash
-MODEL_ID=Qwen/Qwen3-1.7B \
-TASK_KIND=multiple_choice_gpqa \
-TARGET_KIND=binary \
-BINARY_TARGET_MODE=prompt_majority_tail \
-PROFILE_TARGET=majority_tail \
-PROFILE_TAIL_THRESHOLD=0.5 \
-NUM_GENERATIONS=4 \
-TEMPERATURE=0.2 \
-TRAIN_CONFIG=gpqa_diamond \
-TEST_CONFIG=gpqa_diamond \
-PROMPT_FIELD=Question \
-TRAIN_EXTRA_ARGS="--classifier-mode ensemble" \
-SCORE_RULE=vote_fraction \
-sbatch slurm/run_probe_train_e2e.sbatch
-```
-
-Repeated-rollout runs now also leave a single reusable archive at
-`diagnostics/prompt_rollout_archive.jsonl`, so later prefill-activation plots can reuse the same prompts and prompt-level labels without generating a second rollout bundle.
+Repeated-rollout runs also leave one reusable archive at
+`diagnostics/prompt_rollout_archive.jsonl`, so later prefill-activation plots
+and relabels can reuse the same prompts without a second rollout bundle.
 
 ## Validation Caveat
 
-The code compiles cleanly, and the pure-Python target aggregation path was smoke-checked locally, but this workspace did not have a local Torch runtime or project virtualenv at hand. That means the remaining unverified piece in this session is the actual Torch-backed train/build execution path, not the CLI wiring or the target math itself.
+The pure-Python target aggregation path has been smoke-checked locally. The remaining unverified piece in this workspace is still the full Torch-backed remote build/train execution path, not the target math itself.

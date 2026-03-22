@@ -4,7 +4,7 @@ Purpose
 - Build a binary probe dataset from LLM runs to train a CoT loop detector.
 - The canonical dataset stores the last-token activation from every transformer layer as a stacked `[layer, hidden]` tensor per prompt.
 - Train a probe classifier (linear or MLP) either on one selected layer or as a layerwise voting ensemble.
-- The same builder/trainer path now also supports prompt-level repeated-rollout targets such as `s_0.9 = P(L / E >= 0.9)` and `mean_relative_length = E[L / E]`.
+- The same builder/trainer path now also supports prompt-level repeated-rollout targets such as `p_loop = E[1[rollout loops]]`, `p_cap = E[1[rollout hits cap]]`, `s_t = P(L / E >= t)`, and `mean_relative_length = E[L / E]`.
 
 High-level flow
 1. Load Hugging Face dataset rows and read prompt text from `--prompt-field`.
@@ -98,7 +98,20 @@ python scripts/train_probe.py \
   --wandb-project cot-loop-probe
 ```
 
-Build a prompt-level `s_0.9` dataset from repeated rollouts
+Build a prompt-level `p_loop` dataset from repeated rollouts
+```bash
+python scripts/build_probe_dataset.py \
+  --train-dataset HuggingFaceH4/MATH-500 \
+  --train-split test \
+  --prompt-field problem \
+  --model-preset openthinker3_1p5b \
+  --target-kind probability \
+  --profile-target p_loop \
+  --num-generations 10 \
+  --out-dir outputs/probe_data/p_loop
+```
+
+Build a prompt-level `s_0.9` tail-rate dataset from repeated rollouts
 ```bash
 python scripts/build_probe_dataset.py \
   --train-dataset HuggingFaceH4/MATH-500 \
