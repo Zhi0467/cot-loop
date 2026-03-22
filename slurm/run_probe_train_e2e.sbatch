@@ -60,6 +60,10 @@ if [[ -z "${VLLM_CACHE_ROOT:-}" ]]; then
   export VLLM_CACHE_ROOT="${DEFAULT_CACHE_BASE}/vllm"
 fi
 
+if [[ -n "${PINNED_VISIBLE_DEVICES:-}" ]]; then
+  export CUDA_VISIBLE_DEVICES="${PINNED_VISIBLE_DEVICES}"
+fi
+
 mkdir -p "${HF_HOME}" "${HUGGINGFACE_HUB_CACHE}" "${TRANSFORMERS_CACHE}" "${VLLM_CACHE_ROOT}" "${TORCH_HOME}" "${XDG_CACHE_HOME}"
 echo "[probe-e2e] HF_HOME=${HF_HOME}"
 echo "[probe-e2e] HUGGINGFACE_HUB_CACHE=${HUGGINGFACE_HUB_CACHE}"
@@ -67,6 +71,9 @@ echo "[probe-e2e] TRANSFORMERS_CACHE=${TRANSFORMERS_CACHE}"
 echo "[probe-e2e] VLLM_CACHE_ROOT=${VLLM_CACHE_ROOT}"
 echo "[probe-e2e] TORCH_HOME=${TORCH_HOME}"
 echo "[probe-e2e] XDG_CACHE_HOME=${XDG_CACHE_HOME}"
+if [[ -n "${CUDA_VISIBLE_DEVICES:-}" ]]; then
+  echo "[probe-e2e] CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}"
+fi
 
 MODEL_PRESET="${MODEL_PRESET-}"
 MODEL_ID="${MODEL_ID:-}"
