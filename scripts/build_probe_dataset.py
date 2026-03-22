@@ -53,6 +53,7 @@ ROLLOUT_LAST_TOKEN_ALL_LAYERS_MEAN = "rollout_last_token_all_layers_mean"
 COMPLETION_POOLING_CHOICES = (ROLLOUT_LAST_TOKEN_ALL_LAYERS_MEAN,)
 ALL_FEATURE_POOLING_CHOICES = FEATURE_POOLING_CHOICES + COMPLETION_POOLING_CHOICES
 TARGET_KIND_CHOICES = ("binary", "probability", "regression")
+BINARY_TARGET_MODE_CHOICES = ("rollout_label", "prompt_majority_tail")
 TASK_KIND_CHOICES = ("math_freeform", "multiple_choice_gpqa", "multiple_choice_mmlupro")
 PROFILE_TARGET_CHOICES = PROMPT_PROFILE_TARGET_CHOICES
 
@@ -126,8 +127,19 @@ def _parse_args() -> argparse.Namespace:
         default="binary",
         help=(
             "Target family to build. 'binary' preserves the legacy rollout-level "
-            "loop label; 'probability' aggregates repeated rollouts into a prompt-level "
-            "soft target."
+            "loop label unless --binary-target-mode switches it to a prompt-level "
+            "repeated-rollout head; 'probability' aggregates repeated rollouts into "
+            "a prompt-level soft target."
+        ),
+    )
+    parser.add_argument(
+        "--binary-target-mode",
+        choices=BINARY_TARGET_MODE_CHOICES,
+        default="rollout_label",
+        help=(
+            "Binary-label surface. 'rollout_label' keeps the legacy one-rollout label. "
+            "'prompt_majority_tail' uses repeated rollouts and labels each prompt with "
+            "a strict majority vote over 1[L / E >= --profile-tail-threshold]."
         ),
     )
     parser.add_argument(
@@ -154,8 +166,10 @@ def _parse_args() -> argparse.Namespace:
         type=float,
         default=0.9,
         help=(
-            "Tail threshold used when --target-kind=probability. "
-            "The emitted soft target is s_t = P(L / E >= t)."
+            "Tail threshold used by prompt-profile targets. "
+            "For probability targets the emitted scalar is s_t = P(L / E >= t); "
+            "for prompt-profile binary targets it defines the per-rollout "
+            "tail event used by the strict-majority label."
         ),
     )
     parser.add_argument(
@@ -164,8 +178,10 @@ def _parse_args() -> argparse.Namespace:
         default=None,
         help=(
             "Prompt-profile scalar to supervise when --target-kind is "
-            "'probability' or 'regression'. Defaults to 's_tail' for "
-            "probability and 'mean_relative_length' for regression."
+            "'probability'/'regression' or when --binary-target-mode switches "
+            "binary labels onto a prompt-profile head. Defaults to "
+            "'majority_tail' for prompt-profile binary, 's_tail' for probability, "
+            "and 'mean_relative_length' for regression."
         ),
     )
     parser.add_argument("--shard-size", type=int, default=2048)
@@ -753,7 +769,7 @@ def _probe_cache_status(
     if manifest_target_spec != target_spec:
         return False, "manifest mismatch on 'target_spec'"
 
-    if target_spec["kind"] == "binary":
+    if _target_source(target_spec) == "rollout_label":
         manifest_label_spec = manifest.get(
             "label_spec",
             {
@@ -864,6 +880,22 @@ def _probe_cache_status(
         if not _split_shards_exist(out_dir, manifest.get("test")):
             return False, "test shards are missing"
 
+    if _target_source(target_spec) == "prompt_profile":
+        prompt_profile_files = manifest.get("prompt_profile_files")
+        if not isinstance(prompt_profile_files, dict):
+            return False, "manifest missing prompt_profile_files for prompt-profile target"
+        for split_name in ("train", "test"):
+            rel_path = prompt_profile_files.get(split_name)
+            if not isinstance(rel_path, str) or not rel_path:
+                return False, f"manifest missing prompt-profile diagnostics for split '{split_name}'"
+            if not os.path.exists(os.path.join(out_dir, rel_path)):
+                return False, f"prompt-profile diagnostics missing for split '{split_name}'"
+        prompt_rollout_archive_file = manifest.get("prompt_rollout_archive_file")
+        if not isinstance(prompt_rollout_archive_file, str) or not prompt_rollout_archive_file:
+            return False, "manifest missing prompt_rollout_archive_file for prompt-profile target"
+        if not os.path.exists(os.path.join(out_dir, prompt_rollout_archive_file)):
+            return False, "prompt_rollout_archive_file is missing"
+
     if manifest_seed is None:
         return True, "compatible legacy manifest match (no seed recorded)"
     return True, "manifest and shards match requested config"
@@ -931,6 +963,13 @@ def _label_split(
     return labels, rollout_token_ids
 
 
+def _target_source(target_spec: dict[str, object]) -> str:
+    kind = str(target_spec.get("kind", "binary"))
+    if kind in ("probability", "regression"):
+        return "prompt_profile"
+    return str(target_spec.get("source", "rollout_label"))
+
+
 def _build_prompt_profile_targets(
     split_name: str,
     records: list[SampleRecord],
@@ -945,7 +984,7 @@ def _build_prompt_profile_targets(
     tail_threshold: float,
     profile_target: str,
     target_kind: str,
-) -> tuple[list[float], list[dict[str, object]], list[dict[str, object]]]:
+) -> tuple[list[int | float], list[dict[str, object]], list[dict[str, object]]]:
     if (
         len(records) != len(prompt_token_ids)
         or len(records) != len(sample_ids)
@@ -974,7 +1013,7 @@ def _build_prompt_profile_targets(
         profile_target,
         tail_threshold=tail_threshold,
     )
-    targets: list[float] = []
+    targets: list[int | float] = []
     rows: list[dict[str, object]] = []
     archive_rows: list[dict[str, object]] = []
     for rec, prompt_ids, sample_id, split, prompt_rollouts in zip(
@@ -1005,9 +1044,14 @@ def _build_prompt_profile_targets(
             loop_k=loop_k,
             tail_threshold=tail_threshold,
         )
-        target_value = profile_target_value(
+        raw_target_value = profile_target_value(
             profile,
             profile_target=profile_target,
+        )
+        target_value = (
+            int(raw_target_value)
+            if target_kind == "binary"
+            else float(raw_target_value)
         )
         targets.append(target_value)
         rows.append(
@@ -1018,7 +1062,7 @@ def _build_prompt_profile_targets(
                 "effective_max_tokens": int(effective_max_tokens),
                 "target_kind": target_kind,
                 "target_name": target_name,
-                "target_value": float(target_value),
+                "target_value": target_value,
                 target_name: target_value,
                 "p_cap": float(profile["p_cap"]),
                 "p_loop": float(profile["p_loop"]),
@@ -1026,23 +1070,27 @@ def _build_prompt_profile_targets(
                 "mean_length": float(profile["mean_length"]),
                 "mean_relative_length": float(profile["mean_relative_length"]),
                 "tail_threshold": float(profile["tail_threshold"]),
+                "tail_hit_count": int(profile["tail_hit_count"]),
+                "majority_tail": int(profile["majority_tail"]),
                 "num_rollouts": int(profile["num_rollouts"]),
                 "lengths": profile["lengths"],
                 "relative_lengths": profile["relative_lengths"],
                 "cap_hits": profile["cap_hits"],
                 "loop_flags": profile["loop_flags"],
+                "tail_hits": profile["tail_hits"],
                 "first_loop_prefix_lengths": profile["first_loop_prefix_lengths"],
                 "finish_reasons": [rollout.finish_reason for rollout in prompt_rollouts],
             }
         )
         rollout_rows = []
-        for rollout_index, rollout, length, relative_length, cap_hit, loop_flag, first_loop_prefix in zip(
+        for rollout_index, rollout, length, relative_length, cap_hit, loop_flag, tail_hit, first_loop_prefix in zip(
             range(len(prompt_rollouts)),
             prompt_rollouts,
             profile["lengths"],
             profile["relative_lengths"],
             profile["cap_hits"],
             profile["loop_flags"],
+            profile["tail_hits"],
             profile["first_loop_prefix_lengths"],
             strict=True,
         ):
@@ -1055,6 +1103,7 @@ def _build_prompt_profile_targets(
                     "relative_length": float(relative_length),
                     "cap_hit": int(cap_hit),
                     "loop_flag": int(loop_flag),
+                    "tail_hit": int(tail_hit),
                     "first_loop_prefix_length": first_loop_prefix,
                 }
             )
@@ -1071,14 +1120,16 @@ def _build_prompt_profile_targets(
                 "effective_max_tokens": int(effective_max_tokens),
                 "target_kind": target_kind,
                 "target_name": target_name,
-                "target_value": float(target_value),
-                target_name: float(target_value),
+                "target_value": target_value,
+                target_name: target_value,
                 "p_cap": float(profile["p_cap"]),
                 "p_loop": float(profile["p_loop"]),
                 "mu_log_rel": float(profile["mu_log_rel"]),
                 "mean_length": float(profile["mean_length"]),
                 "mean_relative_length": float(profile["mean_relative_length"]),
                 "tail_threshold": float(profile["tail_threshold"]),
+                "tail_hit_count": int(profile["tail_hit_count"]),
+                "majority_tail": int(profile["majority_tail"]),
                 "num_rollouts": int(profile["num_rollouts"]),
                 "rollouts": rollout_rows,
             }
@@ -1293,10 +1344,57 @@ def _resolve_target_spec(
 ) -> dict[str, object]:
     target_kind = str(args.target_kind)
     if target_kind == "binary":
+        binary_target_mode = str(args.binary_target_mode)
+        if binary_target_mode == "rollout_label":
+            if args.profile_target not in (None, ""):
+                raise SystemExit(
+                    "--profile-target is only valid for prompt-profile targets."
+                )
+            if rollout_cfg.num_generations != 1:
+                raise SystemExit(
+                    "Legacy rollout-level binary targets require --num-generations=1. "
+                    "Use --binary-target-mode=prompt_majority_tail for repeated-rollout "
+                    "prompt-level binary labels."
+                )
+            return {
+                "kind": "binary",
+                "name": str(label_spec["target"]),
+                "horizon": label_spec["horizon"],
+            }
+        if binary_target_mode != "prompt_majority_tail":
+            raise SystemExit(
+                f"Unsupported --binary-target-mode '{binary_target_mode}'. "
+                f"Valid: {BINARY_TARGET_MODE_CHOICES}"
+            )
+        if rollout_cfg.num_generations < 2:
+            raise SystemExit(
+                "--binary-target-mode=prompt_majority_tail requires "
+                "--num-generations >= 2 so majority labels are estimated from "
+                "repeated rollouts."
+            )
+        tail_threshold = float(args.profile_tail_threshold)
+        if not 0.0 < tail_threshold <= 1.0:
+            raise SystemExit("--profile-tail-threshold must be in (0, 1].")
+        profile_target = args.profile_target
+        if profile_target is None or profile_target == "":
+            profile_target = "majority_tail"
+        if profile_target != "majority_tail":
+            raise SystemExit(
+                "--binary-target-mode=prompt_majority_tail currently expects "
+                "--profile-target=majority_tail."
+            )
+        target_name = profile_target_name(
+            profile_target,
+            tail_threshold=tail_threshold,
+        )
         return {
             "kind": "binary",
-            "name": str(label_spec["target"]),
-            "horizon": label_spec["horizon"],
+            "source": "prompt_profile",
+            "name": target_name,
+            "profile_target": profile_target,
+            "tail_threshold": tail_threshold,
+            "num_generations": int(rollout_cfg.num_generations),
+            "positive_rule": "strict_majority",
         }
     if target_kind not in ("probability", "regression"):
         raise SystemExit(f"Unsupported --target-kind '{target_kind}'.")
@@ -1382,21 +1480,19 @@ def main() -> None:
         rollout_cfg=rollout_cfg,
         label_spec=label_spec,
     )
+    target_source = _target_source(target_spec)
     balance_seed = args.seed if args.balance_seed is None else args.balance_seed
-    if target_spec["kind"] != "binary":
+    if target_source == "prompt_profile":
         if completion_feature_views:
             raise SystemExit(
-                "--target-kind=probability currently supports prefill feature views only."
+                "Prompt-profile targets currently support prefill feature views only."
             )
-        if args.balance_train != "none" or args.balance_test != "none":
+        if target_spec["kind"] != "binary" and (
+            args.balance_train != "none" or args.balance_test != "none"
+        ):
             raise SystemExit(
                 "Balancing is only supported for binary targets in this builder."
             )
-    elif rollout_cfg.num_generations != 1:
-        raise SystemExit(
-            "Binary targets currently require --num-generations=1. "
-            "Use --target-kind=probability for repeated-rollout prompt targets."
-        )
 
     if args.reuse_if_compatible:
         cache_hit, reason = _probe_cache_status(
@@ -1500,7 +1596,7 @@ def main() -> None:
     test_profile_rows: list[dict[str, object]] = []
     prompt_rollout_archive_rows: list[dict[str, object]] = []
 
-    if target_spec["kind"] == "binary":
+    if target_source == "rollout_label":
         need_rollout_tokens = bool(completion_feature_views)
         all_labels, all_rollout_token_ids = _label_split(
             "all",
@@ -1607,16 +1703,32 @@ def main() -> None:
         test_labels = all_targets[split_at:]
         train_profile_rows = all_profile_rows[:split_at]
         test_profile_rows = all_profile_rows[split_at:]
-        train_keep_idx = list(range(len(train_labels)))
-        test_keep_idx = list(range(len(test_labels)))
+        if target_spec["kind"] == "binary":
+            train_keep_idx = _balanced_indices(
+                train_labels,
+                split_name="train",
+                mode=args.balance_train,
+                seed=balance_seed,
+            )
+            test_keep_idx = _balanced_indices(
+                test_labels,
+                split_name="test",
+                mode=args.balance_test,
+                seed=balance_seed + 1,
+            )
+            train_labels = _subset_list(train_labels, train_keep_idx)
+            test_labels = _subset_list(test_labels, test_keep_idx)
+        else:
+            train_keep_idx = list(range(len(train_labels)))
+            test_keep_idx = list(range(len(test_labels)))
+            train_labels = _subset_float_list(train_labels, train_keep_idx)
+            test_labels = _subset_float_list(test_labels, test_keep_idx)
 
     train_ids = _subset_list(train_ids, train_keep_idx)
     test_ids = _subset_list(test_ids, test_keep_idx)
     train_prompt_token_lengths = _subset_list(train_prompt_token_lengths, train_keep_idx)
     test_prompt_token_lengths = _subset_list(test_prompt_token_lengths, test_keep_idx)
-    if target_spec["kind"] == "probability":
-        train_labels = _subset_float_list(train_labels, train_keep_idx)
-        test_labels = _subset_float_list(test_labels, test_keep_idx)
+    if target_source == "prompt_profile":
         train_profile_rows = [train_profile_rows[idx] for idx in train_keep_idx]
         test_profile_rows = [test_profile_rows[idx] for idx in test_keep_idx]
     train_keep_idx_t = torch.tensor(train_keep_idx, dtype=torch.long)
@@ -1702,7 +1814,7 @@ def main() -> None:
 
     prompt_profile_files: dict[str, str] = {}
     prompt_rollout_archive_file = ""
-    if target_spec["kind"] in ("probability", "regression"):
+    if target_source == "prompt_profile":
         train_profile_path = os.path.join("diagnostics", "train_prompt_profile.jsonl")
         test_profile_path = os.path.join("diagnostics", "test_prompt_profile.jsonl")
         prompt_rollout_archive_path = os.path.join(
@@ -1728,7 +1840,7 @@ def main() -> None:
         prompt_rollout_archive_file = prompt_rollout_archive_path
 
     manifest = {
-        "version": 6,
+        "version": 7,
         "input_dim": primary_input_dim,
         "sample_shape": feature_views_manifest[primary_feature_key]["sample_shape"],
         "default_feature_key": primary_feature_key,
@@ -1761,7 +1873,7 @@ def main() -> None:
             "k": args.loop_k,
         },
         "target_spec": target_spec,
-        "label_spec": label_spec if target_spec["kind"] == "binary" else None,
+        "label_spec": label_spec if target_source == "rollout_label" else None,
         "balancing": {
             "train": args.balance_train,
             "test": args.balance_test,

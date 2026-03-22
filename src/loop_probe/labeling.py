@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from collections.abc import Iterable
 
 LABEL_TARGET_CHOICES = ("eventual_loop", "loop_by_horizon")
-PROMPT_PROFILE_TARGET_CHOICES = ("s_tail", "mean_relative_length")
+PROMPT_PROFILE_TARGET_CHOICES = ("s_tail", "mean_relative_length", "majority_tail")
 
 
 @dataclass(frozen=True)
@@ -157,6 +157,7 @@ def aggregate_prompt_profile(
     loop_flags = [stat.loop_flag for stat in stats]
     first_loop_prefix_lengths = [stat.first_loop_prefix for stat in stats]
     tail_hits = [int(stat.relative_length >= tail_threshold) for stat in stats]
+    tail_hit_count = sum(tail_hits)
     mu_log_rel = sum(math.log1p(stat.relative_length) for stat in stats) / float(
         num_rollouts
     )
@@ -170,6 +171,8 @@ def aggregate_prompt_profile(
         "loop_flags": loop_flags,
         "first_loop_prefix_lengths": first_loop_prefix_lengths,
         "tail_hits": tail_hits,
+        "tail_hit_count": int(tail_hit_count),
+        "majority_tail": int(tail_hit_count > (num_rollouts / 2.0)),
         "mean_length": sum(lengths) / float(num_rollouts),
         "mean_relative_length": sum(relative_lengths) / float(num_rollouts),
         "p_cap": sum(cap_hits) / float(num_rollouts),
@@ -190,6 +193,9 @@ def profile_target_name(
         return f"s_{threshold_text}"
     if profile_target == "mean_relative_length":
         return "mean_relative_length"
+    if profile_target == "majority_tail":
+        threshold_text = format(float(tail_threshold), "g")
+        return f"majority_s_{threshold_text}"
     raise ValueError(
         f"Unknown prompt-profile target '{profile_target}'. "
         f"Valid: {PROMPT_PROFILE_TARGET_CHOICES}"
@@ -205,6 +211,8 @@ def profile_target_value(
         return float(profile["s_tail"])
     if profile_target == "mean_relative_length":
         return float(profile["mean_relative_length"])
+    if profile_target == "majority_tail":
+        return float(profile["majority_tail"])
     raise ValueError(
         f"Unknown prompt-profile target '{profile_target}'. "
         f"Valid: {PROMPT_PROFILE_TARGET_CHOICES}"

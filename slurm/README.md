@@ -23,9 +23,10 @@ This directory contains SLURM workflows for the CoT loop detector project.
 - optional rollout-completion feature throughput override: `COMPLETION_BATCH_SIZE=...` (default: `1`)
 - task-aware prompt formatting: `TASK_KIND=math_freeform|multiple_choice_gpqa|multiple_choice_mmlupro`
 - prompt-level target controls:
-  - `TARGET_KIND=binary` (legacy loop bit), `TARGET_KIND=probability` (prompt-level `s_t` soft target), or `TARGET_KIND=regression` (prompt-level continuous target)
+  - `TARGET_KIND=binary` (legacy loop bit by default, or prompt-majority tail labels with `BINARY_TARGET_MODE=prompt_majority_tail`), `TARGET_KIND=probability` (prompt-level `s_t` soft target), or `TARGET_KIND=regression` (prompt-level continuous target)
+  - `BINARY_TARGET_MODE=rollout_label|prompt_majority_tail`
   - `PROFILE_TAIL_THRESHOLD=0.9` for `s_0.9`
-  - `PROFILE_TARGET=mean_relative_length` for the dense realized-length regression head
+  - `PROFILE_TARGET=majority_tail` for prompt-majority binary, or `PROFILE_TARGET=mean_relative_length` for the dense realized-length regression head
   - `SCORE_RULE=mean_prob` for non-binary ensembles
 - canonical prefill dataset controls:
   - `FEATURE_POOLING=last_token_all_layers_stack`
@@ -69,6 +70,24 @@ TEST_CONFIG=gpqa_diamond \
 PROMPT_FIELD=Question \
 TRAIN_EXTRA_ARGS="--classifier-mode ensemble" \
 SCORE_RULE=mean_prob \
+sbatch slurm/run_probe_train_e2e.sbatch
+```
+
+Example: run the prompt-majority `majority_s_0.5` GPQA-style path with per-layer majority vote:
+```bash
+MODEL_ID=Qwen/Qwen3-1.7B \
+TASK_KIND=multiple_choice_gpqa \
+TARGET_KIND=binary \
+BINARY_TARGET_MODE=prompt_majority_tail \
+PROFILE_TARGET=majority_tail \
+PROFILE_TAIL_THRESHOLD=0.5 \
+NUM_GENERATIONS=4 \
+TEMPERATURE=0.2 \
+TRAIN_CONFIG=gpqa_diamond \
+TEST_CONFIG=gpqa_diamond \
+PROMPT_FIELD=Question \
+TRAIN_EXTRA_ARGS="--classifier-mode ensemble" \
+SCORE_RULE=vote_fraction \
 sbatch slurm/run_probe_train_e2e.sbatch
 ```
 

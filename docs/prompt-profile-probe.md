@@ -1,15 +1,17 @@
 # Prompt-Profile Probe Path
 
-Last updated: 2026-03-20 05:36 UTC
+Last updated: 2026-03-22 00:28 UTC
 
 ## What Landed
 
 The repo now has a first runnable path for the current prompt-level target plan:
 
 - repeated rollouts per prompt via `--num-generations`;
+- prompt-level binary-majority targets via `--target-kind binary --binary-target-mode prompt_majority_tail`;
 - prompt-level soft-target build via `--target-kind probability`;
 - prompt-level regression build via `--target-kind regression --profile-target mean_relative_length`;
 - first target family implemented as `s_t = P(L / E >= t)` with `--profile-tail-threshold` (use `0.9` for `s_0.9`);
+- binary-majority head implemented as `majority_s_t = 1[\sum_r 1[L_r / E >= t] > n / 2]`;
 - second single-head objective implemented as `mean_relative_length = E[L / E]` across repeated rollouts;
 - task-aware prompt formatting via `--task-kind`, so `GPQA` and `MMLU-Pro` use their multiple-choice prompt templates instead of the boxed-answer math prompt;
 - prompt-profile diagnostics written to `diagnostics/train_prompt_profile.jsonl` and `diagnostics/test_prompt_profile.jsonl`;
@@ -26,7 +28,62 @@ This v1 path is intentionally narrow:
 - one scalar head only;
 - no completion-view repeated-rollout support yet;
 - no joint multi-head trainer yet;
-- binary downsampling is disabled for prompt-profile targets.
+- balancing remains available only for binary targets; the soft-target and regression prompt-profile heads still do not support downsampling.
+
+## Prompt-Majority Binary Pilot
+
+The current all-dataset pilot head is:
+
+- `majority_s_0.5 = 1[\sum_r 1[L / E >= 0.5] > n / 2]`
+- shared decode policy: `temperature=0.2`, `num_generations=4`
+- feature surface: last prompt-token prefill activations only
+- probe comparison: final-layer MLP vs per-layer ensemble MLP with majority vote
+
+Example dataset build:
+
+```bash
+python scripts/build_probe_dataset.py \
+  --train-dataset <dataset-source> \
+  --train-split <split> \
+  --test-dataset <dataset-source> \
+  --test-split <split> \
+  --train-max-samples <train_n> \
+  --test-max-samples <test_n> \
+  --prompt-field <field> \
+  --task-kind <task-kind> \
+  --model-id Qwen/Qwen3-1.7B \
+  --temperature 0.2 \
+  --num-generations 4 \
+  --max-tokens 30000 \
+  --max-model-len 40960 \
+  --target-kind binary \
+  --binary-target-mode prompt_majority_tail \
+  --profile-target majority_tail \
+  --profile-tail-threshold 0.5 \
+  --feature-pooling last_token_all_layers_stack \
+  --feature-layer -1 \
+  --out-dir outputs/prompt_majority_binary_dataset
+```
+
+Training examples:
+
+```bash
+python scripts/train_probe.py \
+  --data-dir outputs/prompt_majority_binary_dataset \
+  --out-dir outputs/prompt_majority_last_layer \
+  --probe-preset mlp \
+  --classifier-mode last_layer \
+  --classifier-layer -1 \
+  --wandb-project cot-loop-probe
+
+python scripts/train_probe.py \
+  --data-dir outputs/prompt_majority_binary_dataset \
+  --out-dir outputs/prompt_majority_layerwise_vote \
+  --probe-preset mlp \
+  --classifier-mode ensemble \
+  --score-rule vote_fraction \
+  --wandb-project cot-loop-probe
+```
 
 ## Recommended First GPQA Run
 
@@ -125,7 +182,8 @@ python scripts/build_probe_dataset.py \
 - `TEMPERATURE=0.2`
 - `MAX_MODEL_LEN=<ctx>`
 - `TP=...`, `DP=...`, `MAX_NUM_BATCHED_TOKENS=...`
-- `TARGET_KIND=probability|regression`
+- `TARGET_KIND=binary|probability|regression`
+- `BINARY_TARGET_MODE=rollout_label|prompt_majority_tail`
 - `PROFILE_TAIL_THRESHOLD=0.9`
 - `PROFILE_TARGET=mean_relative_length` for the regression head
 - `NUM_GENERATIONS=10`
@@ -149,6 +207,25 @@ MAX_TOKENS=<cap> \
 MAX_MODEL_LEN=<ctx> \
 TRAIN_EXTRA_ARGS="--classifier-mode ensemble" \
 SCORE_RULE=mean_prob \
+sbatch slurm/run_probe_train_e2e.sbatch
+```
+
+Prompt-majority binary example:
+
+```bash
+MODEL_ID=Qwen/Qwen3-1.7B \
+TASK_KIND=multiple_choice_gpqa \
+TARGET_KIND=binary \
+BINARY_TARGET_MODE=prompt_majority_tail \
+PROFILE_TARGET=majority_tail \
+PROFILE_TAIL_THRESHOLD=0.5 \
+NUM_GENERATIONS=4 \
+TEMPERATURE=0.2 \
+TRAIN_CONFIG=gpqa_diamond \
+TEST_CONFIG=gpqa_diamond \
+PROMPT_FIELD=Question \
+TRAIN_EXTRA_ARGS="--classifier-mode ensemble" \
+SCORE_RULE=vote_fraction \
 sbatch slurm/run_probe_train_e2e.sbatch
 ```
 
