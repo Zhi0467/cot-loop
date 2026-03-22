@@ -1,0 +1,130 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{hyperref}
+
+\title{\texttt{p\_loop} as the Next Prompt-Profile Objective}
+\author{}
+\date{2026-03-22}
+
+\begin{document}
+\maketitle
+
+\paragraph{Bottom line.}
+The next prompt-profile probe should predict direct prompt-level loop probability,
+\[
+p_{\mathrm{loop}}(x) = \mathbb{E}_r \left[ 1\{\text{rollout } r \text{ loops}\} \right],
+\]
+from prompt-prefill activations under one fixed model and decode policy. The best
+backup objective is \texttt{mean\_relative\_length = E[L / E]}. Keep
+\texttt{p\_cap} diagnostic-first, not as the main head.
+
+\paragraph{Why this changed.}
+The first real \texttt{GPQA} prompt-profile pilot ruled out the old high-tail
+headline target. On the saved \texttt{48}-prompt archive,
+\texttt{s\_0.9} collapsed exactly to \texttt{p(cap-hit)}, and
+the trained probe was essentially constant-baseline quality. A same-archive
+\texttt{mean\_relative\_length} retrain was directionally better, but it still
+lost to trivial baselines on MSE/MAE at that pilot scale.
+
+\paragraph{Why \texttt{p\_loop} is the right next scalar.}
+The cross-dataset rollout-stat bundle says the failure mode is fundamentally a
+terminal-statistics problem:
+\begin{itemize}[leftmargin=1.5em]
+\item loops are much longer than ordinary wrong rollouts, which are longer than correct ones;
+\item looped rollouts are much less accurate;
+\item \texttt{P(loop | max-length-hit)} is effectively \texttt{1.0} across all five datasets.
+\end{itemize}
+That makes \texttt{p\_loop} the cleanest direct prompt-level summary of the
+behavior we actually care about: ``under this prompt and this fixed policy, how
+often do I enter a looping terminal regime?''
+
+\paragraph{Why not the obvious alternatives.}
+\begin{itemize}[leftmargin=1.5em]
+\item \textbf{\texttt{majority\_s\_0.5}.} It does show real activation signal on the
+  corrected \texttt{GPQA} pilot, but with \texttt{n=4} it is a lossy thresholded
+  view of the same rollout counts. Counts \texttt{0}, \texttt{1}, and
+  \texttt{2} all map to the same negative label.
+\item \textbf{\texttt{s\_t}.} High-threshold tails are too close to cap-hit on the
+  current long-cap surface, while lower-threshold tails buy density by mixing in
+  more non-loop long answers.
+\item \textbf{\texttt{mean\_relative\_length}.} It is the best no-plumbing fallback,
+  but it is still a proxy that mixes correct long reasoning, wrong long reasoning,
+  and looped long reasoning.
+\item \textbf{pure cap risk.} \texttt{p\_cap} is sharp but too narrow. Many loops do
+  not hit the cap, especially on \texttt{GPQA} and \texttt{MMLU-Pro}.
+\end{itemize}
+
+\paragraph{The key GPQA leakage check.}
+On the saved \texttt{GPQA} prompt-profile archive, \texttt{p\_loop} is also the
+least prompt-length-correlated of the obvious scalar targets:
+\begin{center}
+\begin{tabular}{lr}
+\toprule
+Target & Spearman with prompt length \\
+\midrule
+\texttt{p\_loop} & \texttt{0.297} \\
+\texttt{mean\_relative\_length} & \texttt{0.375} \\
+\texttt{p\_cap} & \texttt{0.346} \\
+\texttt{s\_0.5} & \texttt{0.341} \\
+\texttt{s\_0.6} & \texttt{0.373} \\
+\texttt{s\_0.9} & \texttt{0.346} \\
+\bottomrule
+\end{tabular}
+\end{center}
+So the direct loop-rate target is not only more aligned than the length-style
+proxies; on the current \texttt{GPQA} slice it is also less length-leaky.
+
+\paragraph{Concrete next run.}
+\begin{enumerate}[leftmargin=1.5em]
+\item \textbf{Split.} Prompt-disjoint, in-distribution only, read per dataset rather
+  than pooled first.
+\item \textbf{Input.} Last prompt-token prefill activations, comparing:
+  \begin{itemize}[leftmargin=1.5em]
+  \item one selected-layer MLP probe;
+  \item one per-layer MLP ensemble with score aggregation by \texttt{mean\_prob}.
+  \end{itemize}
+\item \textbf{Target.} \texttt{--target-kind probability --profile-target p\_loop}.
+\item \textbf{Backup.} \texttt{--target-kind regression --profile-target mean\_relative\_length}.
+\item \textbf{Baselines.} Constant, prompt-token-count only, effective-budget only,
+  and prompt-token-count plus effective-budget together.
+\end{enumerate}
+
+\paragraph{Evaluation bundle.}
+For the main \texttt{p\_loop} head, use the probability-target bundle already in
+the repo:
+\begin{itemize}[leftmargin=1.5em]
+\item Brier;
+\item MAE;
+\item Spearman;
+\item top-\texttt{10\%} and top-\texttt{20\%} capture of realized loop mass.
+\end{itemize}
+Then attach downstream diagnostics on the same ranked prompts:
+\begin{itemize}[leftmargin=1.5em]
+\item observed \texttt{p\_cap} in the top-risk buckets;
+\item observed correctness in the top-risk buckets;
+\item comparison against prompt-length-only and effective-budget-only controls.
+\end{itemize}
+
+\paragraph{Implementation note.}
+This does not require a new data pipeline. The prompt-profile aggregator already
+computes \texttt{p\_loop} for every prompt. The useful code change is just to
+expose that existing field as a trainable probability target in the dataset
+builder so the next run can call
+\texttt{build\_probe\_dataset.py --target-kind probability --profile-target p\_loop}
+directly.
+
+\paragraph{Recommendation.}
+Stop spending the single-head prompt-profile path on thresholded surrogates first.
+Ship \texttt{p\_loop}. If it still fails to beat the leakage baselines on the
+larger prompt-disjoint runs, fall back to \texttt{mean\_relative\_length} rather
+than another \texttt{s\_t} variant.
+
+\end{document}

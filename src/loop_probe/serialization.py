@@ -10,10 +10,11 @@ def save_split_shards(
     out_dir: str,
     split: str,
     features: torch.Tensor,
-    labels: Sequence[int],
+    labels: Sequence[int | float],
     sample_ids: Sequence[int],
     *,
     shard_size: int,
+    target_kind: str = "binary",
 ) -> dict[str, object]:
     if shard_size < 1:
         raise SystemExit("--shard-size must be >= 1.")
@@ -32,7 +33,12 @@ def save_split_shards(
     os.makedirs(split_dir, exist_ok=True)
 
     x = features.to(dtype=torch.float16).cpu()
-    y = torch.tensor(labels, dtype=torch.uint8)
+    if target_kind == "binary":
+        y = torch.tensor(labels, dtype=torch.uint8)
+    elif target_kind in ("probability", "regression"):
+        y = torch.tensor(labels, dtype=torch.float32)
+    else:
+        raise SystemExit(f"Unsupported target_kind '{target_kind}'.")
     sid = torch.tensor(sample_ids, dtype=torch.int64)
 
     shard_files: list[str] = []
@@ -50,12 +56,23 @@ def save_split_shards(
         )
         shard_files.append(os.path.relpath(shard_path, out_dir))
 
-    return {
+    meta = {
         "num_samples": num_samples,
-        "num_positive": int(sum(labels)),
-        "num_negative": int(num_samples - sum(labels)),
+        "target_kind": target_kind,
         "shards": shard_files,
     }
+    if target_kind == "binary":
+        positive = int(sum(int(label) for label in labels))
+        meta["num_positive"] = positive
+        meta["num_negative"] = int(num_samples - positive)
+        return meta
+
+    label_values = [float(label) for label in labels]
+    if label_values:
+        meta["target_mean"] = float(sum(label_values) / len(label_values))
+        meta["target_min"] = float(min(label_values))
+        meta["target_max"] = float(max(label_values))
+    return meta
 
 
 def write_manifest(out_dir: str, payload: dict[str, object]) -> None:

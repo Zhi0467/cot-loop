@@ -4,6 +4,7 @@ Purpose
 - Build a binary probe dataset from LLM runs to train a CoT loop detector.
 - The canonical dataset stores the last-token activation from every transformer layer as a stacked `[layer, hidden]` tensor per prompt.
 - Train a probe classifier (linear or MLP) either on one selected layer or as a layerwise voting ensemble.
+- The same builder/trainer path now also supports prompt-level repeated-rollout targets such as `p_loop = E[1[rollout loops]]`, `p_cap = E[1[rollout hits cap]]`, `s_t = P(L / E >= t)`, and `mean_relative_length = E[L / E]`.
 
 High-level flow
 1. Load Hugging Face dataset rows and read prompt text from `--prompt-field`.
@@ -13,9 +14,9 @@ High-level flow
    - identical train/test specs split deterministically with `--split-ratio`.
 4. Prefill pass (Transformers): extract last-token activations from every layer and store them as a stacked tensor `[layer, hidden]` per prompt.
 5. Rollout pass (vLLM): generate one trajectory per prompt.
-6. Label with loop detector (`n`-gram repeated `k` times).
+6. Either label with the loop detector (`n`-gram repeated `k` times) or aggregate repeated rollouts into a prompt-level scalar target.
 7. Save tensors as `.pt` shards and write `manifest.json`.
-8. Train/eval a probe classifier with weighted BCE and W&B logging.
+8. Train/eval a probe classifier with weighted BCE for binary targets, soft BCE for prompt-level probability targets, or sigmoid-MSE for prompt-level regression targets, and log metrics to W&B.
 
 Key modules
 - `configs.py`: rollout + probe config dataclasses, presets, and probe model factory.
@@ -97,18 +98,59 @@ python scripts/train_probe.py \
   --wandb-project cot-loop-probe
 ```
 
+Build a prompt-level `p_loop` dataset from repeated rollouts
+```bash
+python scripts/build_probe_dataset.py \
+  --train-dataset HuggingFaceH4/MATH-500 \
+  --train-split test \
+  --prompt-field problem \
+  --model-preset openthinker3_1p5b \
+  --target-kind probability \
+  --profile-target p_loop \
+  --num-generations 10 \
+  --out-dir outputs/probe_data/p_loop
+```
+
+Build a prompt-level `s_0.9` tail-rate dataset from repeated rollouts
+```bash
+python scripts/build_probe_dataset.py \
+  --train-dataset HuggingFaceH4/MATH-500 \
+  --train-split test \
+  --prompt-field problem \
+  --model-preset openthinker3_1p5b \
+  --target-kind probability \
+  --num-generations 10 \
+  --profile-tail-threshold 0.9 \
+  --out-dir outputs/probe_data/s09
+```
+
+Build a prompt-level mean-length-fraction regression dataset from repeated rollouts
+```bash
+python scripts/build_probe_dataset.py \
+  --train-dataset HuggingFaceH4/MATH-500 \
+  --train-split test \
+  --prompt-field problem \
+  --model-preset openthinker3_1p5b \
+  --target-kind regression \
+  --profile-target mean_relative_length \
+  --num-generations 10 \
+  --out-dir outputs/probe_data/mean_relative_length
+```
+
 Outputs
 - Dataset build:
   - `out_dir/train/shard-*.pt`
   - `out_dir/test/shard-*.pt`
   - `out_dir/manifest.json`
+  - `out_dir/diagnostics/prompt_rollout_archive.jsonl` for repeated-rollout targets
 - Training:
   - `out_dir/best.pt`
   - `out_dir/last.pt`
   - `out_dir/metrics.jsonl`
   - `metrics.jsonl` rows include eval metrics:
     `accuracy`, `macro_f1`, `roc_auc`, `pr_auc`,
-    `positive_precision`, `positive_recall`, `positive_f1`, `prevalence`
+    `positive_precision`, `positive_recall`, `positive_f1`, `prevalence`,
+    or the continuous-target bundle `brier|mse`, `mae`, `rmse`, `spearman`
 
 Notes
 - Training script loads `.env` and expects `WANDB_API_KEY`.

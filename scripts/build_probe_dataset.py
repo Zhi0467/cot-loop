@@ -21,13 +21,25 @@ if SRC not in sys.path:
 
 from loop_probe.configs import get_rollout_config, preset_choices
 from loop_probe.hf_data import load_prompt_records, specs_equal, split_records
-from loop_probe.labeling import LABEL_TARGET_CHOICES, labels_from_rollouts
+from loop_probe.labeling import (
+    LABEL_TARGET_CHOICES,
+    PROMPT_PROFILE_TARGET_CHOICES,
+    aggregate_prompt_profile,
+    labels_from_rollouts,
+    profile_target_name,
+    profile_target_value,
+)
+from loop_probe.adapters import (
+    livecodebench_codegen,
+    multiple_choice_gpqa,
+    multiple_choice_mmlupro,
+)
 from loop_probe.prefill import (
     FEATURE_POOLING_CHOICES,
     extract_prefill_features_multi,
     load_prefill_model_and_tokenizer,
 )
-from loop_probe.rollout import generate_rollout_token_ids
+from loop_probe.rollout import generate_grouped_rollouts, generate_rollout_token_ids
 from loop_probe.serialization import save_split_shards, write_manifest
 from loop_probe.types import DatasetSpec, SampleRecord
 from utils import build_prompt
@@ -44,6 +56,15 @@ BALANCE_CHOICES = ("none", "downsample")
 ROLLOUT_LAST_TOKEN_ALL_LAYERS_MEAN = "rollout_last_token_all_layers_mean"
 COMPLETION_POOLING_CHOICES = (ROLLOUT_LAST_TOKEN_ALL_LAYERS_MEAN,)
 ALL_FEATURE_POOLING_CHOICES = FEATURE_POOLING_CHOICES + COMPLETION_POOLING_CHOICES
+TARGET_KIND_CHOICES = ("binary", "probability", "regression")
+BINARY_TARGET_MODE_CHOICES = ("rollout_label", "prompt_majority_tail")
+TASK_KIND_CHOICES = (
+    "math_freeform",
+    "multiple_choice_gpqa",
+    "multiple_choice_mmlupro",
+    "livecodebench_codegen",
+)
+PROFILE_TARGET_CHOICES = PROMPT_PROFILE_TARGET_CHOICES
 
 
 def _parse_args() -> argparse.Namespace:
@@ -68,6 +89,16 @@ def _parse_args() -> argparse.Namespace:
 
     parser.add_argument("--prompt-field", required=True)
     parser.add_argument(
+        "--task-kind",
+        choices=TASK_KIND_CHOICES,
+        default="math_freeform",
+        help=(
+            "Prompt/task formatting path. Use the multiple-choice modes so "
+            "GPQA or MMLU-Pro prompts include answer options instead of the "
+            "boxed-answer math template."
+        ),
+    )
+    parser.add_argument(
         "--split-ratio",
         type=float,
         default=0.1,
@@ -76,10 +107,14 @@ def _parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--livecodebench-repo", default="")
+    parser.add_argument("--release-version", default="release_v6")
+    parser.add_argument("--lm-style-override", default=None)
 
     parser.add_argument("--model-preset", choices=preset_choices(), default=None)
     parser.add_argument("--model-id", default=None)
     parser.add_argument("--temperature", type=float, default=None)
+    parser.add_argument("--num-generations", type=int, default=None)
     parser.add_argument("--max-tokens", type=int, default=None)
     parser.add_argument("--tp", type=int, default=None)
     parser.add_argument("--dp", type=int, default=None)
@@ -99,6 +134,27 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--loop-n", type=int, default=30)
     parser.add_argument("--loop-k", type=int, default=20)
     parser.add_argument(
+        "--target-kind",
+        choices=TARGET_KIND_CHOICES,
+        default="binary",
+        help=(
+            "Target family to build. 'binary' preserves the legacy rollout-level "
+            "loop label unless --binary-target-mode switches it to a prompt-level "
+            "repeated-rollout head; 'probability' aggregates repeated rollouts into "
+            "a prompt-level soft target."
+        ),
+    )
+    parser.add_argument(
+        "--binary-target-mode",
+        choices=BINARY_TARGET_MODE_CHOICES,
+        default="rollout_label",
+        help=(
+            "Binary-label surface. 'rollout_label' keeps the legacy one-rollout label. "
+            "'prompt_majority_tail' uses repeated rollouts and labels each prompt with "
+            "a strict majority vote over 1[L / E >= --profile-tail-threshold]."
+        ),
+    )
+    parser.add_argument(
         "--label-target",
         choices=LABEL_TARGET_CHOICES,
         default="eventual_loop",
@@ -115,6 +171,32 @@ def _parse_args() -> argparse.Namespace:
         default=None,
         help=(
             "Positive token horizon used when --label-target=loop_by_horizon."
+        ),
+    )
+    parser.add_argument(
+        "--profile-tail-threshold",
+        type=float,
+        default=0.9,
+        help=(
+            "Tail threshold used by prompt-profile targets. "
+            "For probability targets it applies when "
+            "--profile-target=s_tail and the emitted scalar is s_t = P(L / E >= t); "
+            "it is ignored by direct rate targets such as p_loop / p_cap. "
+            "for prompt-profile binary targets it defines the per-rollout "
+            "tail event used by the strict-majority label."
+        ),
+    )
+    parser.add_argument(
+        "--profile-target",
+        choices=PROFILE_TARGET_CHOICES,
+        default=None,
+        help=(
+            "Prompt-profile scalar to supervise when --target-kind is "
+            "'probability'/'regression' or when --binary-target-mode switches "
+            "binary labels onto a prompt-profile head. Defaults to "
+            "'majority_tail' for prompt-profile binary, 's_tail' for probability, "
+            "and 'mean_relative_length' for regression. Probability heads also "
+            "support direct prompt-level rates such as 'p_loop' and 'p_cap'."
         ),
     )
     parser.add_argument("--shard-size", type=int, default=2048)
@@ -345,6 +427,24 @@ def _prompts(records: list[SampleRecord]) -> list[str]:
     return [rec.prompt for rec in records]
 
 
+def _prompt_token_lengths(tokenizer, records: list[SampleRecord]) -> list[int]:
+    return [len(token_ids) for token_ids in _prompt_token_ids(tokenizer, records)]
+
+
+def _prompt_token_ids(tokenizer, records: list[SampleRecord]) -> list[list[int]]:
+    if not records:
+        return []
+    encoded = tokenizer(
+        [rec.prompt for rec in records],
+        add_special_tokens=False,
+    )["input_ids"]
+    if len(encoded) != len(records):
+        raise RuntimeError(
+            "Tokenizer returned a mismatched number of prompt tokenizations."
+        )
+    return [list(token_ids) for token_ids in encoded]
+
+
 def _apply_chat_prompt(
     tokenizer,
     records: list[SampleRecord],
@@ -353,14 +453,114 @@ def _apply_chat_prompt(
 ) -> list[SampleRecord]:
     formatted: list[SampleRecord] = []
     for rec in records:
+        if rec.prompt_style == "math_freeform":
+            prompt_text = build_prompt(tokenizer, rec.prompt, num_repetition)
+        elif rec.prompt_style == "multiple_choice_gpqa":
+            if not rec.choices:
+                raise SystemExit("GPQA record is missing answer choices.")
+            if num_repetition != 1:
+                raise SystemExit("GPQA prompt formatting does not support num_repetition != 1.")
+            prompt_text = multiple_choice_gpqa.build_mcq_prompt(
+                tokenizer,
+                rec.prompt,
+                list(rec.choices),
+            )
+        elif rec.prompt_style == "multiple_choice_mmlupro":
+            if not rec.choices:
+                raise SystemExit("MMLU-Pro record is missing answer choices.")
+            if num_repetition != 1:
+                raise SystemExit(
+                    "MMLU-Pro prompt formatting does not support num_repetition != 1."
+                )
+            prompt_text = multiple_choice_mmlupro.build_mcq_prompt(
+                tokenizer,
+                rec.prompt,
+                list(rec.choices),
+            )
+        elif rec.prompt_style == "livecodebench_codegen":
+            if num_repetition != 1:
+                raise SystemExit(
+                    "LiveCodeBench prompt formatting does not support num_repetition != 1."
+                )
+            prompt_text = rec.prompt
+        else:
+            raise SystemExit(f"Unsupported prompt_style '{rec.prompt_style}'.")
         formatted.append(
             SampleRecord(
                 sample_id=rec.sample_id,
-                prompt=build_prompt(tokenizer, rec.prompt, num_repetition),
+                prompt=prompt_text,
                 source_split=rec.source_split,
+                prompt_style=rec.prompt_style,
+                choices=rec.choices,
             )
         )
     return formatted
+
+
+def _load_task_records(
+    spec: DatasetSpec,
+    *,
+    prompt_field: str,
+    task_kind: str,
+    seed: int,
+    rollout_model_id: str,
+    livecodebench_repo: str,
+    release_version: str,
+    lm_style_override: str | None,
+) -> list[SampleRecord]:
+    if task_kind == "math_freeform":
+        return load_prompt_records(spec, prompt_field)
+    if task_kind == "multiple_choice_gpqa":
+        raw_records = multiple_choice_gpqa.load_and_shuffle(spec, seed)
+        return [
+            SampleRecord(
+                sample_id=record.sample_id,
+                prompt=record.prompt,
+                source_split=record.source_split,
+                prompt_style="multiple_choice_gpqa",
+                choices=tuple(options),
+            )
+            for record, options, _gold_letter in raw_records
+        ]
+    if task_kind == "multiple_choice_mmlupro":
+        raw_records = multiple_choice_mmlupro.load_samples(spec)
+        return [
+            SampleRecord(
+                sample_id=record.sample_id,
+                prompt=record.prompt,
+                source_split=record.source_split,
+                prompt_style="multiple_choice_mmlupro",
+                choices=tuple(options),
+            )
+            for record, options, _gold_answer, _gold_index in raw_records
+        ]
+    if task_kind == "livecodebench_codegen":
+        if not livecodebench_repo:
+            raise SystemExit(
+                "--livecodebench-repo is required when --task-kind=livecodebench_codegen."
+            )
+        benchmark, format_prompt = livecodebench_codegen.load_benchmark(
+            livecodebench_repo,
+            release_version,
+        )
+        prompt_records, _lm_style = livecodebench_codegen.build_prompts(
+            benchmark,
+            format_prompt,
+            repo_path=livecodebench_repo,
+            model_id=rollout_model_id,
+            lm_style_override=lm_style_override,
+            max_samples=spec.max_samples,
+        )
+        return [
+            SampleRecord(
+                sample_id=idx,
+                prompt=prompt,
+                source_split=spec.split,
+                prompt_style="livecodebench_codegen",
+            )
+            for idx, (_question_id, prompt) in enumerate(prompt_records)
+        ]
+    raise SystemExit(f"Unsupported --task-kind '{task_kind}'.")
 
 
 def _same_data_source(a: DatasetSpec, b: DatasetSpec) -> bool:
@@ -418,9 +618,20 @@ def _resolve_splits(
     args: argparse.Namespace,
     train_spec: DatasetSpec,
     test_spec: DatasetSpec | None,
+    *,
+    rollout_model_id: str,
 ) -> tuple[list[SampleRecord], list[SampleRecord], str]:
     if test_spec is None:
-        merged_records = load_prompt_records(train_spec, args.prompt_field)
+        merged_records = _load_task_records(
+            train_spec,
+            prompt_field=args.prompt_field,
+            task_kind=str(args.task_kind),
+            seed=args.seed,
+            rollout_model_id=rollout_model_id,
+            livecodebench_repo=str(args.livecodebench_repo),
+            release_version=str(args.release_version),
+            lm_style_override=args.lm_style_override,
+        )
         train_records, test_records = split_records(
             merged_records,
             test_ratio=args.split_ratio,
@@ -430,7 +641,16 @@ def _resolve_splits(
         return train_records, test_records, split_source
 
     if specs_equal(train_spec, test_spec):
-        merged_records = load_prompt_records(train_spec, args.prompt_field)
+        merged_records = _load_task_records(
+            train_spec,
+            prompt_field=args.prompt_field,
+            task_kind=str(args.task_kind),
+            seed=args.seed,
+            rollout_model_id=rollout_model_id,
+            livecodebench_repo=str(args.livecodebench_repo),
+            release_version=str(args.release_version),
+            lm_style_override=args.lm_style_override,
+        )
         train_records, test_records = split_records(
             merged_records,
             test_ratio=args.split_ratio,
@@ -448,7 +668,16 @@ def _resolve_splits(
         if train_max is not None and test_max is not None:
             requested_total = train_max + test_max
             merged_spec = _with_max_samples(train_spec, requested_total)
-            merged_records = load_prompt_records(merged_spec, args.prompt_field)
+            merged_records = _load_task_records(
+                merged_spec,
+                prompt_field=args.prompt_field,
+                task_kind=str(args.task_kind),
+                seed=args.seed,
+                rollout_model_id=rollout_model_id,
+                livecodebench_repo=str(args.livecodebench_repo),
+                release_version=str(args.release_version),
+                lm_style_override=args.lm_style_override,
+            )
             if len(merged_records) < requested_total:
                 raise SystemExit(
                     "Requested disjoint split sizes exceed available rows: "
@@ -464,7 +693,16 @@ def _resolve_splits(
             return train_records, test_records, split_source
 
         merged_spec = _with_max_samples(train_spec, None)
-        merged_records = load_prompt_records(merged_spec, args.prompt_field)
+        merged_records = _load_task_records(
+            merged_spec,
+            prompt_field=args.prompt_field,
+            task_kind=str(args.task_kind),
+            seed=args.seed,
+            rollout_model_id=rollout_model_id,
+            livecodebench_repo=str(args.livecodebench_repo),
+            release_version=str(args.release_version),
+            lm_style_override=args.lm_style_override,
+        )
         train_records, test_records = split_records(
             merged_records,
             test_ratio=args.split_ratio,
@@ -481,8 +719,26 @@ def _resolve_splits(
         split_source = "same_train_test_source_ratio_split"
         return train_records, test_records, split_source
 
-    train_records = load_prompt_records(train_spec, args.prompt_field)
-    test_records = load_prompt_records(test_spec, args.prompt_field)
+    train_records = _load_task_records(
+        train_spec,
+        prompt_field=args.prompt_field,
+        task_kind=str(args.task_kind),
+        seed=args.seed,
+        rollout_model_id=rollout_model_id,
+        livecodebench_repo=str(args.livecodebench_repo),
+        release_version=str(args.release_version),
+        lm_style_override=args.lm_style_override,
+    )
+    test_records = _load_task_records(
+        test_spec,
+        prompt_field=args.prompt_field,
+        task_kind=str(args.task_kind),
+        seed=args.seed,
+        rollout_model_id=rollout_model_id,
+        livecodebench_repo=str(args.livecodebench_repo),
+        release_version=str(args.release_version),
+        lm_style_override=args.lm_style_override,
+    )
     if not train_records:
         raise SystemExit("Train split is empty.")
     if not test_records:
@@ -540,10 +796,12 @@ def _probe_cache_status(
     train_spec: DatasetSpec,
     test_spec: DatasetSpec | None,
     prompt_field: str,
+    task_kind: str,
     split_source: str,
     split_ratio: float,
     loop_n: int,
     loop_k: int,
+    target_spec: dict[str, object],
     label_spec: dict[str, object],
     rollout_config: dict[str, object],
     requested_primary_feature_key: str,
@@ -565,6 +823,7 @@ def _probe_cache_status(
 
     expected = {
         "prompt_field": prompt_field,
+        "task_kind": task_kind,
         "split_source": split_source,
         "loop_detector": {"n": loop_n, "k": loop_k},
         "rollout_config": rollout_config,
@@ -577,15 +836,26 @@ def _probe_cache_status(
         if manifest.get(key) != value:
             return False, f"manifest mismatch on '{key}'"
 
-    manifest_label_spec = manifest.get(
-        "label_spec",
-        {
-            "target": "eventual_loop",
-            "horizon": None,
-        },
-    )
-    if manifest_label_spec != label_spec:
-        return False, "manifest mismatch on 'label_spec'"
+    manifest_target_spec = manifest.get("target_spec")
+    if manifest_target_spec is None:
+        manifest_target_spec = {
+            "kind": "binary",
+            "name": label_spec.get("target", "eventual_loop"),
+            "horizon": label_spec.get("horizon"),
+        }
+    if manifest_target_spec != target_spec:
+        return False, "manifest mismatch on 'target_spec'"
+
+    if _target_source(target_spec) == "rollout_label":
+        manifest_label_spec = manifest.get(
+            "label_spec",
+            {
+                "target": "eventual_loop",
+                "horizon": None,
+            },
+        )
+        if manifest_label_spec != label_spec:
+            return False, "manifest mismatch on 'label_spec'"
 
     expected_balancing = {
         "train": balance_train,
@@ -687,6 +957,22 @@ def _probe_cache_status(
         if not _split_shards_exist(out_dir, manifest.get("test")):
             return False, "test shards are missing"
 
+    if _target_source(target_spec) == "prompt_profile":
+        prompt_profile_files = manifest.get("prompt_profile_files")
+        if not isinstance(prompt_profile_files, dict):
+            return False, "manifest missing prompt_profile_files for prompt-profile target"
+        for split_name in ("train", "test"):
+            rel_path = prompt_profile_files.get(split_name)
+            if not isinstance(rel_path, str) or not rel_path:
+                return False, f"manifest missing prompt-profile diagnostics for split '{split_name}'"
+            if not os.path.exists(os.path.join(out_dir, rel_path)):
+                return False, f"prompt-profile diagnostics missing for split '{split_name}'"
+        prompt_rollout_archive_file = manifest.get("prompt_rollout_archive_file")
+        if not isinstance(prompt_rollout_archive_file, str) or not prompt_rollout_archive_file:
+            return False, "manifest missing prompt_rollout_archive_file for prompt-profile target"
+        if not os.path.exists(os.path.join(out_dir, prompt_rollout_archive_file)):
+            return False, "prompt_rollout_archive_file is missing"
+
     if manifest_seed is None:
         return True, "compatible legacy manifest match (no seed recorded)"
     return True, "manifest and shards match requested config"
@@ -752,6 +1038,180 @@ def _label_split(
     if not return_rollout_token_ids:
         return labels, None
     return labels, rollout_token_ids
+
+
+def _target_source(target_spec: dict[str, object]) -> str:
+    kind = str(target_spec.get("kind", "binary"))
+    if kind in ("probability", "regression"):
+        return "prompt_profile"
+    return str(target_spec.get("source", "rollout_label"))
+
+
+def _build_prompt_profile_targets(
+    split_name: str,
+    records: list[SampleRecord],
+    prompt_token_ids: list[list[int]],
+    sample_ids: list[int],
+    split_names: list[str],
+    *,
+    rollout_cfg,
+    seed: int,
+    loop_n: int,
+    loop_k: int,
+    tail_threshold: float,
+    profile_target: str,
+    target_kind: str,
+) -> tuple[list[int | float], list[dict[str, object]], list[dict[str, object]]]:
+    if (
+        len(records) != len(prompt_token_ids)
+        or len(records) != len(sample_ids)
+        or len(records) != len(split_names)
+    ):
+        raise SystemExit(
+            "Prompt-profile target builder got mismatched record/token/sample_id counts."
+        )
+    prompts = _prompts(records)
+    print(
+        f"[{split_name}] running grouped rollouts for {len(prompts)} prompts "
+        f"(n={rollout_cfg.num_generations})",
+        flush=True,
+    )
+    grouped_rollouts = generate_grouped_rollouts(
+        prompts,
+        rollout_cfg,
+        seed=seed,
+    )
+    if len(grouped_rollouts) != len(prompts):
+        raise RuntimeError(
+            "Grouped rollout generator returned a mismatched number of prompt groups."
+        )
+
+    target_name = profile_target_name(
+        profile_target,
+        tail_threshold=tail_threshold,
+    )
+    targets: list[int | float] = []
+    rows: list[dict[str, object]] = []
+    archive_rows: list[dict[str, object]] = []
+    for rec, prompt_ids, sample_id, split, prompt_rollouts in zip(
+        records,
+        prompt_token_ids,
+        sample_ids,
+        split_names,
+        grouped_rollouts,
+        strict=True,
+    ):
+        prompt_len = len(prompt_ids)
+        effective_max_tokens = int(rollout_cfg.max_tokens)
+        if rollout_cfg.max_model_len is not None and rollout_cfg.max_model_len > 0:
+            effective_max_tokens = min(
+                effective_max_tokens,
+                int(rollout_cfg.max_model_len) - int(prompt_len),
+            )
+        if effective_max_tokens < 1:
+            raise SystemExit(
+                "Prompt exceeds the available generation budget under the current "
+                "max_model_len / max_tokens setting."
+            )
+
+        profile = aggregate_prompt_profile(
+            [rollout.token_ids for rollout in prompt_rollouts],
+            effective_max_tokens=effective_max_tokens,
+            loop_n=loop_n,
+            loop_k=loop_k,
+            tail_threshold=tail_threshold,
+        )
+        raw_target_value = profile_target_value(
+            profile,
+            profile_target=profile_target,
+        )
+        target_value = (
+            int(raw_target_value)
+            if target_kind == "binary"
+            else float(raw_target_value)
+        )
+        targets.append(target_value)
+        rows.append(
+            {
+                "split": split,
+                "sample_id": int(sample_id),
+                "prompt_token_count": int(prompt_len),
+                "effective_max_tokens": int(effective_max_tokens),
+                "target_kind": target_kind,
+                "target_name": target_name,
+                "target_value": target_value,
+                target_name: target_value,
+                "p_cap": float(profile["p_cap"]),
+                "p_loop": float(profile["p_loop"]),
+                "mu_log_rel": float(profile["mu_log_rel"]),
+                "mean_length": float(profile["mean_length"]),
+                "mean_relative_length": float(profile["mean_relative_length"]),
+                "tail_threshold": float(profile["tail_threshold"]),
+                "tail_hit_count": int(profile["tail_hit_count"]),
+                "majority_tail": int(profile["majority_tail"]),
+                "num_rollouts": int(profile["num_rollouts"]),
+                "lengths": profile["lengths"],
+                "relative_lengths": profile["relative_lengths"],
+                "cap_hits": profile["cap_hits"],
+                "loop_flags": profile["loop_flags"],
+                "tail_hits": profile["tail_hits"],
+                "first_loop_prefix_lengths": profile["first_loop_prefix_lengths"],
+                "finish_reasons": [rollout.finish_reason for rollout in prompt_rollouts],
+            }
+        )
+        rollout_rows = []
+        for rollout_index, rollout, length, relative_length, cap_hit, loop_flag, tail_hit, first_loop_prefix in zip(
+            range(len(prompt_rollouts)),
+            prompt_rollouts,
+            profile["lengths"],
+            profile["relative_lengths"],
+            profile["cap_hits"],
+            profile["loop_flags"],
+            profile["tail_hits"],
+            profile["first_loop_prefix_lengths"],
+            strict=True,
+        ):
+            rollout_rows.append(
+                {
+                    "rollout_index": int(rollout_index),
+                    "completion_text": rollout.text,
+                    "finish_reason": rollout.finish_reason,
+                    "length": int(length),
+                    "relative_length": float(relative_length),
+                    "cap_hit": int(cap_hit),
+                    "loop_flag": int(loop_flag),
+                    "tail_hit": int(tail_hit),
+                    "first_loop_prefix_length": first_loop_prefix,
+                }
+            )
+        archive_rows.append(
+            {
+                "split": split,
+                "sample_id": int(sample_id),
+                "source_split": rec.source_split,
+                "prompt_style": rec.prompt_style,
+                "choices": list(rec.choices) if rec.choices is not None else None,
+                "prompt": rec.prompt,
+                "prompt_token_ids": list(prompt_ids),
+                "prompt_token_count": int(prompt_len),
+                "effective_max_tokens": int(effective_max_tokens),
+                "target_kind": target_kind,
+                "target_name": target_name,
+                "target_value": target_value,
+                target_name: target_value,
+                "p_cap": float(profile["p_cap"]),
+                "p_loop": float(profile["p_loop"]),
+                "mu_log_rel": float(profile["mu_log_rel"]),
+                "mean_length": float(profile["mean_length"]),
+                "mean_relative_length": float(profile["mean_relative_length"]),
+                "tail_threshold": float(profile["tail_threshold"]),
+                "tail_hit_count": int(profile["tail_hit_count"]),
+                "majority_tail": int(profile["majority_tail"]),
+                "num_rollouts": int(profile["num_rollouts"]),
+                "rollouts": rollout_rows,
+            }
+        )
+    return targets, rows, archive_rows
 
 
 def _extract_completion_features(
@@ -913,6 +1373,17 @@ def _subset_list(values: list[int], keep_indices: list[int]) -> list[int]:
     return [values[idx] for idx in keep_indices]
 
 
+def _subset_float_list(values: list[float], keep_indices: list[int]) -> list[float]:
+    return [float(values[idx]) for idx in keep_indices]
+
+
+def _write_jsonl_rows(path: str, rows: list[dict[str, object]]) -> None:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        for row in rows:
+            f.write(json.dumps(row, sort_keys=True) + "\n")
+
+
 def _sample_shape_from_features(features: torch.Tensor) -> list[int]:
     if features.ndim not in (2, 3):
         raise SystemExit(
@@ -942,6 +1413,122 @@ def _resolve_label_spec(args: argparse.Namespace) -> dict[str, object]:
     }
 
 
+def _resolve_target_spec(
+    args: argparse.Namespace,
+    *,
+    rollout_cfg,
+    label_spec: dict[str, object],
+) -> dict[str, object]:
+    target_kind = str(args.target_kind)
+    if target_kind == "binary":
+        binary_target_mode = str(args.binary_target_mode)
+        if binary_target_mode == "rollout_label":
+            if args.profile_target not in (None, ""):
+                raise SystemExit(
+                    "--profile-target is only valid for prompt-profile targets."
+                )
+            if rollout_cfg.num_generations != 1:
+                raise SystemExit(
+                    "Legacy rollout-level binary targets require --num-generations=1. "
+                    "Use --binary-target-mode=prompt_majority_tail for repeated-rollout "
+                    "prompt-level binary labels."
+                )
+            return {
+                "kind": "binary",
+                "name": str(label_spec["target"]),
+                "horizon": label_spec["horizon"],
+            }
+        if binary_target_mode != "prompt_majority_tail":
+            raise SystemExit(
+                f"Unsupported --binary-target-mode '{binary_target_mode}'. "
+                f"Valid: {BINARY_TARGET_MODE_CHOICES}"
+            )
+        if rollout_cfg.num_generations < 2:
+            raise SystemExit(
+                "--binary-target-mode=prompt_majority_tail requires "
+                "--num-generations >= 2 so majority labels are estimated from "
+                "repeated rollouts."
+            )
+        tail_threshold = float(args.profile_tail_threshold)
+        if not 0.0 < tail_threshold <= 1.0:
+            raise SystemExit("--profile-tail-threshold must be in (0, 1].")
+        profile_target = args.profile_target
+        if profile_target is None or profile_target == "":
+            profile_target = "majority_tail"
+        if profile_target != "majority_tail":
+            raise SystemExit(
+                "--binary-target-mode=prompt_majority_tail currently expects "
+                "--profile-target=majority_tail."
+            )
+        target_name = profile_target_name(
+            profile_target,
+            tail_threshold=tail_threshold,
+        )
+        return {
+            "kind": "binary",
+            "source": "prompt_profile",
+            "name": target_name,
+            "profile_target": profile_target,
+            "tail_threshold": tail_threshold,
+            "num_generations": int(rollout_cfg.num_generations),
+            "positive_rule": "strict_majority",
+        }
+    if target_kind not in ("probability", "regression"):
+        raise SystemExit(f"Unsupported --target-kind '{target_kind}'.")
+    if rollout_cfg.num_generations < 2:
+        raise SystemExit(
+            "--target-kind=probability/regression requires --num-generations >= 2 "
+            "so the target is estimated from repeated rollouts rather than "
+            "collapsing back to a single sample."
+        )
+    tail_threshold = float(args.profile_tail_threshold)
+    if not 0.0 < tail_threshold <= 1.0:
+        raise SystemExit("--profile-tail-threshold must be in (0, 1].")
+    profile_target = args.profile_target
+    if profile_target is None or profile_target == "":
+        profile_target = "s_tail" if target_kind == "probability" else "mean_relative_length"
+    if profile_target not in PROFILE_TARGET_CHOICES:
+        raise SystemExit(
+            f"Unsupported --profile-target '{profile_target}'. "
+            f"Valid: {PROFILE_TARGET_CHOICES}"
+        )
+    if target_kind == "probability" and profile_target not in {
+        "s_tail",
+        "p_loop",
+        "p_cap",
+    }:
+        raise SystemExit(
+            "--target-kind=probability currently expects "
+            "--profile-target in {s_tail, p_loop, p_cap}."
+        )
+    if target_kind == "regression" and profile_target != "mean_relative_length":
+        raise SystemExit(
+            "--target-kind=regression currently expects "
+            "--profile-target=mean_relative_length."
+        )
+    target_name = profile_target_name(
+        profile_target,
+        tail_threshold=tail_threshold,
+    )
+    if target_kind == "probability":
+        return {
+            "kind": "probability",
+            "name": target_name,
+            "profile_target": profile_target,
+            "tail_threshold": tail_threshold,
+            "num_generations": int(rollout_cfg.num_generations),
+            "loss": "soft_bce",
+        }
+    return {
+        "kind": "regression",
+        "name": target_name,
+        "profile_target": profile_target,
+        "tail_threshold": tail_threshold,
+        "num_generations": int(rollout_cfg.num_generations),
+        "loss": "sigmoid_mse",
+    }
+
+
 def main() -> None:
     args = _parse_args()
 
@@ -950,6 +1537,7 @@ def main() -> None:
             args.model_preset,
             model_id=args.model_id,
             temperature=args.temperature,
+            num_generations=args.num_generations,
             max_tokens=args.max_tokens,
             tp=args.tp,
             dp=args.dp,
@@ -969,7 +1557,24 @@ def main() -> None:
         feature_views
     )
     label_spec = _resolve_label_spec(args)
+    target_spec = _resolve_target_spec(
+        args,
+        rollout_cfg=rollout_cfg,
+        label_spec=label_spec,
+    )
+    target_source = _target_source(target_spec)
     balance_seed = args.seed if args.balance_seed is None else args.balance_seed
+    if target_source == "prompt_profile":
+        if completion_feature_views:
+            raise SystemExit(
+                "Prompt-profile targets currently support prefill feature views only."
+            )
+        if target_spec["kind"] != "binary" and (
+            args.balance_train != "none" or args.balance_test != "none"
+        ):
+            raise SystemExit(
+                "Balancing is only supported for binary targets in this builder."
+            )
 
     if args.reuse_if_compatible:
         cache_hit, reason = _probe_cache_status(
@@ -977,10 +1582,12 @@ def main() -> None:
             train_spec=train_spec,
             test_spec=test_spec,
             prompt_field=args.prompt_field,
+            task_kind=str(args.task_kind),
             split_source=split_source,
             split_ratio=args.split_ratio,
             loop_n=args.loop_n,
             loop_k=args.loop_k,
+            target_spec=target_spec,
             label_spec=label_spec,
             rollout_config=rollout_cfg.to_dict(),
             requested_primary_feature_key=primary_feature_key,
@@ -1001,16 +1608,22 @@ def main() -> None:
             flush=True,
         )
 
-    train_records, test_records, split_source = _resolve_splits(args, train_spec, test_spec)
-    label_desc = str(label_spec["target"])
-    if label_spec["horizon"] is not None:
-        label_desc = f"{label_desc}@{label_spec['horizon']}"
+    train_records, test_records, split_source = _resolve_splits(
+        args,
+        train_spec,
+        test_spec,
+        rollout_model_id=rollout_cfg.model_id,
+    )
+    target_desc = str(target_spec["name"])
+    if target_spec["kind"] == "binary" and target_spec.get("horizon") is not None:
+        target_desc = f"{target_desc}@{target_spec['horizon']}"
 
     print(
         f"Building probe dataset with model={rollout_cfg.model_id}, "
         f"train={len(train_records)}, test={len(test_records)}, "
         f"feature_views={list(feature_views.keys())}, "
-        f"label_target={label_desc}",
+        f"target={target_desc}, "
+        f"task_kind={args.task_kind}",
         flush=True,
     )
 
@@ -1025,6 +1638,10 @@ def main() -> None:
 
     train_ids = _sample_ids(train_records)
     test_ids = _sample_ids(test_records)
+    train_prompt_token_ids = _prompt_token_ids(tokenizer, train_records)
+    test_prompt_token_ids = _prompt_token_ids(tokenizer, test_records)
+    train_prompt_token_lengths = [len(token_ids) for token_ids in train_prompt_token_ids]
+    test_prompt_token_lengths = [len(token_ids) for token_ids in test_prompt_token_ids]
     train_features_by_key: dict[str, torch.Tensor] = {}
     test_features_by_key: dict[str, torch.Tensor] = {}
 
@@ -1061,92 +1678,146 @@ def main() -> None:
     train_prompts = _prompts(train_records)
     test_prompts = _prompts(test_records)
     all_prompts = train_prompts + test_prompts
-    need_rollout_tokens = bool(completion_feature_views)
-    all_labels, all_rollout_token_ids = _label_split(
-        "all",
-        all_prompts,
-        rollout_cfg=rollout_cfg,
-        seed=args.seed,
-        loop_n=args.loop_n,
-        loop_k=args.loop_k,
-        label_target=str(label_spec["target"]),
-        label_horizon=(
-            int(label_spec["horizon"])
-            if label_spec["horizon"] is not None
-            else None
-        ),
-        return_rollout_token_ids=need_rollout_tokens,
-    )
     split_at = len(train_prompts)
-    train_labels = all_labels[:split_at]
-    test_labels = all_labels[split_at:]
+    train_profile_rows: list[dict[str, object]] = []
+    test_profile_rows: list[dict[str, object]] = []
+    prompt_rollout_archive_rows: list[dict[str, object]] = []
 
-    if completion_feature_views:
-        if all_rollout_token_ids is None:
-            raise RuntimeError(
-                "Completion views requested but rollout token IDs were not retained."
+    if target_source == "rollout_label":
+        need_rollout_tokens = bool(completion_feature_views)
+        all_labels, all_rollout_token_ids = _label_split(
+            "all",
+            all_prompts,
+            rollout_cfg=rollout_cfg,
+            seed=args.seed,
+            loop_n=args.loop_n,
+            loop_k=args.loop_k,
+            label_target=str(label_spec["target"]),
+            label_horizon=(
+                int(label_spec["horizon"])
+                if label_spec["horizon"] is not None
+                else None
+            ),
+            return_rollout_token_ids=need_rollout_tokens,
+        )
+        train_labels: list[int | float] = all_labels[:split_at]
+        test_labels: list[int | float] = all_labels[split_at:]
+
+        if completion_feature_views:
+            if all_rollout_token_ids is None:
+                raise RuntimeError(
+                    "Completion views requested but rollout token IDs were not retained."
+                )
+            train_rollout_token_ids = all_rollout_token_ids[:split_at]
+            test_rollout_token_ids = all_rollout_token_ids[split_at:]
+            completion_model, completion_tokenizer, completion_device = (
+                load_prefill_model_and_tokenizer(
+                    rollout_cfg.model_id,
+                    trust_remote_code=rollout_cfg.trust_remote_code,
+                )
             )
-        train_rollout_token_ids = all_rollout_token_ids[:split_at]
-        test_rollout_token_ids = all_rollout_token_ids[split_at:]
-        completion_model, completion_tokenizer, completion_device = (
-            load_prefill_model_and_tokenizer(
-                rollout_cfg.model_id,
-                trust_remote_code=rollout_cfg.trust_remote_code,
+            train_completion_features_by_key = _extract_completion_features(
+                "train",
+                train_records,
+                train_rollout_token_ids,
+                model=completion_model,
+                tokenizer=completion_tokenizer,
+                device=completion_device,
+                feature_views=completion_feature_views,
+                batch_size=args.completion_batch_size,
+                max_model_len=rollout_cfg.max_model_len,
             )
-        )
-        train_completion_features_by_key = _extract_completion_features(
-            "train",
-            train_records,
-            train_rollout_token_ids,
-            model=completion_model,
-            tokenizer=completion_tokenizer,
-            device=completion_device,
-            feature_views=completion_feature_views,
-            batch_size=args.completion_batch_size,
-            max_model_len=rollout_cfg.max_model_len,
-        )
-        test_completion_features_by_key = _extract_completion_features(
-            "test",
-            test_records,
-            test_rollout_token_ids,
-            model=completion_model,
-            tokenizer=completion_tokenizer,
-            device=completion_device,
-            feature_views=completion_feature_views,
-            batch_size=args.completion_batch_size,
-            max_model_len=rollout_cfg.max_model_len,
-        )
-        train_features_by_key.update(train_completion_features_by_key)
-        test_features_by_key.update(test_completion_features_by_key)
+            test_completion_features_by_key = _extract_completion_features(
+                "test",
+                test_records,
+                test_rollout_token_ids,
+                model=completion_model,
+                tokenizer=completion_tokenizer,
+                device=completion_device,
+                feature_views=completion_feature_views,
+                batch_size=args.completion_batch_size,
+                max_model_len=rollout_cfg.max_model_len,
+            )
+            train_features_by_key.update(train_completion_features_by_key)
+            test_features_by_key.update(test_completion_features_by_key)
 
-        del train_rollout_token_ids
-        del test_rollout_token_ids
-        del all_rollout_token_ids
+            del train_rollout_token_ids
+            del test_rollout_token_ids
+            del all_rollout_token_ids
 
-        del completion_model
-        del completion_tokenizer
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.synchronize()
-            torch.cuda.empty_cache()
-            torch.cuda.ipc_collect()
+            del completion_model
+            del completion_tokenizer
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+                torch.cuda.empty_cache()
+                torch.cuda.ipc_collect()
 
-    train_keep_idx = _balanced_indices(
-        train_labels,
-        split_name="train",
-        mode=args.balance_train,
-        seed=balance_seed,
-    )
-    test_keep_idx = _balanced_indices(
-        test_labels,
-        split_name="test",
-        mode=args.balance_test,
-        seed=balance_seed + 1,
-    )
-    train_labels = _subset_list(train_labels, train_keep_idx)
-    test_labels = _subset_list(test_labels, test_keep_idx)
+        train_keep_idx = _balanced_indices(
+            train_labels,
+            split_name="train",
+            mode=args.balance_train,
+            seed=balance_seed,
+        )
+        test_keep_idx = _balanced_indices(
+            test_labels,
+            split_name="test",
+            mode=args.balance_test,
+            seed=balance_seed + 1,
+        )
+        train_labels = _subset_list(train_labels, train_keep_idx)
+        test_labels = _subset_list(test_labels, test_keep_idx)
+    else:
+        all_records = train_records + test_records
+        all_prompt_token_ids = train_prompt_token_ids + test_prompt_token_ids
+        all_ids = train_ids + test_ids
+        all_split_names = (["train"] * len(train_records)) + (["test"] * len(test_records))
+        all_targets, all_profile_rows, prompt_rollout_archive_rows = _build_prompt_profile_targets(
+            "all",
+            all_records,
+            all_prompt_token_ids,
+            all_ids,
+            all_split_names,
+            rollout_cfg=rollout_cfg,
+            seed=args.seed,
+            loop_n=args.loop_n,
+            loop_k=args.loop_k,
+            tail_threshold=float(target_spec["tail_threshold"]),
+            profile_target=str(target_spec["profile_target"]),
+            target_kind=str(target_spec["kind"]),
+        )
+        train_labels = all_targets[:split_at]
+        test_labels = all_targets[split_at:]
+        train_profile_rows = all_profile_rows[:split_at]
+        test_profile_rows = all_profile_rows[split_at:]
+        if target_spec["kind"] == "binary":
+            train_keep_idx = _balanced_indices(
+                train_labels,
+                split_name="train",
+                mode=args.balance_train,
+                seed=balance_seed,
+            )
+            test_keep_idx = _balanced_indices(
+                test_labels,
+                split_name="test",
+                mode=args.balance_test,
+                seed=balance_seed + 1,
+            )
+            train_labels = _subset_list(train_labels, train_keep_idx)
+            test_labels = _subset_list(test_labels, test_keep_idx)
+        else:
+            train_keep_idx = list(range(len(train_labels)))
+            test_keep_idx = list(range(len(test_labels)))
+            train_labels = _subset_float_list(train_labels, train_keep_idx)
+            test_labels = _subset_float_list(test_labels, test_keep_idx)
+
     train_ids = _subset_list(train_ids, train_keep_idx)
     test_ids = _subset_list(test_ids, test_keep_idx)
+    train_prompt_token_lengths = _subset_list(train_prompt_token_lengths, train_keep_idx)
+    test_prompt_token_lengths = _subset_list(test_prompt_token_lengths, test_keep_idx)
+    if target_source == "prompt_profile":
+        train_profile_rows = [train_profile_rows[idx] for idx in train_keep_idx]
+        test_profile_rows = [test_profile_rows[idx] for idx in test_keep_idx]
     train_keep_idx_t = torch.tensor(train_keep_idx, dtype=torch.long)
     test_keep_idx_t = torch.tensor(test_keep_idx, dtype=torch.long)
 
@@ -1198,6 +1869,7 @@ def main() -> None:
             train_labels,
             train_ids,
             shard_size=args.shard_size,
+            target_kind=str(target_spec["kind"]),
         )
         test_meta = save_split_shards(
             args.out_dir,
@@ -1206,6 +1878,7 @@ def main() -> None:
             test_labels,
             test_ids,
             shard_size=args.shard_size,
+            target_kind=str(target_spec["kind"]),
         )
 
         feature_views_manifest[feature_key] = {
@@ -1226,8 +1899,35 @@ def main() -> None:
     if primary_train_meta is None or primary_test_meta is None or primary_input_dim is None:
         raise SystemExit(f"Primary feature view '{primary_feature_key}' was not materialized.")
 
+    prompt_profile_files: dict[str, str] = {}
+    prompt_rollout_archive_file = ""
+    if target_source == "prompt_profile":
+        train_profile_path = os.path.join("diagnostics", "train_prompt_profile.jsonl")
+        test_profile_path = os.path.join("diagnostics", "test_prompt_profile.jsonl")
+        prompt_rollout_archive_path = os.path.join(
+            "diagnostics",
+            "prompt_rollout_archive.jsonl",
+        )
+        _write_jsonl_rows(
+            os.path.join(args.out_dir, train_profile_path),
+            train_profile_rows,
+        )
+        _write_jsonl_rows(
+            os.path.join(args.out_dir, test_profile_path),
+            test_profile_rows,
+        )
+        prompt_profile_files = {
+            "train": train_profile_path,
+            "test": test_profile_path,
+        }
+        _write_jsonl_rows(
+            os.path.join(args.out_dir, prompt_rollout_archive_path),
+            prompt_rollout_archive_rows,
+        )
+        prompt_rollout_archive_file = prompt_rollout_archive_path
+
     manifest = {
-        "version": 4,
+        "version": 7,
         "input_dim": primary_input_dim,
         "sample_shape": feature_views_manifest[primary_feature_key]["sample_shape"],
         "default_feature_key": primary_feature_key,
@@ -1237,9 +1937,22 @@ def main() -> None:
             "layer": feature_views[primary_feature_key]["layer"],
         },
         "feature_views": feature_views_manifest,
+        "task_kind": str(args.task_kind),
         "prompt_field": args.prompt_field,
         "prompt_template": {
-            "source": "utils.build_prompt",
+            "source": (
+            "loop_probe.adapters.multiple_choice_gpqa.build_mcq_prompt"
+            if args.task_kind == "multiple_choice_gpqa"
+            else (
+                "loop_probe.adapters.multiple_choice_mmlupro.build_mcq_prompt"
+                if args.task_kind == "multiple_choice_mmlupro"
+                else (
+                    "loop_probe.adapters.livecodebench_codegen.build_prompts"
+                    if args.task_kind == "livecodebench_codegen"
+                    else "utils.build_prompt"
+                )
+            )
+        ),
             "num_repetition": 1,
             "chat_template": True,
         },
@@ -1250,13 +1963,16 @@ def main() -> None:
             "n": args.loop_n,
             "k": args.loop_k,
         },
-        "label_spec": label_spec,
+        "target_spec": target_spec,
+        "label_spec": label_spec if target_source == "rollout_label" else None,
         "balancing": {
             "train": args.balance_train,
             "test": args.balance_test,
             "seed": balance_seed,
         },
         "rollout_config": rollout_cfg.to_dict(),
+        "prompt_profile_files": prompt_profile_files or None,
+        "prompt_rollout_archive_file": prompt_rollout_archive_file or None,
         "train_spec": asdict(train_spec),
         "test_spec": asdict(test_spec) if test_spec else None,
         "train": primary_train_meta,

@@ -14,3 +14,5 @@ class SampleRecord:
     sample_id: int
     prompt: str
     source_split: str
+    prompt_style: str = "math_freeform"
+    choices: tuple[str, ...] | None = None

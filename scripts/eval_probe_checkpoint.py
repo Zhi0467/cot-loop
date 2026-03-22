@@ -172,6 +172,8 @@ def _evaluate(
     *,
     classifier_mode: str,
     resolved_classifier_layer: int | None,
+    target_kind: str,
+    score_rule: str,
 ) -> dict[str, float]:
     model.eval()
     all_logits = []
@@ -194,6 +196,8 @@ def _evaluate(
         labels_cat,
         logits_cat,
         classifier_mode=classifier_mode,
+        target_kind=target_kind,
+        score_rule=score_rule,
     )
 
 
@@ -212,6 +216,16 @@ def main() -> None:
 
     checkpoint_feature_key = payload.get("feature_key")
     manifest = read_manifest(args.data_dir)
+    target_spec = manifest.get("target_spec")
+    if not isinstance(target_spec, dict):
+        label_spec = manifest.get("label_spec")
+        target_spec = {
+            "kind": "binary",
+            "name": label_spec.get("target", "eventual_loop") if isinstance(label_spec, dict) else "eventual_loop",
+        }
+    target_kind = str(target_spec.get("kind", "binary"))
+    if target_kind not in ("binary", "probability", "regression"):
+        raise SystemExit(f"Unsupported manifest target kind '{target_kind}'.")
     resolved_feature_key_arg = args.feature_key
     if (
         (resolved_feature_key_arg is None or resolved_feature_key_arg == "")
@@ -276,6 +290,8 @@ def main() -> None:
         device,
         classifier_mode=probe_cfg.classifier_mode,
         resolved_classifier_layer=resolved_classifier_layer,
+        target_kind=target_kind,
+        score_rule=probe_cfg.score_rule,
     )
 
     out = {
@@ -283,6 +299,8 @@ def main() -> None:
         "data_dir": args.data_dir,
         "split": args.split,
         "feature_key": resolved_feature_key,
+        "target_kind": target_kind,
+        "target_spec": target_spec,
         "input_dim": input_dim,
         "sample_shape": list(sample_shape),
         "classifier_mode": probe_cfg.classifier_mode,

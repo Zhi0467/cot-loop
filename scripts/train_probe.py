@@ -99,6 +99,16 @@ def _parse_args() -> argparse.Namespace:
             "selected feature view is stacked as [layer, hidden]."
         ),
     )
+    parser.add_argument(
+        "--score-rule",
+        choices=("vote_fraction", "mean_prob"),
+        default=None,
+        help=(
+            "How to aggregate per-layer ensemble scores at eval time. "
+            "Defaults to vote_fraction for binary targets and mean_prob for "
+            "probability targets."
+        ),
+    )
 
     parser.add_argument("--wandb-project", required=True)
     parser.add_argument("--wandb-run-name", default=None)
@@ -155,6 +165,8 @@ def _evaluate(
     *,
     classifier_mode: str,
     resolved_classifier_layer: int | None,
+    target_kind: str,
+    score_rule: str,
 ) -> dict[str, float]:
     model.eval()
     all_logits = []
@@ -177,6 +189,8 @@ def _evaluate(
         labels_cat,
         logits_cat,
         classifier_mode=classifier_mode,
+        target_kind=target_kind,
+        score_rule=score_rule,
     )
 
 
@@ -193,6 +207,7 @@ def _checkpoint_payload(
     probe_config: dict[str, object] | None = None,
     feature_key: str | None = None,
     sample_shape: tuple[int, ...] | None = None,
+    target_spec: dict[str, object] | None = None,
 ) -> dict[str, object]:
     payload = {
         "epoch": epoch,
@@ -206,7 +221,154 @@ def _checkpoint_payload(
         payload["feature_key"] = feature_key
     if sample_shape is not None:
         payload["sample_shape"] = [int(dim) for dim in sample_shape]
+    if target_spec is not None:
+        payload["target_spec"] = target_spec
     return payload
+
+
+def _resolve_target_spec(manifest: dict[str, object]) -> dict[str, object]:
+    target_spec = manifest.get("target_spec")
+    if isinstance(target_spec, dict):
+        return target_spec
+    label_spec = manifest.get("label_spec")
+    if isinstance(label_spec, dict):
+        return {
+            "kind": "binary",
+            "name": label_spec.get("target", "eventual_loop"),
+            "horizon": label_spec.get("horizon"),
+        }
+    return {
+        "kind": "binary",
+        "name": "eventual_loop",
+        "horizon": None,
+    }
+
+
+def _metric_bundle(
+    prefix: str,
+    metrics: dict[str, float],
+    *,
+    target_kind: str,
+) -> dict[str, float]:
+    if target_kind == "binary":
+        return {
+            f"{prefix}/accuracy": metrics["accuracy"],
+            f"{prefix}/macro_f1": metrics["macro_f1"],
+            f"{prefix}/positive_precision": metrics["positive_precision"],
+            f"{prefix}/positive_recall": metrics["positive_recall"],
+            f"{prefix}/positive_f1": metrics["positive_f1"],
+            f"{prefix}/prevalence": metrics["prevalence"],
+            f"{prefix}/roc_auc": metrics["roc_auc"],
+            f"{prefix}/pr_auc": metrics["pr_auc"],
+        }
+    if target_kind == "probability":
+        return {
+            f"{prefix}/brier": metrics["brier"],
+            f"{prefix}/mae": metrics["mae"],
+            f"{prefix}/rmse": metrics["rmse"],
+            f"{prefix}/target_mean": metrics["target_mean"],
+            f"{prefix}/pred_mean": metrics["pred_mean"],
+            f"{prefix}/spearman": metrics["spearman"],
+            f"{prefix}/top_10p_capture": metrics["top_10p_capture"],
+            f"{prefix}/top_20p_capture": metrics["top_20p_capture"],
+        }
+    if target_kind == "regression":
+        return {
+            f"{prefix}/mse": metrics["mse"],
+            f"{prefix}/mae": metrics["mae"],
+            f"{prefix}/rmse": metrics["rmse"],
+            f"{prefix}/target_mean": metrics["target_mean"],
+            f"{prefix}/pred_mean": metrics["pred_mean"],
+            f"{prefix}/spearman": metrics["spearman"],
+            f"{prefix}/top_10p_capture": metrics["top_10p_capture"],
+            f"{prefix}/top_20p_capture": metrics["top_20p_capture"],
+        }
+    raise SystemExit(f"Unsupported target_kind '{target_kind}'.")
+
+
+def _log_row_fields(
+    prefix: str,
+    metrics: dict[str, float],
+    *,
+    target_kind: str,
+) -> dict[str, float]:
+    return {
+        f"{prefix}_{key}": float(value)
+        for key, value in metrics.items()
+        if isinstance(value, (int, float))
+    }
+
+
+def _print_metric_summary(
+    *,
+    epoch: int,
+    train_loss: float,
+    train_metrics: dict[str, float],
+    eval_metrics: dict[str, float] | None,
+    target_kind: str,
+) -> str:
+    parts = [
+        f"epoch={epoch}",
+        f"train_loss={train_loss:.6f}",
+    ]
+    if target_kind == "binary":
+        parts.extend(
+            [
+                f"train_acc={train_metrics['accuracy']:.4f}",
+                f"train_auc={train_metrics['roc_auc']:.4f}",
+                f"train_pr_auc={train_metrics['pr_auc']:.4f}",
+            ]
+        )
+        if eval_metrics is not None:
+            parts.extend(
+                [
+                    f"eval_acc={eval_metrics['accuracy']:.4f}",
+                    f"eval_f1={eval_metrics['macro_f1']:.4f}",
+                    f"eval_auc={eval_metrics['roc_auc']:.4f}",
+                    f"eval_pr_auc={eval_metrics['pr_auc']:.4f}",
+                ]
+            )
+        return " ".join(parts)
+
+    if target_kind == "probability":
+        parts.extend(
+            [
+                f"train_brier={train_metrics['brier']:.4f}",
+                f"train_mae={train_metrics['mae']:.4f}",
+                f"train_spear={train_metrics['spearman']:.4f}",
+            ]
+        )
+        if eval_metrics is not None:
+            parts.extend(
+                [
+                    f"eval_brier={eval_metrics['brier']:.4f}",
+                    f"eval_mae={eval_metrics['mae']:.4f}",
+                    f"eval_spear={eval_metrics['spearman']:.4f}",
+                    f"eval_top10={eval_metrics['top_10p_capture']:.4f}",
+                ]
+            )
+        return " ".join(parts)
+
+    if target_kind == "regression":
+        parts.extend(
+            [
+                f"train_mse={train_metrics['mse']:.4f}",
+                f"train_mae={train_metrics['mae']:.4f}",
+                f"train_spear={train_metrics['spearman']:.4f}",
+            ]
+        )
+        if eval_metrics is not None:
+            parts.extend(
+                [
+                    f"eval_mse={eval_metrics['mse']:.4f}",
+                    f"eval_mae={eval_metrics['mae']:.4f}",
+                    f"eval_spear={eval_metrics['spearman']:.4f}",
+                    f"eval_top10={eval_metrics['top_10p_capture']:.4f}",
+                ]
+            )
+        return " ".join(parts)
+
+    raise SystemExit(f"Unsupported target_kind '{target_kind}'.")
 
 
 def _cosine_lr_factor(
@@ -283,6 +445,10 @@ def main() -> None:
     import wandb
 
     manifest = read_manifest(args.data_dir)
+    target_spec = _resolve_target_spec(manifest)
+    target_kind = str(target_spec.get("kind", "binary"))
+    if target_kind not in ("binary", "probability", "regression"):
+        raise SystemExit(f"Unsupported manifest target kind '{target_kind}'.")
     train_info, resolved_feature_key = resolve_split_info(
         manifest,
         split="train",
@@ -298,6 +464,11 @@ def main() -> None:
             depth=args.mlp_depth,
             classifier_mode=args.classifier_mode,
             classifier_layer=args.classifier_layer,
+            score_rule=(
+                args.score_rule
+                if args.score_rule is not None
+                else ("mean_prob" if target_kind != "binary" else None)
+            ),
         )
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
@@ -333,8 +504,12 @@ def main() -> None:
 
     num_pos = int(train_info.get("num_positive", 0))
     num_neg = int(train_info.get("num_negative", 0))
-    if num_pos > 0 and num_neg > 0:
-        pos_weight = torch.tensor(float(num_neg / num_pos), dtype=torch.float32, device=device)
+    if target_kind == "binary" and num_pos > 0 and num_neg > 0:
+        pos_weight = torch.tensor(
+            float(num_neg / num_pos),
+            dtype=torch.float32,
+            device=device,
+        )
     else:
         pos_weight = torch.tensor(1.0, dtype=torch.float32, device=device)
 
@@ -343,7 +518,12 @@ def main() -> None:
         probe_cfg=probe_cfg,
         sample_shape=sample_shape,
     ).to(device)
-    criterion = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+    if target_kind == "binary":
+        criterion = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+    elif target_kind == "probability":
+        criterion = torch.nn.BCEWithLogitsLoss()
+    else:
+        criterion = torch.nn.MSELoss()
     optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=args.lr,
@@ -362,6 +542,7 @@ def main() -> None:
         config={
             "data_dir": args.data_dir,
             "feature_key": resolved_feature_key,
+            "target_spec": target_spec,
             "input_dim": input_dim,
             "sample_shape": list(sample_shape),
             "epochs": args.epochs,
@@ -391,8 +572,18 @@ def main() -> None:
     with open(metrics_jsonl, "w", encoding="utf-8"):
         pass
 
-    best_auc = float("-inf")
-    best_f1 = float("-inf")
+    if target_kind == "binary":
+        best_primary = float("-inf")
+        best_secondary = float("-inf")
+        selection_rule = "max(roc_auc), tie_break=max(macro_f1)"
+    elif target_kind == "probability":
+        best_primary = float("inf")
+        best_secondary = float("-inf")
+        selection_rule = "min(brier), tie_break=max(spearman)"
+    else:
+        best_primary = float("inf")
+        best_secondary = float("-inf")
+        selection_rule = "min(mse), tie_break=max(spearman)"
     best_eval_row: dict[str, object] | None = None
     global_step = 0
 
@@ -424,8 +615,11 @@ def main() -> None:
             y = y.to(device)
 
             logits = model(x)
+            loss_inputs = logits
+            if target_kind == "regression":
+                loss_inputs = torch.sigmoid(logits)
             loss = criterion(
-                logits,
+                loss_inputs,
                 _loss_targets(
                     y,
                     logits=logits,
@@ -472,26 +666,25 @@ def main() -> None:
             epoch_labels_cat,
             epoch_logits_cat,
             classifier_mode=probe_cfg.classifier_mode,
+            target_kind=target_kind,
+            score_rule=probe_cfg.score_rule,
         )
 
         # Always log training metrics to wandb (every epoch)
-        wandb.log(
-            {
-                "train/loss_epoch": train_loss_epoch,
-                "train/accuracy_epoch": train_metrics_epoch["accuracy"],
-                "train/macro_f1_epoch": train_metrics_epoch["macro_f1"],
-                "train/positive_precision_epoch": train_metrics_epoch["positive_precision"],
-                "train/positive_recall_epoch": train_metrics_epoch["positive_recall"],
-                "train/positive_f1_epoch": train_metrics_epoch["positive_f1"],
-                "train/prevalence_epoch": train_metrics_epoch["prevalence"],
-                "train/roc_auc_epoch": train_metrics_epoch["roc_auc"],
-                "train/pr_auc_epoch": train_metrics_epoch["pr_auc"],
-                "train/lr": lr_now,
-                "epoch": epoch,
-                "step": global_step,
-            },
-            step=global_step,
+        train_log_payload = {
+            "train/loss_epoch": train_loss_epoch,
+            "train/lr": lr_now,
+            "epoch": epoch,
+            "step": global_step,
+        }
+        train_log_payload.update(
+            _metric_bundle(
+                "train",
+                train_metrics_epoch,
+                target_kind=target_kind,
+            )
         )
+        wandb.log(train_log_payload, step=global_step)
 
         # Evaluate on test set based on eval_every
         if epoch % args.eval_every == 0:
@@ -501,6 +694,8 @@ def main() -> None:
                 device,
                 classifier_mode=probe_cfg.classifier_mode,
                 resolved_classifier_layer=resolved_classifier_layer,
+                target_kind=target_kind,
+                score_rule=probe_cfg.score_rule,
             )
             
             # Log to metrics.jsonl
@@ -508,14 +703,8 @@ def main() -> None:
                 "epoch": epoch,
                 "step": global_step,
                 "train_loss": train_loss_epoch,
-                "train_accuracy": train_metrics_epoch["accuracy"],
-                "train_macro_f1": train_metrics_epoch["macro_f1"],
-                "train_positive_precision": train_metrics_epoch["positive_precision"],
-                "train_positive_recall": train_metrics_epoch["positive_recall"],
-                "train_positive_f1": train_metrics_epoch["positive_f1"],
-                "train_prevalence": train_metrics_epoch["prevalence"],
-                "train_roc_auc": train_metrics_epoch["roc_auc"],
-                "train_pr_auc": train_metrics_epoch["pr_auc"],
+                "target_kind": target_kind,
+                "target_name": target_spec.get("name"),
                 "seed": args.seed,
                 "lr": lr_now,
                 "feature_key": resolved_feature_key,
@@ -525,36 +714,84 @@ def main() -> None:
                 "resolved_classifier_layer": resolved_classifier_layer,
                 "vote_rule": probe_cfg.vote_rule,
                 "score_rule": probe_cfg.score_rule,
-                **eval_metrics,
             }
+            log_row.update(
+                _log_row_fields(
+                    "train",
+                    train_metrics_epoch,
+                    target_kind=target_kind,
+                )
+            )
+            log_row.update(
+                _log_row_fields(
+                    "eval",
+                    eval_metrics,
+                    target_kind=target_kind,
+                )
+            )
             _write_jsonl(metrics_jsonl, log_row)
 
             # Log eval metrics to wandb
-            wandb.log(
-                {
-                    "eval/accuracy": eval_metrics["accuracy"],
-                    "eval/macro_f1": eval_metrics["macro_f1"],
-                    "eval/positive_precision": eval_metrics["positive_precision"],
-                    "eval/positive_recall": eval_metrics["positive_recall"],
-                    "eval/positive_f1": eval_metrics["positive_f1"],
-                    "eval/prevalence": eval_metrics["prevalence"],
-                    "eval/roc_auc": eval_metrics["roc_auc"],
-                    "eval/pr_auc": eval_metrics["pr_auc"],
-                    "epoch": epoch,
-                    "step": global_step,
-                },
-                step=global_step,
+            eval_log_payload = {
+                "epoch": epoch,
+                "step": global_step,
+            }
+            eval_log_payload.update(
+                _metric_bundle(
+                    "eval",
+                    eval_metrics,
+                    target_kind=target_kind,
+                )
             )
+            wandb.log(eval_log_payload, step=global_step)
 
             # Update best checkpoint
-            auc = eval_metrics["roc_auc"]
-            auc_rank = auc if not math.isnan(auc) else float("-inf")
-            is_better = (auc_rank > best_auc) or (
-                auc_rank == best_auc and eval_metrics["macro_f1"] > best_f1
-            )
+            if target_kind == "binary":
+                primary_metric = eval_metrics["roc_auc"]
+                primary_rank = (
+                    primary_metric
+                    if not math.isnan(primary_metric)
+                    else float("-inf")
+                )
+                secondary_rank = eval_metrics["macro_f1"]
+                is_better = (primary_rank > best_primary) or (
+                    primary_rank == best_primary and secondary_rank > best_secondary
+                )
+            elif target_kind == "probability":
+                primary_metric = eval_metrics["brier"]
+                primary_rank = (
+                    primary_metric
+                    if not math.isnan(primary_metric)
+                    else float("inf")
+                )
+                secondary_rank = eval_metrics["spearman"]
+                secondary_rank = (
+                    secondary_rank
+                    if not math.isnan(secondary_rank)
+                    else float("-inf")
+                )
+                is_better = (primary_rank < best_primary) or (
+                    primary_rank == best_primary and secondary_rank > best_secondary
+                )
+            else:
+                primary_metric = eval_metrics["mse"]
+                primary_rank = (
+                    primary_metric
+                    if not math.isnan(primary_metric)
+                    else float("inf")
+                )
+                secondary_rank = eval_metrics["spearman"]
+                secondary_rank = (
+                    secondary_rank
+                    if not math.isnan(secondary_rank)
+                    else float("-inf")
+                )
+                is_better = (primary_rank < best_primary) or (
+                    primary_rank == best_primary and secondary_rank > best_secondary
+                )
             if is_better:
-                best_auc = auc_rank
-                best_f1 = eval_metrics["macro_f1"]
+                best_primary = primary_rank
+                best_secondary = secondary_rank
                 best_eval_row = dict(log_row)
                 torch.save(
                     _checkpoint_payload(
@@ -565,64 +802,46 @@ def main() -> None:
                         probe_config=probe_cfg.to_dict(),
                         feature_key=resolved_feature_key,
                         sample_shape=sample_shape,
+                        target_spec=target_spec,
                     ),
                     best_ckpt,
                 )
 
             print(
-                " ".join(
-                    [
-                        f"epoch={epoch}",
-                        f"train_loss={train_loss_epoch:.6f}",
-                        f"train_acc={train_metrics_epoch['accuracy']:.4f}",
-                        f"train_prevalence={train_metrics_epoch['prevalence']:.4f}",
-                        f"eval_acc={eval_metrics['accuracy']:.4f}",
-                        f"eval_pos_p={eval_metrics['positive_precision']:.4f}",
-                        f"eval_pos_r={eval_metrics['positive_recall']:.4f}",
-                        f"eval_f1={eval_metrics['macro_f1']:.4f}",
-                        f"eval_auc={eval_metrics['roc_auc']:.4f}",
-                        f"eval_pr_auc={eval_metrics['pr_auc']:.4f}",
-                    ]
+                _print_metric_summary(
+                    epoch=epoch,
+                    train_loss=train_loss_epoch,
+                    train_metrics=train_metrics_epoch,
+                    eval_metrics=eval_metrics,
+                    target_kind=target_kind,
                 ),
                 flush=True,
             )
         else:
             # Print training metrics only
             print(
-                " ".join(
-                    [
-                        f"epoch={epoch}",
-                        f"train_loss={train_loss_epoch:.6f}",
-                        f"train_acc={train_metrics_epoch['accuracy']:.4f}",
-                        f"train_pos_p={train_metrics_epoch['positive_precision']:.4f}",
-                        f"train_pos_r={train_metrics_epoch['positive_recall']:.4f}",
-                        f"train_f1={train_metrics_epoch['macro_f1']:.4f}",
-                        f"train_auc={train_metrics_epoch['roc_auc']:.4f}",
-                        f"train_pr_auc={train_metrics_epoch['pr_auc']:.4f}",
-                    ]
+                _print_metric_summary(
+                    epoch=epoch,
+                    train_loss=train_loss_epoch,
+                    train_metrics=train_metrics_epoch,
+                    eval_metrics=None,
+                    target_kind=target_kind,
                 ),
                 flush=True,
             )
 
+        train_checkpoint_metrics = {"train_loss": train_loss_epoch}
+        train_checkpoint_metrics.update(train_metrics_epoch)
         torch.save(
             _checkpoint_payload(
                 model,
                 epoch,
                 global_step,
-                {
-                    "train_loss": train_loss_epoch,
-                    "train_accuracy": train_metrics_epoch["accuracy"],
-                    "train_macro_f1": train_metrics_epoch["macro_f1"],
-                    "train_positive_precision": train_metrics_epoch["positive_precision"],
-                    "train_positive_recall": train_metrics_epoch["positive_recall"],
-                    "train_positive_f1": train_metrics_epoch["positive_f1"],
-                    "train_prevalence": train_metrics_epoch["prevalence"],
-                    "train_roc_auc": train_metrics_epoch["roc_auc"],
-                    "train_pr_auc": train_metrics_epoch["pr_auc"],
-                },
+                train_checkpoint_metrics,
                 probe_config=probe_cfg.to_dict(),
                 feature_key=resolved_feature_key,
                 sample_shape=sample_shape,
+                target_spec=target_spec,
             ),
             last_ckpt,
         )
@@ -630,7 +849,7 @@ def main() -> None:
     run.finish()
     if best_eval_row is not None:
         best_payload = {
-            "selection_rule": "max(roc_auc), tie_break=max(macro_f1)",
+            "selection_rule": selection_rule,
             **best_eval_row,
         }
         with open(best_metrics_json, "w", encoding="utf-8") as f:
