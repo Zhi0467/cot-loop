@@ -1,6 +1,6 @@
 # Prompt-Profile Probe Path
 
-Last updated: 2026-03-22 06:50 UTC
+Last updated: 2026-03-22 07:30 UTC
 
 ## What Landed
 
@@ -22,18 +22,20 @@ The repo now has one runnable prompt-level repeated-rollout path for prefill pro
 
 ## Current Recommendation
 
-The next prompt-profile head should be:
+The next prompt-profile heads should be treated in two tiers:
 
-- primary: `p_loop = E[1{rollout loops}]`;
-- backup: `mean_relative_length = E[L / E]`;
+- current shipped utility head: `mean_relative_length = E[L / E]`;
+- cleaner loop-prox study head: `p_loop = E[1{rollout loops}]`;
 - keep `p_cap` diagnostic-first, not the headline target;
 - keep `majority_s_t` as a sparse pilot label, not the main objective.
 
 Why this is the current recommendation:
 
 - `s_0.9` already failed on the first real `GPQA` pilot because it collapsed to `p_cap` on that slice;
-- `majority_s_0.5` does show real activation signal, but with `n = 4` it throws away most of the rollout-count information;
-- `p_loop` is already computed in the archive, stays closer to the failure mode we care about than raw length, and on the saved `GPQA` slice it is less prompt-length-correlated than `mean_relative_length`.
+- `majority_s_0.5` does show real activation signal, but with `n = 4` it throws away most of the rollout-count information and on `AIME` is already mostly explained by prompt length;
+- `p_loop` is already computed in the archive, stays closer to the failure mode we care about than raw length, and on both saved `GPQA` and `AIME` slices it is less prompt-length-correlated than `mean_relative_length`;
+- the 2026-03-22 direct-head relabel check on the same `GPQA` archive showed that `p_loop` is not yet the most reliable *useful* head under the current training/selection rules: its ensemble run had a decent early ranking epoch (`eval Spearman 0.320`, top-20% capture `0.364`) but the default Brier-first checkpoint rule drifted toward near-constant predictions;
+- the same relabel check showed that `mean_relative_length` is currently the stronger deployable head on this surface: the ensemble reached `eval Spearman 0.433` at the default MSE-selected checkpoint, and `0.658` at the best ranking epoch, both above the prompt-length-only baseline on that test split.
 
 ## Scope
 
@@ -49,7 +51,8 @@ This path is still intentionally narrow:
 
 Target:
 
-- `p_loop = E[1{loop}]`
+- ship `mean_relative_length = E[L / E]` first;
+- run `p_loop = E[1{loop}]` in parallel when the goal is cleaner loop-prox supervision rather than immediate utility.
 
 Decode policy:
 
@@ -64,9 +67,11 @@ Feature views:
 
 Evaluation boundary:
 
-- train and evaluate `p_loop` directly;
+- keep the train/test split prompt-disjoint;
 - always benchmark against prompt-token-count-only and effective-budget-only baselines;
-- keep `p_cap`, `mean_relative_length`, and correctness as downstream diagnostics on the same prompts.
+- for `mean_relative_length`, prefer the ensemble view and do not rely only on MSE when the downstream goal is ranking or top-bucket capture;
+- for `p_loop`, treat the current default Brier-first checkpoint rule as provisional because it can hide the better ranking epoch on small pilot splits;
+- keep `p_cap`, correctness, and the prompt-majority controls as downstream diagnostics on the same prompts.
 
 Example dataset build:
 
@@ -108,11 +113,14 @@ python scripts/train_probe.py \
 
 ## Backup Objective
 
-If the direct loop-rate head still fails to beat prompt-length / effective-budget baselines, fall back to:
+The best no-reroll way to compare prompt-level heads now is:
 
-- `mean_relative_length = E[L / E]`
+- `python scripts/relabel_prompt_profile_dataset.py --source-dir <finished_prompt_profile_data_dir> --out-dir <new_data_dir> --target-kind regression --profile-target mean_relative_length`
+- `python scripts/relabel_prompt_profile_dataset.py --source-dir <finished_prompt_profile_data_dir> --out-dir <new_data_dir> --target-kind probability --profile-target p_loop`
 
-That is the best no-plumbing backup because it is dense, stable, and already implemented. It remains a proxy rather than the preferred main head because it mixes correct long reasoning, wrong long reasoning, and looped long reasoning.
+That helper reuses the saved prefill activations and `diagnostics/prompt_rollout_archive.jsonl`, so target swaps do not require a second rollout bundle or a second prefill pass.
+
+`mean_relative_length` remains the best current shipped head because it is dense, stable, already implemented, and now has same-archive evidence that the ensemble readout can beat prompt length on `GPQA`. It remains a proxy rather than the cleanest main head because it mixes correct long reasoning, wrong long reasoning, and looped long reasoning.
 
 Example dataset build:
 
@@ -189,8 +197,11 @@ sbatch slurm/run_probe_train_e2e.sbatch
 
 Repeated-rollout runs also leave one reusable archive at
 `diagnostics/prompt_rollout_archive.jsonl`, so later prefill-activation plots
-and relabels can reuse the same prompts without a second rollout bundle.
+and relabels can reuse the same prompts without a second rollout bundle. The
+new `scripts/relabel_prompt_profile_dataset.py` helper reuses that archive plus
+the saved prefill shards directly, so prompt-level target swaps also avoid a
+second feature-extraction pass.
 
 ## Validation Caveat
 
-The pure-Python target aggregation path has been smoke-checked locally. The remaining unverified piece in this workspace is still the full Torch-backed remote build/train execution path, not the target math itself.
+The pure-Python target aggregation path has been smoke-checked locally, and the archive-relabel path has now been exercised remotely on the saved `GPQA` prompt-profile dataset. The remaining open issue is not target math or relabel plumbing; it is which checkpoint-selection rule best matches the desired notion of usefulness for prompt-level heads on small pilot splits.
