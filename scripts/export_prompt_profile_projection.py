@@ -193,6 +193,7 @@ def build_correctness_lookup(
     args: argparse.Namespace,
 ) -> tuple[dict[int, dict[str, Any]], str]:
     task_kind = str(manifest.get("task_kind", ""))
+    prompt_field = str(manifest.get("prompt_field", "question"))
     if task_kind == "multiple_choice_gpqa":
         lookup: dict[int, dict[str, Any]] = {}
         for spec in unique_specs(manifest, args=args):
@@ -218,7 +219,10 @@ def build_correctness_lookup(
     if task_kind == "math_freeform":
         lookup = {}
         for spec in unique_specs(manifest, args=args):
-            for record, gold_answer in math_freeform.load_samples(spec):
+            for record, gold_answer in math_freeform.load_samples(
+                spec,
+                question_field=prompt_field,
+            ):
                 if record.sample_id in sample_ids:
                     lookup[record.sample_id] = {"gold_answer": gold_answer}
         return lookup, task_kind

@@ -7,6 +7,7 @@ import argparse
 import json
 import math
 import os
+import shutil
 import sys
 
 import torch
@@ -197,6 +198,136 @@ def _evaluate(
 def _write_jsonl(path: str, row: dict[str, object]) -> None:
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(row, sort_keys=True) + "\n")
+
+
+def _is_nan(value: object) -> bool:
+    return isinstance(value, float) and math.isnan(value)
+
+
+def _metric_float(value: object, *, default: float) -> float:
+    if value is None:
+        return default
+    if isinstance(value, (int, float)):
+        if _is_nan(float(value)):
+            return default
+        return float(value)
+    return default
+
+
+def _binary_primary_key(row: dict[str, object]) -> tuple[float, float]:
+    return (
+        _metric_float(row.get("eval_roc_auc"), default=float("-inf")),
+        _metric_float(row.get("eval_macro_f1"), default=float("-inf")),
+    )
+
+
+def _binary_rank_key(row: dict[str, object]) -> tuple[float, float, float]:
+    return (
+        _metric_float(row.get("eval_pr_auc"), default=float("-inf")),
+        _metric_float(row.get("eval_roc_auc"), default=float("-inf")),
+        _metric_float(row.get("eval_macro_f1"), default=float("-inf")),
+    )
+
+
+def _probability_primary_key(row: dict[str, object]) -> tuple[float, float]:
+    return (
+        -_metric_float(row.get("eval_brier"), default=float("inf")),
+        _metric_float(row.get("eval_spearman"), default=float("-inf")),
+    )
+
+
+def _probability_rank_key(row: dict[str, object]) -> tuple[float, float, float]:
+    return (
+        _metric_float(row.get("eval_top_20p_capture"), default=float("-inf")),
+        _metric_float(row.get("eval_spearman"), default=float("-inf")),
+        -_metric_float(row.get("eval_brier"), default=float("inf")),
+    )
+
+
+def _regression_primary_key(row: dict[str, object]) -> tuple[float, float]:
+    return (
+        -_metric_float(row.get("eval_mse"), default=float("inf")),
+        _metric_float(row.get("eval_spearman"), default=float("-inf")),
+    )
+
+
+def _regression_rank_key(row: dict[str, object]) -> tuple[float, float, float]:
+    return (
+        _metric_float(row.get("eval_spearman"), default=float("-inf")),
+        _metric_float(row.get("eval_top_20p_capture"), default=float("-inf")),
+        -_metric_float(row.get("eval_mse"), default=float("inf")),
+    )
+
+
+def _within_relative_tolerance(
+    value: float,
+    best_value: float,
+    *,
+    relative_tolerance: float,
+) -> bool:
+    if not math.isfinite(value) or not math.isfinite(best_value):
+        return False
+    if best_value == 0.0:
+        return abs(value) <= 1e-12
+    return value <= (best_value * (1.0 + relative_tolerance))
+
+
+def _select_best_loss_row(
+    eval_rows: list[dict[str, object]],
+    *,
+    target_kind: str,
+) -> dict[str, object] | None:
+    if not eval_rows:
+        return None
+    if target_kind == "binary":
+        return max(eval_rows, key=_binary_primary_key)
+    if target_kind == "probability":
+        return max(eval_rows, key=_probability_primary_key)
+    if target_kind == "regression":
+        return max(eval_rows, key=_regression_primary_key)
+    raise SystemExit(f"Unsupported target_kind '{target_kind}'.")
+
+
+def _select_best_rank_row(
+    eval_rows: list[dict[str, object]],
+    *,
+    target_kind: str,
+) -> dict[str, object] | None:
+    if not eval_rows:
+        return None
+    if target_kind == "binary":
+        return max(eval_rows, key=_binary_rank_key)
+    if target_kind == "probability":
+        best_brier = min(
+            _metric_float(row.get("eval_brier"), default=float("inf"))
+            for row in eval_rows
+        )
+        candidates = [
+            row
+            for row in eval_rows
+            if _within_relative_tolerance(
+                _metric_float(row.get("eval_brier"), default=float("inf")),
+                best_brier,
+                relative_tolerance=0.10,
+            )
+        ]
+        return max(candidates or eval_rows, key=_probability_rank_key)
+    if target_kind == "regression":
+        best_mse = min(
+            _metric_float(row.get("eval_mse"), default=float("inf"))
+            for row in eval_rows
+        )
+        candidates = [
+            row
+            for row in eval_rows
+            if _within_relative_tolerance(
+                _metric_float(row.get("eval_mse"), default=float("inf")),
+                best_mse,
+                relative_tolerance=0.10,
+            )
+        ]
+        return max(candidates or eval_rows, key=_regression_rank_key)
+    raise SystemExit(f"Unsupported target_kind '{target_kind}'.")
 
 
 def _checkpoint_payload(
@@ -566,25 +697,34 @@ def main() -> None:
 
     metrics_jsonl = os.path.join(args.out_dir, "metrics.jsonl")
     best_ckpt = os.path.join(args.out_dir, "best.pt")
+    best_loss_ckpt = os.path.join(args.out_dir, "best_loss.pt")
+    best_rank_ckpt = os.path.join(args.out_dir, "best_rank.pt")
     last_ckpt = os.path.join(args.out_dir, "last.pt")
     best_metrics_json = os.path.join(args.out_dir, "best_metrics.json")
+    best_loss_metrics_json = os.path.join(args.out_dir, "best_loss_metrics.json")
+    best_rank_metrics_json = os.path.join(args.out_dir, "best_rank_metrics.json")
+    eval_ckpt_dir = os.path.join(args.out_dir, "_eval_ckpts")
+    os.makedirs(eval_ckpt_dir, exist_ok=True)
 
     with open(metrics_jsonl, "w", encoding="utf-8"):
         pass
 
     if target_kind == "binary":
-        best_primary = float("-inf")
-        best_secondary = float("-inf")
         selection_rule = "max(roc_auc), tie_break=max(macro_f1)"
+        rank_selection_rule = "max(pr_auc), tie_break=max(roc_auc), max(macro_f1)"
     elif target_kind == "probability":
-        best_primary = float("inf")
-        best_secondary = float("-inf")
         selection_rule = "min(brier), tie_break=max(spearman)"
+        rank_selection_rule = (
+            "within 10% of min(brier), max(top_20p_capture), "
+            "tie_break=max(spearman), min(brier)"
+        )
     else:
-        best_primary = float("inf")
-        best_secondary = float("-inf")
         selection_rule = "min(mse), tie_break=max(spearman)"
-    best_eval_row: dict[str, object] | None = None
+        rank_selection_rule = (
+            "within 10% of min(mse), max(spearman), "
+            "tie_break=max(top_20p_capture), min(mse)"
+        )
+    eval_rows: list[dict[str, object]] = []
     global_step = 0
 
     for epoch in range(1, args.epochs + 1):
@@ -729,7 +869,23 @@ def main() -> None:
                     target_kind=target_kind,
                 )
             )
+            eval_ckpt_path = os.path.join(eval_ckpt_dir, f"epoch_{epoch:03d}.pt")
+            torch.save(
+                _checkpoint_payload(
+                    model,
+                    epoch,
+                    global_step,
+                    eval_metrics,
+                    probe_config=probe_cfg.to_dict(),
+                    feature_key=resolved_feature_key,
+                    sample_shape=sample_shape,
+                    target_spec=target_spec,
+                ),
+                eval_ckpt_path,
+            )
+            log_row["checkpoint_path"] = eval_ckpt_path
             _write_jsonl(metrics_jsonl, log_row)
+            eval_rows.append(dict(log_row))
 
             # Log eval metrics to wandb
             eval_log_payload = {
@@ -744,68 +900,6 @@ def main() -> None:
                 )
             )
             wandb.log(eval_log_payload, step=global_step)
-
-            # Update best checkpoint
-            if target_kind == "binary":
-                primary_metric = eval_metrics["roc_auc"]
-                primary_rank = (
-                    primary_metric
-                    if not math.isnan(primary_metric)
-                    else float("-inf")
-                )
-                secondary_rank = eval_metrics["macro_f1"]
-                is_better = (primary_rank > best_primary) or (
-                    primary_rank == best_primary and secondary_rank > best_secondary
-                )
-            elif target_kind == "probability":
-                primary_metric = eval_metrics["brier"]
-                primary_rank = (
-                    primary_metric
-                    if not math.isnan(primary_metric)
-                    else float("inf")
-                )
-                secondary_rank = eval_metrics["spearman"]
-                secondary_rank = (
-                    secondary_rank
-                    if not math.isnan(secondary_rank)
-                    else float("-inf")
-                )
-                is_better = (primary_rank < best_primary) or (
-                    primary_rank == best_primary and secondary_rank > best_secondary
-                )
-            else:
-                primary_metric = eval_metrics["mse"]
-                primary_rank = (
-                    primary_metric
-                    if not math.isnan(primary_metric)
-                    else float("inf")
-                )
-                secondary_rank = eval_metrics["spearman"]
-                secondary_rank = (
-                    secondary_rank
-                    if not math.isnan(secondary_rank)
-                    else float("-inf")
-                )
-                is_better = (primary_rank < best_primary) or (
-                    primary_rank == best_primary and secondary_rank > best_secondary
-                )
-            if is_better:
-                best_primary = primary_rank
-                best_secondary = secondary_rank
-                best_eval_row = dict(log_row)
-                torch.save(
-                    _checkpoint_payload(
-                        model,
-                        epoch,
-                        global_step,
-                        eval_metrics,
-                        probe_config=probe_cfg.to_dict(),
-                        feature_key=resolved_feature_key,
-                        sample_shape=sample_shape,
-                        target_spec=target_spec,
-                    ),
-                    best_ckpt,
-                )
 
             print(
                 _print_metric_summary(
@@ -847,19 +941,42 @@ def main() -> None:
         )
 
     run.finish()
-    if best_eval_row is not None:
-        best_payload = {
+    if eval_rows:
+        best_loss_row = _select_best_loss_row(eval_rows, target_kind=target_kind)
+        best_rank_row = _select_best_rank_row(eval_rows, target_kind=target_kind)
+
+        if best_loss_row is None or best_rank_row is None:
+            raise RuntimeError("Expected non-empty eval rows to produce best checkpoints.")
+
+        shutil.copy2(str(best_loss_row["checkpoint_path"]), best_ckpt)
+        shutil.copy2(str(best_loss_row["checkpoint_path"]), best_loss_ckpt)
+        shutil.copy2(str(best_rank_row["checkpoint_path"]), best_rank_ckpt)
+
+        best_loss_payload = {
+            "selection_kind": "best_loss",
             "selection_rule": selection_rule,
-            **best_eval_row,
+            **best_loss_row,
         }
-        with open(best_metrics_json, "w", encoding="utf-8") as f:
-            json.dump(best_payload, f, indent=2, sort_keys=True)
-            f.write("\n")
+        best_rank_payload = {
+            "selection_kind": "best_rank",
+            "selection_rule": rank_selection_rule,
+            **best_rank_row,
+        }
+
+        for path, payload in (
+            (best_metrics_json, best_loss_payload),
+            (best_loss_metrics_json, best_loss_payload),
+            (best_rank_metrics_json, best_rank_payload),
+        ):
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(payload, f, indent=2, sort_keys=True)
+                f.write("\n")
     else:
         print(
             "No eval checkpoints were logged (check --eval-every); best_metrics.json not written.",
             flush=True,
         )
+    shutil.rmtree(eval_ckpt_dir, ignore_errors=True)
     print(f"Saved checkpoints to {args.out_dir}", flush=True)
 
 

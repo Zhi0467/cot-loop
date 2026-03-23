@@ -1,6 +1,6 @@
 # Prompt-Profile Probe Path
 
-Last updated: 2026-03-22 08:22 UTC
+Last updated: 2026-03-23 03:57 UTC
 
 ## What Landed
 
@@ -18,6 +18,7 @@ The repo now has one runnable prompt-level repeated-rollout path for prefill pro
 - one combined repeated-rollout archive written to `diagnostics/prompt_rollout_archive.jsonl`, with prompt text, prompt token IDs, rollout texts, and per-rollout terminal stats so later relabels do not require rerollout;
 - trainer/eval support for probability targets with Brier / MAE / Spearman / top-bucket capture metrics;
 - trainer/eval support for regression targets with MSE / MAE / Spearman / top-bucket capture metrics;
+- trainer checkpoint emission for both `best_loss` and ranking-oriented `best_rank`, with backward-compatible `best.pt -> best_loss`;
 - ensemble scoring with mean layer probability via `--score-rule mean_prob`.
 
 ## Current Recommendation
@@ -26,6 +27,7 @@ The next prompt-profile heads should be treated as a two-head default:
 
 - current shipped utility head: `mean_relative_length = E[L / E]`;
 - default loop-prox companion head: `p_loop = E[1{rollout loops}]`;
+- ship `best_rank` for utility-facing prompt ranking and keep `best_loss` for calibration-style reporting;
 - keep `p_cap` diagnostic-first, not the headline target;
 - keep `majority_s_t` as a sparse pilot label, not the main objective.
 
@@ -34,17 +36,17 @@ Why this is the current recommendation:
 - `s_0.9` already failed on the first real `GPQA` pilot because it collapsed to `p_cap` on that slice;
 - `majority_s_0.5` does show real activation signal, but with `n = 4` it throws away most of the rollout-count information and on `AIME` is already mostly explained by prompt length;
 - `p_loop` is already computed in the archive, stays closer to the failure mode we care about than raw length, and on both saved `GPQA` and `AIME` slices it is less prompt-length-correlated than `mean_relative_length`;
-- the 2026-03-22 direct-head relabel check on the same `GPQA` archive showed that `p_loop` is not yet the most reliable *useful* head under the current training/selection rules: its ensemble run had a decent early ranking epoch (`eval Spearman 0.320`, top-20% capture `0.364`) but the default Brier-first checkpoint rule drifted toward near-constant predictions;
-- the same-day same-archive `AIME` relabel check showed that `p_loop` should not be dropped because of the GPQA read: the ensemble reached `eval Spearman 0.538` at the Brier-selected checkpoint and `0.584` at the best ranking epoch, with `top-20% capture = 0.8` on that slice;
-- the same relabel check showed that `mean_relative_length` is currently the stronger deployable head on this surface: the ensemble reached `eval Spearman 0.433` at the default MSE-selected checkpoint, and `0.658` at the best ranking epoch, both above the prompt-length-only baseline on that test split.
-- the corresponding `AIME` relabel check still says `mean_relative_length` is the steadier utility head under the default selector (`ensemble MSE 0.0461`, `Spearman 0.629`), but it is much more prompt-length-shaped than `p_loop` on that slice.
+- the first same-archive `GPQA` / `AIME` relabel checks showed that loss-best selection was hiding the useful epochs on small pilots, especially for `p_loop`;
+- the trainer now writes both `best_loss` and `best_rank`, so the shipped checkpoint can be aligned with ranking utility without dropping the calibration-first view;
+- under that updated read, `mean_relative_length` remains the safer shipped utility head, while `p_loop` stays in the default bundle because it is cleaner and materially less prompt-length-shaped on the heavier-tail slices.
 
 ## Scope
 
 This path is still intentionally narrow:
 
 - prefill feature views only;
-- one scalar head only;
+- one scalar head per fit;
+- default workflow is now two separate fits from one repeated-rollout archive rather than one joint multi-head run;
 - no completion-view repeated-rollout support yet;
 - no joint multi-head trainer yet;
 - balancing remains available only for binary targets; the prompt-profile probability and regression heads still run on the natural prompt-disjoint split.
@@ -73,16 +75,16 @@ Evaluation boundary:
 - keep the train/test split prompt-disjoint;
 - always benchmark against prompt-token-count-only and effective-budget-only baselines;
 - for `mean_relative_length`, prefer the ensemble view and do not rely only on MSE when the downstream goal is ranking or top-bucket capture;
-- for `p_loop`, treat the current default Brier-first checkpoint rule as provisional because it can hide the better ranking epoch on small pilot splits;
+- ship `best_rank` for utility-facing ranking and keep `best_loss` beside it for calibration-style reporting;
 - keep `p_cap`, correctness, and the prompt-majority controls as downstream diagnostics on the same prompts.
 
 Checkpoint selection:
 
-- keep the current loss-best checkpoint as `best_loss` for calibration-style reporting;
-- add a ranking-oriented `best_rank` selector on a prompt-disjoint validation carveout from train;
-- for `mean_relative_length`, restrict to epochs within `10%` of the best validation MSE, then pick the epoch with the best validation Spearman; break ties with better validation top-20% capture, then lower validation MSE;
-- for `p_loop`, restrict to epochs within `10%` of the best validation Brier score, then pick the epoch with the best validation top-20% capture; break ties with better validation Spearman, then lower validation Brier;
-- only treat a checkpoint as shipped-useful if it beats the stronger non-degenerate metadata baseline on that same validation slice in the head's primary ranking metric.
+- `train_probe.py` now writes `best_loss.pt`, `best_rank.pt`, and backward-compatible `best.pt` (aliasing `best_loss`);
+- for `mean_relative_length`, `best_rank` picks the max-Spearman epoch among checkpoints within `10%` of best MSE, then tie-breaks by top-20% capture and lower MSE;
+- for `p_loop`, `best_rank` picks the max top-20% capture epoch among checkpoints within `10%` of best Brier, then tie-breaks by Spearman and lower Brier;
+- use `best_rank` as the default shipped checkpoint and keep `best_loss` as the calibration/control checkpoint;
+- for serious sweeps, still compare the chosen checkpoint against the stronger non-degenerate metadata baseline on a validation slice before treating the head as shipped-useful.
 
 Example dataset build:
 
@@ -122,16 +124,16 @@ python scripts/train_probe.py \
   --wandb-project cot-loop-probe
 ```
 
-## Backup Objective
+## Archive Relabel Path
 
-The best no-reroll way to compare prompt-level heads now is:
+The best no-reroll way to fit both prompt-level heads now is:
 
 - `python scripts/relabel_prompt_profile_dataset.py --source-dir <finished_prompt_profile_data_dir> --out-dir <new_data_dir> --target-kind regression --profile-target mean_relative_length`
 - `python scripts/relabel_prompt_profile_dataset.py --source-dir <finished_prompt_profile_data_dir> --out-dir <new_data_dir> --target-kind probability --profile-target p_loop`
 
 That helper reuses the saved prefill activations and `diagnostics/prompt_rollout_archive.jsonl`, so target swaps do not require a second rollout bundle or a second prefill pass.
 
-`mean_relative_length` remains the best current shipped head because it is dense, stable, already implemented, and now has same-archive evidence that the ensemble readout can beat prompt length on `GPQA`. It remains a proxy rather than the cleanest main head because it mixes correct long reasoning, wrong long reasoning, and looped long reasoning.
+`mean_relative_length` remains the shipped utility head because it is dense, stable, already implemented, and now has same-archive evidence that the ensemble readout can beat prompt length on `GPQA`, `AIME`, and the lower-tail controls. It remains a proxy rather than the cleanest main head because it mixes correct long reasoning, wrong long reasoning, and looped long reasoning. `p_loop` remains the cleaner companion head for failure proximity, especially on the heavier-tail datasets.
 
 Example dataset build:
 
