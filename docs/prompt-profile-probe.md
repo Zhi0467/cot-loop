@@ -1,6 +1,6 @@
 # Prompt-Profile Probe Path
 
-Last updated: 2026-03-23 03:57 UTC
+Last updated: 2026-03-23 04:52 UTC
 
 ## What Landed
 
@@ -27,6 +27,7 @@ The next prompt-profile heads should be treated as a two-head default:
 
 - current shipped utility head: `mean_relative_length = E[L / E]`;
 - default loop-prox companion head: `p_loop = E[1{rollout loops}]`;
+- optional severity-weighted auxiliary head: `loop_budget_share = E[1{rollout loops}] * (L / E)`;
 - ship `best_rank` for utility-facing prompt ranking and keep `best_loss` for calibration-style reporting;
 - keep `p_cap` diagnostic-first, not the headline target;
 - keep `majority_s_t` as a sparse pilot label, not the main objective.
@@ -38,6 +39,7 @@ Why this is the current recommendation:
 - `p_loop` is already computed in the archive, stays closer to the failure mode we care about than raw length, and on both saved `GPQA` and `AIME` slices it is less prompt-length-correlated than `mean_relative_length`;
 - the first same-archive `GPQA` / `AIME` relabel checks showed that loss-best selection was hiding the useful epochs on small pilots, especially for `p_loop`;
 - the trainer now writes both `best_loss` and `best_rank`, so the shipped checkpoint can be aligned with ranking utility without dropping the calibration-first view;
+- a final archive-only check on `loop_budget_share` did not survive the lower-tail controls cleanly enough to replace the current bundle, even though it remains useful on `AIME`;
 - under that updated read, `mean_relative_length` remains the safer shipped utility head, while `p_loop` stays in the default bundle because it is cleaner and materially less prompt-length-shaped on the heavier-tail slices.
 
 ## Scope
@@ -134,6 +136,8 @@ The best no-reroll way to fit both prompt-level heads now is:
 That helper reuses the saved prefill activations and `diagnostics/prompt_rollout_archive.jsonl`, so target swaps do not require a second rollout bundle or a second prefill pass.
 
 `mean_relative_length` remains the shipped utility head because it is dense, stable, already implemented, and now has same-archive evidence that the ensemble readout can beat prompt length on `GPQA`, `AIME`, and the lower-tail controls. It remains a proxy rather than the cleanest main head because it mixes correct long reasoning, wrong long reasoning, and looped long reasoning. `p_loop` remains the cleaner companion head for failure proximity, especially on the heavier-tail datasets.
+
+`loop_budget_share` is now implemented too and can be relabeled from the same archive. It is worth keeping as an auxiliary severity-weighted target for analysis, but the finished four-dataset archive check did not support promoting it to the shipped score: it behaves well on `AIME`, but it is weaker on `GPQA` and does not hold up on `MATH-500` / `MMLU-Pro`.
 
 Example dataset build:
 

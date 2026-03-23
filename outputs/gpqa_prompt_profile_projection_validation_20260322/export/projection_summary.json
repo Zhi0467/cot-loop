@@ -1,0 +1,200 @@
+{
+  "binary_label_alignment": {
+    "majority_cap": {
+      "accuracy": 0.9583333333333334,
+      "adjusted_mutual_info": 0.008458298140515871,
+      "adjusted_rand": 0.010368684569868001,
+      "balanced_accuracy": 0.5,
+      "label_silhouette_2d": -0.13031971233428624,
+      "prevalence": 0.041666666666666664
+    },
+    "majority_correct": {
+      "accuracy": 0.7291666666666666,
+      "adjusted_mutual_info": 0.09183028750186487,
+      "adjusted_rand": 0.1151050808137849,
+      "balanced_accuracy": 0.6707779886148008,
+      "label_silhouette_2d": 0.11951548582632539,
+      "prevalence": 0.3541666666666667
+    },
+    "majority_finish_reason_length": {
+      "accuracy": 0.9583333333333334,
+      "adjusted_mutual_info": 0.008458298140515871,
+      "adjusted_rand": 0.010368684569868001,
+      "balanced_accuracy": 0.5,
+      "label_silhouette_2d": -0.13031971233428624,
+      "prevalence": 0.041666666666666664
+    },
+    "majority_loop": {
+      "accuracy": 0.6666666666666666,
+      "adjusted_mutual_info": -0.027659568511991466,
+      "adjusted_rand": -0.026042358052253665,
+      "balanced_accuracy": 0.5,
+      "label_silhouette_2d": -0.03430155479222552,
+      "prevalence": 0.3333333333333333
+    },
+    "majority_s_0.5": {
+      "accuracy": 0.9375,
+      "adjusted_mutual_info": -0.01034386014635838,
+      "adjusted_rand": 0.01248748100264037,
+      "balanced_accuracy": 0.5,
+      "label_silhouette_2d": -0.10438981916558658,
+      "prevalence": 0.0625
+    },
+    "majority_s_0.6": {
+      "accuracy": 0.9375,
+      "adjusted_mutual_info": -0.01034386014635838,
+      "adjusted_rand": 0.01248748100264037,
+      "balanced_accuracy": 0.5,
+      "label_silhouette_2d": -0.10438981916558658,
+      "prevalence": 0.0625
+    },
+    "majority_s_0.9": {
+      "accuracy": 0.9583333333333334,
+      "adjusted_mutual_info": 0.008458298140515871,
+      "adjusted_rand": 0.010368684569868001,
+      "balanced_accuracy": 0.5,
+      "label_silhouette_2d": -0.13031971233428624,
+      "prevalence": 0.041666666666666664
+    }
+  },
+  "cluster_summary": {
+    "candidate_scores": [
+      {
+        "inertia": 1239.2686767578125,
+        "k": 2,
+        "silhouette": 0.4798165261745453
+      },
+      {
+        "inertia": 644.6815185546875,
+        "k": 3,
+        "silhouette": 0.4993335008621216
+      },
+      {
+        "inertia": 457.4292907714844,
+        "k": 4,
+        "silhouette": 0.4997842609882355
+      },
+      {
+        "inertia": 307.74041748046875,
+        "k": 5,
+        "silhouette": 0.48613324761390686
+      },
+      {
+        "inertia": 243.18405151367188,
+        "k": 6,
+        "silhouette": 0.4616347849369049
+      }
+    ],
+    "cluster_sizes": {
+      "0": 18,
+      "1": 12,
+      "2": 5,
+      "3": 13
+    },
+    "inertia": 457.4292907714844,
+    "k": 4,
+    "num_clusters": 4,
+    "silhouette": 0.4997842609882355
+  },
+  "continuous_signal": {
+    "correct_rate": {
+      "cluster_r2": 0.2292636503771075,
+      "linear_r2_2d": 0.20328807081129951,
+      "max_abs_spearman_pc": 0.4272113824395169,
+      "mean": 0.3541666666666667,
+      "spearman_pc1": -0.4272113824395169,
+      "spearman_pc2": 0.09534066669241907,
+      "std": 0.3952627466494773
+    },
+    "finish_reason_length_rate": {
+      "cluster_r2": 0.05001953406123416,
+      "linear_r2_2d": 0.01591816591524753,
+      "max_abs_spearman_pc": 0.1869927569066189,
+      "mean": 0.07083333333333333,
+      "spearman_pc1": 0.1869927569066189,
+      "spearman_pc2": 0.050648020418796666,
+      "std": 0.14713702985841312
+    },
+    "mean_relative_length": {
+      "cluster_r2": 0.18390845764913855,
+      "linear_r2_2d": 0.1392795210675124,
+      "max_abs_spearman_pc": 0.39068606165870595,
+      "mean": 0.2901211805555555,
+      "spearman_pc1": 0.17553191489361702,
+      "spearman_pc2": 0.39068606165870595,
+      "std": 0.18193312861904934
+    },
+    "p_cap": {
+      "cluster_r2": 0.05001953406123416,
+      "linear_r2_2d": 0.01591816591524753,
+      "max_abs_spearman_pc": 0.1869927569066189,
+      "mean": 0.07083333333333333,
+      "spearman_pc1": 0.1869927569066189,
+      "spearman_pc2": 0.050648020418796666,
+      "std": 0.14713702985841312
+    },
+    "p_loop": {
+      "cluster_r2": 0.08618072657620668,
+      "linear_r2_2d": 0.058110738657634387,
+      "max_abs_spearman_pc": 0.24411164769491986,
+      "mean": 0.375,
+      "spearman_pc1": 0.16592134903971864,
+      "spearman_pc2": 0.24411164769491986,
+      "std": 0.33260336739125174
+    },
+    "s_0.5": {
+      "cluster_r2": 0.08613122171945709,
+      "linear_r2_2d": 0.020191556299179347,
+      "max_abs_spearman_pc": 0.1974459471862726,
+      "mean": 0.09999999999999999,
+      "spearman_pc1": -0.0644771876329273,
+      "spearman_pc2": 0.1974459471862726,
+      "std": 0.18819316317727028
+    },
+    "s_0.6": {
+      "cluster_r2": 0.04899007888450402,
+      "linear_r2_2d": 0.007164567774891828,
+      "max_abs_spearman_pc": 0.10846605690763551,
+      "mean": 0.07708333333333332,
+      "spearman_pc1": 0.07875634592467043,
+      "spearman_pc2": 0.10846605690763551,
+      "std": 0.1530789329797612
+    },
+    "s_0.9": {
+      "cluster_r2": 0.05001953406123416,
+      "linear_r2_2d": 0.01591816591524753,
+      "max_abs_spearman_pc": 0.1869927569066189,
+      "mean": 0.07083333333333333,
+      "spearman_pc1": 0.1869927569066189,
+      "spearman_pc2": 0.050648020418796666,
+      "std": 0.14713702985841312
+    }
+  },
+  "data_dir": "/data/scratch/murphy/outputs/cot-loop-detection/gpqa_s09_prob_pilot_20260321/data",
+  "dataset_name": "/data/scratch/murphy/projects/worktrees/cot-loop-gpqa-20260316/data/gpqa_diamond.csv",
+  "explained_variance_ratio": [
+    0.1586686223745346,
+    0.09713219106197357
+  ],
+  "manifest_default_feature_key": "last_token_all_layers_stack_final",
+  "num_prompts": 48,
+  "projection_view": "last_layer",
+  "prompt_stats": {
+    "mean_correct_rate": 0.3541666666666667,
+    "mean_mean_relative_length": 0.2901211805555555,
+    "mean_p_cap": 0.07083333333333333,
+    "mean_p_loop": 0.375
+  },
+  "split_counts": {
+    "prompts": {
+      "test": 16,
+      "train": 32
+    }
+  },
+  "tail_thresholds": [
+    0.5,
+    0.6,
+    0.9
+  ],
+  "task_kind": "multiple_choice_gpqa"
+}

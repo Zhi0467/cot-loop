@@ -27,6 +27,7 @@ PROFILE_TARGET_CHOICES = (
     "p_loop",
     "p_cap",
     "mean_relative_length",
+    "loop_budget_share",
     "majority_tail",
 )
 
@@ -134,14 +135,20 @@ def _resolve_target_spec(
         }
 
     if target_kind == "regression":
-        if resolved_profile_target != "mean_relative_length":
+        if resolved_profile_target not in {
+            "mean_relative_length",
+            "loop_budget_share",
+        }:
             raise SystemExit(
                 "--target-kind=regression currently expects "
-                "--profile-target=mean_relative_length."
+                "--profile-target in {mean_relative_length, loop_budget_share}."
             )
         return {
             "kind": "regression",
-            "name": "mean_relative_length",
+            "name": _profile_target_name(
+                resolved_profile_target,
+                tail_threshold=tail_threshold,
+            ),
             "profile_target": resolved_profile_target,
             "tail_threshold": tail_threshold,
             "num_generations": num_generations,
@@ -160,6 +167,8 @@ def _profile_target_name(
         return f"s_{format(float(tail_threshold), 'g')}"
     if profile_target == "mean_relative_length":
         return "mean_relative_length"
+    if profile_target == "loop_budget_share":
+        return "loop_budget_share"
     if profile_target == "p_loop":
         return "p_loop"
     if profile_target == "p_cap":
@@ -181,6 +190,8 @@ def _profile_target_value(
         return float(profile["s_tail"])
     if profile_target == "mean_relative_length":
         return float(profile["mean_relative_length"])
+    if profile_target == "loop_budget_share":
+        return float(profile["loop_budget_share"])
     if profile_target == "p_loop":
         return float(profile["p_loop"])
     if profile_target == "p_cap":
@@ -325,6 +336,11 @@ def _profile_from_archive_row(
         "majority_tail": int(tail_hit_count > (num_rollouts / 2.0)),
         "mean_length": sum(lengths) / float(num_rollouts),
         "mean_relative_length": sum(relative_lengths) / float(num_rollouts),
+        "loop_budget_share": sum(
+            loop_flag * relative_length
+            for loop_flag, relative_length in zip(loop_flags, relative_lengths, strict=True)
+        )
+        / float(num_rollouts),
         "p_cap": sum(cap_hits) / float(num_rollouts),
         "p_loop": sum(loop_flags) / float(num_rollouts),
         "mu_log_rel": sum(math.log1p(value) for value in relative_lengths) / float(num_rollouts),
@@ -383,6 +399,7 @@ def _rows_for_split(
             target_name: target_value,
             "p_cap": float(profile["p_cap"]),
             "p_loop": float(profile["p_loop"]),
+            "loop_budget_share": float(profile["loop_budget_share"]),
             "mu_log_rel": float(profile["mu_log_rel"]),
             "mean_length": float(profile["mean_length"]),
             "mean_relative_length": float(profile["mean_relative_length"]),
@@ -416,6 +433,7 @@ def _rows_for_split(
             target_name: target_value,
             "p_cap": float(profile["p_cap"]),
             "p_loop": float(profile["p_loop"]),
+            "loop_budget_share": float(profile["loop_budget_share"]),
             "mu_log_rel": float(profile["mu_log_rel"]),
             "mean_length": float(profile["mean_length"]),
             "mean_relative_length": float(profile["mean_relative_length"]),

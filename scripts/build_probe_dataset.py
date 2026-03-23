@@ -196,7 +196,8 @@ def _parse_args() -> argparse.Namespace:
             "binary labels onto a prompt-profile head. Defaults to "
             "'majority_tail' for prompt-profile binary, 's_tail' for probability, "
             "and 'mean_relative_length' for regression. Probability heads also "
-            "support direct prompt-level rates such as 'p_loop' and 'p_cap'."
+            "support direct prompt-level rates such as 'p_loop' and 'p_cap'; "
+            "regression heads also support 'loop_budget_share'."
         ),
     )
     parser.add_argument("--shard-size", type=int, default=2048)
@@ -1143,6 +1144,7 @@ def _build_prompt_profile_targets(
                 target_name: target_value,
                 "p_cap": float(profile["p_cap"]),
                 "p_loop": float(profile["p_loop"]),
+                "loop_budget_share": float(profile["loop_budget_share"]),
                 "mu_log_rel": float(profile["mu_log_rel"]),
                 "mean_length": float(profile["mean_length"]),
                 "mean_relative_length": float(profile["mean_relative_length"]),
@@ -1201,6 +1203,7 @@ def _build_prompt_profile_targets(
                 target_name: target_value,
                 "p_cap": float(profile["p_cap"]),
                 "p_loop": float(profile["p_loop"]),
+                "loop_budget_share": float(profile["loop_budget_share"]),
                 "mu_log_rel": float(profile["mu_log_rel"]),
                 "mean_length": float(profile["mean_length"]),
                 "mean_relative_length": float(profile["mean_relative_length"]),
@@ -1501,10 +1504,13 @@ def _resolve_target_spec(
             "--target-kind=probability currently expects "
             "--profile-target in {s_tail, p_loop, p_cap}."
         )
-    if target_kind == "regression" and profile_target != "mean_relative_length":
+    if target_kind == "regression" and profile_target not in {
+        "mean_relative_length",
+        "loop_budget_share",
+    }:
         raise SystemExit(
             "--target-kind=regression currently expects "
-            "--profile-target=mean_relative_length."
+            "--profile-target in {mean_relative_length, loop_budget_share}."
         )
     target_name = profile_target_name(
         profile_target,

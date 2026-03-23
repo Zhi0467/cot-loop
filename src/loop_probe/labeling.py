@@ -10,6 +10,7 @@ PROMPT_PROFILE_TARGET_CHOICES = (
     "p_loop",
     "p_cap",
     "mean_relative_length",
+    "loop_budget_share",
     "majority_tail",
 )
 
@@ -181,6 +182,10 @@ def aggregate_prompt_profile(
         "majority_tail": int(tail_hit_count > (num_rollouts / 2.0)),
         "mean_length": sum(lengths) / float(num_rollouts),
         "mean_relative_length": sum(relative_lengths) / float(num_rollouts),
+        "loop_budget_share": sum(
+            stat.loop_flag * stat.relative_length for stat in stats
+        )
+        / float(num_rollouts),
         "p_cap": sum(cap_hits) / float(num_rollouts),
         "p_loop": sum(loop_flags) / float(num_rollouts),
         "mu_log_rel": mu_log_rel,
@@ -199,6 +204,8 @@ def profile_target_name(
         return f"s_{threshold_text}"
     if profile_target == "mean_relative_length":
         return "mean_relative_length"
+    if profile_target == "loop_budget_share":
+        return "loop_budget_share"
     if profile_target == "p_loop":
         return "p_loop"
     if profile_target == "p_cap":
@@ -221,6 +228,8 @@ def profile_target_value(
         return float(profile["s_tail"])
     if profile_target == "mean_relative_length":
         return float(profile["mean_relative_length"])
+    if profile_target == "loop_budget_share":
+        return float(profile["loop_budget_share"])
     if profile_target == "p_loop":
         return float(profile["p_loop"])
     if profile_target == "p_cap":

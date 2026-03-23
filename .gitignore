@@ -22,3 +22,6 @@ __pycache__/
 wandb/
 outputs/probe_data/
 outputs/probe_runs/
+
+# macOS Google Drive folder icons.
+Icon?
