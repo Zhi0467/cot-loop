@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-03-23 04:52 UTC
+Last updated: 2026-03-23 06:42 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -23,10 +23,12 @@ Current docs and references:
 - GPQA prompt-profile recommendation PDF: ../outputs/gpqa_prompt_profile_recommendation_20260321/gpqa_prompt_profile_recommendation.pdf
 - Prompt-profile objective refresh PDF: ../outputs/p_loop_objective_recommendation_20260322/p_loop_objective_recommendation.pdf
 - Two-head prompt-profile recommendation PDF: ../outputs/two_head_prompt_profile_recommendation_20260322/two_head_prompt_profile_recommendation.pdf
+- Prompt-profile build-recipe PDF: ../outputs/prompt_profile_build_recipe_20260323/prompt_profile_build_recipe.pdf
 
 Current live status note:
 - The refreshed common-policy cross-dataset bundle is now reportable across all five datasets, with repaired `GPQA` / `MMLU-Pro` JSON-answer rows and a regenerated PDF in `../outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/`. Follow the root project report (`../../projects/cot-loop-detection.md`) for the separate benchmark-style `GPQA` calibration note and the explicit reminder that recovered capped `LiveCodeBench` still leaves `avg_first_loop_prefix_length` missing after the crash.
 - The current design recommendation is to move the next predictor round away from another binary loop label and away from raw `p(max_length_hit)` as the sole main target. The live objective is now a prompt-level rollout-profile target trained directly on repeated-rollout labels, and the best current default is to train two direct heads from the same archive: `mean_relative_length` as the shipped utility head, and `p_loop` as the cleaner loop-prox companion head that should stay in the default evaluation bundle rather than being dropped.
+- The newest Athena-backed build recipe sharpened the evaluation contract instead of changing the head ranking: every run now needs `prompt_length`, `effective_budget`, and joint `prompt_length + effective_budget` baselines; `best_rank` is the checkpoint to ship; and if `LiveCodeBench` forces one more binary-head check, direct `p_cap` is the next head to reopen rather than `loop_budget_share` or another threshold sweep.
 - The first code path for that recommendation is now in-repo: `build_probe_dataset.py` can emit prompt-level probability targets for `p_loop`, `p_cap`, or `s_t` from repeated rollouts, can also emit `mean_relative_length` regression labels, the builder has task-aware prompt formatting for `GPQA` / `MMLU-Pro`, `train_probe.py` can train/evaluate against both continuous target kinds, the builder writes one reusable repeated-rollout archive to `diagnostics/prompt_rollout_archive.jsonl`, and `scripts/relabel_prompt_profile_dataset.py` can relabel a finished prompt-profile dataset onto a new prompt-level target without rerolling or re-extracting activations. The current implementation note is `prompt-profile-probe.md`.
 - The newest recommendation note now has one more qualification on top of the Athena-backed objective refresh. The repaired archive geometry still favors `p_loop` over thresholded tail labels as the cleaner target, and the new same-archive `AIME` relabel check shows that `p_loop` remains genuinely usable there (`ensemble Spearman 0.538` at the Brier-selected checkpoint, `0.584` at the best ranking epoch). But the direct same-archive `GPQA` retrain still says usefulness depends on selection rule: `p_loop` shows ranking signal only at early epochs on that tiny slice, while `mean_relative_length` remains the more stable useful head overall.
 - A second Athena follow-up on the updated `GPQA` + `AIME` relabel evidence landed on the same objective ranking but made the operational recommendation sharper: keep the default as two heads, not one, and add a `best_rank` checkpoint beside the old loss-best checkpoint. The concrete rule now written into `prompt-profile-probe.md` is to ship against ranking-oriented selection with a loss-quality guard, rather than using plain `min(Brier)` / `min(MSE)` as the only selector.

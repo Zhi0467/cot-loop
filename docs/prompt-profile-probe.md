@@ -1,6 +1,6 @@
 # Prompt-Profile Probe Path
 
-Last updated: 2026-03-23 04:52 UTC
+Last updated: 2026-03-23 06:42 UTC
 
 ## What Landed
 
@@ -29,6 +29,10 @@ The next prompt-profile heads should be treated as a two-head default:
 - default loop-prox companion head: `p_loop = E[1{rollout loops}]`;
 - optional severity-weighted auxiliary head: `loop_budget_share = E[1{rollout loops}] * (L / E)`;
 - ship `best_rank` for utility-facing prompt ranking and keep `best_loss` for calibration-style reporting;
+- make the trivial non-activation baselines mandatory on every run:
+  - `prompt_length` only;
+  - `effective_budget` only;
+  - joint `prompt_length + effective_budget`;
 - keep `p_cap` diagnostic-first, not the headline target;
 - keep `majority_s_t` as a sparse pilot label, not the main objective.
 
@@ -76,6 +80,7 @@ Evaluation boundary:
 
 - keep the train/test split prompt-disjoint;
 - always benchmark against prompt-token-count-only and effective-budget-only baselines;
+- also benchmark against the joint `prompt-token-count + effective-budget` baseline, because that is the real “did prefill activations add anything beyond prompt geometry?” check;
 - for `mean_relative_length`, prefer the ensemble view and do not rely only on MSE when the downstream goal is ranking or top-bucket capture;
 - ship `best_rank` for utility-facing ranking and keep `best_loss` beside it for calibration-style reporting;
 - keep `p_cap`, correctness, and the prompt-majority controls as downstream diagnostics on the same prompts.
@@ -138,6 +143,8 @@ That helper reuses the saved prefill activations and `diagnostics/prompt_rollout
 `mean_relative_length` remains the shipped utility head because it is dense, stable, already implemented, and now has same-archive evidence that the ensemble readout can beat prompt length on `GPQA`, `AIME`, and the lower-tail controls. It remains a proxy rather than the cleanest main head because it mixes correct long reasoning, wrong long reasoning, and looped long reasoning. `p_loop` remains the cleaner companion head for failure proximity, especially on the heavier-tail datasets.
 
 `loop_budget_share` is now implemented too and can be relabeled from the same archive. It is worth keeping as an auxiliary severity-weighted target for analysis, but the finished four-dataset archive check did not support promoting it to the shipped score: it behaves well on `AIME`, but it is weaker on `GPQA` and does not hold up on `MATH-500` / `MMLU-Pro`.
+
+If the unfinished `LiveCodeBench` lane comes back inconsistent enough to justify one more binary-head check, reopen direct `p_cap` next. Do not reopen `loop_budget_share` or another thresholded `s_t` sweep before that.
 
 Example dataset build:
 
