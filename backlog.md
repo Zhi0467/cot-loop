@@ -1,11 +1,10 @@
 # CoT Loop Detection Backlog
 
-## Active Experiment: LiveCodeBench Completion
+## Next Experiment: Joint Metadata Baseline
 
-- `LiveCodeBench` is the only unfinished dataset in the cross-dataset validation suite.
-- The current rollout job is `1668` on 2 GPUs with `MAX_NUM_SEQS=16`, running the `640 / 160`, `n = 4` surface.
-- The dependent follow-up job `1693` (behind `afterok:1668`) will train majority controls, relabel direct heads (`p_loop`, `mean_relative_length`, `loop_budget_share`), run fits, and write `lcb_followup_summary.json`.
-- As of 2026-03-23 06:42 UTC, `1668` had reached 332 / 800 prompts total (176/400 on dp-rank 0, 156/400 on dp-rank 1) after 2h52m.
+- The five-dataset same-archive table is now complete; `LiveCodeBench` did not change the ranking (`mean_relative_length` first, `p_loop` second, `loop_budget_share` auxiliary-only).
+- The main open measurement gap is the missing joint `prompt_length + effective_budget` baseline. The current saved summaries only include the separate one-variable baselines.
+- Once that joint baseline exists, future head changes should be judged against it rather than against prompt length alone.
 
 ## Known Data Gaps
 
@@ -17,7 +16,7 @@
 
 ## Conditional Next Steps
 
-- If `LiveCodeBench` contradicts the current head ordering enough to justify one more binary-head test, reopen direct `p_cap` next rather than another threshold sweep or `loop_budget_share`.
+- If a future dataset/model variant contradicts the current head ordering enough to justify one more binary-head test, reopen direct `p_cap` next rather than another threshold sweep or `loop_budget_share`.
 
 ## Open Review Surfaces
 

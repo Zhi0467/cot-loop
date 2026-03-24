@@ -1,6 +1,6 @@
 # Prompt-Profile Probe Path
 
-Last updated: 2026-03-23 06:42 UTC
+Last updated: 2026-03-24 07:41 UTC
 
 ## What Landed
 
@@ -43,6 +43,7 @@ Why this is the current recommendation:
 - `p_loop` is already computed in the archive, stays closer to the failure mode we care about than raw length, and on both saved `GPQA` and `AIME` slices it is less prompt-length-correlated than `mean_relative_length`;
 - the first same-archive `GPQA` / `AIME` relabel checks showed that loss-best selection was hiding the useful epochs on small pilots, especially for `p_loop`;
 - the trainer now writes both `best_loss` and `best_rank`, so the shipped checkpoint can be aligned with ranking utility without dropping the calibration-first view;
+- the recovered `LiveCodeBench` follow-up did not overturn that ranking either: ensemble `mean_relative_length` reached `Spearman 0.751` on the saved archive versus prompt-length `0.405`, while ensemble `p_loop` reached `Spearman 0.478` and `top-20% capture 0.463` versus prompt-length `0.191`;
 - a final archive-only check on `loop_budget_share` did not survive the lower-tail controls cleanly enough to replace the current bundle, even though it remains useful on `AIME`;
 - under that updated read, `mean_relative_length` remains the safer shipped utility head, while `p_loop` stays in the default bundle because it is cleaner and materially less prompt-length-shaped on the heavier-tail slices.
 
@@ -142,9 +143,9 @@ That helper reuses the saved prefill activations and `diagnostics/prompt_rollout
 
 `mean_relative_length` remains the shipped utility head because it is dense, stable, already implemented, and now has same-archive evidence that the ensemble readout can beat prompt length on `GPQA`, `AIME`, and the lower-tail controls. It remains a proxy rather than the cleanest main head because it mixes correct long reasoning, wrong long reasoning, and looped long reasoning. `p_loop` remains the cleaner companion head for failure proximity, especially on the heavier-tail datasets.
 
-`loop_budget_share` is now implemented too and can be relabeled from the same archive. It is worth keeping as an auxiliary severity-weighted target for analysis, but the finished four-dataset archive check did not support promoting it to the shipped score: it behaves well on `AIME`, but it is weaker on `GPQA` and does not hold up on `MATH-500` / `MMLU-Pro`.
+`loop_budget_share` is now implemented too and can be relabeled from the same archive. It is worth keeping as an auxiliary severity-weighted target for analysis, but the finished five-dataset archive check did not support promoting it to the shipped score: it behaves well on `AIME`, but it is weaker on `GPQA`, does not hold up on `MATH-500` / `MMLU-Pro`, and stayed far behind the main bundle on `LiveCodeBench`.
 
-If the unfinished `LiveCodeBench` lane comes back inconsistent enough to justify one more binary-head check, reopen direct `p_cap` next. Do not reopen `loop_budget_share` or another thresholded `s_t` sweep before that.
+`LiveCodeBench` came back consistent with the existing ranking. If a future heavier-tail dataset or model variant is inconsistent enough to justify one more binary-head check, reopen direct `p_cap` next. Do not reopen `loop_budget_share` or another thresholded `s_t` sweep before that.
 
 Example dataset build:
 
