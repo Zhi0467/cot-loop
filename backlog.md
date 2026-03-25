@@ -1,9 +1,13 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-03-25 05:26 UTC
+Last updated: 2026-03-25 06:10 UTC
 
 ## Immediate Next Experiments
 
+- Rebuild the explicit cross-dataset `majority_s_0.5` table before making another global prompt-length claim.
+  - For every finished dataset, report the prompt-length-only 1D rule beside the learned last-layer and ensemble probes.
+  - Use the full binary metric bundle: `PR-AUC`, `ROC-AUC`, `macro-F1`, positive precision / recall, and prevalence.
+  - This is the direct missing answer to "does prompt length actually work?" on the one surface where a real prompt-length predictor already exists.
 - Close the unresolved cross-dataset degeneracy question before making another objective claim.
   - On the existing held-out archives, rank prompts by `majority_s_0.5`, `p_loop`, `mean_relative_length`, and the metadata baselines below.
   - For the top predicted-risk `20%` prompts under each score, measure actual loop rate, actual max-length-hit rate, and actual accuracy.
@@ -18,6 +22,13 @@ Last updated: 2026-03-25 05:26 UTC
   - This is the missing bridge between "easy to predict" and "actually useful for catching bad rollouts."
   - If the cheap prompt-length or joint metadata baseline wins this test, keep it as a valid operational screen and state clearly that the gain is metadata-driven rather than activation-driven.
 - Rebuild the compact five-dataset summary once the metadata baselines above exist, so future head choices are judged against the strongest non-activation model rather than against prompt length alone.
+
+## Fixed Experimental Surface
+
+- Keep the predictor input to prompt-prefill activations only.
+- Stay in-distribution and prompt-disjoint.
+- Keep one selected layer or per-layer independent probes with late aggregation.
+- Keep the decode policy fixed at `temperature = 0.2` while settling the objective question.
 
 ## Measurement And Reporting Gaps
 
