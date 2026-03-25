@@ -1,6 +1,6 @@
 # Roadmap - CoT Loop Detection
 
-Last updated: 2026-03-25 00:23 UTC
+Last updated: 2026-03-25 00:56 UTC
 
 Scope:
 - Build and validate a probe pipeline for CoT loop detection across prefill and completion feature views.
@@ -49,6 +49,7 @@ Success criteria:
 - Make that objective less brittle to the chosen decode ceiling than a pure max-length-hit label.
 
 Activity log:
+- 2026-03-25 00:56 UTC: clarified the interpretation contract after collaborator feedback. The docs now answer five operational questions directly instead of spreading them across thread notes: (1) for binary `majority_s_0.5`, "prompt length alone" already means a real held-out 1D scorer with train-chosen orientation and threshold; (2) for the five-dataset continuous-head table, prompt length is still only raw held-out association and is not yet a trained predictor; (3) the strong `majority_s_0.5` prompt-length baseline does **not** kill that target operationally, but it does keep it out of the main activation-lift claim; (4) `Spearman` is now spelled out as prompt-level rank agreement with the realized target; and (5) the concrete next experiments are now logged in `backlog.md` as the metadata-baseline pass plus the top-risk-bucket usefulness check on empirical loop rate, cap-hit rate, and accuracy.
 - 2026-03-20 05:36 UTC: rebased the prompt-profile branch onto the newer upstream `main` state, resolved the docs-layer merge drift, and extended the implementation so repeated-rollout builds can supervise either direct `s_0.9` or `mean_relative_length` while emitting one reusable `diagnostics/prompt_rollout_archive.jsonl` bundle per dataset build.
 - 2026-03-21 17:18 UTC: the first real GPQA `s_0.9` pilot finished end to end on the 3-GPU path (`37m22s`) and materially changed the recommendation. The runtime path is fine, but the target is not: on this `32 / 16` pilot, `s_0.9` equals `p(max_length_hit)` for every prompt, the probe's eval Brier (`0.03456`) is slightly worse than a constant baseline (`0.03434`), and eval Spearman is negative (`-0.2799`). The next run should therefore keep the same prefill/data-view design but switch the main head to `mean_relative_length` (or lower the tail threshold) instead of treating `s_0.9` as the settled first objective.
 - 2026-03-21 17:24 UTC: reused the finished rollout archive and prefill shards to train `mean_relative_length` on the exact same prompts with no second rollout. This confirms the direction but not success yet: the best regression run improves eval Spearman to `+0.0647`, but its eval MSE/MAE (`0.0503 / 0.1549`) still trail both a constant baseline (`0.0311 / 0.1342`) and a prompt-length-only linear fit (`0.0422 / 0.1425`). The next experiment therefore needs a denser target plus a larger prompt count, not only a label swap on the same 48-prompt slice.

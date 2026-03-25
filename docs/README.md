@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-03-25 00:23 UTC
+Last updated: 2026-03-25 00:56 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -8,6 +8,7 @@ Purpose:
 
 Core docs:
 - Project roadmap: ../roadmap.md
+- Open experiment ledger / next runs: ../backlog.md
 - Prompt-profile implementation path: prompt-profile-probe.md
 - Prompt-profile evaluation contract: prompt-profile-eval-contract.md
 - Prompt-profile projection/export path: prompt-profile-projection.md
@@ -28,4 +29,5 @@ Current live status:
 - The default bundle remains `mean_relative_length` as the main useful score plus `p_loop` as the cleaner failure-prox companion.
 - `majority_s_0.5` is still worth keeping as a control and possible cheap degenerate-prompt screen, but it is too prompt-length-shaped on `AIME` to be the main activation-lift claim.
 - The evaluation-contract note now makes one ambiguity explicit: the binary majority table already has a true one-feature prompt-length scorer, while the current five-dataset continuous-head table still only records raw prompt-length association. A trained metadata-only continuous baseline suite is still the next missing measurement piece.
+- `roadmap.md` is the chronological experiment log; `backlog.md` now holds the concrete next experiments for the metadata-baseline pass and the top-risk-bucket usefulness check.
 - `LiveCodeBench` is no longer pending. The recovered follow-up reinforced rather than changed the `mean_relative_length` plus `p_loop` ranking.

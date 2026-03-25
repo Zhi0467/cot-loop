@@ -1,6 +1,6 @@
 # Prompt-Profile Evaluation Contract
 
-Last updated: 2026-03-25 00:23 UTC
+Last updated: 2026-03-25 00:56 UTC
 
 ## Predictor Object
 
@@ -41,6 +41,7 @@ For binary heads such as `majority_s_0.5`, the prompt-length baseline is already
 - no activations
 - no MLP
 - no hidden layer
+- operationally, this is a 1D train-fit decision rule on prompt length, then held-out evaluation on new prompts
 
 Selection rule in the current exporter:
 
@@ -58,6 +59,7 @@ For the current five-dataset table on `p_loop`, `mean_relative_length`, and `loo
 - it is currently just the raw held-out association between prompt length and the target
 - in practice that means `Spearman(prompt_token_count, target)` in the saved summaries
 - it is not yet a trained regressor or calibrated metadata model
+- so for these continuous heads, the current saved table does **not** yet contain a true "prompt-length-only predictor"
 
 This is why the joint `prompt_length + effective_budget` baseline is still an open measurement item rather than a finished one. The next baseline pass needs true metadata-only models for:
 
@@ -70,6 +72,7 @@ evaluated with the same held-out metrics as the activation probes.
 ## How To Read The Metrics
 
 - `Spearman rank correlation`: correlation between the ranking induced by the predictor and the ranking induced by the realized prompt-level target across prompts. `1` is perfect monotone ranking, `0` is no monotone signal, negative means the ranking is reversed.
+- Example for `p_loop`: if prompt A truly loops more often than prompt B, a higher `Spearman` means the predictor is more likely to score A above B.
 - `top-20% capture`: sort prompts by predicted score, keep the top 20% highest-scored prompts, and measure what fraction of the total target mass lies inside that bucket.
 - For `p_loop`, target mass means the summed empirical loop probabilities across prompts.
 - For `mean_relative_length`, target mass means the summed realized relative-length mass across prompts.
@@ -96,13 +99,16 @@ Current evidence says this is not only a `GPQA` artifact:
 What is still unresolved:
 
 - whether `0.5` is itself too easy, versus whether majority-threshold heads are generically too geometry-shaped
+- whether the problem is mainly the hard majority collapse (`0,1,2 -> 0`, `3,4 -> 1`) or the fact that long-rollout frequency is already a prompt-geometry proxy under the current decode policy
 - whether `majority_s_0.5` top-risk prompts actually isolate degenerate behavior as well as `p_loop` or `p_cap`
 
-That second question needs a direct bucket comparison on predicted high-risk prompts:
+Those questions are exactly why the next experiment is a direct bucket comparison on predicted high-risk prompts:
 
 - empirical loop rate
 - empirical max-length-hit rate
 - empirical accuracy
+
+If the prompt-length-only baseline already wins that bucket test, that is still a valid operational result. It would mean the useful screen is mostly metadata-driven, not activation-driven.
 
 ## Current Decision Rule
 
