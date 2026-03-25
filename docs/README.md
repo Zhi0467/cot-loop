@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-03-25 00:56 UTC
+Last updated: 2026-03-25 04:41 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -28,6 +28,6 @@ Current live status:
 - The current prompt-level predictor task is "predict terminal rollout statistics from prompt-prefill activations under one fixed model and decode policy," not "force everything into one binary loop label."
 - The default bundle remains `mean_relative_length` as the main useful score plus `p_loop` as the cleaner failure-prox companion.
 - `majority_s_0.5` is still worth keeping as a control and possible cheap degenerate-prompt screen, but it is too prompt-length-shaped on `AIME` to be the main activation-lift claim.
-- The evaluation-contract note now makes one ambiguity explicit: the binary majority table already has a true one-feature prompt-length scorer, while the current five-dataset continuous-head table still only records raw prompt-length association. A trained metadata-only continuous baseline suite is still the next missing measurement piece.
+- The evaluation-contract note now makes the baseline boundary explicit in one sentence: the binary majority table already has a true one-feature prompt-length scorer, while the current five-dataset continuous-head table still only records raw prompt-length association. A trained metadata-only continuous baseline suite is still the next missing measurement piece, and the current continuous rows should not be described as a trained baseline.
 - `roadmap.md` is the chronological experiment log; `backlog.md` now holds the concrete next experiments for the metadata-baseline pass and the top-risk-bucket usefulness check.
 - `LiveCodeBench` is no longer pending. The recovered follow-up reinforced rather than changed the `mean_relative_length` plus `p_loop` ranking.

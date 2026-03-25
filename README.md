@@ -16,9 +16,9 @@ Latest status:
 - one explicit caveat remains on that recovered `LiveCodeBench` block: the original job crashed after grading and before writing the final JSON, and replay-based repair did not reproduce the stored generations exactly enough to recover `avg_first_loop_prefix_length`. That single metric therefore remains `null` for the recovered capped run.
 - the current prompt-profile question is now "which prompt-level terminal statistic is most useful to predict from prompt-prefill activations under a fixed model and decode policy?" rather than "which binary loop threshold should we force as the main label?" The current default bundle is `mean_relative_length` plus `p_loop`.
 - `majority_s_0.5` is still kept as a control and possible cheap degenerate-rollout screen, but it is too prompt-length-shaped on `AIME` to be the main activation-lift claim. The exact target, baseline, and metric definitions now live in `docs/prompt-profile-eval-contract.md`.
-- the current docs now separate two different prompt-length baselines that had been conflated in-thread:
+- the current docs now lock one distinction that had kept drifting in-thread:
   - for binary `majority_s_0.5`, prompt length already means a true one-feature held-out scorer;
-  - for the five-dataset continuous-head table, prompt length is still only raw held-out association, not yet a trained metadata-only predictor.
+  - for the five-dataset continuous-head table, prompt length is still only raw held-out association, not yet a trained metadata-only predictor, so those rows should not be described as a metadata model "working."
 - the current open measurement work is therefore concrete rather than vague:
   - add trained metadata-only baselines for `prompt_length`, `effective_budget`, and `prompt_length + effective_budget`;
   - compare the top predicted-risk prompts from `majority_s_0.5`, `p_loop`, and `mean_relative_length` on actual loop rate, cap-hit rate, and accuracy.

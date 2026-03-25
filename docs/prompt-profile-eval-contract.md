@@ -1,12 +1,24 @@
 # Prompt-Profile Evaluation Contract
 
-Last updated: 2026-03-25 00:56 UTC
+Last updated: 2026-03-25 04:41 UTC
 
 ## Predictor Object
 
 - The prompt-profile predictor is not trying to predict an intrinsic "loop label" for a prompt in the abstract.
 - It predicts prompt-level terminal statistics of repeated rollouts for one fixed model and one fixed decode policy, using prompt-prefill activations only.
 - Every target below is defined per prompt from repeated rollouts under that fixed policy.
+
+## Terminology Lock
+
+The thread had been collapsing two different things into one phrase. They need to stay separate:
+
+- Binary `majority_s_0.5`: "prompt-length-only baseline" means a real trained 1-feature held-out predictor. It uses only `prompt_token_count`, fits its direction and threshold on the train prompts, then evaluates that fixed rule on held-out prompts.
+- Continuous `p_loop`, `mean_relative_length`, `loop_budget_share`: the current saved "prompt length" number is **not** a trained predictor. It is only the held-out rank association `Spearman(prompt_token_count, target)`.
+
+Operational consequence:
+
+- when I say prompt length "works" on `majority_s_0.5`, that claim is backed by a real held-out baseline run;
+- I should **not** say prompt length "works" on the current continuous-head table, because that metadata-only predictor has not been trained yet.
 
 Notation:
 
@@ -29,11 +41,7 @@ These targets answer different questions:
 - `p_cap` asks how often this prompt reaches the hard ceiling.
 - `mean_relative_length` asks how much token budget this prompt tends to consume on average.
 
-## What "Prompt-Length-Only Baseline" Means
-
-This phrase had drifted across notes. The exact meaning is now explicit.
-
-### Binary Targets
+## Binary `prompt_length` Baseline: Exact Algorithm
 
 For binary heads such as `majority_s_0.5`, the prompt-length baseline is already a real one-feature scorer:
 
@@ -41,7 +49,13 @@ For binary heads such as `majority_s_0.5`, the prompt-length baseline is already
 - no activations
 - no MLP
 - no hidden layer
-- operationally, this is a 1D train-fit decision rule on prompt length, then held-out evaluation on new prompts
+
+In plain terms, the algorithm is:
+
+1. For each prompt, compute one number: `prompt_token_count`.
+2. On the train split only, decide whether larger or smaller prompt length should mean "more likely positive."
+3. On the train split only, choose one threshold on that 1D score.
+4. Freeze that rule and evaluate it on held-out test prompts.
 
 Selection rule in the current exporter:
 
@@ -52,16 +66,21 @@ Selection rule in the current exporter:
 
 The `effective_budget` baseline is defined the same way, but uses `effective_max_tokens` as the only feature.
 
-### Continuous Targets
+Current backed claim:
 
-For the current five-dataset table on `p_loop`, `mean_relative_length`, and `loop_budget_share`, the "prompt-length baseline" is weaker and more limited:
+- on the finished `AIME` seed-`0` `majority_s_0.5` split, this prompt-length-only binary rule reaches test `PR-AUC 0.8976`.
 
-- it is currently just the raw held-out association between prompt length and the target
-- in practice that means `Spearman(prompt_token_count, target)` in the saved summaries
-- it is not yet a trained regressor or calibrated metadata model
-- so for these continuous heads, the current saved table does **not** yet contain a true "prompt-length-only predictor"
+## Continuous `prompt_length` Numbers: What Exists And What Does Not
 
-This is why the joint `prompt_length + effective_budget` baseline is still an open measurement item rather than a finished one. The next baseline pass needs true metadata-only models for:
+For the current five-dataset table on `p_loop`, `mean_relative_length`, and `loop_budget_share`, the saved prompt-length number is weaker and more limited:
+
+- what exists today: raw held-out association between prompt length and the target
+- in practice: `Spearman(prompt_token_count, target)` in the saved summaries
+- what does **not** exist yet: a trained 1D regressor, a trained 2D metadata model, or a calibrated metadata-only predictor
+
+So for these continuous heads, the current saved table does **not** yet contain a true prompt-length-only predictor. That is why the joint `prompt_length + effective_budget` baseline is still an open measurement item rather than a finished one.
+
+The next baseline pass needs true metadata-only models for:
 
 - `prompt_length`
 - `effective_budget`
@@ -95,6 +114,11 @@ Why prompt length can do well on this head:
 Current evidence says this is not only a `GPQA` artifact:
 
 - on the finished `AIME` seed-`0` split, prompt length alone already reaches `PR-AUC 0.8976` for `majority_s_0.5`
+
+Important scope boundary:
+
+- that `PR-AUC 0.8976` statement applies to the binary `majority_s_0.5` baseline only;
+- it should not be reused as evidence that a trained metadata baseline already works for `p_loop` or `mean_relative_length`.
 
 What is still unresolved:
 

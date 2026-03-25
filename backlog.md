@@ -1,13 +1,13 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-03-25 00:56 UTC
+Last updated: 2026-03-25 04:41 UTC
 
 ## Immediate Next Experiments
 
-- Add true metadata-only baselines for the continuous heads.
+- Add the first true metadata-only predictor pass for the continuous heads.
   - Fit `prompt_length` only, `effective_budget` only, and `prompt_length + effective_budget` on the same train split used by the activation probes.
   - Evaluate them on the same held-out metrics as the probe heads: `Spearman`, `top-20% capture`, and `Brier` or `MSE` where relevant.
-  - Keep the docs explicit that this is the first real metadata-only predictor pass for the continuous heads; the current saved table is still only raw association.
+  - Keep the docs explicit that this is the first real metadata-only predictor pass for the continuous heads; the current saved table is still only raw association, not a trained baseline.
 - Check whether the soft labels actually isolate degenerate prompts.
   - For `majority_s_0.5`, `p_loop`, and `mean_relative_length`, compare the predicted top-risk 20% prompts on empirical loop rate, empirical max-length-hit rate, and empirical accuracy.
   - This is the missing bridge between "easy to predict" and "actually useful for catching bad rollouts."
@@ -18,6 +18,7 @@ Last updated: 2026-03-25 00:56 UTC
 
 - The current five-dataset continuous-head table still uses raw prompt-length association rather than a trained metadata baseline.
 - The current saved summaries still do not log the joint `prompt_length + effective_budget` baseline.
+- Do not describe the current continuous-head prompt-length rows as a metadata-only predictor; they are descriptive correlations only.
 - Older thread notes used "rank correlation" as shorthand. Future writeups should say `Spearman rank correlation` explicitly and always name the target being ranked.
 - Older notes also used "prompt-length baseline" too loosely. Future writeups should say whether this means a train-fit 1D scorer or only a raw held-out association statistic.
 
