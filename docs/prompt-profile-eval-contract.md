@@ -1,6 +1,6 @@
 # Prompt-Profile Evaluation Contract
 
-Last updated: 2026-03-25 04:41 UTC
+Last updated: 2026-03-25 10:02 UTC
 
 ## Predictor Object
 
@@ -73,7 +73,10 @@ Current backed claim:
 What that does and does not mean cross-dataset:
 
 - on the current `GPQA` `majority_s_0.5` split, prompt length is weak (`PR-AUC 0.0817`) while the learned ensemble probe is much stronger (`PR-AUC 0.6667`);
-- on the finished `AIME` seed-`0` split, prompt length is already very strong (`PR-AUC 0.8976`) and the learned probes only move it modestly;
+- on `AIME`, prompt length is strong but still not the whole story: across the three finished `48 / 12` split seeds, the prompt-length rule averages `PR-AUC 0.806`, while the ensemble averages `0.907`; seed-`0` remains the sharpest single example (`0.8976` prompt length vs `0.9214` ensemble);
+- on `LiveCodeBench`, prompt length is nontrivial (`PR-AUC 0.5763`), but both learned probes still add signal (`0.7510` last-layer, `0.7000` ensemble);
+- on `MATH-500`, prompt length is weak (`PR-AUC 0.1028`) and the ensemble only reaches `0.2159` under a `4%` positive rate;
+- on `MMLU-Pro`, the whole surface is close to control because the positive rate is only `1.25%` (`PR-AUC 0.1104` prompt length, `0.1417` ensemble);
 - so "prompt length works" is not one global statement even for `majority_s_0.5`: it is dataset-conditional, and the current evidence says the label can be nontrivial on one slice and mostly prompt-geometry-shaped on another.
 
 ## Continuous `prompt_length` Numbers: What Exists And What Does Not

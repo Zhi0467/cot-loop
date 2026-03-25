@@ -1,13 +1,9 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-03-25 06:10 UTC
+Last updated: 2026-03-25 10:02 UTC
 
 ## Immediate Next Experiments
 
-- Rebuild the explicit cross-dataset `majority_s_0.5` table before making another global prompt-length claim.
-  - For every finished dataset, report the prompt-length-only 1D rule beside the learned last-layer and ensemble probes.
-  - Use the full binary metric bundle: `PR-AUC`, `ROC-AUC`, `macro-F1`, positive precision / recall, and prevalence.
-  - This is the direct missing answer to "does prompt length actually work?" on the one surface where a real prompt-length predictor already exists.
 - Close the unresolved cross-dataset degeneracy question before making another objective claim.
   - On the existing held-out archives, rank prompts by `majority_s_0.5`, `p_loop`, `mean_relative_length`, and the metadata baselines below.
   - For the top predicted-risk `20%` prompts under each score, measure actual loop rate, actual max-length-hit rate, and actual accuracy.
@@ -32,6 +28,8 @@ Last updated: 2026-03-25 06:10 UTC
 
 ## Measurement And Reporting Gaps
 
+- The explicit cross-dataset `majority_s_0.5` table now exists under `outputs/prompt_majority05_cross_dataset_rebuild_20260325/`; future replies should cite that table directly instead of falling back to `AIME`-only anecdotes.
+- That rebuilt table answers only the binary prompt-length question. It does **not** answer the collaborator's actual degeneracy-screen question yet; the bucket test on empirical loop rate, max-length-hit rate, and accuracy is still missing.
 - The current five-dataset continuous-head table still uses raw prompt-length association rather than a trained metadata baseline.
 - The current saved summaries still do not log the joint `prompt_length + effective_budget` baseline.
 - Do not describe the current continuous-head prompt-length rows as a metadata-only predictor; they are descriptive correlations only.
