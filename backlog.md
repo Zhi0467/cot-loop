@@ -1,9 +1,14 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-03-25 04:41 UTC
+Last updated: 2026-03-25 05:26 UTC
 
 ## Immediate Next Experiments
 
+- Close the unresolved cross-dataset degeneracy question before making another objective claim.
+  - On the existing held-out archives, rank prompts by `majority_s_0.5`, `p_loop`, `mean_relative_length`, and the metadata baselines below.
+  - For the top predicted-risk `20%` prompts under each score, measure actual loop rate, actual max-length-hit rate, and actual accuracy.
+  - This is the first experiment that directly answers whether the threshold label is actually catching degenerate prompts across datasets or only catching prompt geometry.
+  - Until this exists, do not claim that `majority_s_0.5` is the right cross-dataset operational screen.
 - Add the first true metadata-only predictor pass for the continuous heads.
   - Fit `prompt_length` only, `effective_budget` only, and `prompt_length + effective_budget` on the same train split used by the activation probes.
   - Evaluate them on the same held-out metrics as the probe heads: `Spearman`, `top-20% capture`, and `Brier` or `MSE` where relevant.
@@ -11,7 +16,7 @@ Last updated: 2026-03-25 04:41 UTC
 - Check whether the soft labels actually isolate degenerate prompts.
   - For `majority_s_0.5`, `p_loop`, and `mean_relative_length`, compare the predicted top-risk 20% prompts on empirical loop rate, empirical max-length-hit rate, and empirical accuracy.
   - This is the missing bridge between "easy to predict" and "actually useful for catching bad rollouts."
-  - If the cheap prompt-length baseline wins this test, keep it as a valid operational screen and state clearly that the gain is metadata-driven rather than activation-driven.
+  - If the cheap prompt-length or joint metadata baseline wins this test, keep it as a valid operational screen and state clearly that the gain is metadata-driven rather than activation-driven.
 - Rebuild the compact five-dataset summary once the metadata baselines above exist, so future head choices are judged against the strongest non-activation model rather than against prompt length alone.
 
 ## Measurement And Reporting Gaps

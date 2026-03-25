@@ -70,6 +70,12 @@ Current backed claim:
 
 - on the finished `AIME` seed-`0` `majority_s_0.5` split, this prompt-length-only binary rule reaches test `PR-AUC 0.8976`.
 
+What that does and does not mean cross-dataset:
+
+- on the current `GPQA` `majority_s_0.5` split, prompt length is weak (`PR-AUC 0.0817`) while the learned ensemble probe is much stronger (`PR-AUC 0.6667`);
+- on the finished `AIME` seed-`0` split, prompt length is already very strong (`PR-AUC 0.8976`) and the learned probes only move it modestly;
+- so "prompt length works" is not one global statement even for `majority_s_0.5`: it is dataset-conditional, and the current evidence says the label can be nontrivial on one slice and mostly prompt-geometry-shaped on another.
+
 ## Continuous `prompt_length` Numbers: What Exists And What Does Not
 
 For the current five-dataset table on `p_loop`, `mean_relative_length`, and `loop_budget_share`, the saved prompt-length number is weaker and more limited:
@@ -125,6 +131,23 @@ What is still unresolved:
 - whether `0.5` is itself too easy, versus whether majority-threshold heads are generically too geometry-shaped
 - whether the problem is mainly the hard majority collapse (`0,1,2 -> 0`, `3,4 -> 1`) or the fact that long-rollout frequency is already a prompt-geometry proxy under the current decode policy
 - whether `majority_s_0.5` top-risk prompts actually isolate degenerate behavior as well as `p_loop` or `p_cap`
+
+What is already true at the rollout level:
+
+- the hard datasets really do contain a distinct degenerate regime under the shared decode policy:
+  - `GPQA`: `16.4%` looped, `6.9%` max-length hits
+  - `AIME`: `15.0%` looped, `12.7%` max-length hits
+  - `LiveCodeBench`: `25.3%` looped, `20.9%` max-length hits on the capped full sweep
+  - `MMLU-Pro`: `4.6%` looped, `0.9%` max-length hits
+  - `MATH-500`: `2.9%` looped, `1.5%` max-length hits
+- cap hit is tightly nested inside loop on the hard datasets:
+  - `GPQA`: every cap hit loops, but only `42.2%` of loops hit the cap
+  - `LiveCodeBench`: `99.5%` of cap-hit rollouts loop, and only `3.4%` of looped rollouts are still correct
+
+What is not yet proven at the prompt level:
+
+- we still have not shown that the prompts ranked highest by `majority_s_0.5` are the best cross-dataset screen for degenerate rollouts;
+- the decisive held-out comparison is still missing: for `majority_s_0.5`, `p_loop`, and the strongest metadata baseline, compare the top-risk prompts on empirical loop rate, empirical max-length-hit rate, and empirical accuracy.
 
 Those questions are exactly why the next experiment is a direct bucket comparison on predicted high-risk prompts:
 
