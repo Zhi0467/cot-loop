@@ -1,6 +1,6 @@
 # Prompt-Profile Probe Path
 
-Last updated: 2026-03-24 07:41 UTC
+Last updated: 2026-03-25 00:23 UTC
 
 ## What Landed
 
@@ -23,13 +23,15 @@ The repo now has one runnable prompt-level repeated-rollout path for prefill pro
 
 ## Current Recommendation
 
+Read `prompt-profile-eval-contract.md` before using the saved numbers in a recommendation note. That file defines exactly what "prompt-length baseline," `Spearman`, and `top-20% capture` mean on this project.
+
 The next prompt-profile heads should be treated as a two-head default:
 
 - current shipped utility head: `mean_relative_length = E[L / E]`;
 - default loop-prox companion head: `p_loop = E[1{rollout loops}]`;
 - optional severity-weighted auxiliary head: `loop_budget_share = E[1{rollout loops}] * (L / E)`;
 - ship `best_rank` for utility-facing prompt ranking and keep `best_loss` for calibration-style reporting;
-- make the trivial non-activation baselines mandatory on every run:
+- make the non-activation baselines mandatory on every run:
   - `prompt_length` only;
   - `effective_budget` only;
   - joint `prompt_length + effective_budget`;
@@ -39,7 +41,7 @@ The next prompt-profile heads should be treated as a two-head default:
 Why this is the current recommendation:
 
 - `s_0.9` already failed on the first real `GPQA` pilot because it collapsed to `p_cap` on that slice;
-- `majority_s_0.5` does show real activation signal, but with `n = 4` it throws away most of the rollout-count information and on `AIME` is already mostly explained by prompt length;
+- `majority_s_0.5` does show real activation signal, but with `n = 4` it throws away most of the rollout-count information and on `AIME` is already mostly explained by prompt length; that does not make it operationally useless, but it does keep it in the control lane rather than as the main activation-lift claim;
 - `p_loop` is already computed in the archive, stays closer to the failure mode we care about than raw length, and on both saved `GPQA` and `AIME` slices it is less prompt-length-correlated than `mean_relative_length`;
 - the first same-archive `GPQA` / `AIME` relabel checks showed that loss-best selection was hiding the useful epochs on small pilots, especially for `p_loop`;
 - the trainer now writes both `best_loss` and `best_rank`, so the shipped checkpoint can be aligned with ranking utility without dropping the calibration-first view;
@@ -57,6 +59,21 @@ This path is still intentionally narrow:
 - no completion-view repeated-rollout support yet;
 - no joint multi-head trainer yet;
 - balancing remains available only for binary targets; the prompt-profile probability and regression heads still run on the natural prompt-disjoint split.
+
+## Metric And Baseline Note
+
+The project has used two different prompt-length baselines so far:
+
+- for binary `majority_s_0.5`, prompt length is already a real one-feature scorer with train-chosen orientation and threshold;
+- for the current five-dataset continuous-head table, prompt length is still only a raw held-out association baseline, mainly `Spearman(prompt_length, target)`.
+
+That mismatch is the main remaining measurement gap. The next baseline pass needs trained metadata-only baselines for `prompt_length`, `effective_budget`, and `prompt_length + effective_budget` on the continuous heads too.
+
+Metric meanings:
+
+- `Spearman` means prompt ranking agreement with the realized prompt-level target;
+- `top-20% capture` means how much of the target mass lands in the top-risk fifth of prompts under the predicted score;
+- `Brier` and `MSE` stay as guardrails, not as the only ship criterion.
 
 ## Recommended First ID Run
 

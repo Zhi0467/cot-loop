@@ -10,7 +10,8 @@ This repository builds a chain-of-thought (CoT) failure predictor from configura
 - `slurm/`: SLURM batch scripts for probe pipeline, generation, and prefill-stability experiments.
 - `outputs/`: Generated artifacts (prefill shards, checkpoints, metrics CSVs, figures).
 - `pyproject.toml` + `uv.lock`: Dependency definitions (Python >= 3.10).
-- `docs/prompt-profile-probe.md`: current prompt-level `s_0.9` implementation path and launch knobs.
+- `docs/prompt-profile-probe.md`: current prompt-profile implementation path and launch knobs.
+- `docs/prompt-profile-eval-contract.md`: exact prompt-profile target, baseline, and metric definitions; read this before making claims about prompt-length controls or `Spearman`/capture metrics.
 
 ## Build, Test, and Development Commands
 - Install dependencies: `uv sync`.

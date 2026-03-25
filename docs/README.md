@@ -1,43 +1,31 @@
 # Docs Index
 
-Last updated: 2026-03-24 07:41 UTC
+Last updated: 2026-03-25 00:23 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
 - Keep each doc header dated in UTC when it is created or updated.
 
-Current docs and references:
+Core docs:
 - Project roadmap: ../roadmap.md
-- Terminal-objective design note: terminal-objective.md
-- Prompt-profile implementation note: prompt-profile-probe.md
-- Prompt-level projection note: prompt-profile-projection.md
+- Prompt-profile implementation path: prompt-profile-probe.md
+- Prompt-profile evaluation contract: prompt-profile-eval-contract.md
+- Prompt-profile projection/export path: prompt-profile-projection.md
 - Prefill-activation visualization note: prefill-activation-visualization.md
-- Rollout text visualization note: rollout-text-visualization.md
-- Consolidated findings: ../outputs/pr2_experiment_findings_consolidated.md
-- Consolidated findings PDF: ../outputs/pr2_experiment_findings_consolidated_pdf/pr2_experiment_findings_consolidated.pdf
-- Detailed reopened-round summary PDF: ../outputs/prefill_rounds_1_to_12_detailed_summary/prefill_rounds_1_to_12_detailed_summary.pdf
-- Rollout-statistics module audit PDF: ../outputs/rollout_stats_module_audit/rollout_stats_module_audit.pdf
-- Terminal-objective recommendation PDF (initial fixed-policy framing): ../outputs/prefill_round13_terminal_objective_report/terminal_objective_plan.pdf
-- Terminal-objective follow-up PDF (cap-generalization refinement): ../outputs/prefill_round14_tail_profile_objective_report/tail_profile_objective_plan.pdf
-- Terminal-objective Athena follow-up PDF: ../outputs/prefill_round15_athena_target_followup/athena_target_followup.pdf
-- GPQA prompt-profile recommendation PDF: ../outputs/gpqa_prompt_profile_recommendation_20260321/gpqa_prompt_profile_recommendation.pdf
-- Prompt-profile objective refresh PDF: ../outputs/p_loop_objective_recommendation_20260322/p_loop_objective_recommendation.pdf
-- Two-head prompt-profile recommendation PDF: ../outputs/two_head_prompt_profile_recommendation_20260322/two_head_prompt_profile_recommendation.pdf
-- Prompt-profile build-recipe PDF: ../outputs/prompt_profile_build_recipe_20260323/prompt_profile_build_recipe.pdf
 
-Current live status note:
-- The refreshed common-policy cross-dataset bundle is now reportable across all five datasets, with repaired `GPQA` / `MMLU-Pro` JSON-answer rows and a regenerated PDF in `../outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/`. Follow the root project report (`../../projects/cot-loop-detection.md`) for the separate benchmark-style `GPQA` calibration note and the explicit reminder that recovered capped `LiveCodeBench` still leaves `avg_first_loop_prefix_length` missing after the crash.
-- The current design recommendation is to move the next predictor round away from another binary loop label and away from raw `p(max_length_hit)` as the sole main target. The live objective is now a prompt-level rollout-profile target trained directly on repeated-rollout labels, and the best current default is to train two direct heads from the same archive: `mean_relative_length` as the shipped utility head, and `p_loop` as the cleaner loop-prox companion head that should stay in the default evaluation bundle rather than being dropped.
-- `LiveCodeBench` is no longer the unresolved caveat on the prompt-profile side. The recovered follow-up finished on 2026-03-24 07:41 UTC and reinforced the same ranking rather than changing it: ensemble `mean_relative_length` reached `Spearman 0.751` vs prompt-length `0.405`, ensemble `p_loop` reached `Spearman 0.478` with `top-20% capture 0.463` vs prompt-length `0.191`, and `loop_budget_share` stayed too weak to promote.
-- The newest Athena-backed build recipe sharpened the evaluation contract instead of changing the head ranking: every run now needs `prompt_length`, `effective_budget`, and joint `prompt_length + effective_budget` baselines; `best_rank` is the checkpoint to ship; and if a future heavier-tail contradiction forces one more binary-head check, direct `p_cap` is the next head to reopen rather than `loop_budget_share` or another threshold sweep.
-- The first code path for that recommendation is now in-repo: `build_probe_dataset.py` can emit prompt-level probability targets for `p_loop`, `p_cap`, or `s_t` from repeated rollouts, can also emit `mean_relative_length` regression labels, the builder has task-aware prompt formatting for `GPQA` / `MMLU-Pro`, `train_probe.py` can train/evaluate against both continuous target kinds, the builder writes one reusable repeated-rollout archive to `diagnostics/prompt_rollout_archive.jsonl`, and `scripts/relabel_prompt_profile_dataset.py` can relabel a finished prompt-profile dataset onto a new prompt-level target without rerolling or re-extracting activations. The current implementation note is `prompt-profile-probe.md`.
-- The newest recommendation note now has one more qualification on top of the Athena-backed objective refresh. The repaired archive geometry still favors `p_loop` over thresholded tail labels as the cleaner target, and the new same-archive `AIME` relabel check shows that `p_loop` remains genuinely usable there (`ensemble Spearman 0.538` at the Brier-selected checkpoint, `0.584` at the best ranking epoch). But the direct same-archive `GPQA` retrain still says usefulness depends on selection rule: `p_loop` shows ranking signal only at early epochs on that tiny slice, while `mean_relative_length` remains the more stable useful head overall.
-- A second Athena follow-up on the updated `GPQA` + `AIME` relabel evidence landed on the same objective ranking but made the operational recommendation sharper: keep the default as two heads, not one, and add a `best_rank` checkpoint beside the old loss-best checkpoint. The concrete rule now written into `prompt-profile-probe.md` is to ship against ranking-oriented selection with a loss-quality guard, rather than using plain `min(Brier)` / `min(MSE)` as the only selector.
-- One extra archive-only scalar was checked before closing this round: `loop_budget_share = E[1{loop} * (L / E)]`. It is now supported in the relabel/build path and remains interesting on `AIME`, but the finished five-dataset check, now including `LiveCodeBench`, did not support promoting it over the existing `mean_relative_length` + `p_loop` bundle, so it stays auxiliary-only for now.
-- The first GPQA prompt-profile pilot was staged on 2026-03-19 with a local `gpqa_diamond.csv` mirror and the requested `temperature=0.2`, `n=10`, per-layer-ensemble setup, but the remote run did not start because `wth-gpu-01` was fully occupied by another user's 8-GPU Slurm job through the currently scheduled end time `2026-03-21 20:18 UTC`. The submission was canceled rather than left pending unattended.
-- The resumed 2026-03-21 pilot on GPUs `0-2` is no longer only a feasibility note: it finished end to end in `37m22s`, wrote the prompt-profile archive plus probe checkpoints, and showed that runtime is acceptable on the 3-GPU path. A same-archive `mean_relative_length` retrain also landed immediately afterward, so the current status is tighter still: the remaining issue is not rollout/runtime plumbing but predictor quality versus trivial baselines on a too-small `48`-prompt slice.
-- The GPQA rollout-text visualization note now has a binary-figure follow-up on top of the original pilot: the raw geometry still shows strong prompt dominance, quantified by same-prompt `5`-NN purity dropping from `0.934` to `0.444` after prompt-centering; the clearest visible binary split remains `stop` vs `length`, while exact loops still appear as a sparse subset inside the broader length-hit cloud.
-- A larger-prompt GPQA rerun (`48` prompts x `4` rollouts) was attempted on 2026-03-19, but the shared GPU node queued that bounded job for `2026-03-21` and it was canceled instead of being left unattended. The current published visualization therefore remains the improved binary view on the checked-in `16 x 10` slice.
-- A corrected activation-based GPQA visualization now exists on top of the finished 2026-03-21 prompt-profile pilot. It uses the saved prefill feature shards plus the rollout/profile JSONLs rather than rollout text, projects the final-layer last-prefill-token activations with one shared PCA plane, and shows that correctness is the strongest large-scale gradient while `max_length` risk appears in several prompt islands rather than one clean failure lobe.
-- There is now a separate prompt-level projection path for the repeated-rollout prompt-profile bundles. It keeps one point per prompt, can recolor that same plane by prompt-majority labels and threshold-derived rates (`s_0.5`, `s_0.6`, `s_0.9`), and adds a quantitative separability table from one unsupervised cluster fit on the 2D plane. The implementation note is `prompt-profile-projection.md`.
-- The old `2`-GPU all-dataset queue was canceled to match the newer `1`-GPU ceiling from the thread. The corrected serial visualization chain now runs through `slurm/run_prompt_profile_projection.sbatch`; the first GPQA validation export already shows that correctness aligns with the prompt clusters much more than prompt-majority loop / cap labels, and that `s_0.5` and `s_0.6` are nearly indistinguishable on that saved slice.
+Key outputs:
+- Common-policy rollout report PDF: ../outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/qwen3_1p7b_cross_dataset_rollout_report.pdf
+- Prompt-majority control note PDF: ../outputs/prompt_majority_05_all_datasets_recommendation_20260321/prompt_majority_05_all_datasets_recommendation.pdf
+- `p_loop` objective note PDF: ../outputs/p_loop_objective_recommendation_20260322/p_loop_objective_recommendation.pdf
+- Two-head recommendation PDF: ../outputs/two_head_prompt_profile_recommendation_20260322/two_head_prompt_profile_recommendation.pdf
+- Build-recipe PDF: ../outputs/prompt_profile_build_recipe_20260323/prompt_profile_build_recipe.pdf
+- Consolidated earlier findings PDF: ../outputs/pr2_experiment_findings_consolidated_pdf/pr2_experiment_findings_consolidated.pdf
+- Rollout-statistics module audit PDF: ../outputs/rollout_stats_module_audit/rollout_stats_module_audit.pdf
+- Detailed reopened-round summary PDF: ../outputs/prefill_rounds_1_to_12_detailed_summary/prefill_rounds_1_to_12_detailed_summary.pdf
+
+Current live status:
+- The current prompt-level predictor task is "predict terminal rollout statistics from prompt-prefill activations under one fixed model and decode policy," not "force everything into one binary loop label."
+- The default bundle remains `mean_relative_length` as the main useful score plus `p_loop` as the cleaner failure-prox companion.
+- `majority_s_0.5` is still worth keeping as a control and possible cheap degenerate-prompt screen, but it is too prompt-length-shaped on `AIME` to be the main activation-lift claim.
+- The evaluation-contract note now makes one ambiguity explicit: the binary majority table already has a true one-feature prompt-length scorer, while the current five-dataset continuous-head table still only records raw prompt-length association. A trained metadata-only continuous baseline suite is still the next missing measurement piece.
+- `LiveCodeBench` is no longer pending. The recovered follow-up reinforced rather than changed the `mean_relative_length` plus `p_loop` ranking.
