@@ -1,0 +1,132 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+
+\title{Two-Head Prompt-Profile Recommendation}
+\author{}
+\date{2026-03-22 08:22 UTC}
+
+\begin{document}
+\maketitle
+
+\section*{Bottom line}
+Do not spend the next round on another thresholded loop label. Train two direct
+prompt-level heads from the same repeated-rollout archive:
+\begin{itemize}[leftmargin=1.5em]
+\item \texttt{mean\_relative\_length = E[L / E]} as the shipped utility score;
+\item \texttt{p\_loop = E[1\{\text{rollout loops}\}]} as the failure-prox companion.
+\end{itemize}
+Keep the input surface unchanged for now: prompt-prefill activations only, using
+either one selected layer or the current per-layer ensemble readout. Evaluate
+in-distribution with prompt-disjoint splits, not OOD.
+
+\section*{Why the old binary heads should stop being the default}
+The rollout-statistics bundle already says that looping is mostly a terminal-statistics
+problem: loops are longer than ordinary wrong answers, long-cap hits are almost
+always loops, and looped rollouts are much less accurate. But the thresholded
+heads we tried are too brittle:
+\begin{itemize}[leftmargin=1.5em]
+\item \texttt{s\_0.9} collapsed to cap-hit on the first real \texttt{GPQA} pilot;
+\item \texttt{majority\_s\_0.5} does preserve some signal, but with \texttt{n=4}
+it throws away rollout-count information and on \texttt{AIME} it is already
+mostly a prompt-length problem.
+\end{itemize}
+That leaves the direct archive statistics as the right next targets.
+
+\section*{What the same-archive checks say}
+The key advantage of the current code path is that we can relabel a finished
+prompt-profile bundle without rerolling or re-extracting activations. On the
+same prompts and the same saved prefill shards:
+\begin{itemize}[leftmargin=1.5em]
+\item \textbf{\texttt{GPQA}:} \texttt{mean\_relative\_length} is the steadier useful
+head under the current selector. The ensemble reaches \texttt{Spearman 0.433} at the
+MSE-selected checkpoint and \texttt{0.658} at its best ranking epoch. \texttt{p\_loop}
+is not dead, but the Brier-selected checkpoint drifts toward near-constant
+predictions; its best ranking epoch only reaches \texttt{Spearman 0.320}.
+\item \textbf{\texttt{AIME}:} the picture is less one-sided. \texttt{mean\_relative\_length}
+still has the stronger overall ranking epochs (\texttt{Spearman 0.629} at the
+MSE-selected checkpoint, \texttt{0.748} at the best ranking epoch), but it is much
+more prompt-length-shaped. \texttt{p\_loop} remains genuinely usable here:
+the ensemble reaches \texttt{Spearman 0.538} at the Brier-selected checkpoint and
+\texttt{0.584} at the best ranking epoch, with \texttt{top-20\% capture = 0.8}.
+\end{itemize}
+So the practical read is no longer ``pick one scalar and declare victory.'' The
+stable utility head and the cleaner failure-prox head are different objects, and
+the archive already lets us train both cheaply.
+
+\section*{Why this should be a two-head default}
+\texttt{mean\_relative\_length} and \texttt{p\_loop} are not redundant:
+\begin{itemize}[leftmargin=1.5em]
+\item \texttt{mean\_relative\_length} is denser and lower-variance. It is the easier
+head to fit well on small prompt-disjoint pilots, so it is the right score to
+ship first when the requirement is simply ``be useful.''
+\item \texttt{p\_loop} is closer to the actual failure we care about and is less
+prompt-length-correlated on the saved prompt-profile archives. It should stay in
+the default bundle so we do not optimize only for long-runway utility proxies.
+\end{itemize}
+The current codebase does not need a new pipeline or a joint multi-head trainer
+to get this benefit. \texttt{scripts/relabel\_prompt\_profile\_dataset.py} already
+makes the second head cheap.
+
+\section*{Checkpoint selection should match ranking utility}
+The main operational lesson from the `GPQA` / `AIME` relabel checks is not that
+\texttt{p\_loop} is a bad target. It is that plain loss-best checkpointing can hide
+the best useful epoch on small pilot splits.
+
+Keep two selectors:
+\begin{itemize}[leftmargin=1.5em]
+\item \texttt{best\_loss}: the current loss-best checkpoint, for calibration-style reporting;
+\item \texttt{best\_rank}: the shipped checkpoint for prompt ranking.
+\end{itemize}
+
+Recommended rule on a prompt-disjoint validation carveout:
+\begin{itemize}[leftmargin=1.5em]
+\item \textbf{\texttt{mean\_relative\_length}:} keep only epochs within \texttt{10\%} of the
+best validation MSE, then choose the one with the highest validation Spearman.
+Break ties with better validation top-\texttt{20\%} capture, then lower validation MSE.
+\item \textbf{\texttt{p\_loop}:} keep only epochs within \texttt{10\%} of the best
+validation Brier score, then choose the one with the highest validation
+top-\texttt{20\%} capture. Break ties with better validation Spearman, then lower
+validation Brier.
+\end{itemize}
+
+Add one gate before calling a head useful: the chosen checkpoint should beat the
+stronger non-degenerate metadata baseline on that same validation slice in the
+head's primary ranking metric.
+
+\section*{What to de-prioritize}
+\begin{itemize}[leftmargin=1.5em]
+\item keep \texttt{majority\_s\_0.5} and related \texttt{majority\_s\_t} heads as
+sparse controls, not as the main objective;
+\item keep thresholded \texttt{s\_t} heads diagnostic-only for now;
+\item keep \texttt{p\_cap} diagnostic-first and narrow-alert-focused, not the
+headline loop predictor.
+\end{itemize}
+
+\section*{Concrete next run}
+\begin{enumerate}[leftmargin=1.5em]
+\item build one repeated-rollout prompt-profile archive under the fixed decode policy
+(\texttt{temperature=0.2}, fixed \texttt{num\_generations}, fixed \texttt{max\_tokens},
+fixed \texttt{max\_model\_len});
+\item relabel it twice:
+  \begin{itemize}[leftmargin=1.5em]
+  \item \texttt{--target-kind regression --profile-target mean\_relative\_length}
+  \item \texttt{--target-kind probability --profile-target p\_loop}
+  \end{itemize}
+\item train the ensemble readout for both heads by default, keeping last-layer as
+a cheaper control arm;
+\item report both \texttt{best\_loss} and \texttt{best\_rank}, but ship the ranking-based
+checkpoint if it also clears the metadata-baseline gate.
+\end{enumerate}
+
+\end{document}

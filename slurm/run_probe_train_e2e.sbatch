@@ -53,19 +53,42 @@ mkdir -p "${DEFAULT_CACHE_BASE}"
 export HF_HOME="${HF_HOME:-${DEFAULT_CACHE_BASE}/huggingface}"
 export HUGGINGFACE_HUB_CACHE="${HUGGINGFACE_HUB_CACHE:-${HF_HOME}/hub}"
 export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-${HF_HOME}/transformers}"
+export TORCH_HOME="${TORCH_HOME:-${DEFAULT_CACHE_BASE}/torch}"
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-${DEFAULT_CACHE_BASE}}"
 
 if [[ -z "${VLLM_CACHE_ROOT:-}" ]]; then
   export VLLM_CACHE_ROOT="${DEFAULT_CACHE_BASE}/vllm"
 fi
 
-mkdir -p "${HF_HOME}" "${HUGGINGFACE_HUB_CACHE}" "${TRANSFORMERS_CACHE}" "${VLLM_CACHE_ROOT}"
+if [[ -n "${PINNED_VISIBLE_DEVICES:-}" ]]; then
+  export CUDA_VISIBLE_DEVICES="${PINNED_VISIBLE_DEVICES}"
+fi
+
+mkdir -p "${HF_HOME}" "${HUGGINGFACE_HUB_CACHE}" "${TRANSFORMERS_CACHE}" "${VLLM_CACHE_ROOT}" "${TORCH_HOME}" "${XDG_CACHE_HOME}"
 echo "[probe-e2e] HF_HOME=${HF_HOME}"
 echo "[probe-e2e] HUGGINGFACE_HUB_CACHE=${HUGGINGFACE_HUB_CACHE}"
 echo "[probe-e2e] TRANSFORMERS_CACHE=${TRANSFORMERS_CACHE}"
 echo "[probe-e2e] VLLM_CACHE_ROOT=${VLLM_CACHE_ROOT}"
+echo "[probe-e2e] TORCH_HOME=${TORCH_HOME}"
+echo "[probe-e2e] XDG_CACHE_HOME=${XDG_CACHE_HOME}"
+if [[ -n "${CUDA_VISIBLE_DEVICES:-}" ]]; then
+  echo "[probe-e2e] CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}"
+fi
 
-MODEL_PRESET="${MODEL_PRESET:-openthinker3_1p5b}"
+MODEL_PRESET="${MODEL_PRESET-}"
+MODEL_ID="${MODEL_ID:-}"
+if [[ -z "${MODEL_PRESET}" && -z "${MODEL_ID}" ]]; then
+  MODEL_PRESET="openthinker3_1p5b"
+fi
+MODEL_TAG="${MODEL_PRESET}"
+if [[ -z "${MODEL_TAG}" ]]; then
+  MODEL_TAG="$(printf '%s' "${MODEL_ID}" | tr '/:' '__')"
+fi
 PROMPT_FIELD="${PROMPT_FIELD:-problem}"
+TASK_KIND="${TASK_KIND:-math_freeform}"
+LIVECODEBENCH_REPO="${LIVECODEBENCH_REPO:-}"
+RELEASE_VERSION="${RELEASE_VERSION:-release_v6}"
+LM_STYLE_OVERRIDE="${LM_STYLE_OVERRIDE:-}"
 
 TRAIN_DATASET="${TRAIN_DATASET:-HuggingFaceH4/MATH-500}"
 TRAIN_CONFIG="${TRAIN_CONFIG:-}"
@@ -82,20 +105,31 @@ SEED="${SEED:-}"
 SEEDS="${SEEDS:-}"
 DATASET_SEED="${DATASET_SEED:-}"
 
+TEMPERATURE="${TEMPERATURE:-}"
+TP="${TP:-}"
+DP="${DP:-}"
 MAX_NUM_SEQS="${MAX_NUM_SEQS:-}"
+MAX_MODEL_LEN="${MAX_MODEL_LEN:-}"
+MAX_NUM_BATCHED_TOKENS="${MAX_NUM_BATCHED_TOKENS:-}"
+NUM_GENERATIONS="${NUM_GENERATIONS:-}"
 MAX_TOKENS="${MAX_TOKENS:-}"
 PREFILL_BATCH_SIZE="${PREFILL_BATCH_SIZE:-32}"
 COMPLETION_BATCH_SIZE="${COMPLETION_BATCH_SIZE:-1}"
 FEATURE_POOLING="${FEATURE_POOLING:-last_token_all_layers_stack}"
 FEATURE_LAYER="${FEATURE_LAYER:--1}"
 FEATURE_KEY="${FEATURE_KEY:-}"
+TARGET_KIND="${TARGET_KIND:-binary}"
+BINARY_TARGET_MODE="${BINARY_TARGET_MODE:-rollout_label}"
+PROFILE_TAIL_THRESHOLD="${PROFILE_TAIL_THRESHOLD:-0.9}"
+PROFILE_TARGET="${PROFILE_TARGET:-}"
+SCORE_RULE="${SCORE_RULE:-}"
 
 LOOP_N="${LOOP_N:-30}"
 LOOP_K="${LOOP_K:-10}"
 SHARD_SIZE="${SHARD_SIZE:-2048}"
 
-OUT_DATA_DIR="${OUT_DATA_DIR:-outputs/probe_data/${MODEL_PRESET}}"
-RUN_NAME="${RUN_NAME:-${MODEL_PRESET}-${SLURM_JOB_ID}}"
+OUT_DATA_DIR="${OUT_DATA_DIR:-outputs/probe_data/${MODEL_TAG}}"
+RUN_NAME="${RUN_NAME:-${MODEL_TAG}-${SLURM_JOB_ID}}"
 OUT_RUN_DIR="${OUT_RUN_DIR:-outputs/probe_runs/${RUN_NAME}}"
 
 WANDB_PROJECT="${WANDB_PROJECT:-cot-loop-probe}"
@@ -131,20 +165,32 @@ if [[ -z "${DATASET_SEED}" ]]; then
 fi
 
 echo "[probe-e2e] model_preset=${MODEL_PRESET} train=${TRAIN_DATASET}:${TRAIN_SPLIT} test=${TEST_DATASET}:${TEST_SPLIT}"
+echo "[probe-e2e] model_id=${MODEL_ID}"
+echo "[probe-e2e] task_kind=${TASK_KIND}"
+echo "[probe-e2e] livecodebench_repo=${LIVECODEBENCH_REPO} release_version=${RELEASE_VERSION} lm_style_override=${LM_STYLE_OVERRIDE}"
 echo "[probe-e2e] probe_preset=${PROBE_PRESET}"
 echo "[probe-e2e] feature_pooling=${FEATURE_POOLING} feature_layer=${FEATURE_LAYER}"
 echo "[probe-e2e] feature_key=${FEATURE_KEY}"
+echo "[probe-e2e] target_kind=${TARGET_KIND} binary_target_mode=${BINARY_TARGET_MODE} profile_tail_threshold=${PROFILE_TAIL_THRESHOLD} profile_target=${PROFILE_TARGET}"
+echo "[probe-e2e] score_rule=${SCORE_RULE}"
 echo "[probe-e2e] prefill_batch_size=${PREFILL_BATCH_SIZE} completion_batch_size=${COMPLETION_BATCH_SIZE}"
+echo "[probe-e2e] temperature=${TEMPERATURE} tp=${TP} dp=${DP} max_model_len=${MAX_MODEL_LEN} max_num_batched_tokens=${MAX_NUM_BATCHED_TOKENS}"
 echo "[probe-e2e] resolved seeds: ${SEED_LIST[*]}"
 
 BUILD_ARGS=(
   --train-dataset "${TRAIN_DATASET}"
   --train-split "${TRAIN_SPLIT}"
   --prompt-field "${PROMPT_FIELD}"
+  --task-kind "${TASK_KIND}"
+  --livecodebench-repo "${LIVECODEBENCH_REPO}"
+  --release-version "${RELEASE_VERSION}"
   --split-ratio "${SPLIT_RATIO}"
   --seed "${DATASET_SEED}"
   --loop-n "${LOOP_N}"
   --loop-k "${LOOP_K}"
+  --target-kind "${TARGET_KIND}"
+  --binary-target-mode "${BINARY_TARGET_MODE}"
+  --profile-tail-threshold "${PROFILE_TAIL_THRESHOLD}"
   --shard-size "${SHARD_SIZE}"
   --prefill-batch-size "${PREFILL_BATCH_SIZE}"
   --completion-batch-size "${COMPLETION_BATCH_SIZE}"
@@ -155,6 +201,12 @@ BUILD_ARGS=(
 
 if [[ -n "${MODEL_PRESET}" ]]; then
   BUILD_ARGS+=(--model-preset "${MODEL_PRESET}")
+fi
+if [[ -n "${MODEL_ID}" ]]; then
+  BUILD_ARGS+=(--model-id "${MODEL_ID}")
+fi
+if [[ -n "${TEMPERATURE}" ]]; then
+  BUILD_ARGS+=(--temperature "${TEMPERATURE}")
 fi
 if [[ -n "${TEST_DATASET}" ]]; then
   BUILD_ARGS+=(--test-dataset "${TEST_DATASET}" --test-split "${TEST_SPLIT}")
@@ -175,11 +227,32 @@ fi
 if [[ -n "${MAX_NUM_SEQS}" ]]; then
   BUILD_ARGS+=(--max-num-seqs "${MAX_NUM_SEQS}")
 fi
+if [[ -n "${TP}" ]]; then
+  BUILD_ARGS+=(--tp "${TP}")
+fi
+if [[ -n "${DP}" ]]; then
+  BUILD_ARGS+=(--dp "${DP}")
+fi
+if [[ -n "${MAX_MODEL_LEN}" ]]; then
+  BUILD_ARGS+=(--max-model-len "${MAX_MODEL_LEN}")
+fi
+if [[ -n "${MAX_NUM_BATCHED_TOKENS}" ]]; then
+  BUILD_ARGS+=(--max-num-batched-tokens "${MAX_NUM_BATCHED_TOKENS}")
+fi
+if [[ -n "${NUM_GENERATIONS}" ]]; then
+  BUILD_ARGS+=(--num-generations "${NUM_GENERATIONS}")
+fi
 if [[ -n "${MAX_TOKENS}" ]]; then
   BUILD_ARGS+=(--max-tokens "${MAX_TOKENS}")
 fi
 if [[ -n "${FEATURE_KEY}" ]]; then
   BUILD_ARGS+=(--feature-key "${FEATURE_KEY}")
+fi
+if [[ -n "${PROFILE_TARGET}" ]]; then
+  BUILD_ARGS+=(--profile-target "${PROFILE_TARGET}")
+fi
+if [[ -n "${LM_STYLE_OVERRIDE}" ]]; then
+  BUILD_ARGS+=(--lm-style-override "${LM_STYLE_OVERRIDE}")
 fi
 
 echo "[probe-e2e] validating/reusing dataset at ${OUT_DATA_DIR} with dataset_seed=${DATASET_SEED}"
@@ -212,6 +285,9 @@ for RUN_SEED in "${SEED_LIST[@]}"; do
   )
   if [[ -n "${FEATURE_KEY}" ]]; then
     TRAIN_ARGS+=(--feature-key "${FEATURE_KEY}")
+  fi
+  if [[ -n "${SCORE_RULE}" ]]; then
+    TRAIN_ARGS+=(--score-rule "${SCORE_RULE}")
   fi
 
   echo "[probe-e2e] seed=${RUN_SEED}: train probe data_dir=${OUT_DATA_DIR} out_dir=${SEED_RUN_DIR} probe_preset=${PROBE_PRESET}"

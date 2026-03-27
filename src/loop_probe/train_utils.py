@@ -1,4 +1,5 @@
 import random
+import math
 
 import numpy as np
 import torch
@@ -110,10 +111,103 @@ def evaluate_binary_metrics(y_true: torch.Tensor, logits: torch.Tensor) -> dict[
     return evaluate_binary_metrics_from_scores(y_true, scores, predictions)
 
 
+def _safe_spearman(y_true_np: np.ndarray, scores_np: np.ndarray) -> float:
+    if y_true_np.size < 2:
+        return float("nan")
+    if np.allclose(y_true_np, y_true_np[0]) or np.allclose(scores_np, scores_np[0]):
+        return float("nan")
+    try:
+        from scipy.stats import spearmanr  # type: ignore
+    except Exception:
+        return float("nan")
+    corr = spearmanr(y_true_np, scores_np).correlation
+    if corr is None or not math.isfinite(float(corr)):
+        return float("nan")
+    return float(corr)
+
+
+def _top_capture_fraction(
+    y_true_np: np.ndarray,
+    scores_np: np.ndarray,
+    *,
+    fraction: float,
+) -> float:
+    if y_true_np.size == 0:
+        return float("nan")
+    total_mass = float(np.sum(y_true_np))
+    if total_mass <= 0.0:
+        return float("nan")
+    keep = max(1, int(math.ceil(float(y_true_np.size) * fraction)))
+    order = np.argsort(-scores_np, kind="stable")
+    captured = float(np.sum(y_true_np[order[:keep]]))
+    return captured / total_mass
+
+
+def evaluate_probability_metrics_from_scores(
+    y_true: torch.Tensor,
+    scores: torch.Tensor,
+) -> dict[str, float]:
+    y_true_np = y_true.detach().cpu().numpy().astype(float)
+    scores_np = scores.detach().cpu().numpy().astype(float)
+    errors = scores_np - y_true_np
+    brier = float(np.mean(np.square(errors)))
+    mae = float(np.mean(np.abs(errors)))
+    rmse = float(np.sqrt(np.mean(np.square(errors))))
+    return {
+        "brier": brier,
+        "mae": mae,
+        "rmse": rmse,
+        "target_mean": float(np.mean(y_true_np)),
+        "pred_mean": float(np.mean(scores_np)),
+        "spearman": _safe_spearman(y_true_np, scores_np),
+        "top_10p_capture": _top_capture_fraction(
+            y_true_np,
+            scores_np,
+            fraction=0.10,
+        ),
+        "top_20p_capture": _top_capture_fraction(
+            y_true_np,
+            scores_np,
+            fraction=0.20,
+        ),
+    }
+
+
+def evaluate_regression_metrics_from_scores(
+    y_true: torch.Tensor,
+    scores: torch.Tensor,
+) -> dict[str, float]:
+    y_true_np = y_true.detach().cpu().numpy().astype(float)
+    scores_np = scores.detach().cpu().numpy().astype(float)
+    errors = scores_np - y_true_np
+    mse = float(np.mean(np.square(errors)))
+    mae = float(np.mean(np.abs(errors)))
+    rmse = float(np.sqrt(np.mean(np.square(errors))))
+    return {
+        "mse": mse,
+        "mae": mae,
+        "rmse": rmse,
+        "target_mean": float(np.mean(y_true_np)),
+        "pred_mean": float(np.mean(scores_np)),
+        "spearman": _safe_spearman(y_true_np, scores_np),
+        "top_10p_capture": _top_capture_fraction(
+            y_true_np,
+            scores_np,
+            fraction=0.10,
+        ),
+        "top_20p_capture": _top_capture_fraction(
+            y_true_np,
+            scores_np,
+            fraction=0.20,
+        ),
+    }
+
+
 def probe_scores_and_predictions(
     logits: torch.Tensor,
     *,
     classifier_mode: str,
+    score_rule: str = "vote_fraction",
 ) -> tuple[torch.Tensor, torch.Tensor]:
     if classifier_mode == "last_layer":
         if logits.ndim == 2 and logits.size(-1) == 1:
@@ -133,10 +227,17 @@ def probe_scores_and_predictions(
                 "ensemble metrics expect [batch, layer] logits, "
                 f"got shape {tuple(logits.shape)}"
             )
-        layer_predictions = (torch.sigmoid(logits) >= 0.5).to(dtype=torch.float32)
-        vote_fraction = layer_predictions.mean(dim=1)
-        predictions = (vote_fraction > 0.5).to(dtype=torch.int64)
-        return vote_fraction, predictions
+        layer_probs = torch.sigmoid(logits)
+        if score_rule == "vote_fraction":
+            layer_predictions = (layer_probs >= 0.5).to(dtype=torch.float32)
+            scores = layer_predictions.mean(dim=1)
+            predictions = (scores > 0.5).to(dtype=torch.int64)
+        elif score_rule == "mean_prob":
+            scores = layer_probs.mean(dim=1)
+            predictions = (scores >= 0.5).to(dtype=torch.int64)
+        else:
+            raise SystemExit(f"Unsupported score_rule '{score_rule}'.")
+        return scores, predictions
 
     raise SystemExit(f"Unsupported classifier_mode '{classifier_mode}'.")
 
@@ -146,9 +247,18 @@ def evaluate_probe_outputs(
     logits: torch.Tensor,
     *,
     classifier_mode: str,
+    target_kind: str = "binary",
+    score_rule: str = "vote_fraction",
 ) -> dict[str, float]:
     scores, predictions = probe_scores_and_predictions(
         logits,
         classifier_mode=classifier_mode,
+        score_rule=score_rule,
     )
-    return evaluate_binary_metrics_from_scores(y_true, scores, predictions)
+    if target_kind == "binary":
+        return evaluate_binary_metrics_from_scores(y_true, scores, predictions)
+    if target_kind == "probability":
+        return evaluate_probability_metrics_from_scores(y_true, scores)
+    if target_kind == "regression":
+        return evaluate_regression_metrics_from_scores(y_true, scores)
+    raise SystemExit(f"Unsupported target_kind '{target_kind}'.")
