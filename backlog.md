@@ -1,19 +1,21 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-03-30 10:15 UTC
+Last updated: 2026-03-30 10:55 UTC
 
 ## Immediate Next Experiments
 
-- Freeze the new objective choice prospectively.
-  - Run one fresh prompt-disjoint `p_loop` fit on a representative hard slice with the architecture/view/checkpoint rule fixed up front, so the new objective recommendation is not only retrospective on saved bundles.
-  - Keep the output note explicit that this is the first prospective confirmation after the retrospective bucket comparison.
-- Keep `mean_relative_length` as a secondary head only where it still buys utility.
-  - If a deployment path wants both a degeneracy screen and a budget / difficulty proxy, train `mean_relative_length` beside `p_loop`.
-  - Do not let that secondary use silently turn back into the main objective.
+- Decide the output type before the next objective run.
+  - If the product wants a regression target, compare `mean_relative_length` and `p_loop` prospectively on the same prompt-disjoint split and choose by held-out regression fit on the target itself plus metadata lift.
+  - If the product wants a binary label, keep `majority_s_0.5` as the current binary control and only reopen a direct loop-derived binary label if it wins on held-out classification quality.
+- Stop using the old bucket test as the objective selector.
+  - The `top 20%` loop-enrichment slice can stay as a downstream diagnostic.
+  - It should not choose the training label again.
+- If `p_loop` is still the desired semantic target, run one fresh prompt-disjoint `p_loop` fit with the architecture/view/checkpoint rule frozen up front.
+  - Judge that run by held-out `p_loop` fit and metadata lift, not by downstream enrichment.
 - Recover `LiveCodeBench` prompt-level accuracy only if the 5/5 accuracy table becomes operationally necessary.
   - The current recovered projection surface still lacks prompt-level correctness, so the completed bucket test is `4 / 5` datasets for accuracy even though the loop / cap comparisons are complete.
 - Reopen direct `p_cap` only on contradiction.
-  - The finished metadata + bucket pass no longer leaves the binary choice unsettled.
+  - The finished metadata + bucket pass no longer justifies reopening it by default.
   - Only reopen `p_cap` if a later slice shows cap-hit isolation matters beyond what `p_loop` already surfaces.
 
 ## Fixed Experimental Surface

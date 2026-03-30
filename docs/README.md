@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-03-30 09:14 UTC
+Last updated: 2026-03-30 10:55 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -31,11 +31,11 @@ Key outputs:
 
 Current live status:
 - The current prompt-level predictor task is "predict terminal rollout statistics from prompt-prefill activations under one fixed model and decode policy," not "force everything into one binary loop label."
-- The main prompt-level screening target is now `p_loop`; the first real continuous metadata baselines plus the held-out top-risk-bucket test are complete, and `p_loop` is the only score that consistently concentrates loop-heavy, cap-heavy, low-accuracy prompts across the saved datasets.
-- `mean_relative_length` remains useful as a secondary utility / budget-consumption head, not as the main degeneracy screen.
-- `majority_s_0.5` is still worth keeping as a control and possible cheap auxiliary screen, but the finished bucket test now makes it a geometry-heavy control rather than the main target.
-- The new note `prompt-profile-risk-screen-2026-03-30.md` is the current decision surface for the objective choice and its caveats.
-- The new note `prompt-profile-plain-language-2026-03-30.md` is the collaborator-facing explanation of what the target names mean, what was trained, why `p_loop` won, and what the remaining caveats are.
+- The objective selector is now fixed explicitly: choose the target by held-out predictability on the target itself, not by the downstream `top 20%` loop-enrichment slice.
+- Under that criterion, `mean_relative_length` is the strongest current regression target and `majority_s_0.5` is the strongest finished binary label surface.
+- `p_loop` still wins the old bucket diagnostic for concentrating looping prompts, but that is no longer treated as proof that it should be the main training objective.
+- The note `prompt-profile-risk-screen-2026-03-30.md` is now the technical decision surface for this predictability-first correction.
+- The note `prompt-profile-plain-language-2026-03-30.md` is the collaborator-facing explanation of the same correction in plain words.
 - The reset note `thread-reset-2026-03-25.md` is now the correct restart surface for Slack follow-up. It captures the collaborator's recent corrections, the proved-vs-unproved ledger, and the exact next work order.
-- `roadmap.md` is the chronological experiment log; `backlog.md` now holds the next prospective follow-ups after the objective decision rather than the already-finished metadata/bucket gap.
-- `LiveCodeBench` is no longer pending. The recovered follow-up plus the finished bucket test reinforced the final ordering: `p_loop` as the main screen, `mean_relative_length` as the secondary utility head.
+- `roadmap.md` is the chronological experiment log; `backlog.md` now carries the next objective run under the corrected selection rule.
+- `LiveCodeBench` is no longer pending, but its recovered projection artifact still lacks prompt-level accuracy.

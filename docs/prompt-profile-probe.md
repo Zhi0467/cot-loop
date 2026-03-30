@@ -1,6 +1,6 @@
 # Prompt-Profile Probe Path
 
-Last updated: 2026-03-30 03:10 UTC
+Last updated: 2026-03-30 10:55 UTC
 
 ## What Landed
 
@@ -25,30 +25,30 @@ The repo now has one runnable prompt-level repeated-rollout path for prefill pro
 
 Read `prompt-profile-eval-contract.md` before using the saved numbers in a recommendation note. That file defines exactly what "prompt-length baseline," `Spearman`, and `top-20% capture` mean on this project.
 
-The next prompt-profile heads should be treated as one main screening objective plus one secondary utility head:
+The next prompt-profile heads should no longer be forced into one default answer before output type is chosen:
 
-- main degeneracy-screen target: `p_loop = E[1{rollout loops}]`;
-- secondary utility / budget head: `mean_relative_length = E[L / E]`;
-- optional severity-weighted auxiliary head: `loop_budget_share = E[1{rollout loops}] * (L / E)`;
-- ship `best_rank` for utility-facing prompt ranking and keep `best_loss` for calibration-style reporting;
+- if the product wants a continuous target, the current default is `mean_relative_length = E[L / E]`;
+- if it wants a binary label, the current default control is `majority_s_0.5`;
+- keep `p_loop = E[1{rollout loops}]` as the loop-specific target candidate, not as a proved default objective;
+- keep `loop_budget_share = E[1{rollout loops}] * (L / E)` auxiliary-only;
+- keep `best_loss` as the primary checkpoint for target-fit reporting and treat `best_rank` only as a downstream diagnostic checkpoint when needed;
 - make the non-activation baselines mandatory on every run:
   - `prompt_length` only;
   - `effective_budget` only;
   - joint `prompt_length + effective_budget`;
 - keep `p_cap` diagnostic-first, not the headline target;
-- keep `majority_s_t` as a sparse pilot label, not the main objective.
+- keep `majority_s_t` as a sparse pilot label family, not the main objective family.
 
 Why this is the current recommendation:
 
 - `s_0.9` already failed on the first real `GPQA` pilot because it collapsed to `p_cap` on that slice;
-- the first real metadata-only baselines plus the finished top-risk-bucket comparison are now in `outputs/prompt_profile_risk_controls_20260330/`, so the objective call is no longer resting on raw prompt-length association or one dataset anecdote;
-- `majority_s_0.5` does show real activation signal, but on the completed bucket test it is less consistent than `p_loop` at isolating the loop-heavy, low-accuracy prompt buckets, so it now belongs in the control lane rather than as the main target;
-- `p_loop` is already computed in the archive, stays closest to the failure mode we care about, and on the finished bucket test it is the only score that wins loop-rate enrichment on `AIME`, `MATH-500`, `MMLU-Pro`, and `LiveCodeBench` while also producing the worst-accuracy bucket in all four datasets with prompt-level accuracy;
-- `mean_relative_length` still ranks its own target well and remains useful as the secondary utility head, but it is weaker than `p_loop` as the main degeneracy screen;
-- the trainer now writes both `best_loss` and `best_rank`, so the shipped checkpoint can be aligned with ranking utility without dropping the calibration-first view;
-- the recovered `LiveCodeBench` follow-up plus the finished bucket test did not overturn that ranking either: `p_loop` remains the strongest loop/cap screen on the saved codegen bundle even though prompt-level accuracy is still missing there;
+- the first real metadata-only baselines plus the finished top-risk-bucket comparison are now in `outputs/prompt_profile_risk_controls_20260330/`, so the objective call no longer has to rest on raw prompt-length association or one dataset anecdote;
+- on held-out regression fit, `mean_relative_length` is currently stronger than `p_loop` on `4 / 5` datasets and has a much higher average best `Spearman` (`0.661` versus `0.372`);
+- on the saved binary surface, `majority_s_0.5` is still the only mature binary label family, though it remains partly prompt-length-shaped;
+- `p_loop` is already computed in the archive and stays closest to the failure mode we care about, but the finished bundle does not yet show that it is the most learnable target;
+- the old bucket comparison still matters operationally: `p_loop` remains the strongest loop/cap screen on the saved codegen bundle and on the other finished datasets even though prompt-level accuracy is still missing on `LiveCodeBench`;
 - a final archive-only check on `loop_budget_share` did not survive the lower-tail controls cleanly enough to replace the current bundle, even though it remains useful on `AIME`;
-- under that updated read, `p_loop` is now the main training objective for bad-prompt screening, while `mean_relative_length` stays in the default bundle only as the secondary utility score.
+- under the corrected read, the repo should carry two honest defaults instead of one forced winner: `mean_relative_length` for the current regression path, `majority_s_0.5` for the current binary path, and `p_loop` as the loop-specific target that still needs a predictability-first confirmation run.
 
 ## Scope
 
