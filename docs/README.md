@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-03-30 03:10 UTC
+Last updated: 2026-03-30 09:14 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -12,6 +12,7 @@ Core docs:
 - Prompt-profile implementation path: prompt-profile-probe.md
 - Prompt-profile evaluation contract: prompt-profile-eval-contract.md
 - Prompt-profile risk-screen decision: prompt-profile-risk-screen-2026-03-30.md
+- Prompt-profile plain-language note: prompt-profile-plain-language-2026-03-30.md
 - Thread reset / new-thread handoff: thread-reset-2026-03-25.md
 - Prompt-profile projection/export path: prompt-profile-projection.md
 - Prefill-activation visualization note: prefill-activation-visualization.md
@@ -23,6 +24,7 @@ Key outputs:
 - Two-head recommendation PDF: ../outputs/two_head_prompt_profile_recommendation_20260322/two_head_prompt_profile_recommendation.pdf
 - Build-recipe PDF: ../outputs/prompt_profile_build_recipe_20260323/prompt_profile_build_recipe.pdf
 - Prompt-profile risk-control bundle: ../outputs/prompt_profile_risk_controls_20260330/
+- Plain-language objective PDF: ../outputs/prompt_profile_plain_language_20260330/prompt_profile_plain_language_20260330.pdf
 - Consolidated earlier findings PDF: ../outputs/pr2_experiment_findings_consolidated_pdf/pr2_experiment_findings_consolidated.pdf
 - Rollout-statistics module audit PDF: ../outputs/rollout_stats_module_audit/rollout_stats_module_audit.pdf
 - Detailed reopened-round summary PDF: ../outputs/prefill_rounds_1_to_12_detailed_summary/prefill_rounds_1_to_12_detailed_summary.pdf
@@ -33,6 +35,7 @@ Current live status:
 - `mean_relative_length` remains useful as a secondary utility / budget-consumption head, not as the main degeneracy screen.
 - `majority_s_0.5` is still worth keeping as a control and possible cheap auxiliary screen, but the finished bucket test now makes it a geometry-heavy control rather than the main target.
 - The new note `prompt-profile-risk-screen-2026-03-30.md` is the current decision surface for the objective choice and its caveats.
+- The new note `prompt-profile-plain-language-2026-03-30.md` is the collaborator-facing explanation of what the target names mean, what was trained, why `p_loop` won, and what the remaining caveats are.
 - The reset note `thread-reset-2026-03-25.md` is now the correct restart surface for Slack follow-up. It captures the collaborator's recent corrections, the proved-vs-unproved ledger, and the exact next work order.
 - `roadmap.md` is the chronological experiment log; `backlog.md` now holds the next prospective follow-ups after the objective decision rather than the already-finished metadata/bucket gap.
 - `LiveCodeBench` is no longer pending. The recovered follow-up plus the finished bucket test reinforced the final ordering: `p_loop` as the main screen, `mean_relative_length` as the secondary utility head.

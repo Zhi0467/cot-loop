@@ -1,0 +1,238 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.65em}
+
+\title{Prompt-Profile Objective: Plain-Language Note}
+\author{}
+\date{2026-03-30 09:14 UTC}
+
+\begin{document}
+\maketitle
+
+\section*{Bottom line}
+The project wants a predictor that looks only at prompt-prefill activations and
+flags prompts that are likely to make the model go bad under one fixed model and
+one fixed decode policy. On the current saved five-dataset bundle, the best main
+target for that job is \texttt{p\_loop}.
+
+\section*{What the project is actually trying to do}
+We are not trying to predict whether a prompt is ``inherently loopy'' in the
+abstract. We are trying to predict what usually happens for one fixed
+\texttt{(model, prompt, decode policy)} tuple before generation starts.
+
+The practical use is prompt screening: rank prompts by risk, then inspect or
+avoid the worst ones. ``Bad'' here mainly means:
+\begin{itemize}[leftmargin=1.5em]
+\item the rollout falls into the loop regime;
+\item the rollout burns a lot of budget and may hit the cap;
+\item accuracy drops sharply inside that risky slice.
+\end{itemize}
+
+\section*{Definitions}
+\textbf{\texttt{p\_loop}}: for one prompt, how often repeated rollouts loop. If
+\texttt{3} out of \texttt{10} rollouts loop, then \texttt{p\_loop = 0.3}.
+
+\textbf{\texttt{p\_cap}}: for one prompt, how often repeated rollouts hit the
+hard max-length cap.
+
+\textbf{\texttt{mean\_relative\_length}}: on average, what fraction of the
+available generation budget the prompt consumes.
+
+\textbf{\texttt{majority\_s\_0.5}}: a binary label that is \texttt{1} if more
+than half of repeated rollouts use at least half of the available budget. This
+is better read as ``often long'' than as ``often loops.''
+
+\textbf{\texttt{effective\_budget}}: the actual generation budget available
+after prompt length and context-limit constraints are taken into account.
+
+\textbf{Loop-rate enrichment}: loop rate inside the top predicted-risk bucket,
+divided by the overall loop rate on the test split. A value of \texttt{2.0x}
+means the flagged bucket has twice the average loop rate.
+
+\section*{What was missing from the last thread}
+The last thread was still missing two decisive pieces:
+\begin{enumerate}[leftmargin=1.5em]
+\item real metadata-only baselines for the continuous heads, not just raw
+\texttt{Spearman(prompt\_length, target)};
+\item an operational bucket test: rank held-out prompts by predicted risk, keep
+the top \texttt{20\%}, and measure the actual loop rate, cap-hit rate, and
+accuracy inside that bucket.
+\end{enumerate}
+
+Without those two pieces, the old thread could not cleanly answer which
+objective should actually be trained.
+
+\section*{What was trained and compared}
+This pass used the finished saved prompt-profile bundles for:
+\texttt{GPQA}, \texttt{AIME}, \texttt{MATH-500}, \texttt{MMLU-Pro}, and
+\texttt{LiveCodeBench}.
+
+The comparison surface contained:
+\begin{itemize}[leftmargin=1.5em]
+\item existing activation probes already trained from prompt-prefill activations
+for \texttt{majority\_s\_0.5}, \texttt{p\_loop}, and
+\texttt{mean\_relative\_length};
+\item two existing activation readouts: last-layer MLP and per-layer ensemble
+MLP;
+\item new metadata-only controls trained in this pass:
+  \begin{itemize}[leftmargin=1.5em]
+  \item logistic regression for \texttt{p\_loop};
+  \item linear regression for \texttt{mean\_relative\_length};
+  \item features = \texttt{prompt\_length}, \texttt{effective\_budget}, and
+  both together.
+  \end{itemize}
+\end{itemize}
+
+The split stayed prompt-disjoint: train on one set of prompts, test on a
+different set, and never let the same prompt leak across the split through
+repeated rollouts.
+
+\section*{How the comparison worked}
+For each prompt:
+\begin{enumerate}[leftmargin=1.5em]
+\item run repeated rollouts under one fixed decode policy;
+\item turn those rollouts into prompt-level target numbers such as
+\texttt{p\_loop};
+\item train on train prompts only;
+\item score held-out test prompts;
+\item sort test prompts by predicted risk;
+\item keep the top \texttt{20\%} highest-risk prompts;
+\item measure what actually happened inside that bucket:
+  \begin{itemize}[leftmargin=1.5em]
+  \item true loop rate;
+  \item true cap-hit rate;
+  \item true accuracy when prompt-level correctness exists.
+  \end{itemize}
+\end{enumerate}
+
+This bucket test is the key operational check. It answers: if we really use this
+score to flag bad prompts, does it isolate the bad slice?
+
+\section*{Why \texttt{p\_loop} wins}
+\begin{center}
+\begin{tabular}{>{\raggedright\arraybackslash}p{1.55in}ccc}
+\toprule
+Dataset & \texttt{majority\_s\_0.5} & \texttt{p\_loop} & strongest metadata \\
+ & loop enrich. & loop enrich. & baseline \\
+\midrule
+\texttt{GPQA} & \texttt{1.82x} & \texttt{1.82x} & \texttt{0.91x} \\
+\texttt{AIME} & \texttt{0.80x} & \texttt{3.20x} & \texttt{0.80x} \\
+\texttt{MATH-500} & \texttt{2.50x} & \texttt{3.50x} & \texttt{1.50x} \\
+\texttt{MMLU-Pro} & \texttt{2.61x} & \texttt{3.48x} & \texttt{1.74x} \\
+\texttt{LiveCodeBench} & \texttt{1.63x} & \texttt{2.32x} & \texttt{1.26x} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Average loop-rate enrichment across datasets:
+\begin{itemize}[leftmargin=1.5em]
+\item \texttt{p\_loop}: \texttt{2.86x}
+\item \texttt{majority\_s\_0.5}: \texttt{1.87x}
+\item \texttt{mean\_relative\_length}: \texttt{1.77x}
+\item strongest metadata baseline: \texttt{1.24x}
+\end{itemize}
+
+On the four datasets where prompt-level accuracy is available
+(\texttt{GPQA}, \texttt{AIME}, \texttt{MATH-500}, \texttt{MMLU-Pro}), the
+\texttt{p\_loop} top-risk bucket is also the lowest-accuracy bucket every time.
+
+If the operational goal is ``find prompts that actually go bad,'' then
+\texttt{p\_loop} is the target most aligned with that job: it directly asks how
+often the prompt loops, it consistently concentrates loop-heavy prompts, and it
+also concentrates low-accuracy prompts where accuracy is available.
+
+\section*{Why the other objectives lost}
+\textbf{Why not \texttt{majority\_s\_0.5}}: it is a coarse thresholded label. It
+mainly asks whether the prompt is often long, not whether it often loops.
+Prompt length alone already does very well on this label in some slices,
+especially \texttt{AIME}. So it still has signal, but it is too geometry-heavy
+to be the main headline objective.
+
+\textbf{Why not \texttt{mean\_relative\_length}}: it is a useful dense target and
+ranks budget usage well, but it mixes correct long reasoning, wrong long
+reasoning, and looping. It is good as a secondary utility or budget head, not
+the cleanest main bad-prompt screen.
+
+\textbf{Why not \texttt{p\_cap}}: it is too narrow. Many bad looped rollouts do
+not hit the cap, so training only on cap hits would miss a lot of the failure
+mass we care about.
+
+\section*{Why this training objective leads to the best result}
+The main reason is alignment between the target and the downstream decision:
+\begin{itemize}[leftmargin=1.5em]
+\item training \texttt{majority\_s\_0.5} teaches a coarse ``often long'' label;
+\item training \texttt{mean\_relative\_length} teaches budget usage;
+\item training \texttt{p\_cap} teaches only the narrow cap-hit subset;
+\item training \texttt{p\_loop} teaches the event we actually want to screen
+for: entering the loop regime.
+\end{itemize}
+
+So the winning result is not mysterious. The objective itself matches the
+operational question better, and that advantage survives the held-out bucket
+test.
+
+\section*{What this resolves, and what it does not}
+This pass resolves the main open issue from the last thread:
+\begin{itemize}[leftmargin=1.5em]
+\item the decision is no longer resting on one dataset anecdote;
+\item it is no longer resting on raw prompt-length correlation for the
+continuous heads;
+\item it is no longer missing the operational bucket test.
+\end{itemize}
+
+So the target choice is now materially better supported:
+\begin{itemize}[leftmargin=1.5em]
+\item main objective: \texttt{p\_loop}
+\item secondary utility head: \texttt{mean\_relative\_length}
+\item control / cheap auxiliary screen: \texttt{majority\_s\_0.5}
+\item do not reopen direct \texttt{p\_cap} now
+\end{itemize}
+
+What it still does \textbf{not} resolve:
+\begin{enumerate}[leftmargin=1.5em]
+\item this is retrospective on saved bundles, not a fresh prospective run;
+\item \texttt{LiveCodeBench} still lacks prompt-level accuracy in the recovered
+projection artifact, so the low-accuracy claim is \texttt{4 / 5} datasets;
+\item small datasets, especially \texttt{AIME}, can still move noticeably when
+only a few prompts change buckets.
+\end{enumerate}
+
+\section*{Exact recommended next run}
+\begin{itemize}[leftmargin=1.5em]
+\item Freeze the architecture, feature view, and checkpoint-selection rule up
+front.
+\item Train one fresh prompt-disjoint \texttt{p\_loop} predictor on a
+representative hard slice.
+\item Keep the metadata baselines mandatory:
+  \texttt{prompt\_length}, \texttt{effective\_budget}, and both together.
+\item Train \texttt{mean\_relative\_length} only if a secondary utility or
+budget score is still wanted.
+\item Keep \texttt{majority\_s\_0.5} in the evaluation bundle as a control, not
+as the main target.
+\end{itemize}
+
+\section*{Bottom line again}
+The plainest summary is:
+\begin{itemize}[leftmargin=1.5em]
+\item the project goal is to flag prompts that make the model go bad before
+generation starts;
+\item the missing baselines and bucket test are now done on the saved
+five-dataset bundle;
+\item \texttt{p\_loop} is the objective most aligned with that goal and the one
+that wins the held-out risk-bucket test;
+\item \texttt{mean\_relative\_length} is still useful, but as a secondary budget
+head;
+\item \texttt{majority\_s\_0.5} still has signal, but it is too close to a
+geometry-heavy ``often long'' control to be the main objective.
+\end{itemize}
+
+\end{document}

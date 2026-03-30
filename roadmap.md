@@ -1,6 +1,6 @@
 # Roadmap - CoT Loop Detection
 
-Last updated: 2026-03-30 03:10 UTC
+Last updated: 2026-03-30 09:14 UTC
 
 Scope:
 - Build and validate a probe pipeline for CoT loop detection across prefill and completion feature views.
@@ -87,3 +87,6 @@ Status: future (set 2026-03-13 13:05 UTC)
 Success criteria:
 - Recommend a default feature view and probe configuration for routine use.
 - Document performance tradeoffs, expected failure modes, and cost profile.
+
+Activity log:
+- 2026-03-30 09:14 UTC: wrote a plain-language objective note plus PDF companion after collaborator feedback that the current explanation was still too esoteric. The new note (`docs/prompt-profile-plain-language-2026-03-30.md`) keeps the object fixed in plain terms: what the project goal is, what `p_loop` / `p_cap` / `majority_s_0.5` / `mean_relative_length` mean, what was actually trained in the finished bundle comparison, why the held-out bucket test promotes `p_loop`, and what is still unresolved. The readable PDF lives in `outputs/prompt_profile_plain_language_20260330/`.
