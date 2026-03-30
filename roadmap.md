@@ -1,6 +1,6 @@
 # Roadmap - CoT Loop Detection
 
-Last updated: 2026-03-30 09:14 UTC
+Last updated: 2026-03-30 10:15 UTC
 
 Scope:
 - Build and validate a probe pipeline for CoT loop detection across prefill and completion feature views.
@@ -89,4 +89,5 @@ Success criteria:
 - Document performance tradeoffs, expected failure modes, and cost profile.
 
 Activity log:
+- 2026-03-30 10:15 UTC: corrected the plain-language framing after collaborator pushback that I had quietly changed the project object from "choose the right prompt-level target" into "rank prompts." The durable fix is in the note itself, not only in thread prose. `docs/prompt-profile-plain-language-2026-03-30.md` now states explicitly that the project goal is target choice under fixed model/policy; the `top 20%` bucket is only one common held-out evaluation slice; `flagged top-risk bucket` and `loop-rate enrichment` are both defined in plain words; and `loop-rate enrichment` is justified only as a normalization/comparison device across datasets with different base loop rates. This does not change the empirical decision from the finished control bundle: `p_loop` is still the best main target, `mean_relative_length` is still secondary, and `majority_s_0.5` stays in the control lane.
 - 2026-03-30 09:14 UTC: wrote a plain-language objective note plus PDF companion after collaborator feedback that the current explanation was still too esoteric. The new note (`docs/prompt-profile-plain-language-2026-03-30.md`) keeps the object fixed in plain terms: what the project goal is, what `p_loop` / `p_cap` / `majority_s_0.5` / `mean_relative_length` mean, what was actually trained in the finished bundle comparison, why the held-out bucket test promotes `p_loop`, and what is still unresolved. The readable PDF lives in `outputs/prompt_profile_plain_language_20260330/`.

@@ -13,29 +13,39 @@
 
 \title{Prompt-Profile Objective: Plain-Language Note}
 \author{}
-\date{2026-03-30 09:14 UTC}
+\date{2026-03-30 10:15 UTC}
 
 \begin{document}
 \maketitle
 
-\section*{Bottom line}
-The project wants a predictor that looks only at prompt-prefill activations and
-flags prompts that are likely to make the model go bad under one fixed model and
-one fixed decode policy. On the current saved five-dataset bundle, the best main
-target for that job is \texttt{p\_loop}.
+\section*{One correction first}
+The project goal is \textbf{not} ``rank prompts.'' The project goal is: choose
+the right prompt-level label or regression target to predict from
+prompt-prefill activations under one fixed model and one fixed decode policy.
+The \texttt{top 20\%} bucket was only a common diagnostic I used to compare
+candidate targets on the same footing.
+
+\section*{One-sentence answer}
+On the current saved five-dataset bundle, the best main target is
+\texttt{p\_loop}: for each prompt, regress the fraction of rollouts that enter
+the loop regime.
 
 \section*{What the project is actually trying to do}
-We are not trying to predict whether a prompt is ``inherently loopy'' in the
-abstract. We are trying to predict what usually happens for one fixed
-\texttt{(model, prompt, decode policy)} tuple before generation starts.
+Fix one \texttt{(model, decode policy)} pair. For each prompt, define one
+prompt-level target from repeated rollouts. Then ask which target is the best
+thing to learn from prompt-prefill activations. ``Best'' here means the learned
+score should track the bad behavior we actually care about, not just prompt
+geometry or budget usage.
 
-The practical use is prompt screening: rank prompts by risk, then inspect or
-avoid the worst ones. ``Bad'' here mainly means:
+So the project question is a target-choice question:
 \begin{itemize}[leftmargin=1.5em]
-\item the rollout falls into the loop regime;
-\item the rollout burns a lot of budget and may hit the cap;
-\item accuracy drops sharply inside that risky slice.
+\item should we train on \texttt{majority\_s\_0.5}?
+\item should we regress \texttt{p\_loop}?
+\item should we regress \texttt{mean\_relative\_length}?
+\item should we regress \texttt{p\_cap}?
 \end{itemize}
+
+On the current saved five-dataset bundle, the answer is \texttt{p\_loop}.
 
 \section*{Definitions}
 \textbf{\texttt{p\_loop}}: for one prompt, how often repeated rollouts loop. If
@@ -54,18 +64,32 @@ is better read as ``often long'' than as ``often loops.''
 \textbf{\texttt{effective\_budget}}: the actual generation budget available
 after prompt length and context-limit constraints are taken into account.
 
-\textbf{Loop-rate enrichment}: loop rate inside the top predicted-risk bucket,
-divided by the overall loop rate on the test split. A value of \texttt{2.0x}
-means the flagged bucket has twice the average loop rate.
+\textbf{Flagged top-risk bucket}: this phrase only refers to an evaluation
+slice. For one trained model on one held-out test split, take the \texttt{20\%}
+of prompts with the largest predicted badness score, then check what really
+happened on those prompts. It is not a new project goal and it is not a new
+label.
+
+\textbf{Loop-rate enrichment}: loop rate inside the flagged bucket, divided by
+the overall loop rate on the test split. A value of \texttt{2.0x} means the
+bucket has twice the average loop rate. A value near \texttt{1.0x} means no
+concentration.
+
+\textbf{Why use loop-rate enrichment?} Different datasets have very different
+base loop rates, and the candidate targets live on different scales
+(\texttt{majority\_s\_0.5} is binary; \texttt{p\_loop} and \texttt{p\_cap} are
+probabilities; \texttt{mean\_relative\_length} is continuous). Enrichment gives
+one simple common check: when a target says ``these prompts look bad,'' do those
+prompts actually loop more often than usual?
 
 \section*{What was missing from the last thread}
 The last thread was still missing two decisive pieces:
 \begin{enumerate}[leftmargin=1.5em]
 \item real metadata-only baselines for the continuous heads, not just raw
 \texttt{Spearman(prompt\_length, target)};
-\item an operational bucket test: rank held-out prompts by predicted risk, keep
-the top \texttt{20\%}, and measure the actual loop rate, cap-hit rate, and
-accuracy inside that bucket.
+\item a common held-out bucket test: take the \texttt{20\%} of prompts with the
+largest predicted badness score, and measure the actual loop rate, cap-hit
+rate, and accuracy inside that bucket.
 \end{enumerate}
 
 Without those two pieces, the old thread could not cleanly answer which
@@ -104,8 +128,8 @@ For each prompt:
 \texttt{p\_loop};
 \item train on train prompts only;
 \item score held-out test prompts;
-\item sort test prompts by predicted risk;
-\item keep the top \texttt{20\%} highest-risk prompts;
+\item take the \texttt{20\%} of prompts with the largest predicted badness
+score;
 \item measure what actually happened inside that bucket:
   \begin{itemize}[leftmargin=1.5em]
   \item true loop rate;
@@ -114,8 +138,9 @@ For each prompt:
   \end{itemize}
 \end{enumerate}
 
-This bucket test is the key operational check. It answers: if we really use this
-score to flag bad prompts, does it isolate the bad slice?
+This bucket test is only one evaluation device. I used it because it lets
+different target types share one simple held-out check without choosing a
+custom threshold for every target.
 
 \section*{Why \texttt{p\_loop} wins}
 \begin{center}
@@ -143,22 +168,23 @@ Average loop-rate enrichment across datasets:
 
 On the four datasets where prompt-level accuracy is available
 (\texttt{GPQA}, \texttt{AIME}, \texttt{MATH-500}, \texttt{MMLU-Pro}), the
-\texttt{p\_loop} top-risk bucket is also the lowest-accuracy bucket every time.
+\texttt{p\_loop} bucket is also the lowest-accuracy bucket every time.
 
-If the operational goal is ``find prompts that actually go bad,'' then
-\texttt{p\_loop} is the target most aligned with that job: it directly asks how
-often the prompt loops, it consistently concentrates loop-heavy prompts, and it
-also concentrates low-accuracy prompts where accuracy is available.
+If the project goal is ``choose the prompt-level target that best matches real
+looping behavior,'' then \texttt{p\_loop} is the most aligned target: it
+directly asks how often the prompt loops, it consistently concentrates
+loop-heavy prompts, and it also concentrates low-accuracy prompts where
+accuracy is available.
 
 \section*{Why the other objectives lost}
 \textbf{Why not \texttt{majority\_s\_0.5}}: it is a coarse thresholded label. It
 mainly asks whether the prompt is often long, not whether it often loops.
 Prompt length alone already does very well on this label in some slices,
-especially \texttt{AIME}. So it still has signal, but it is too geometry-heavy
-to be the main headline objective.
+especially \texttt{AIME}. So it should stay as a control or cheap auxiliary
+screen, not the main target.
 
 \textbf{Why not \texttt{mean\_relative\_length}}: it is a useful dense target and
-ranks budget usage well, but it mixes correct long reasoning, wrong long
+tracks budget usage well, but it mixes correct long reasoning, wrong long
 reasoning, and looping. It is good as a secondary utility or budget head, not
 the cleanest main bad-prompt screen.
 
@@ -167,18 +193,18 @@ not hit the cap, so training only on cap hits would miss a lot of the failure
 mass we care about.
 
 \section*{Why this training objective leads to the best result}
-The main reason is alignment between the target and the downstream decision:
+The main reason is alignment between the target and the thing we actually want
+to predict:
 \begin{itemize}[leftmargin=1.5em]
 \item training \texttt{majority\_s\_0.5} teaches a coarse ``often long'' label;
 \item training \texttt{mean\_relative\_length} teaches budget usage;
 \item training \texttt{p\_cap} teaches only the narrow cap-hit subset;
-\item training \texttt{p\_loop} teaches the event we actually want to screen
-for: entering the loop regime.
+\item training \texttt{p\_loop} teaches the event we actually want to predict:
+entering the loop regime.
 \end{itemize}
 
-So the winning result is not mysterious. The objective itself matches the
-operational question better, and that advantage survives the held-out bucket
-test.
+So the winning result is not mysterious. The target itself matches the failure
+mode better, and that survives the held-out comparison.
 
 \section*{What this resolves, and what it does not}
 This pass resolves the main open issue from the last thread:
@@ -186,7 +212,8 @@ This pass resolves the main open issue from the last thread:
 \item the decision is no longer resting on one dataset anecdote;
 \item it is no longer resting on raw prompt-length correlation for the
 continuous heads;
-\item it is no longer missing the operational bucket test.
+\item it is no longer missing the metadata-only baseline pass;
+\item it is no longer missing one common held-out comparison slice.
 \end{itemize}
 
 So the target choice is now materially better supported:
@@ -208,31 +235,16 @@ only a few prompts change buckets.
 
 \section*{Exact recommended next run}
 \begin{itemize}[leftmargin=1.5em]
-\item Freeze the architecture, feature view, and checkpoint-selection rule up
-front.
-\item Train one fresh prompt-disjoint \texttt{p\_loop} predictor on a
-representative hard slice.
-\item Keep the metadata baselines mandatory:
-  \texttt{prompt\_length}, \texttt{effective\_budget}, and both together.
-\item Train \texttt{mean\_relative\_length} only if a secondary utility or
-budget score is still wanted.
-\item Keep \texttt{majority\_s\_0.5} in the evaluation bundle as a control, not
+\item freeze the architecture, feature view, and checkpoint-selection rule up
+front;
+\item train one fresh prompt-disjoint \texttt{p\_loop} predictor on a
+representative hard slice;
+\item keep the metadata baselines mandatory:
+  \texttt{prompt\_length}, \texttt{effective\_budget}, and both together;
+\item train \texttt{mean\_relative\_length} only if a secondary utility or
+budget score is still wanted;
+\item keep \texttt{majority\_s\_0.5} in the evaluation bundle as a control, not
 as the main target.
-\end{itemize}
-
-\section*{Bottom line again}
-The plainest summary is:
-\begin{itemize}[leftmargin=1.5em]
-\item the project goal is to flag prompts that make the model go bad before
-generation starts;
-\item the missing baselines and bucket test are now done on the saved
-five-dataset bundle;
-\item \texttt{p\_loop} is the objective most aligned with that goal and the one
-that wins the held-out risk-bucket test;
-\item \texttt{mean\_relative\_length} is still useful, but as a secondary budget
-head;
-\item \texttt{majority\_s\_0.5} still has signal, but it is too close to a
-geometry-heavy ``often long'' control to be the main objective.
 \end{itemize}
 
 \end{document}

@@ -1,22 +1,32 @@
 # Prompt-Profile Objective In Plain Words
 
-Last updated: 2026-03-30 09:14 UTC
+Last updated: 2026-03-30 10:15 UTC
+
+## One Correction First
+
+- The project goal is **not** "rank prompts."
+- The project goal is: choose the right prompt-level label or regression target to predict from prompt-prefill activations under one fixed model and one fixed decode policy.
+- I used one common `top 20%` bucket diagnostic only to compare candidate targets on the same footing. That diagnostic is not the goal of the project.
 
 ## One-Sentence Answer
 
-The project wants a predictor that looks only at prompt-prefill activations and flags prompts that are likely to make the model enter a bad rollout regime under one fixed model and one fixed decode policy. On the current saved five-dataset bundle, the best main target for that job is `p_loop`.
+On the current saved five-dataset bundle, the best main target is `p_loop`: for each prompt, regress the fraction of rollouts that enter the loop regime.
 
 ## What The Project Is Actually Trying To Do
 
-- We are not trying to predict whether a prompt is "inherently loopy" in the abstract.
-- We are trying to predict what usually happens for one fixed `(model, prompt, decode policy)` tuple before generation starts.
-- The practical use is prompt screening: rank prompts by risk, then inspect or avoid the worst ones.
-- "Bad" here mainly means:
-  - the rollout falls into the loop regime;
-  - the rollout burns a lot of budget and may hit the cap;
-  - accuracy drops sharply inside that risky slice.
+- Fix one `(model, decode policy)` pair.
+- For each prompt, define one prompt-level target from repeated rollouts.
+- Ask which target is the best thing to learn from prompt-prefill activations.
+- "Best" here means: the learned score should track the bad behavior we actually care about, not just prompt geometry or budget usage.
 
-So the project goal is: use prompt-prefill activations to find prompts that are likely to go bad later, not just prompts that are long.
+So the project question is a target-choice question:
+
+- should we train on `majority_s_0.5`?
+- should we regress `p_loop`?
+- should we regress `mean_relative_length`?
+- should we regress `p_cap`?
+
+The answer now is `p_loop`.
 
 ## Definitions
 
@@ -47,12 +57,28 @@ So the project goal is: use prompt-prefill activations to find prompts that are 
 
 - Plain meaning: the actual generation budget available after prompt length and context-limit constraints are taken into account.
 
+### `flagged top-risk bucket`
+
+- This phrase only refers to an evaluation slice.
+- For one trained model on one held-out test split, take the `20%` of prompts with the largest predicted badness score.
+- Then check what really happened on those prompts.
+- It is not a new project goal and it is not a new label. It is just one way to compare different candidate targets with the same bucket size.
+
 ### `loop-rate enrichment`
 
 - Definition:
-  `loop-rate enrichment = (loop rate inside the top predicted-risk bucket) / (overall loop rate on the test split)`
-- Example: `2.0x` means the flagged bucket has twice the average loop rate.
-- This is important because the downstream use is ranking prompts and then looking at the worst slice.
+  `loop-rate enrichment = (loop rate inside the flagged bucket) / (overall loop rate on the test split)`
+- Example: `2.0x` means the flagged bucket has twice the average loop rate. `1.0x` means no concentration. Below `1.0x` means the bucket is worse than the dataset average.
+
+### Why use `loop-rate enrichment` at all?
+
+- Different datasets have very different base loop rates, so raw loop rate is not directly comparable across `AIME`, `GPQA`, `MATH-500`, `MMLU-Pro`, and `LiveCodeBench`.
+- The candidate targets also live on different scales:
+  - `majority_s_0.5` is binary;
+  - `p_loop` and `p_cap` are probabilities;
+  - `mean_relative_length` is a continuous budget-use number.
+- `loop-rate enrichment` gives one simple common check: when a target says "these prompts look bad," do those prompts actually loop more often than usual?
+- So enrichment is an evaluation tool for target choice, not the definition of success by itself.
 
 ## What Was Missing From The Last Thread
 
@@ -61,9 +87,8 @@ The last thread was still missing two decisive pieces:
 1. Real metadata-only baselines for the continuous heads.
    - Not just raw `Spearman(prompt_length, target)`.
    - Actual trained models using `prompt_length`, `effective_budget`, or both.
-2. An operational bucket test.
-   - Rank held-out prompts by predicted risk.
-   - Keep the top `20%`.
+2. A common held-out bucket test.
+   - On held-out prompts, take the `20%` with the largest predicted badness score.
    - Measure the actual loop rate, actual cap-hit rate, and actual accuracy inside that bucket.
 
 Without those two pieces, the old thread could not cleanly answer which objective should actually be trained.
@@ -80,14 +105,14 @@ This pass used the finished saved prompt-profile bundles for five datasets:
 
 For each dataset, the comparison surface contained:
 
-- Existing activation probes already trained from prompt-prefill activations:
+- existing activation probes already trained from prompt-prefill activations:
   - `majority_s_0.5`
   - `p_loop`
   - `mean_relative_length`
-- Existing activation readouts:
+- existing activation readouts:
   - last-layer MLP
   - per-layer ensemble MLP
-- New metadata-only controls trained in this pass:
+- new metadata-only controls trained in this pass:
   - logistic regression for `p_loop`
   - linear regression for `mean_relative_length`
   - features = `prompt_length`, `effective_budget`, and `prompt_length + effective_budget`
@@ -106,14 +131,13 @@ For each prompt:
 2. Turn those rollouts into prompt-level target numbers such as `p_loop` and `mean_relative_length`.
 3. Train on train prompts only.
 4. Score held-out test prompts.
-5. Sort test prompts by predicted risk.
-6. Keep the top `20%` highest-risk prompts.
-7. Measure what actually happened inside that bucket:
+5. Take the `20%` of prompts with the largest predicted badness score.
+6. Measure what actually happened inside that bucket:
    - true loop rate;
    - true cap-hit rate;
    - true accuracy when prompt-level correctness exists.
 
-This bucket test is the key operational check. It answers "if we really use this score to flag bad prompts, does it isolate the bad slice?" That is more important than only reporting correlation or loss.
+This bucket test is only one evaluation device. I used it because it lets different target types share one simple held-out check without choosing a custom threshold for every target.
 
 ## Why `p_loop` Wins
 
@@ -134,17 +158,17 @@ Average loop-rate enrichment across datasets:
 - `mean_relative_length`: `1.77x`
 - strongest metadata baseline: `1.24x`
 
-On the four datasets where prompt-level accuracy is available (`GPQA`, `AIME`, `MATH-500`, `MMLU-Pro`), the `p_loop` top-risk bucket is also the lowest-accuracy bucket every time.
+On the four datasets where prompt-level accuracy is available (`GPQA`, `AIME`, `MATH-500`, `MMLU-Pro`), the `p_loop` bucket is also the lowest-accuracy bucket every time.
 
 ### Why That Matters
 
-If the operational goal is "find prompts that actually go bad," then `p_loop` is the target most aligned with that job:
+If the project goal is "choose the prompt-level target that best matches real looping behavior," then `p_loop` is the most aligned target:
 
 - it directly asks how often the prompt loops;
 - it consistently concentrates loop-heavy prompts;
 - it also concentrates low-accuracy prompts where accuracy is available.
 
-That is exactly the screening behavior we wanted.
+That is why the evidence now points to `p_loop`, not because the project quietly changed into a ranking task.
 
 ## Why The Other Objectives Lost
 
@@ -153,7 +177,6 @@ That is exactly the screening behavior we wanted.
 - It is a coarse thresholded label.
 - It mainly asks whether the prompt is often long, not whether it often loops.
 - Prompt length alone already does very well on this label in some slices, especially `AIME`.
-- So it still has signal, but it is too geometry-heavy to be the main headline objective.
 
 This is why it should stay as a control or cheap auxiliary screen, not the main training target.
 
@@ -176,14 +199,14 @@ So it is good as a secondary utility or budget head, but it is not the cleanest 
 
 ## Why This Training Objective Leads To The Best Result
 
-The main reason is alignment between the target and the downstream decision:
+The main reason is alignment between the target and the thing we actually want to predict:
 
 - If you train `majority_s_0.5`, you teach the model to predict a coarse "often long" label.
 - If you train `mean_relative_length`, you teach the model to predict budget usage.
 - If you train `p_cap`, you teach the model to predict only the narrow cap-hit subset.
 - If you train `p_loop`, you teach the model to predict the event we actually want to screen for: entering the loop regime.
 
-The winning result is therefore not "mysteriously better training." It is that the objective itself matches the operational question better, and that advantage survives the held-out bucket test.
+So the winning result is not "mysteriously better training." The target itself matches the failure mode better, and that survives the held-out comparison.
 
 ## What This Resolves From The Last Thread
 
@@ -191,7 +214,8 @@ This pass resolves the main open issue from the last thread:
 
 - the decision is no longer resting on one dataset anecdote;
 - it is no longer resting on raw prompt-length correlation for the continuous heads;
-- it is no longer missing the operational bucket test.
+- it is no longer missing the metadata-only baseline pass;
+- it is no longer missing one common held-out comparison slice.
 
 So the target choice is now materially better supported:
 
@@ -204,7 +228,7 @@ So the target choice is now materially better supported:
 
 Three limits still matter:
 
-1. This is retrospective on saved bundles, not a fresh prospective deployment run.
+1. This is retrospective on saved bundles, not a fresh prospective run.
 2. `LiveCodeBench` still lacks prompt-level accuracy in the recovered projection artifact, so the "lowest-accuracy bucket" claim is `4 / 5` datasets rather than `5 / 5`.
 3. Small datasets, especially `AIME`, can still move noticeably when only a few prompts change buckets.
 
@@ -218,15 +242,5 @@ So the objective choice is settled much better than before, but the next confirm
   - `prompt_length`
   - `effective_budget`
   - `prompt_length + effective_budget`
-- Train `mean_relative_length` only if we also want a secondary utility or budget score.
+- Train `mean_relative_length` only if a secondary utility or budget score is still wanted.
 - Keep `majority_s_0.5` in the evaluation bundle as a control, not as the main target.
-
-## Bottom Line
-
-The plainest summary is:
-
-- the project goal is to flag prompts that make the model go bad before generation starts;
-- the missing baselines and bucket test are now done on the saved five-dataset bundle;
-- `p_loop` is the objective most aligned with that goal and the one that wins the actual held-out risk-bucket test;
-- `mean_relative_length` is still useful, but as a secondary budget head;
-- `majority_s_0.5` still has signal, but it is too close to a geometry-heavy "often long" control to be the main objective.
