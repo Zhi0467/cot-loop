@@ -147,18 +147,13 @@ What is already true at the rollout level:
   - `GPQA`: every cap hit loops, but only `42.2%` of loops hit the cap
   - `LiveCodeBench`: `99.5%` of cap-hit rollouts loop, and only `3.4%` of looped rollouts are still correct
 
-What is not yet proven at the prompt level:
+What the completed prompt-level bucket test now says:
 
-- we still have not shown that the prompts ranked highest by `majority_s_0.5` are the best cross-dataset screen for degenerate rollouts;
-- the decisive held-out comparison is still missing: for `majority_s_0.5`, `p_loop`, and the strongest metadata baseline, compare the top-risk prompts on empirical loop rate, empirical max-length-hit rate, and empirical accuracy.
-
-Those questions are exactly why the next experiment is a direct bucket comparison on predicted high-risk prompts:
-
-- empirical loop rate
-- empirical max-length-hit rate
-- empirical accuracy
-
-If the prompt-length-only baseline already wins that bucket test, that is still a valid operational result. It would mean the useful screen is mostly metadata-driven, not activation-driven.
+- the decisive held-out comparison is no longer missing for the current saved bundles;
+- on the finished five-dataset analysis bundle (`outputs/prompt_profile_risk_controls_20260330/`), the selected `p_loop` screen wins loop-rate enrichment on `AIME`, `MATH-500`, `MMLU-Pro`, and `LiveCodeBench`, while roughly tying `GPQA` with `majority_s_0.5`;
+- on the four datasets where prompt-level accuracy exists (`GPQA`, `AIME`, `MATH-500`, `MMLU-Pro`), the selected `p_loop` bucket is also the lowest-accuracy bucket every time;
+- the strongest metadata baseline stays weaker than that `p_loop` screen on the operational bucket comparison;
+- `majority_s_0.5` still has signal, but after this test it reads better as a geometry-heavy control / auxiliary screen than as the main cross-dataset objective.
 
 ## Current Decision Rule
 
@@ -167,7 +162,7 @@ If the prompt-length-only baseline already wins that bucket test, that is still 
 
 Current head recommendation:
 
-- ship `mean_relative_length` as the main useful score
-- keep `p_loop` alongside it as the cleaner failure-prox companion
+- train `p_loop` as the main screening objective
+- keep `mean_relative_length` beside it only as the secondary utility / budget head
 - keep `majority_s_0.5` as a control and possible cheap operational screen, not as the main activation-lift claim
-- only reopen direct `p_cap` if the next baseline-and-bucket checks still leave the binary-head choice unsettled
+- do not reopen direct `p_cap` unless a later contradictory slice shows that cap-hit isolation matters beyond what `p_loop` already surfaces

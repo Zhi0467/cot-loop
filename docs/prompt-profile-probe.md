@@ -1,6 +1,6 @@
 # Prompt-Profile Probe Path
 
-Last updated: 2026-03-25 00:23 UTC
+Last updated: 2026-03-30 03:10 UTC
 
 ## What Landed
 
@@ -25,10 +25,10 @@ The repo now has one runnable prompt-level repeated-rollout path for prefill pro
 
 Read `prompt-profile-eval-contract.md` before using the saved numbers in a recommendation note. That file defines exactly what "prompt-length baseline," `Spearman`, and `top-20% capture` mean on this project.
 
-The next prompt-profile heads should be treated as a two-head default:
+The next prompt-profile heads should be treated as one main screening objective plus one secondary utility head:
 
-- current shipped utility head: `mean_relative_length = E[L / E]`;
-- default loop-prox companion head: `p_loop = E[1{rollout loops}]`;
+- main degeneracy-screen target: `p_loop = E[1{rollout loops}]`;
+- secondary utility / budget head: `mean_relative_length = E[L / E]`;
 - optional severity-weighted auxiliary head: `loop_budget_share = E[1{rollout loops}] * (L / E)`;
 - ship `best_rank` for utility-facing prompt ranking and keep `best_loss` for calibration-style reporting;
 - make the non-activation baselines mandatory on every run:
@@ -41,13 +41,14 @@ The next prompt-profile heads should be treated as a two-head default:
 Why this is the current recommendation:
 
 - `s_0.9` already failed on the first real `GPQA` pilot because it collapsed to `p_cap` on that slice;
-- `majority_s_0.5` does show real activation signal, but with `n = 4` it throws away most of the rollout-count information and on `AIME` is already mostly explained by prompt length; that does not make it operationally useless, but it does keep it in the control lane rather than as the main activation-lift claim;
-- `p_loop` is already computed in the archive, stays closer to the failure mode we care about than raw length, and on both saved `GPQA` and `AIME` slices it is less prompt-length-correlated than `mean_relative_length`;
-- the first same-archive `GPQA` / `AIME` relabel checks showed that loss-best selection was hiding the useful epochs on small pilots, especially for `p_loop`;
+- the first real metadata-only baselines plus the finished top-risk-bucket comparison are now in `outputs/prompt_profile_risk_controls_20260330/`, so the objective call is no longer resting on raw prompt-length association or one dataset anecdote;
+- `majority_s_0.5` does show real activation signal, but on the completed bucket test it is less consistent than `p_loop` at isolating the loop-heavy, low-accuracy prompt buckets, so it now belongs in the control lane rather than as the main target;
+- `p_loop` is already computed in the archive, stays closest to the failure mode we care about, and on the finished bucket test it is the only score that wins loop-rate enrichment on `AIME`, `MATH-500`, `MMLU-Pro`, and `LiveCodeBench` while also producing the worst-accuracy bucket in all four datasets with prompt-level accuracy;
+- `mean_relative_length` still ranks its own target well and remains useful as the secondary utility head, but it is weaker than `p_loop` as the main degeneracy screen;
 - the trainer now writes both `best_loss` and `best_rank`, so the shipped checkpoint can be aligned with ranking utility without dropping the calibration-first view;
-- the recovered `LiveCodeBench` follow-up did not overturn that ranking either: ensemble `mean_relative_length` reached `Spearman 0.751` on the saved archive versus prompt-length `0.405`, while ensemble `p_loop` reached `Spearman 0.478` and `top-20% capture 0.463` versus prompt-length `0.191`;
+- the recovered `LiveCodeBench` follow-up plus the finished bucket test did not overturn that ranking either: `p_loop` remains the strongest loop/cap screen on the saved codegen bundle even though prompt-level accuracy is still missing there;
 - a final archive-only check on `loop_budget_share` did not survive the lower-tail controls cleanly enough to replace the current bundle, even though it remains useful on `AIME`;
-- under that updated read, `mean_relative_length` remains the safer shipped utility head, while `p_loop` stays in the default bundle because it is cleaner and materially less prompt-length-shaped on the heavier-tail slices.
+- under that updated read, `p_loop` is now the main training objective for bad-prompt screening, while `mean_relative_length` stays in the default bundle only as the secondary utility score.
 
 ## Scope
 
@@ -67,7 +68,7 @@ The project has used two different prompt-length baselines so far:
 - for binary `majority_s_0.5`, prompt length is already a real one-feature scorer with train-chosen orientation and threshold;
 - for the current five-dataset continuous-head table, prompt length is still only a raw held-out association baseline, mainly `Spearman(prompt_length, target)`.
 
-That mismatch is the main remaining measurement gap. The next baseline pass needs trained metadata-only baselines for `prompt_length`, `effective_budget`, and `prompt_length + effective_budget` on the continuous heads too.
+That mismatch is no longer hypothetical for the saved five-dataset bundle. The first trained metadata-only baseline pass now exists in `outputs/prompt_profile_risk_controls_20260330/`, and the strongest control is still weaker than the selected `p_loop` screen on the operational bucket test.
 
 Metric meanings:
 
@@ -79,9 +80,9 @@ Metric meanings:
 
 Target:
 
-- train `mean_relative_length = E[L / E]` and `p_loop = E[1{loop}]` from the same repeated-rollout archive by default;
-- use `mean_relative_length` as the shipped utility score;
-- keep `p_loop` as the default failure-prox companion score rather than a dropped ablation.
+- train `p_loop = E[1{loop}]` first when the goal is to screen degenerate prompts;
+- train `mean_relative_length = E[L / E]` beside it only when a secondary utility / budget score is still wanted;
+- keep `majority_s_0.5` as a control and `p_cap` as a diagnostic companion rather than reopening either as the default target.
 
 Decode policy:
 
@@ -158,11 +159,11 @@ The best no-reroll way to fit both prompt-level heads now is:
 
 That helper reuses the saved prefill activations and `diagnostics/prompt_rollout_archive.jsonl`, so target swaps do not require a second rollout bundle or a second prefill pass.
 
-`mean_relative_length` remains the shipped utility head because it is dense, stable, already implemented, and now has same-archive evidence that the ensemble readout can beat prompt length on `GPQA`, `AIME`, and the lower-tail controls. It remains a proxy rather than the cleanest main head because it mixes correct long reasoning, wrong long reasoning, and looped long reasoning. `p_loop` remains the cleaner companion head for failure proximity, especially on the heavier-tail datasets.
+`p_loop` is now the main objective because the finished metadata-control and top-risk-bucket pass shows that it is the most reliable cross-dataset screen for the prompts that actually loop, hit the cap, and lose accuracy. `mean_relative_length` remains useful because it is dense, stable, already implemented, and still the better proxy when the downstream need is prompt-level budget or difficulty rather than direct degeneracy screening.
 
 `loop_budget_share` is now implemented too and can be relabeled from the same archive. It is worth keeping as an auxiliary severity-weighted target for analysis, but the finished five-dataset archive check did not support promoting it to the shipped score: it behaves well on `AIME`, but it is weaker on `GPQA`, does not hold up on `MATH-500` / `MMLU-Pro`, and stayed far behind the main bundle on `LiveCodeBench`.
 
-`LiveCodeBench` came back consistent with the existing ranking. If a future heavier-tail dataset or model variant is inconsistent enough to justify one more binary-head check, reopen direct `p_cap` next. Do not reopen `loop_budget_share` or another thresholded `s_t` sweep before that.
+`LiveCodeBench` came back consistent with the final ranking, with one caveat: prompt-level accuracy is still unavailable in the recovered projection artifact, so the accuracy part of the bucket test is only `4 / 5` datasets. If a future heavier-tail dataset or model variant is inconsistent enough to justify one more binary-head check, reopen direct `p_cap` next. Do not reopen `loop_budget_share` or another thresholded `s_t` sweep before that.
 
 Example dataset build:
 

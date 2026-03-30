@@ -14,14 +14,14 @@ Latest status:
 - the repaired MC rows are materially different from the stale pre-refresh bundle: `GPQA` now reports `34.5%` rollout success instead of `3.1%`, and `MMLU-Pro` now reports `65.2%` instead of `14.2%`, both under the terminal JSON-answer contract.
 - the readable common-policy artifact is `outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/qwen3_1p7b_cross_dataset_rollout_report.pdf`, while the separate benchmark-style `GPQA` calibration lives in `outputs/gpqa_json_official_temp0p6_gen1/` and should not be conflated with the shared-policy table.
 - one explicit caveat remains on that recovered `LiveCodeBench` block: the original job crashed after grading and before writing the final JSON, and replay-based repair did not reproduce the stored generations exactly enough to recover `avg_first_loop_prefix_length`. That single metric therefore remains `null` for the recovered capped run.
-- the current prompt-profile question is now "which prompt-level terminal statistic is most useful to predict from prompt-prefill activations under a fixed model and decode policy?" rather than "which binary loop threshold should we force as the main label?" The current default bundle is `mean_relative_length` plus `p_loop`.
-- `majority_s_0.5` is still kept as a control and possible cheap degenerate-rollout screen, but it is too prompt-length-shaped on `AIME` to be the main activation-lift claim. The exact target, baseline, and metric definitions now live in `docs/prompt-profile-eval-contract.md`.
+- the current prompt-profile question is now largely settled on the saved five-dataset bundle: `p_loop` is the main screening target, while `mean_relative_length` is only the secondary utility / budget head.
+- `majority_s_0.5` is still kept as a control and possible cheap degenerate-rollout screen, but the finished bucket test now makes it a geometry-heavy auxiliary screen rather than the main target. The exact target, baseline, and metric definitions now live in `docs/prompt-profile-eval-contract.md` and `docs/prompt-profile-risk-screen-2026-03-30.md`.
 - the current docs now lock one distinction that had kept drifting in-thread:
   - for binary `majority_s_0.5`, prompt length already means a true one-feature held-out scorer;
-  - for the five-dataset continuous-head table, prompt length is still only raw held-out association, not yet a trained metadata-only predictor, so those rows should not be described as a metadata model "working."
-- the current open measurement work is therefore concrete rather than vague:
-  - add trained metadata-only baselines for `prompt_length`, `effective_budget`, and `prompt_length + effective_budget`;
-  - compare the top predicted-risk prompts from `majority_s_0.5`, `p_loop`, and `mean_relative_length` on actual loop rate, cap-hit rate, and accuracy.
+  - for the current continuous-head decision, the raw association table has now been superseded by the trained metadata-control bundle in `outputs/prompt_profile_risk_controls_20260330/`.
+- the current open work is now prospective rather than definitional:
+  - run one fresh prospective `p_loop` confirmation with the architecture/view/checkpoint rule fixed up front;
+  - recover `LiveCodeBench` prompt-level accuracy only if a full `5 / 5` accuracy bucket table becomes necessary.
 
 **Workflow:**
 1. Build model-formatted chat prompts (shared `utils.build_prompt` source)

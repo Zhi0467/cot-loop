@@ -1,23 +1,20 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-03-25 10:02 UTC
+Last updated: 2026-03-30 03:10 UTC
 
 ## Immediate Next Experiments
 
-- Close the unresolved cross-dataset degeneracy question before making another objective claim.
-  - On the existing held-out archives, rank prompts by `majority_s_0.5`, `p_loop`, `mean_relative_length`, and the metadata baselines below.
-  - For the top predicted-risk `20%` prompts under each score, measure actual loop rate, actual max-length-hit rate, and actual accuracy.
-  - This is the first experiment that directly answers whether the threshold label is actually catching degenerate prompts across datasets or only catching prompt geometry.
-  - Until this exists, do not claim that `majority_s_0.5` is the right cross-dataset operational screen.
-- Add the first true metadata-only predictor pass for the continuous heads.
-  - Fit `prompt_length` only, `effective_budget` only, and `prompt_length + effective_budget` on the same train split used by the activation probes.
-  - Evaluate them on the same held-out metrics as the probe heads: `Spearman`, `top-20% capture`, and `Brier` or `MSE` where relevant.
-  - Keep the docs explicit that this is the first real metadata-only predictor pass for the continuous heads; the current saved table is still only raw association, not a trained baseline.
-- Check whether the soft labels actually isolate degenerate prompts.
-  - For `majority_s_0.5`, `p_loop`, and `mean_relative_length`, compare the predicted top-risk 20% prompts on empirical loop rate, empirical max-length-hit rate, and empirical accuracy.
-  - This is the missing bridge between "easy to predict" and "actually useful for catching bad rollouts."
-  - If the cheap prompt-length or joint metadata baseline wins this test, keep it as a valid operational screen and state clearly that the gain is metadata-driven rather than activation-driven.
-- Rebuild the compact five-dataset summary once the metadata baselines above exist, so future head choices are judged against the strongest non-activation model rather than against prompt length alone.
+- Freeze the new objective choice prospectively.
+  - Run one fresh prompt-disjoint `p_loop` fit on a representative hard slice with the architecture/view/checkpoint rule fixed up front, so the new objective recommendation is not only retrospective on saved bundles.
+  - Keep the output note explicit that this is the first prospective confirmation after the retrospective bucket comparison.
+- Keep `mean_relative_length` as a secondary head only where it still buys utility.
+  - If a deployment path wants both a degeneracy screen and a budget / difficulty proxy, train `mean_relative_length` beside `p_loop`.
+  - Do not let that secondary use silently turn back into the main objective.
+- Recover `LiveCodeBench` prompt-level accuracy only if the 5/5 accuracy table becomes operationally necessary.
+  - The current recovered projection surface still lacks prompt-level correctness, so the completed bucket test is `4 / 5` datasets for accuracy even though the loop / cap comparisons are complete.
+- Reopen direct `p_cap` only on contradiction.
+  - The finished metadata + bucket pass no longer leaves the binary choice unsettled.
+  - Only reopen `p_cap` if a later slice shows cap-hit isolation matters beyond what `p_loop` already surfaces.
 
 ## Fixed Experimental Surface
 
@@ -29,16 +26,15 @@ Last updated: 2026-03-25 10:02 UTC
 ## Measurement And Reporting Gaps
 
 - The explicit cross-dataset `majority_s_0.5` table now exists under `outputs/prompt_majority05_cross_dataset_rebuild_20260325/`; future replies should cite that table directly instead of falling back to `AIME`-only anecdotes.
-- That rebuilt table answers only the binary prompt-length question. It does **not** answer the collaborator's actual degeneracy-screen question yet; the bucket test on empirical loop rate, max-length-hit rate, and accuracy is still missing.
-- The current five-dataset continuous-head table still uses raw prompt-length association rather than a trained metadata baseline.
-- The current saved summaries still do not log the joint `prompt_length + effective_budget` baseline.
-- Do not describe the current continuous-head prompt-length rows as a metadata-only predictor; they are descriptive correlations only.
+- The metadata-only continuous-baseline pass plus the held-out top-risk bucket comparison now exist under `outputs/prompt_profile_risk_controls_20260330/`; future replies should cite that bundle rather than paraphrasing the result.
+- The finished control suite did **not** find a dataset where the joint `prompt_length + effective_budget` baseline became the new winner. Future writeups should say that explicitly instead of implying the joint baseline is still unmeasured.
 - Older thread notes used "rank correlation" as shorthand. Future writeups should say `Spearman rank correlation` explicitly and always name the target being ranked.
 - Older notes also used "prompt-length baseline" too loosely. Future writeups should say whether this means a train-fit 1D scorer or only a raw held-out association statistic.
 
 ## Known Data Gaps
 
 - The original `LiveCodeBench` job crashed after grading and before writing its final JSON. Replay-based repair did not recover `avg_first_loop_prefix_length` exactly. That metric remains `null` in the recovered capped bundle. A fresh rerun would be required if exact prefix-length telemetry is still needed.
+- The recovered `LiveCodeBench` prompt-projection artifact still lacks prompt-level correctness, so the completed bucket test cannot report prompt-level accuracy there.
 
 ## Open Implementation Issues
 
@@ -46,7 +42,7 @@ Last updated: 2026-03-25 10:02 UTC
 
 ## Conditional Next Step
 
-- If the metadata-baseline pass and top-risk-bucket comparison still leave the binary-head choice unsettled, reopen direct `p_cap` next rather than another threshold sweep or `loop_budget_share`.
+- The metadata-baseline pass and top-risk-bucket comparison no longer leave the binary-head choice unsettled. Keep direct `p_cap` closed unless a later contradictory slice forces it back open.
 
 ## Open Review Surfaces
 

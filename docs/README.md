@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-03-25 06:10 UTC
+Last updated: 2026-03-30 03:10 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -11,6 +11,7 @@ Core docs:
 - Open experiment ledger / next runs: ../backlog.md
 - Prompt-profile implementation path: prompt-profile-probe.md
 - Prompt-profile evaluation contract: prompt-profile-eval-contract.md
+- Prompt-profile risk-screen decision: prompt-profile-risk-screen-2026-03-30.md
 - Thread reset / new-thread handoff: thread-reset-2026-03-25.md
 - Prompt-profile projection/export path: prompt-profile-projection.md
 - Prefill-activation visualization note: prefill-activation-visualization.md
@@ -21,15 +22,17 @@ Key outputs:
 - `p_loop` objective note PDF: ../outputs/p_loop_objective_recommendation_20260322/p_loop_objective_recommendation.pdf
 - Two-head recommendation PDF: ../outputs/two_head_prompt_profile_recommendation_20260322/two_head_prompt_profile_recommendation.pdf
 - Build-recipe PDF: ../outputs/prompt_profile_build_recipe_20260323/prompt_profile_build_recipe.pdf
+- Prompt-profile risk-control bundle: ../outputs/prompt_profile_risk_controls_20260330/
 - Consolidated earlier findings PDF: ../outputs/pr2_experiment_findings_consolidated_pdf/pr2_experiment_findings_consolidated.pdf
 - Rollout-statistics module audit PDF: ../outputs/rollout_stats_module_audit/rollout_stats_module_audit.pdf
 - Detailed reopened-round summary PDF: ../outputs/prefill_rounds_1_to_12_detailed_summary/prefill_rounds_1_to_12_detailed_summary.pdf
 
 Current live status:
 - The current prompt-level predictor task is "predict terminal rollout statistics from prompt-prefill activations under one fixed model and decode policy," not "force everything into one binary loop label."
-- The default bundle remains `mean_relative_length` as the main useful score plus `p_loop` as the cleaner failure-prox companion.
-- `majority_s_0.5` is still worth keeping as a control and possible cheap degenerate-prompt screen, but it is too prompt-length-shaped on `AIME` to be the main activation-lift claim.
-- The evaluation-contract note now makes the baseline boundary explicit in one sentence: the binary majority table already has a true one-feature prompt-length scorer, while the current five-dataset continuous-head table still only records raw prompt-length association. A trained metadata-only continuous baseline suite is still the next missing measurement piece, and the current continuous rows should not be described as a trained baseline.
+- The main prompt-level screening target is now `p_loop`; the first real continuous metadata baselines plus the held-out top-risk-bucket test are complete, and `p_loop` is the only score that consistently concentrates loop-heavy, cap-heavy, low-accuracy prompts across the saved datasets.
+- `mean_relative_length` remains useful as a secondary utility / budget-consumption head, not as the main degeneracy screen.
+- `majority_s_0.5` is still worth keeping as a control and possible cheap auxiliary screen, but the finished bucket test now makes it a geometry-heavy control rather than the main target.
+- The new note `prompt-profile-risk-screen-2026-03-30.md` is the current decision surface for the objective choice and its caveats.
 - The reset note `thread-reset-2026-03-25.md` is now the correct restart surface for Slack follow-up. It captures the collaborator's recent corrections, the proved-vs-unproved ledger, and the exact next work order.
-- `roadmap.md` is the chronological experiment log; `backlog.md` now holds the concrete next experiments for the explicit cross-dataset `majority_s_0.5` table, the trained metadata-baseline pass, and the top-risk-bucket usefulness check.
-- `LiveCodeBench` is no longer pending. The recovered follow-up reinforced rather than changed the `mean_relative_length` plus `p_loop` ranking.
+- `roadmap.md` is the chronological experiment log; `backlog.md` now holds the next prospective follow-ups after the objective decision rather than the already-finished metadata/bucket gap.
+- `LiveCodeBench` is no longer pending. The recovered follow-up plus the finished bucket test reinforced the final ordering: `p_loop` as the main screen, `mean_relative_length` as the secondary utility head.
