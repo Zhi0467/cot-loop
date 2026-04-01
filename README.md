@@ -14,13 +14,14 @@ Latest status:
 - the repaired MC rows are materially different from the stale pre-refresh bundle: `GPQA` now reports `34.5%` rollout success instead of `3.1%`, and `MMLU-Pro` now reports `65.2%` instead of `14.2%`, both under the terminal JSON-answer contract.
 - the readable common-policy artifact is `outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/qwen3_1p7b_cross_dataset_rollout_report.pdf`, while the separate benchmark-style `GPQA` calibration lives in `outputs/gpqa_json_official_temp0p6_gen1/` and should not be conflated with the shared-policy table.
 - one explicit caveat remains on that recovered `LiveCodeBench` block: the original job crashed after grading and before writing the final JSON, and replay-based repair did not reproduce the stored generations exactly enough to recover `avg_first_loop_prefix_length`. That single metric therefore remains `null` for the recovered capped run.
-- the current prompt-profile question is now largely settled on the saved five-dataset bundle: `p_loop` is the main screening target, while `mean_relative_length` is only the secondary utility / budget head.
-- `majority_s_0.5` is still kept as a control and possible cheap degenerate-rollout screen, but the finished bucket test now makes it a geometry-heavy auxiliary screen rather than the main target. The exact target, baseline, and metric definitions now live in `docs/prompt-profile-eval-contract.md` and `docs/prompt-profile-risk-screen-2026-03-30.md`.
+- the target-choice question is no longer open for the next run: Wangzhi locked `mean_relative_length` as the regression train target and `majority_s_0.5` as the binary train target, and asked for a full-train plan PDF on that pair.
+- `p_loop` is still kept in the repo as the loop-specific analysis target, but it is no longer the default training objective for the next full run. The exact target, baseline, and metric definitions now live in `docs/prompt-profile-eval-contract.md` and `docs/prompt-profile-risk-screen-2026-03-30.md`.
 - the current docs now lock one distinction that had kept drifting in-thread:
   - for binary `majority_s_0.5`, prompt length already means a true one-feature held-out scorer;
   - for the current continuous-head decision, the raw association table has now been superseded by the trained metadata-control bundle in `outputs/prompt_profile_risk_controls_20260330/`.
-- the current open work is now prospective rather than definitional:
-  - run one fresh prospective `p_loop` confirmation with the architecture/view/checkpoint rule fixed up front;
+- the current open work is now execution-focused rather than definitional:
+  - deliver the full-train plan PDF for `mean_relative_length` plus `majority_s_0.5`;
+  - run the next full train pass on that locked pair with the architecture/view/checkpoint rule fixed up front;
   - recover `LiveCodeBench` prompt-level accuracy only if a full `5 / 5` accuracy bucket table becomes necessary.
 
 **Workflow:**
