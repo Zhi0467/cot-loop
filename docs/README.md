@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-04-01 11:18 UTC
+Last updated: 2026-04-02 23:04 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -13,6 +13,7 @@ Core docs:
 - Prompt-profile evaluation contract: prompt-profile-eval-contract.md
 - Prompt-profile risk-screen decision: prompt-profile-risk-screen-2026-03-30.md
 - Prompt-profile plain-language note: prompt-profile-plain-language-2026-03-30.md
+- Prompt-profile full-train plan: prompt-profile-full-train-plan-2026-04-02.md
 - Thread reset / new-thread handoff: thread-reset-2026-03-25.md
 - Prompt-profile projection/export path: prompt-profile-projection.md
 - Prefill-activation visualization note: prefill-activation-visualization.md
@@ -25,6 +26,7 @@ Key outputs:
 - Build-recipe PDF: ../outputs/prompt_profile_build_recipe_20260323/prompt_profile_build_recipe.pdf
 - Prompt-profile risk-control bundle: ../outputs/prompt_profile_risk_controls_20260330/
 - Plain-language objective PDF: ../outputs/prompt_profile_plain_language_20260330/prompt_profile_plain_language_20260330.pdf
+- Full-train plan PDF: ../outputs/prompt_profile_full_train_plan_20260402/prompt_profile_full_train_plan_20260402.pdf
 - Consolidated earlier findings PDF: ../outputs/pr2_experiment_findings_consolidated_pdf/pr2_experiment_findings_consolidated.pdf
 - Rollout-statistics module audit PDF: ../outputs/rollout_stats_module_audit/rollout_stats_module_audit.pdf
 - Detailed reopened-round summary PDF: ../outputs/prefill_rounds_1_to_12_detailed_summary/prefill_rounds_1_to_12_detailed_summary.pdf
@@ -36,7 +38,7 @@ Current live status:
 - `p_loop` still wins the old bucket diagnostic for concentrating looping prompts, but that is no longer treated as proof that it should be the main training objective.
 - The note `prompt-profile-risk-screen-2026-03-30.md` is now the technical decision surface for this predictability-first correction.
 - The note `prompt-profile-plain-language-2026-03-30.md` is the collaborator-facing explanation of the same correction in plain words.
-- The immediate deliverable is now a PDF train-run plan for the locked `mean_relative_length` / `majority_s_0.5` pair, not another target-choice memo.
+- The locked pair now has a canonical execution note and PDF on disk, so the next step is the run itself rather than another planning pass.
 - The reset note `thread-reset-2026-03-25.md` is now the correct restart surface for Slack follow-up. It captures the collaborator's recent corrections, the proved-vs-unproved ledger, and the exact next work order.
 - `roadmap.md` is the chronological experiment log; `backlog.md` now carries the next objective run under the corrected selection rule.
 - `LiveCodeBench` is no longer pending, but its recovered projection artifact still lacks prompt-level accuracy.

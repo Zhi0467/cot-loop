@@ -1,0 +1,233 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+
+\title{Prompt-Profile Full Train Plan}
+\author{}
+\date{2026-04-02 23:04 UTC}
+
+\begin{document}
+\maketitle
+
+\section*{Bottom line}
+
+The next full run is locked to two train targets:
+\begin{itemize}[leftmargin=1.5em]
+\item regression: \texttt{mean\_relative\_length}
+\item binary: \texttt{majority\_s\_0.5}
+\end{itemize}
+
+\texttt{p\_loop} stays in the repo, but only as a downstream diagnostic target for this run.
+The purpose of the run is no longer to choose the target. The purpose is to measure
+how well the locked pair trains at the full saved prompt-profile surface under one frozen contract.
+
+\section*{Why this pair is locked}
+
+\begin{itemize}[leftmargin=1.5em]
+\item \textbf{\texttt{mean\_relative\_length}} is the strongest current regression target by held-out fit on the saved five-dataset bundle.
+  \begin{itemize}[leftmargin=1.5em]
+  \item Best activation \texttt{Spearman} is higher on \texttt{4 / 5} datasets.
+  \item Average best held-out \texttt{Spearman} is about \texttt{0.661} for \texttt{mean\_relative\_length} versus \texttt{0.372} for \texttt{p\_loop}.
+  \end{itemize}
+\item \textbf{\texttt{majority\_s\_0.5}} is the strongest finished binary label surface that already has a full held-out classification read.
+  \begin{itemize}[leftmargin=1.5em]
+  \item It is not a pure loop label.
+  \item It is still the cleanest binary thing we can train today without reopening the objective question.
+  \end{itemize}
+\item This run therefore keeps one dense continuous target and one mature binary target.
+\end{itemize}
+
+\section*{Frozen run contract}
+
+\textbf{Model and policy}
+\begin{itemize}[leftmargin=1.5em]
+\item \texttt{MODEL\_ID=Qwen/Qwen3-1.7B}
+\item \texttt{TEMPERATURE=0.2}
+\item \texttt{NUM\_GENERATIONS=4}
+\item \texttt{MAX\_TOKENS=30000}
+\item \texttt{MAX\_MODEL\_LEN=40960}
+\end{itemize}
+
+\textbf{Loop detector}
+\begin{itemize}[leftmargin=1.5em]
+\item \texttt{LOOP\_N=30}
+\item \texttt{LOOP\_K=20}
+\end{itemize}
+
+\textbf{Feature surface}
+\begin{itemize}[leftmargin=1.5em]
+\item prompt-prefill only
+\item \texttt{FEATURE\_POOLING=last\_token\_all\_layers\_stack}
+\item \texttt{FEATURE\_LAYER=-1}
+\item default feature key remains \texttt{last\_token\_all\_layers\_stack\_final}
+\end{itemize}
+
+\textbf{Probe surface}
+\begin{itemize}[leftmargin=1.5em]
+\item main view: per-layer ensemble
+\item cheap control: last-layer only
+\item do not reopen stacked-all-layer single-MLP as the main surface
+\end{itemize}
+
+\textbf{Checkpoint rule}
+\begin{itemize}[leftmargin=1.5em]
+\item use \texttt{best\_loss} as the main fit checkpoint for the locked targets
+\item keep \texttt{best\_rank} only as a downstream diagnostic checkpoint
+\item do not let a ranking-oriented checkpoint re-open target choice
+\end{itemize}
+
+\textbf{Baselines}
+\begin{itemize}[leftmargin=1.5em]
+\item regression must keep \texttt{prompt\_length}, \texttt{effective\_budget}, and the joint baseline
+\item binary must keep the 1D prompt-geometry controls: \texttt{prompt\_length} and \texttt{effective\_budget}
+\end{itemize}
+
+Why \texttt{NUM\_GENERATIONS=4} stays fixed here:
+\begin{itemize}[leftmargin=1.5em]
+\item the locked target decision was made on the saved \texttt{num\_generations=4} prompt-profile bundles
+\item changing archive density and target choice in the same run would move the target itself
+\item if a denser archive is wanted later, that should be a separate run after the locked full pass lands
+\end{itemize}
+
+\section*{Dataset surface}
+
+\small
+\begin{itemize}[leftmargin=1.5em]
+\item \textbf{GPQA}: task kind = multiple choice GPQA; train = 158; test = 40; runtime = DP 1, max seqs 4, max batched tokens 1024.
+\item \textbf{AIME}: task kind = math freeform; train = 48; test = 12; runtime = DP 1, max seqs 4, max batched tokens 1024.
+\item \textbf{MATH-500}: task kind = math freeform; train = 400; test = 100; runtime = DP 1, max seqs 4, max batched tokens 1024.
+\item \textbf{MMLU-Pro}: task kind = multiple choice MMLU-Pro; train = 640; test = 160; runtime = DP 1, max seqs 4, max batched tokens 1024.
+\item \textbf{LiveCodeBench}: task kind = codegen; train = 640; test = 160; runtime = keep the heavier saved path with DP 2, max seqs 16, and max batched tokens 4096.
+\end{itemize}
+\normalsize
+
+Prompt fields remain:
+\begin{itemize}[leftmargin=1.5em]
+\item \texttt{GPQA}: \texttt{Question}
+\item \texttt{AIME}: \texttt{question}
+\item \texttt{MATH-500}: \texttt{problem}
+\item \texttt{MMLU-Pro}: \texttt{problem}
+\item \texttt{LiveCodeBench}: \texttt{problem}
+\end{itemize}
+
+\section*{Exact TO DOs}
+
+\begin{enumerate}[leftmargin=1.5em]
+\item Build one shared repeated-rollout archive per dataset under the locked regression surface.
+\item Train the regression head from that shared archive.
+  \begin{itemize}[leftmargin=1.5em]
+  \item main run: ensemble
+  \item cheap control: last-layer
+  \item optimizer seeds: \texttt{0 1 2}
+  \end{itemize}
+\item Relabel the same archive to the locked binary head.
+  \begin{itemize}[leftmargin=1.5em]
+  \item use \texttt{scripts/relabel\_prompt\_profile\_dataset.py}
+  \item \texttt{--target-kind binary}
+  \item \texttt{--profile-target majority\_tail}
+  \item \texttt{--profile-tail-threshold 0.5}
+  \item \texttt{--balance-train downsample}
+  \item \texttt{--balance-test none}
+  \item no rerollout and no second prefill pass
+  \end{itemize}
+\item Train the binary head from the relabeled archive.
+  \begin{itemize}[leftmargin=1.5em]
+  \item main run: ensemble
+  \item cheap control: last-layer
+  \item optimizer seeds: \texttt{0 1 2}
+  \end{itemize}
+\item Score both locked heads against the required metadata controls on the same held-out prompts.
+\item Write one cross-dataset run note that reports only the locked pair.
+\end{enumerate}
+
+\section*{Main command pattern}
+
+The clean path is:
+\begin{enumerate}[leftmargin=1.5em]
+\item one build to create the shared archive
+\item one regression train from that archive
+\item one relabel to \texttt{majority\_s\_0.5}
+\item one binary train from the relabeled archive
+\end{enumerate}
+
+Example build-and-train launch for \texttt{GPQA} regression:
+
+\begin{verbatim}
+CONDA_ENV=swe311 \
+MODEL_ID=Qwen/Qwen3-1.7B \
+TASK_KIND=multiple_choice_gpqa \
+TARGET_KIND=regression \
+PROFILE_TARGET=mean_relative_length \
+NUM_GENERATIONS=4 \
+TEMPERATURE=0.2 \
+LOOP_N=30 LOOP_K=20 \
+MAX_TOKENS=30000 MAX_MODEL_LEN=40960 \
+MAX_NUM_SEQS=4 MAX_NUM_BATCHED_TOKENS=1024 \
+TRAIN_DATASET=data/gpqa_diamond.csv \
+TEST_DATASET=data/gpqa_diamond.csv \
+TRAIN_SPLIT=train TEST_SPLIT=train \
+TRAIN_MAX_SAMPLES=158 TEST_MAX_SAMPLES=40 \
+PROMPT_FIELD=Question \
+SEEDS="0 1 2" \
+TRAIN_EXTRA_ARGS="--classifier-mode ensemble" \
+SCORE_RULE=mean_prob \
+OUT_DATA_DIR=outputs/full_train/gpqa/shared_archive \
+OUT_RUN_DIR=outputs/full_train/gpqa/mean_relative_length/ensemble \
+sbatch slurm/run_probe_train_e2e.sbatch
+\end{verbatim}
+
+Example relabel for the binary head:
+
+\begin{verbatim}
+python scripts/relabel_prompt_profile_dataset.py \
+  --source-dir outputs/full_train/gpqa/shared_archive \
+  --out-dir outputs/full_train/gpqa/majority_s_0.5/data \
+  --target-kind binary \
+  --profile-target majority_tail \
+  --profile-tail-threshold 0.5 \
+  --balance-train downsample \
+  --balance-test none
+\end{verbatim}
+
+\section*{Reporting rule}
+
+\begin{itemize}[leftmargin=1.5em]
+\item Regression should be judged by held-out fit on \texttt{mean\_relative\_length} itself plus metadata lift.
+\item Binary should be judged by held-out classification quality on \texttt{majority\_s\_0.5} itself.
+\item The old \texttt{top 20\%} bucket test can still be reported, but only after the main target-fit ledger.
+\item Do not use downstream loop concentration to argue that \texttt{p\_loop} should have been the target after the fact.
+\end{itemize}
+
+\section*{Done criteria}
+
+This full run is complete only when all of the following exist for every dataset:
+\begin{itemize}[leftmargin=1.5em]
+\item one shared archive with \texttt{prompt\_rollout\_archive.jsonl}
+\item one regression dataset and one binary relabel from that same archive
+\item ensemble and last-layer runs for each locked target
+\item \texttt{best\_loss} and \texttt{best\_rank} metrics saved for each run
+\item one metadata-baseline comparison on the same held-out prompts
+\item one cross-dataset summary that stays on the locked pair
+\end{itemize}
+
+\section*{Explicit non-goals}
+
+\begin{itemize}[leftmargin=1.5em]
+\item do not reopen \texttt{p\_loop} as a train target inside this run
+\item do not reopen \texttt{p\_cap}
+\item do not change to OOD evaluation
+\item do not change prompt counts, rollout count, or decode policy mid-run
+\item do not mix target selection and downstream bucket concentration again
+\end{itemize}
+
+\end{document}

@@ -1,6 +1,6 @@
 # Prompt-Profile Probe Path
 
-Last updated: 2026-03-30 10:55 UTC
+Last updated: 2026-04-02 23:04 UTC
 
 ## What Landed
 
@@ -25,13 +25,13 @@ The repo now has one runnable prompt-level repeated-rollout path for prefill pro
 
 Read `prompt-profile-eval-contract.md` before using the saved numbers in a recommendation note. That file defines exactly what "prompt-length baseline," `Spearman`, and `top-20% capture` mean on this project.
 
-The next prompt-profile heads should no longer be forced into one default answer before output type is chosen:
+The next full train run is now locked rather than left open:
 
-- if the product wants a continuous target, the current default is `mean_relative_length = E[L / E]`;
-- if it wants a binary label, the current default control is `majority_s_0.5`;
-- keep `p_loop = E[1{rollout loops}]` as the loop-specific target candidate, not as a proved default objective;
+- train `mean_relative_length = E[L / E]` as the regression head;
+- train `majority_s_0.5` as the binary head;
+- keep `p_loop = E[1{rollout loops}]` as the loop-specific target candidate and diagnostic, not as the default objective for this run;
 - keep `loop_budget_share = E[1{rollout loops}] * (L / E)` auxiliary-only;
-- keep `best_loss` as the primary checkpoint for target-fit reporting and treat `best_rank` only as a downstream diagnostic checkpoint when needed;
+- keep `best_loss` as the primary checkpoint for target-fit reporting and treat `best_rank` only as a downstream diagnostic checkpoint;
 - make the non-activation baselines mandatory on every run:
   - `prompt_length` only;
   - `effective_budget` only;
@@ -48,7 +48,7 @@ Why this is the current recommendation:
 - `p_loop` is already computed in the archive and stays closest to the failure mode we care about, but the finished bundle does not yet show that it is the most learnable target;
 - the old bucket comparison still matters operationally: `p_loop` remains the strongest loop/cap screen on the saved codegen bundle and on the other finished datasets even though prompt-level accuracy is still missing on `LiveCodeBench`;
 - a final archive-only check on `loop_budget_share` did not survive the lower-tail controls cleanly enough to replace the current bundle, even though it remains useful on `AIME`;
-- under the corrected read, the repo should carry two honest defaults instead of one forced winner: `mean_relative_length` for the current regression path, `majority_s_0.5` for the current binary path, and `p_loop` as the loop-specific target that still needs a predictability-first confirmation run.
+- under the corrected read, the repo should carry one locked training pair plus one separate loop-specific analysis head: `mean_relative_length` for regression, `majority_s_0.5` for binary, and `p_loop` as the diagnostic target that still needs a predictability-first confirmation run before promotion.
 
 ## Scope
 
@@ -68,7 +68,7 @@ The project has used two different prompt-length baselines so far:
 - for binary `majority_s_0.5`, prompt length is already a real one-feature scorer with train-chosen orientation and threshold;
 - for the current five-dataset continuous-head table, prompt length is still only a raw held-out association baseline, mainly `Spearman(prompt_length, target)`.
 
-That mismatch is no longer hypothetical for the saved five-dataset bundle. The first trained metadata-only baseline pass now exists in `outputs/prompt_profile_risk_controls_20260330/`, and the strongest control is still weaker than the selected `p_loop` screen on the operational bucket test.
+That mismatch is no longer hypothetical for the saved five-dataset bundle. The first trained metadata-only baseline pass now exists in `outputs/prompt_profile_risk_controls_20260330/`. For the next full run, the selector is already fixed: regression is judged on `mean_relative_length`, binary is judged on `majority_s_0.5`, and any `p_loop` bucket read stays diagnostic only.
 
 Metric meanings:
 
@@ -76,19 +76,21 @@ Metric meanings:
 - `top-20% capture` means how much of the target mass lands in the top-risk fifth of prompts under the predicted score;
 - `Brier` and `MSE` stay as guardrails, not as the only ship criterion.
 
-## Recommended First ID Run
+## Recommended Next Full Run
 
 Target:
 
-- train `p_loop = E[1{loop}]` first when the goal is to screen degenerate prompts;
-- train `mean_relative_length = E[L / E]` beside it only when a secondary utility / budget score is still wanted;
-- keep `majority_s_0.5` as a control and `p_cap` as a diagnostic companion rather than reopening either as the default target.
+- train `mean_relative_length = E[L / E]` as the regression head;
+- train `majority_s_0.5` as the binary head;
+- keep `p_loop = E[1{loop}]` as a diagnostic head only;
+- keep `p_cap` diagnostic-first and closed by default.
 
 Decode policy:
 
 - `temperature = 0.2`
-- fixed `num_generations` per dataset (`4` for the current prompt-majority pilot surface, `10` for denser GPQA-style runs)
-- fixed `max_tokens` / `max_model_len`
+- fixed `num_generations = 4`
+- fixed `max_tokens = 30000` and `max_model_len = 40960`
+- fixed loop detector `n = 30`, `k = 20`
 
 Feature views:
 
@@ -99,67 +101,30 @@ Evaluation boundary:
 
 - keep the train/test split prompt-disjoint;
 - always benchmark against prompt-token-count-only and effective-budget-only baselines;
-- also benchmark against the joint `prompt-token-count + effective-budget` baseline, because that is the real “did prefill activations add anything beyond prompt geometry?” check;
-- for `mean_relative_length`, prefer the ensemble view and do not rely only on MSE when the downstream goal is ranking or top-bucket capture;
-- ship `best_rank` for utility-facing ranking and keep `best_loss` beside it for calibration-style reporting;
-- keep `p_cap`, correctness, and the prompt-majority controls as downstream diagnostics on the same prompts.
+- also benchmark against the joint `prompt-token-count + effective-budget` baseline for the regression head;
+- for `mean_relative_length`, prefer the ensemble view and judge the head by held-out fit plus metadata lift;
+- for `majority_s_0.5`, use ensemble as the main surface and last-layer as the cheap control;
+- keep `best_loss` as the main checkpoint for the locked heads and keep `best_rank` only as downstream diagnostic metadata;
+- keep `p_cap`, correctness, `p_loop`, and the old prompt-majority bucket slices as downstream diagnostics on the same prompts.
 
 Checkpoint selection:
 
 - `train_probe.py` now writes `best_loss.pt`, `best_rank.pt`, and backward-compatible `best.pt` (aliasing `best_loss`);
-- for `mean_relative_length`, `best_rank` picks the max-Spearman epoch among checkpoints within `10%` of best MSE, then tie-breaks by top-20% capture and lower MSE;
-- for `p_loop`, `best_rank` picks the max top-20% capture epoch among checkpoints within `10%` of best Brier, then tie-breaks by Spearman and lower Brier;
-- use `best_rank` as the default shipped checkpoint and keep `best_loss` as the calibration/control checkpoint;
+- do not use `best_rank` as the selector for the locked targets in this run;
 - for serious sweeps, still compare the chosen checkpoint against the stronger non-degenerate metadata baseline on a validation slice before treating the head as shipped-useful.
 
-Example dataset build:
-
-```bash
-python scripts/build_probe_dataset.py \
-  --train-dataset <gpqa-source> \
-  --train-config gpqa_diamond \
-  --train-split train \
-  --test-dataset <gpqa-source> \
-  --test-config gpqa_diamond \
-  --test-split train \
-  --train-max-samples <train_n> \
-  --test-max-samples <test_n> \
-  --prompt-field Question \
-  --task-kind multiple_choice_gpqa \
-  --model-id Qwen/Qwen3-1.7B \
-  --temperature 0.2 \
-  --num-generations 10 \
-  --max-tokens <cap> \
-  --max-model-len <ctx> \
-  --target-kind probability \
-  --profile-target p_loop \
-  --feature-pooling last_token_all_layers_stack \
-  --feature-layer -1 \
-  --out-dir outputs/gpqa_p_loop_prefill_dataset
-```
-
-Training:
-
-```bash
-python scripts/train_probe.py \
-  --data-dir outputs/gpqa_p_loop_prefill_dataset \
-  --out-dir outputs/gpqa_p_loop_prefill_run \
-  --probe-preset mlp \
-  --classifier-mode ensemble \
-  --score-rule mean_prob \
-  --wandb-project cot-loop-probe
-```
+The canonical run note for exact commands and dataset counts is `docs/prompt-profile-full-train-plan-2026-04-02.md`.
 
 ## Archive Relabel Path
 
-The best no-reroll way to fit both prompt-level heads now is:
+The best no-reroll way to fit the locked pair now is:
 
 - `python scripts/relabel_prompt_profile_dataset.py --source-dir <finished_prompt_profile_data_dir> --out-dir <new_data_dir> --target-kind regression --profile-target mean_relative_length`
-- `python scripts/relabel_prompt_profile_dataset.py --source-dir <finished_prompt_profile_data_dir> --out-dir <new_data_dir> --target-kind probability --profile-target p_loop`
+- `python scripts/relabel_prompt_profile_dataset.py --source-dir <finished_prompt_profile_data_dir> --out-dir <new_data_dir> --target-kind binary --profile-target majority_tail --profile-tail-threshold 0.5 --balance-train downsample`
 
 That helper reuses the saved prefill activations and `diagnostics/prompt_rollout_archive.jsonl`, so target swaps do not require a second rollout bundle or a second prefill pass.
 
-`p_loop` is now the main objective because the finished metadata-control and top-risk-bucket pass shows that it is the most reliable cross-dataset screen for the prompts that actually loop, hit the cap, and lose accuracy. `mean_relative_length` remains useful because it is dense, stable, already implemented, and still the better proxy when the downstream need is prompt-level budget or difficulty rather than direct degeneracy screening.
+For the next full pass, start from the `mean_relative_length` archive because it is dense and already aligned with the locked regression surface, then relabel that archive to `majority_s_0.5` for the binary run. `p_loop` remains useful because it is loop-specific and already implemented, but it is not the default target for this run.
 
 `loop_budget_share` is now implemented too and can be relabeled from the same archive. It is worth keeping as an auxiliary severity-weighted target for analysis, but the finished five-dataset archive check did not support promoting it to the shipped score: it behaves well on `AIME`, but it is weaker on `GPQA`, does not hold up on `MATH-500` / `MMLU-Pro`, and stayed far behind the main bundle on `LiveCodeBench`.
 

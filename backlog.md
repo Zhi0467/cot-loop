@@ -1,13 +1,17 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-01 11:18 UTC
+Last updated: 2026-04-02 23:04 UTC
 
 ## Immediate Next Experiments
 
-- Prepare and attach the full-train PDF plan for the locked target pair: regression `mean_relative_length` plus binary `majority_s_0.5`.
-- Run the next full train pass on that locked pair with the architecture/view/checkpoint rule frozen up front.
+- Run the next full train pass on the locked target pair: regression `mean_relative_length` plus binary `majority_s_0.5`.
+  - Canonical plan note: `docs/prompt-profile-full-train-plan-2026-04-02.md`
+  - Canonical PDF: `outputs/prompt_profile_full_train_plan_20260402/prompt_profile_full_train_plan_20260402.pdf`
+  - Keep the run contract fixed to the saved prompt-profile surface: `Qwen/Qwen3-1.7B`, `temperature=0.2`, `num_generations=4`, `loop_n=30`, `loop_k=20`, prompt-prefill only.
   - Judge `mean_relative_length` by held-out regression fit plus metadata lift.
   - Judge `majority_s_0.5` by held-out classification quality on the same prompt-disjoint setup.
+  - Use ensemble as the main surface and last-layer as the cheap control.
+  - Keep `best_loss` as the main checkpoint for target-fit reporting; keep `best_rank` diagnostic only.
 - Keep the old bucket test in the diagnostic lane only.
   - The `top 20%` loop-enrichment slice is still useful downstream.
   - It should not re-open target selection by itself.
@@ -30,6 +34,7 @@ Last updated: 2026-04-01 11:18 UTC
 
 - The explicit cross-dataset `majority_s_0.5` table now exists under `outputs/prompt_majority05_cross_dataset_rebuild_20260325/`; future replies should cite that table directly instead of falling back to `AIME`-only anecdotes.
 - The metadata-only continuous-baseline pass plus the held-out top-risk bucket comparison now exist under `outputs/prompt_profile_risk_controls_20260330/`; future replies should cite that bundle rather than paraphrasing the result.
+- The full-train execution object is now pinned in `docs/prompt-profile-full-train-plan-2026-04-02.md`; future handoffs should cite that file instead of restating the run contract from thread memory.
 - The finished control suite did **not** find a dataset where the joint `prompt_length + effective_budget` baseline became the new winner. Future writeups should say that explicitly instead of implying the joint baseline is still unmeasured.
 - Older thread notes used "rank correlation" as shorthand. Future writeups should say `Spearman rank correlation` explicitly and always name the target being ranked.
 - Older notes also used "prompt-length baseline" too loosely. Future writeups should say whether this means a train-fit 1D scorer or only a raw held-out association statistic.
