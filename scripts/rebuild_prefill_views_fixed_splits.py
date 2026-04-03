@@ -25,12 +25,29 @@ from loop_probe.prefill import (
     extract_prefill_features_multi,
     load_prefill_model_and_tokenizer,
 )
+from loop_probe.labeling import PROMPT_PROFILE_TARGET_CHOICES
 from loop_probe.serialization import save_split_shards, write_manifest
 from loop_probe.adapters import multiple_choice_gpqa, multiple_choice_mmlupro
 from loop_probe.types import SampleRecord
 from utils import build_prompt
 
 FEATURE_KEY_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+$")
+
+
+def _is_prompt_profile_target_spec(target_spec: object) -> bool:
+    if not isinstance(target_spec, dict):
+        return False
+    profile_target = target_spec.get("profile_target")
+    if isinstance(profile_target, str) and profile_target in PROMPT_PROFILE_TARGET_CHOICES:
+        return True
+    target_name = target_spec.get("name")
+    if not isinstance(target_name, str):
+        return False
+    return (
+        target_name in PROMPT_PROFILE_TARGET_CHOICES
+        or target_name.startswith("s_")
+        or target_name.startswith("majority_s_")
+    )
 
 
 def _parse_args() -> argparse.Namespace:
@@ -195,6 +212,64 @@ def _load_jsonl_rows(path: str) -> list[dict[str, object]]:
     return rows
 
 
+def _reference_prompt_profile_rows_match_records(
+    *,
+    reference_data_dir: str,
+    reference_manifest: dict[str, object],
+    records_by_split: dict[str, list[SampleRecord]],
+) -> bool:
+    rel_path = reference_manifest.get("prompt_rollout_archive_file")
+    if not isinstance(rel_path, str) or not rel_path:
+        return False
+    archive_rows = _load_jsonl_rows(os.path.join(reference_data_dir, rel_path))
+    prompt_by_key: dict[tuple[str, int], str] = {}
+    for idx, row in enumerate(archive_rows):
+        split = row.get("split")
+        prompt = row.get("prompt")
+        raw_sample_id = row.get("sample_id")
+        if not isinstance(split, str) or not isinstance(prompt, str):
+            return False
+        try:
+            sample_id = int(raw_sample_id)
+        except Exception as exc:
+            raise SystemExit(
+                f"Reference prompt-profile archive row {idx} has invalid sample_id={raw_sample_id!r}."
+            ) from exc
+        key = (split, sample_id)
+        existing = prompt_by_key.get(key)
+        if existing is not None and existing != prompt:
+            raise SystemExit(
+                "Reference prompt-profile archive has conflicting prompt text for "
+                f"split='{split}', sample_id={sample_id}."
+            )
+        prompt_by_key[key] = prompt
+    for split, records in records_by_split.items():
+        for record in records:
+            if prompt_by_key.get((split, int(record.sample_id))) != record.prompt:
+                return False
+    return True
+
+
+def _rows_by_sample_id(pool_rows: list[dict[str, object]]) -> dict[int, dict[str, object]]:
+    lookup: dict[int, dict[str, object]] = {}
+    for idx, row in enumerate(pool_rows):
+        raw_sample_id = row.get("_source_sample_id", idx)
+        try:
+            sample_id = int(raw_sample_id)
+        except Exception as exc:
+            raise SystemExit(
+                f"Pool row {idx} has invalid _source_sample_id={raw_sample_id!r}."
+            ) from exc
+        if sample_id < 0:
+            raise SystemExit(f"Pool row {idx} has negative _source_sample_id={sample_id}.")
+        if sample_id in lookup:
+            raise SystemExit(
+                f"Duplicate _source_sample_id={sample_id} found while indexing pool rows."
+            )
+        lookup[sample_id] = row
+    return lookup
+
+
 def _load_reference_manifest(reference_data_dir: str) -> dict[str, object]:
     manifest_path = os.path.join(reference_data_dir, "manifest.json")
     with open(manifest_path, "r", encoding="utf-8") as f:
@@ -282,7 +357,7 @@ def _load_reference_split(
 
 def _build_records(
     *,
-    pool_rows: list[dict[str, object]],
+    pool_rows_by_sample_id: dict[int, dict[str, object]],
     sample_ids: torch.Tensor,
     prompt_field: str,
     task_kind: str,
@@ -294,17 +369,26 @@ def _build_records(
     records = []
     for sample_id in sample_ids.tolist():
         sample_id_int = int(sample_id)
-        if sample_id_int < 0 or sample_id_int >= len(pool_rows):
+        row = pool_rows_by_sample_id.get(sample_id_int)
+        if row is None:
             raise SystemExit(
-                f"sample_id={sample_id_int} out of range for pool size {len(pool_rows)}"
+                f"sample_id={sample_id_int} not found in the fixed-split source pool."
             )
-        row = pool_rows[sample_id_int]
-        prompt = row.get(prompt_field)
+        if task_kind == "multiple_choice_gpqa":
+            prompt = row.get("Question")
+        elif task_kind == "multiple_choice_mmlupro":
+            prompt = row.get("question")
+        else:
+            prompt = row.get(prompt_field)
         if not isinstance(prompt, str):
             raise SystemExit(
                 f"Prompt field '{prompt_field}' missing/invalid for sample_id={sample_id_int}"
             )
         if task_kind == "multiple_choice_gpqa":
+            if num_repetition != 1:
+                raise SystemExit(
+                    "GPQA prompt formatting does not support num_repetition != 1."
+                )
             required = (
                 "Correct Answer",
                 "Incorrect Answer 1",
@@ -327,6 +411,10 @@ def _build_records(
                 [option for option, _ in shuffled],
             )
         elif task_kind == "multiple_choice_mmlupro":
+            if num_repetition != 1:
+                raise SystemExit(
+                    "MMLU-Pro prompt formatting does not support num_repetition != 1."
+                )
             options = row.get("options")
             if isinstance(options, str):
                 try:
@@ -346,10 +434,17 @@ def _build_records(
             )
         elif task_kind == "math_freeform":
             prompt_text = build_prompt(tokenizer, prompt, num_repetition)
+        elif task_kind == "livecodebench_codegen":
+            if num_repetition != 1:
+                raise SystemExit(
+                    "LiveCodeBench prompt formatting does not support num_repetition != 1."
+                )
+            prompt_text = prompt
         else:
             raise SystemExit(
                 "Fixed-split rebuild currently supports task_kind in "
-                "{math_freeform, multiple_choice_gpqa, multiple_choice_mmlupro}; "
+                "{math_freeform, multiple_choice_gpqa, multiple_choice_mmlupro, "
+                "livecodebench_codegen}; "
                 f"got '{task_kind}'."
             )
         records.append(
@@ -448,6 +543,25 @@ def main() -> None:
             num_repetition = candidate
     if num_repetition is None:
         num_repetition = 1
+    reference_num_repetition = 1
+    reference_prompt_template = reference_manifest.get("prompt_template")
+    if isinstance(reference_prompt_template, dict):
+        candidate = reference_prompt_template.get("num_repetition")
+        if isinstance(candidate, int) and candidate >= 1:
+            reference_num_repetition = candidate
+    reference_prompt_field = reference_manifest.get("prompt_field")
+    reference_model_id: str | None = None
+    if isinstance(rollout_config, dict):
+        candidate = rollout_config.get("model_id")
+        if isinstance(candidate, str) and candidate:
+            reference_model_id = candidate
+    prompt_profile_contract_compatible = (
+        isinstance(reference_prompt_field, str)
+        and prompt_field == reference_prompt_field
+        and reference_model_id is not None
+        and model_id == reference_model_id
+        and num_repetition == reference_num_repetition
+    )
 
     task_kind = str(reference_manifest.get("task_kind", "math_freeform"))
     manifest_seed = reference_manifest.get("seed", 0)
@@ -462,8 +576,8 @@ def main() -> None:
         for key, spec in feature_views.items()
     }
 
-    train_pool_rows = _load_jsonl_rows(args.train_pool_jsonl)
-    eval_pool_rows = _load_jsonl_rows(args.eval_pool_jsonl)
+    train_pool_rows_by_sample_id = _rows_by_sample_id(_load_jsonl_rows(args.train_pool_jsonl))
+    eval_pool_rows_by_sample_id = _rows_by_sample_id(_load_jsonl_rows(args.eval_pool_jsonl))
 
     model, tokenizer, device = load_prefill_model_and_tokenizer(
         model_id=model_id,
@@ -478,6 +592,7 @@ def main() -> None:
         }
         for key, spec in feature_views.items()
     }
+    records_by_split: dict[str, list[SampleRecord]] = {}
 
     built_splits = _resolve_built_splits(reference_manifest, args.splits)
     print(
@@ -492,9 +607,13 @@ def main() -> None:
             manifest=reference_manifest,
             split=split,
         )
-        pool_rows = train_pool_rows if split == "train" else eval_pool_rows
+        pool_rows_by_sample_id = (
+            train_pool_rows_by_sample_id
+            if split == "train"
+            else eval_pool_rows_by_sample_id
+        )
         records = _build_records(
-            pool_rows=pool_rows,
+            pool_rows_by_sample_id=pool_rows_by_sample_id,
             sample_ids=sample_ids,
             prompt_field=prompt_field,
             task_kind=task_kind,
@@ -503,6 +622,7 @@ def main() -> None:
             num_repetition=num_repetition,
             split=split,
         )
+        records_by_split[split] = records
         features_by_key = extract_prefill_features_multi(
             model,
             tokenizer,
@@ -535,6 +655,24 @@ def main() -> None:
             manifest_views[key]["input_dim"] = int(sample_shape[-1])
             manifest_views[key]["sample_shape"] = sample_shape
 
+    prompt_profile_metadata_compatible = (
+        prompt_profile_contract_compatible
+        and _reference_prompt_profile_rows_match_records(
+            reference_data_dir=args.reference_data_dir,
+            reference_manifest=reference_manifest,
+            records_by_split=records_by_split,
+        )
+    )
+    if (
+        not prompt_profile_metadata_compatible
+        and _is_prompt_profile_target_spec(reference_manifest.get("target_spec"))
+    ):
+        raise SystemExit(
+            "Cannot rebuild a prompt-profile target dataset unless the rebuilt "
+            "prompts still match the archived prompt-profile contract. Reuse the "
+            "original source pools or relabel from a fresh prompt-profile archive."
+        )
+
     prompt_template_payload = reference_manifest.get("prompt_template")
     if isinstance(prompt_template_payload, dict):
         prompt_template_payload = dict(prompt_template_payload)
@@ -546,22 +684,23 @@ def main() -> None:
             "source": "utils.build_prompt",
         }
 
-    prompt_profile_files = reference_manifest.get("prompt_profile_files")
-    if isinstance(prompt_profile_files, dict):
-        for rel_path in prompt_profile_files.values():
-            if isinstance(rel_path, str) and rel_path:
-                _copy_reference_relpath(
-                    reference_data_dir=args.reference_data_dir,
-                    out_dir=args.out_dir,
-                    rel_path=rel_path,
-                )
-    prompt_rollout_archive_file = reference_manifest.get("prompt_rollout_archive_file")
-    if isinstance(prompt_rollout_archive_file, str) and prompt_rollout_archive_file:
-        _copy_reference_relpath(
-            reference_data_dir=args.reference_data_dir,
-            out_dir=args.out_dir,
-            rel_path=prompt_rollout_archive_file,
-        )
+    if prompt_profile_metadata_compatible:
+        prompt_profile_files = reference_manifest.get("prompt_profile_files")
+        if isinstance(prompt_profile_files, dict):
+            for rel_path in prompt_profile_files.values():
+                if isinstance(rel_path, str) and rel_path:
+                    _copy_reference_relpath(
+                        reference_data_dir=args.reference_data_dir,
+                        out_dir=args.out_dir,
+                        rel_path=rel_path,
+                    )
+        prompt_rollout_archive_file = reference_manifest.get("prompt_rollout_archive_file")
+        if isinstance(prompt_rollout_archive_file, str) and prompt_rollout_archive_file:
+            _copy_reference_relpath(
+                reference_data_dir=args.reference_data_dir,
+                out_dir=args.out_dir,
+                rel_path=prompt_rollout_archive_file,
+            )
 
     payload = {
         "version": 5,
@@ -601,6 +740,11 @@ def main() -> None:
         "prompt_rollout_archive_file",
         "task_loader_config",
     ):
+        if (
+            key in {"prompt_profile_files", "prompt_rollout_archive_file"}
+            and not prompt_profile_metadata_compatible
+        ):
+            continue
         value = reference_manifest.get(key)
         if value is not None:
             payload[key] = value

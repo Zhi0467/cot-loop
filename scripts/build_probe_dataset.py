@@ -85,7 +85,7 @@ def _parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument("--test-config", default=None)
-    parser.add_argument("--test-split", default="test")
+    parser.add_argument("--test-split", default=None)
     parser.add_argument("--test-max-samples", type=int, default=None)
 
     parser.add_argument("--prompt-field", required=True)
@@ -186,7 +186,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--profile-tail-threshold",
         type=float,
-        default=0.9,
+        default=0.5,
         help=(
             "Tail threshold used by prompt-profile targets. "
             "For probability targets it applies when "
@@ -619,8 +619,13 @@ def _same_task_source(
     *,
     task_kind: str,
 ) -> bool:
-    if task_kind == "livecodebench_codegen":
-        return _same_data_source(a, b)
+    del task_kind
+    if os.path.isfile(a.dataset) and os.path.isfile(b.dataset):
+        try:
+            same_path = os.path.samefile(a.dataset, b.dataset)
+        except OSError:
+            same_path = os.path.abspath(a.dataset) == os.path.abspath(b.dataset)
+        return same_path and a.config == b.config and a.split == b.split
     return _same_data_source(a, b)
 
 
@@ -638,6 +643,7 @@ def _split_source_uses_ratio(split_source: str) -> bool:
 
 
 def _make_specs(args: argparse.Namespace) -> tuple[DatasetSpec, DatasetSpec | None]:
+    test_split = args.test_split if args.test_split is not None else "test"
     train_spec = DatasetSpec(
         dataset=args.train_dataset,
         config=args.train_config,
@@ -649,14 +655,27 @@ def _make_specs(args: argparse.Namespace) -> tuple[DatasetSpec, DatasetSpec | No
         return train_spec, DatasetSpec(
             dataset=args.test_dataset,
             config=args.test_config,
-            split=args.test_split,
+            split=test_split,
             max_samples=args.test_max_samples,
+        )
+
+    if (
+        args.task_kind == "livecodebench_codegen"
+        and args.test_split is None
+        and args.test_config is None
+        and args.test_max_samples is None
+    ):
+        return train_spec, DatasetSpec(
+            dataset=args.train_dataset,
+            config=args.train_config,
+            split="test",
+            max_samples=None,
         )
 
     if args.task_kind != "math_freeform":
         explicit_test_split = (
-            args.test_config is not None
-            or args.test_split != "test"
+            args.test_split is not None
+            or args.test_config is not None
             or args.test_max_samples is not None
         )
         if explicit_test_split:
@@ -665,7 +684,7 @@ def _make_specs(args: argparse.Namespace) -> tuple[DatasetSpec, DatasetSpec | No
                 config=args.test_config
                 if args.test_config is not None
                 else args.train_config,
-                split=args.test_split,
+                split=test_split,
                 max_samples=args.test_max_samples,
             )
         return train_spec, None
@@ -680,7 +699,7 @@ def _make_specs(args: argparse.Namespace) -> tuple[DatasetSpec, DatasetSpec | No
     return train_spec, DatasetSpec(
         dataset=test_dataset,
         config=args.test_config,
-        split=args.test_split,
+        split=test_split,
         max_samples=args.test_max_samples,
     )
 
@@ -1222,6 +1241,7 @@ def _build_prompt_profile_targets(
             loop_n=loop_n,
             loop_k=loop_k,
             tail_threshold=tail_threshold,
+            finish_reasons=[rollout.finish_reason for rollout in prompt_rollouts],
         )
         raw_target_value = profile_target_value(
             profile,
@@ -1909,6 +1929,8 @@ def main() -> None:
         test_labels = all_targets[split_at:]
         train_profile_rows = all_profile_rows[:split_at]
         test_profile_rows = all_profile_rows[split_at:]
+        train_archive_rows = prompt_rollout_archive_rows[:split_at]
+        test_archive_rows = prompt_rollout_archive_rows[split_at:]
         if target_spec["kind"] == "binary":
             train_keep_idx = _balanced_indices(
                 train_labels,
@@ -1937,6 +1959,8 @@ def main() -> None:
     if target_source == "prompt_profile":
         train_profile_rows = [train_profile_rows[idx] for idx in train_keep_idx]
         test_profile_rows = [test_profile_rows[idx] for idx in test_keep_idx]
+        train_archive_rows = [train_archive_rows[idx] for idx in train_keep_idx]
+        test_archive_rows = [test_archive_rows[idx] for idx in test_keep_idx]
     train_keep_idx_t = torch.tensor(train_keep_idx, dtype=torch.long)
     test_keep_idx_t = torch.tensor(test_keep_idx, dtype=torch.long)
 
@@ -2041,7 +2065,7 @@ def main() -> None:
         }
         _write_jsonl_rows(
             os.path.join(args.out_dir, prompt_rollout_archive_path),
-            prompt_rollout_archive_rows,
+            train_archive_rows + test_archive_rows,
         )
         prompt_rollout_archive_file = prompt_rollout_archive_path
 

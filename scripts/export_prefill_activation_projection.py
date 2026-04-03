@@ -163,11 +163,19 @@ def spec_from_manifest(spec_payload: dict[str, Any], *, args: argparse.Namespace
     dataset = args.source_dataset or str(spec_payload["dataset"])
     config = args.source_config or spec_payload.get("config")
     split = args.source_split or str(spec_payload["split"])
+    max_samples = spec_payload.get("max_samples")
+    if max_samples is not None:
+        try:
+            max_samples = int(max_samples)
+        except Exception as exc:
+            raise SystemExit(
+                f"Invalid max_samples in manifest spec payload: {max_samples!r}"
+            ) from exc
     return DatasetSpec(
         dataset=dataset,
         config=config,
         split=split,
-        max_samples=None,
+        max_samples=max_samples,
     )
 
 
@@ -187,6 +195,41 @@ def unique_specs(manifest: dict[str, Any], *, args: argparse.Namespace) -> list[
     return specs
 
 
+def spec_payload_for_split(manifest: dict[str, Any], split_name: str) -> dict[str, Any] | None:
+    split_source = str(manifest.get("split_source", ""))
+    if split_source == "same_train_test_source_count_split":
+        train_payload = manifest.get("train_spec")
+        test_payload = manifest.get("test_spec")
+        shared_payload = train_payload if isinstance(train_payload, dict) else test_payload
+        if isinstance(shared_payload, dict):
+            merged_payload = dict(shared_payload)
+            train_max = train_payload.get("max_samples") if isinstance(train_payload, dict) else None
+            test_max = test_payload.get("max_samples") if isinstance(test_payload, dict) else None
+            if train_max is not None and test_max is not None:
+                merged_payload["max_samples"] = int(train_max) + int(test_max)
+            return merged_payload
+        return None
+    if split_source == "same_train_test_source_ratio_split":
+        shared_payload = manifest.get("train_spec") or manifest.get("test_spec")
+        if isinstance(shared_payload, dict):
+            merged_payload = dict(shared_payload)
+            merged_payload["max_samples"] = None
+            return merged_payload
+        return None
+    if split_source in {
+        "single_dataset_split",
+        "same_train_test_spec_split",
+    }:
+        shared_payload = manifest.get("train_spec") or manifest.get("test_spec")
+        if isinstance(shared_payload, dict):
+            return shared_payload
+        return None
+    payload = manifest.get(f"{split_name}_spec")
+    if isinstance(payload, dict):
+        return payload
+    return None
+
+
 def build_correctness_lookup(
     manifest: dict[str, Any],
     *,
@@ -204,7 +247,7 @@ def build_correctness_lookup(
     if task_kind == "multiple_choice_gpqa":
         lookup: dict[tuple[str, int], dict[str, Any]] = {}
         for split_name in ("train", "test"):
-            spec_payload = manifest.get(f"{split_name}_spec")
+            spec_payload = spec_payload_for_split(manifest, split_name)
             if spec_payload is None:
                 continue
             sample_ids = sample_ids_by_split.get(split_name, set())
@@ -221,7 +264,7 @@ def build_correctness_lookup(
     if task_kind == "multiple_choice_mmlupro":
         lookup = {}
         for split_name in ("train", "test"):
-            spec_payload = manifest.get(f"{split_name}_spec")
+            spec_payload = spec_payload_for_split(manifest, split_name)
             if spec_payload is None:
                 continue
             sample_ids = sample_ids_by_split.get(split_name, set())

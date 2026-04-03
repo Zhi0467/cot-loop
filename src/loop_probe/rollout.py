@@ -7,6 +7,8 @@ from transformers import AutoTokenizer, GenerationConfig
 
 from .configs import RolloutConfig
 
+DEFAULT_GROUPED_MAX_NUM_SEQS = 16
+
 
 @dataclass(frozen=True)
 class GeneratedRollout:
@@ -27,6 +29,17 @@ def resolve_sampling_defaults(model_id: str) -> tuple[float, int]:
     if top_k == 0:
         top_k = -1
     return top_p, top_k
+
+
+def _normalize_finish_reason(reason: object) -> str:
+    if hasattr(reason, "value"):
+        reason = getattr(reason, "value")
+    if reason is None:
+        return "unknown"
+    text = str(reason).strip()
+    if not text:
+        return "unknown"
+    return text.split(".")[-1].lower()
 
 
 def _get_visible_devices() -> list[str]:
@@ -155,7 +168,7 @@ def _generate_grouped_rollouts_single_process(
     if cfg.max_num_seqs is not None:
         chunk_size = max(cfg.max_num_seqs // cfg.num_generations, 1)
     else:
-        chunk_size = len(prompts)
+        chunk_size = max(DEFAULT_GROUPED_MAX_NUM_SEQS // cfg.num_generations, 1)
     for start in range(0, len(prompts), chunk_size):
         end = min(start + chunk_size, len(prompts))
         batch_prompts = prompts[start:end]
@@ -187,11 +200,18 @@ def _generate_grouped_rollouts_single_process(
                 token_ids = getattr(sample, "token_ids", None)
                 if not token_ids:
                     token_ids = tokenizer.encode(sample.text, add_special_tokens=False)
+                finish_reason = getattr(sample, "finish_reason", None)
+                if finish_reason is None:
+                    finish_reason = getattr(sample, "stop_reason", None)
+                if finish_reason is None:
+                    finish_reason = getattr(out, "finish_reason", None)
+                if finish_reason is None:
+                    finish_reason = getattr(out, "stop_reason", None)
                 prompt_rollouts.append(
                     GeneratedRollout(
                         token_ids=list(token_ids),
                         text=str(sample.text),
-                        finish_reason=getattr(sample, "finish_reason", None),
+                        finish_reason=_normalize_finish_reason(finish_reason),
                     )
                 )
             all_rollouts.append(prompt_rollouts)

@@ -98,6 +98,7 @@ class PromptRow:
     p_cap: float
     mean_relative_length: float
     correct_rate: float | None
+    graded_rollout_count: int
     rollout_count: int
     majority_s_0_5: int
 
@@ -107,6 +108,7 @@ class DatasetBundle:
     key: str
     display_name: str
     projection_root: Path
+    projection_data_dir: Path
     majority_last_dir: Path
     majority_ensemble_dir: Path
     p_loop_data_dir: Path
@@ -197,14 +199,12 @@ def find_continuous_data_root(outputs_root: Path, prefix: str, target_stem: str)
     return latest_path(candidates)
 
 
-def find_continuous_run_dir(
-    outputs_root: Path,
-    prefix: str,
-    target_stem: str,
-    variant: str,
-) -> Path:
-    pattern = f"{prefix}_{target_stem}_from_archive_*_{variant}"
-    candidates = sorted(path for path in outputs_root.glob(pattern) if (path / "best.pt").exists())
+def find_continuous_run_dir(data_root: Path, variant: str) -> Path:
+    exact = data_root.parent / f"{data_root.name}_{variant}"
+    if (exact / "best.pt").exists():
+        return exact
+    pattern = f"{data_root.name}_{variant}*"
+    candidates = sorted(path for path in data_root.parent.glob(pattern) if (path / "best.pt").exists())
     return latest_path(candidates)
 
 
@@ -224,6 +224,11 @@ def load_prompt_projection_rows(path: Path) -> list[PromptRow]:
                     p_cap=float(raw["p_cap"]),
                     mean_relative_length=float(raw["mean_relative_length"]),
                     correct_rate=float(correct_rate_text) if correct_rate_text else None,
+                    graded_rollout_count=(
+                        int(raw["graded_rollout_count"])
+                        if (raw.get("graded_rollout_count") or "").strip()
+                        else (int(raw["rollout_count"]) if correct_rate_text else 0)
+                    ),
                     rollout_count=int(raw["rollout_count"]),
                     majority_s_0_5=int(raw["majority_s_0.5"]),
                 )
@@ -249,6 +254,24 @@ def shard_sample_ids(data_dir: Path, split: str) -> list[int]:
 def projection_sample_ids(path: Path, split: str) -> list[int]:
     rows = load_prompt_projection_rows(path / "export" / "prompt_projection.csv")
     return sorted(row.sample_id for row in rows if row.split == split)
+
+
+def resolve_projection_data_dir(projection_root: Path) -> Path:
+    summary_path = projection_root / "export" / "projection_summary.json"
+    if summary_path.exists():
+        summary = read_json(summary_path)
+        raw_data_dir = summary.get("data_dir")
+        if isinstance(raw_data_dir, str) and raw_data_dir:
+            resolved = resolve_dataset_data_dir(Path(raw_data_dir))
+            if resolved is not None:
+                return resolved
+    for candidate in (projection_root / "data", projection_root):
+        resolved = resolve_dataset_data_dir(candidate)
+        if resolved is not None:
+            return resolved
+    raise SystemExit(
+        f"Failed to resolve prompt-profile data dir for projection root '{projection_root}'."
+    )
 
 
 def resolve_projection_root(
@@ -279,9 +302,14 @@ def seed_tag_from_path(path: Path) -> str | None:
 
 
 def resolve_majority_run_dir(candidates: list[Path], *, seed_tag: str | None) -> Path:
-    filtered = candidates
-    if seed_tag is not None:
-        filtered = [path for path in candidates if seed_tag in path.name]
+    if seed_tag is None:
+        if len(candidates) != 1:
+            raise SystemExit(
+                "Failed to resolve a unique majority probe run because the matched "
+                "projection bundle does not carry a seed tag."
+            )
+        return candidates[0]
+    filtered = [path for path in candidates if seed_tag in path.name]
     return latest_path(filtered)
 
 
@@ -307,6 +335,7 @@ def discover_dataset_bundle(outputs_root: Path, spec: dict[str, str]) -> Dataset
         reference_train_ids=p_loop_train_ids,
         reference_test_ids=p_loop_test_ids,
     )
+    projection_data_dir = resolve_projection_data_dir(projection_root)
     seed_tag = seed_tag_from_path(projection_root)
 
     majority_last_dir = resolve_majority_run_dir(
@@ -322,24 +351,15 @@ def discover_dataset_bundle(outputs_root: Path, spec: dict[str, str]) -> Dataset
         key=spec["key"],
         display_name=spec["display_name"],
         projection_root=projection_root,
+        projection_data_dir=projection_data_dir,
         majority_last_dir=majority_last_dir,
         majority_ensemble_dir=majority_ensemble_dir,
         p_loop_data_dir=p_loop_data_dir,
-        p_loop_last_dir=find_continuous_run_dir(outputs_root, spec["continuous_prefix"], "p_loop", "last_layer"),
-        p_loop_ensemble_dir=find_continuous_run_dir(outputs_root, spec["continuous_prefix"], "p_loop", "ensemble"),
+        p_loop_last_dir=find_continuous_run_dir(p_loop_data_root, "last_layer"),
+        p_loop_ensemble_dir=find_continuous_run_dir(p_loop_data_root, "ensemble"),
         mean_data_dir=mean_data_dir,
-        mean_last_dir=find_continuous_run_dir(
-            outputs_root,
-            spec["continuous_prefix"],
-            "mean_relative",
-            "last_layer",
-        ),
-        mean_ensemble_dir=find_continuous_run_dir(
-            outputs_root,
-            spec["continuous_prefix"],
-            "mean_relative",
-            "ensemble",
-        ),
+        mean_last_dir=find_continuous_run_dir(mean_data_root, "last_layer"),
+        mean_ensemble_dir=find_continuous_run_dir(mean_data_root, "ensemble"),
     )
 
 
@@ -696,11 +716,13 @@ def overall_prompt_rates(rows: list[PromptRow]) -> dict[str, float | None]:
     if total_rollouts <= 0.0:
         raise SystemExit("Cannot summarize prompt rates with zero rollouts.")
     accuracy_numer = 0.0
+    graded_rollout_count = 0.0
     has_accuracy = False
     for row in rows:
-        if row.correct_rate is not None:
+        if row.correct_rate is not None and row.graded_rollout_count > 0:
             has_accuracy = True
-            accuracy_numer += float(row.correct_rate) * float(row.rollout_count)
+            accuracy_numer += float(row.correct_rate) * float(row.graded_rollout_count)
+            graded_rollout_count += float(row.graded_rollout_count)
     return {
         "prompt_count": float(len(rows)),
         "rollout_count": total_rollouts,
@@ -710,7 +732,11 @@ def overall_prompt_rates(rows: list[PromptRow]) -> dict[str, float | None]:
         "cap_rate": float(
             sum(float(row.p_cap) * float(row.rollout_count) for row in rows) / total_rollouts
         ),
-        "accuracy": float(accuracy_numer / total_rollouts) if has_accuracy else None,
+        "accuracy": (
+            float(accuracy_numer / graded_rollout_count)
+            if has_accuracy and graded_rollout_count > 0.0
+            else None
+        ),
     }
 
 
@@ -741,12 +767,18 @@ def bucket_stats(
         sum(float(row.p_cap) * float(row.rollout_count) for row in bucket_rows) / total_rollouts
     )
     accuracy_numer = 0.0
+    graded_rollout_count = 0.0
     has_accuracy = False
     for row in bucket_rows:
-        if row.correct_rate is not None:
+        if row.correct_rate is not None and row.graded_rollout_count > 0:
             has_accuracy = True
-            accuracy_numer += float(row.correct_rate) * float(row.rollout_count)
-    accuracy = float(accuracy_numer / total_rollouts) if has_accuracy else None
+            accuracy_numer += float(row.correct_rate) * float(row.graded_rollout_count)
+            graded_rollout_count += float(row.graded_rollout_count)
+    accuracy = (
+        float(accuracy_numer / graded_rollout_count)
+        if has_accuracy and graded_rollout_count > 0.0
+        else None
+    )
     overall_loop_rate = float(overall_rates["loop_rate"])
     overall_cap_rate = float(overall_rates["cap_rate"])
     overall_accuracy = overall_rates["accuracy"]
@@ -897,7 +929,7 @@ def main() -> None:
         ):
             score_by_sample_id = score_checkpoint(
                 checkpoint_path=run_dir / "best.pt",
-                data_dir=bundle.projection_root / "data",
+                data_dir=bundle.projection_data_dir,
                 split="test",
                 batch_size=args.batch_size,
                 device=device,

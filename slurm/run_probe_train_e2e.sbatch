@@ -97,15 +97,16 @@ TRAIN_MAX_SAMPLES="${TRAIN_MAX_SAMPLES:-}"
 
 TEST_DATASET="${TEST_DATASET:-}"
 TEST_CONFIG="${TEST_CONFIG:-}"
-TEST_SPLIT="${TEST_SPLIT:-test}"
+TEST_SPLIT="${TEST_SPLIT:-}"
 TEST_MAX_SAMPLES="${TEST_MAX_SAMPLES:-}"
+TEST_SPLIT_DISPLAY="${TEST_SPLIT:-test}"
 
 SPLIT_RATIO="${SPLIT_RATIO:-0.1}"
 SEED="${SEED:-}"
 SEEDS="${SEEDS:-}"
 DATASET_SEED="${DATASET_SEED:-}"
 
-TEMPERATURE="${TEMPERATURE:-}"
+TEMPERATURE="${TEMPERATURE:-0.2}"
 TP="${TP:-}"
 DP="${DP:-}"
 MAX_NUM_SEQS="${MAX_NUM_SEQS:-}"
@@ -119,9 +120,33 @@ FEATURE_POOLING="${FEATURE_POOLING:-last_token_all_layers_stack}"
 FEATURE_LAYER="${FEATURE_LAYER:--1}"
 FEATURE_KEY="${FEATURE_KEY:-}"
 TARGET_KIND="${TARGET_KIND:-binary}"
-BINARY_TARGET_MODE="${BINARY_TARGET_MODE:-rollout_label}"
-PROFILE_TAIL_THRESHOLD="${PROFILE_TAIL_THRESHOLD:-0.9}"
+BINARY_TARGET_MODE="${BINARY_TARGET_MODE:-prompt_majority_tail}"
+PROFILE_TAIL_THRESHOLD="${PROFILE_TAIL_THRESHOLD:-0.5}"
 PROFILE_TARGET="${PROFILE_TARGET:-}"
+if [[ -z "${NUM_GENERATIONS}" ]]; then
+  if [[ "${TARGET_KIND}" == "binary" && "${BINARY_TARGET_MODE}" == "rollout_label" ]]; then
+    NUM_GENERATIONS="1"
+  else
+    NUM_GENERATIONS="4"
+  fi
+fi
+if [[ -z "${PROFILE_TARGET}" ]]; then
+  if [[ "${TARGET_KIND}" == "binary" && "${BINARY_TARGET_MODE}" == "rollout_label" ]]; then
+    PROFILE_TARGET=""
+  else
+    case "${TARGET_KIND}" in
+      binary)
+        PROFILE_TARGET="majority_tail"
+        ;;
+      probability)
+        PROFILE_TARGET="s_tail"
+        ;;
+      regression)
+        PROFILE_TARGET="mean_relative_length"
+        ;;
+    esac
+  fi
+fi
 SCORE_RULE="${SCORE_RULE:-}"
 
 LOOP_N="${LOOP_N:-30}"
@@ -164,7 +189,7 @@ if [[ -z "${DATASET_SEED}" ]]; then
   DATASET_SEED="${SEED_LIST[0]}"
 fi
 
-echo "[probe-e2e] model_preset=${MODEL_PRESET} train=${TRAIN_DATASET}:${TRAIN_SPLIT} test=${TEST_DATASET}:${TEST_SPLIT}"
+echo "[probe-e2e] model_preset=${MODEL_PRESET} train=${TRAIN_DATASET}:${TRAIN_SPLIT} test=${TEST_DATASET}:${TEST_SPLIT_DISPLAY}"
 echo "[probe-e2e] model_id=${MODEL_ID}"
 echo "[probe-e2e] task_kind=${TASK_KIND}"
 echo "[probe-e2e] livecodebench_repo=${LIVECODEBENCH_REPO} release_version=${RELEASE_VERSION} lm_style_override=${LM_STYLE_OVERRIDE}"
@@ -209,7 +234,10 @@ if [[ -n "${TEMPERATURE}" ]]; then
   BUILD_ARGS+=(--temperature "${TEMPERATURE}")
 fi
 if [[ -n "${TEST_DATASET}" ]]; then
-  BUILD_ARGS+=(--test-dataset "${TEST_DATASET}" --test-split "${TEST_SPLIT}")
+  BUILD_ARGS+=(--test-dataset "${TEST_DATASET}")
+fi
+if [[ -n "${TEST_SPLIT}" ]]; then
+  BUILD_ARGS+=(--test-split "${TEST_SPLIT}")
 fi
 
 if [[ -n "${TRAIN_CONFIG}" ]]; then
@@ -218,10 +246,10 @@ fi
 if [[ -n "${TRAIN_MAX_SAMPLES}" ]]; then
   BUILD_ARGS+=(--train-max-samples "${TRAIN_MAX_SAMPLES}")
 fi
-if [[ -n "${TEST_DATASET}" && -n "${TEST_CONFIG}" ]]; then
+if [[ -n "${TEST_CONFIG}" ]]; then
   BUILD_ARGS+=(--test-config "${TEST_CONFIG}")
 fi
-if [[ -n "${TEST_DATASET}" && -n "${TEST_MAX_SAMPLES}" ]]; then
+if [[ -n "${TEST_MAX_SAMPLES}" ]]; then
   BUILD_ARGS+=(--test-max-samples "${TEST_MAX_SAMPLES}")
 fi
 if [[ -n "${MAX_NUM_SEQS}" ]]; then

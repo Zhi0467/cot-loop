@@ -417,6 +417,109 @@ def _metric_bundle(
     raise SystemExit(f"Unsupported target_kind '{target_kind}'.")
 
 
+def _selection_metadata(
+    *,
+    target_kind: str,
+    selection_kind: str,
+) -> dict[str, object]:
+    if selection_kind == "best_loss":
+        if target_kind == "binary":
+            return {
+                "selection_metric": "roc_auc",
+                "tie_breaker": "macro_f1",
+            }
+        if target_kind == "probability":
+            return {
+                "selection_metric": "brier",
+                "tie_breaker": "spearman",
+            }
+        if target_kind == "regression":
+            return {
+                "selection_metric": "mse",
+                "tie_breaker": "spearman",
+            }
+    elif selection_kind == "best_rank":
+        if target_kind == "binary":
+            return {
+                "selection_metric": "pr_auc",
+                "tie_breaker": "roc_auc",
+                "selection_tertiary_metric": "macro_f1",
+            }
+        if target_kind == "probability":
+            return {
+                "selection_metric": "top_20p_capture",
+                "tie_breaker": "spearman",
+                "selection_constraint_metric": "brier",
+                "selection_constraint_mode": "within_relative_tolerance_min",
+                "selection_constraint_value": 0.10,
+            }
+        if target_kind == "regression":
+            return {
+                "selection_metric": "spearman",
+                "tie_breaker": "top_20p_capture",
+                "selection_constraint_metric": "mse",
+                "selection_constraint_mode": "within_relative_tolerance_min",
+                "selection_constraint_value": 0.10,
+            }
+    raise SystemExit(
+        f"Unsupported selection metadata target_kind='{target_kind}' "
+        f"selection_kind='{selection_kind}'."
+    )
+
+
+def _write_best_checkpoint_aliases(
+    *,
+    eval_rows: list[dict[str, object]],
+    target_kind: str,
+    selection_rule: str,
+    rank_selection_rule: str,
+    best_ckpt: str,
+    best_loss_ckpt: str,
+    best_rank_ckpt: str,
+    best_metrics_json: str,
+    best_loss_metrics_json: str,
+    best_rank_metrics_json: str,
+) -> None:
+    if not eval_rows:
+        return
+
+    best_loss_row = _select_best_loss_row(eval_rows, target_kind=target_kind)
+    best_rank_row = _select_best_rank_row(eval_rows, target_kind=target_kind)
+    if best_loss_row is None or best_rank_row is None:
+        raise RuntimeError("Expected non-empty eval rows to produce best checkpoints.")
+
+    shutil.copy2(str(best_loss_row["checkpoint_path"]), best_ckpt)
+    shutil.copy2(str(best_loss_row["checkpoint_path"]), best_loss_ckpt)
+    shutil.copy2(str(best_rank_row["checkpoint_path"]), best_rank_ckpt)
+
+    best_loss_payload = {
+        "selection_kind": "best_loss",
+        "selection_rule": selection_rule,
+        **_selection_metadata(
+            target_kind=target_kind,
+            selection_kind="best_loss",
+        ),
+        **best_loss_row,
+    }
+    best_rank_payload = {
+        "selection_kind": "best_rank",
+        "selection_rule": rank_selection_rule,
+        **_selection_metadata(
+            target_kind=target_kind,
+            selection_kind="best_rank",
+        ),
+        **best_rank_row,
+    }
+    for path, payload in (
+        (best_metrics_json, best_loss_payload),
+        (best_loss_metrics_json, best_loss_payload),
+        (best_rank_metrics_json, best_rank_payload),
+    ):
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2, sort_keys=True)
+            f.write("\n")
+
+
 def _log_row_fields(
     prefix: str,
     metrics: dict[str, float],
@@ -895,6 +998,18 @@ def main() -> None:
             log_row["checkpoint_path"] = eval_ckpt_path
             _write_jsonl(metrics_jsonl, log_row)
             eval_rows.append(dict(log_row))
+            _write_best_checkpoint_aliases(
+                eval_rows=eval_rows,
+                target_kind=target_kind,
+                selection_rule=selection_rule,
+                rank_selection_rule=rank_selection_rule,
+                best_ckpt=best_ckpt,
+                best_loss_ckpt=best_loss_ckpt,
+                best_rank_ckpt=best_rank_ckpt,
+                best_metrics_json=best_metrics_json,
+                best_loss_metrics_json=best_loss_metrics_json,
+                best_rank_metrics_json=best_rank_metrics_json,
+            )
 
             # Log eval metrics to wandb
             eval_log_payload = {
@@ -951,35 +1066,18 @@ def main() -> None:
 
     run.finish()
     if eval_rows:
-        best_loss_row = _select_best_loss_row(eval_rows, target_kind=target_kind)
-        best_rank_row = _select_best_rank_row(eval_rows, target_kind=target_kind)
-
-        if best_loss_row is None or best_rank_row is None:
-            raise RuntimeError("Expected non-empty eval rows to produce best checkpoints.")
-
-        shutil.copy2(str(best_loss_row["checkpoint_path"]), best_ckpt)
-        shutil.copy2(str(best_loss_row["checkpoint_path"]), best_loss_ckpt)
-        shutil.copy2(str(best_rank_row["checkpoint_path"]), best_rank_ckpt)
-
-        best_loss_payload = {
-            "selection_kind": "best_loss",
-            "selection_rule": selection_rule,
-            **best_loss_row,
-        }
-        best_rank_payload = {
-            "selection_kind": "best_rank",
-            "selection_rule": rank_selection_rule,
-            **best_rank_row,
-        }
-
-        for path, payload in (
-            (best_metrics_json, best_loss_payload),
-            (best_loss_metrics_json, best_loss_payload),
-            (best_rank_metrics_json, best_rank_payload),
-        ):
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(payload, f, indent=2, sort_keys=True)
-                f.write("\n")
+        _write_best_checkpoint_aliases(
+            eval_rows=eval_rows,
+            target_kind=target_kind,
+            selection_rule=selection_rule,
+            rank_selection_rule=rank_selection_rule,
+            best_ckpt=best_ckpt,
+            best_loss_ckpt=best_loss_ckpt,
+            best_rank_ckpt=best_rank_ckpt,
+            best_metrics_json=best_metrics_json,
+            best_loss_metrics_json=best_loss_metrics_json,
+            best_rank_metrics_json=best_rank_metrics_json,
+        )
     else:
         print(
             "No eval checkpoints were logged (check --eval-every); best_metrics.json not written.",

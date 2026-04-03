@@ -79,6 +79,7 @@ PROMPT_FIELD="${PROMPT_FIELD:-problem}"
 TASK_KIND="${TASK_KIND:-math_freeform}"
 LIVECODEBENCH_REPO="${LIVECODEBENCH_REPO:-}"
 RELEASE_VERSION="${RELEASE_VERSION:-release_v6}"
+LM_STYLE_OVERRIDE="${LM_STYLE_OVERRIDE:-}"
 
 TRAIN_DATASET="${TRAIN_DATASET:-HuggingFaceH4/MATH-500}"
 TRAIN_CONFIG="${TRAIN_CONFIG:-}"
@@ -86,8 +87,9 @@ TRAIN_SPLIT="${TRAIN_SPLIT:-test}"
 TRAIN_MAX_SAMPLES="${TRAIN_MAX_SAMPLES:-}"
 TEST_DATASET="${TEST_DATASET:-}"
 TEST_CONFIG="${TEST_CONFIG:-}"
-TEST_SPLIT="${TEST_SPLIT:-test}"
+TEST_SPLIT="${TEST_SPLIT:-}"
 TEST_MAX_SAMPLES="${TEST_MAX_SAMPLES:-}"
+TEST_SPLIT_DISPLAY="${TEST_SPLIT:-test}"
 SPLIT_RATIO="${SPLIT_RATIO:-0.1}"
 SEED="${SEED:-0}"
 
@@ -117,8 +119,9 @@ SHARD_SIZE="${SHARD_SIZE:-2048}"
 OUT_DATA_DIR="${OUT_DATA_DIR:-outputs/prompt_profile_projection_data}"
 OUT_PROJECTION_DIR="${OUT_PROJECTION_DIR:-outputs/prompt_profile_projection}"
 
-echo "[prompt-profile-proj] train=${TRAIN_DATASET}:${TRAIN_SPLIT} test=${TEST_DATASET}:${TEST_SPLIT}"
+echo "[prompt-profile-proj] train=${TRAIN_DATASET}:${TRAIN_SPLIT} test=${TEST_DATASET}:${TEST_SPLIT_DISPLAY}"
 echo "[prompt-profile-proj] model_id=${MODEL_ID} task_kind=${TASK_KIND}"
+echo "[prompt-profile-proj] livecodebench_repo=${LIVECODEBENCH_REPO} release_version=${RELEASE_VERSION} lm_style_override=${LM_STYLE_OVERRIDE}"
 echo "[prompt-profile-proj] tail_threshold=${PROFILE_TAIL_THRESHOLD} export_thresholds=${TAIL_THRESHOLDS}"
 echo "[prompt-profile-proj] tp=${TP} dp=${DP} max_model_len=${MAX_MODEL_LEN} max_num_batched_tokens=${MAX_NUM_BATCHED_TOKENS}"
 echo "[prompt-profile-proj] out_data_dir=${OUT_DATA_DIR}"
@@ -160,10 +163,16 @@ if [[ -n "${MODEL_ID}" ]]; then
   BUILD_ARGS+=(--model-id "${MODEL_ID}")
 fi
 if [[ -n "${TEST_DATASET}" ]]; then
-  BUILD_ARGS+=(--test-dataset "${TEST_DATASET}" --test-split "${TEST_SPLIT}")
+  BUILD_ARGS+=(--test-dataset "${TEST_DATASET}")
+fi
+if [[ -n "${TEST_SPLIT}" ]]; then
+  BUILD_ARGS+=(--test-split "${TEST_SPLIT}")
 fi
 if [[ "${TASK_KIND}" == "livecodebench_codegen" ]]; then
   BUILD_ARGS+=(--livecodebench-repo "${LIVECODEBENCH_REPO}" --release-version "${RELEASE_VERSION}")
+  if [[ -n "${LM_STYLE_OVERRIDE}" ]]; then
+    BUILD_ARGS+=(--lm-style-override "${LM_STYLE_OVERRIDE}")
+  fi
 fi
 if [[ -n "${TRAIN_CONFIG}" ]]; then
   BUILD_ARGS+=(--train-config "${TRAIN_CONFIG}")
@@ -171,10 +180,10 @@ fi
 if [[ -n "${TRAIN_MAX_SAMPLES}" ]]; then
   BUILD_ARGS+=(--train-max-samples "${TRAIN_MAX_SAMPLES}")
 fi
-if [[ -n "${TEST_DATASET}" && -n "${TEST_CONFIG}" ]]; then
+if [[ -n "${TEST_CONFIG}" ]]; then
   BUILD_ARGS+=(--test-config "${TEST_CONFIG}")
 fi
-if [[ -n "${TEST_DATASET}" && -n "${TEST_MAX_SAMPLES}" ]]; then
+if [[ -n "${TEST_MAX_SAMPLES}" ]]; then
   BUILD_ARGS+=(--test-max-samples "${TEST_MAX_SAMPLES}")
 fi
 if [[ -n "${FEATURE_KEY}" ]]; then

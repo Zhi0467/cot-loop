@@ -109,12 +109,26 @@ def labels_from_rollouts(
     ]
 
 
+def cap_hit_from_finish_reason(
+    finish_reason: str | None,
+    *,
+    length: int,
+    effective_max_tokens: int,
+) -> int:
+    if isinstance(finish_reason, str):
+        normalized = finish_reason.strip().lower()
+        if normalized and normalized != "unknown":
+            return int(normalized == "length")
+    return int(length >= effective_max_tokens)
+
+
 def rollout_terminal_stats(
     token_ids: Iterable[int],
     *,
     effective_max_tokens: int,
     loop_n: int,
     loop_k: int,
+    finish_reason: str | None = None,
 ) -> RolloutTerminalStats:
     if effective_max_tokens < 1:
         raise ValueError("effective_max_tokens must be >= 1.")
@@ -129,7 +143,11 @@ def rollout_terminal_stats(
     return RolloutTerminalStats(
         length=length,
         relative_length=float(length) / float(effective_max_tokens),
-        cap_hit=int(length >= effective_max_tokens),
+        cap_hit=cap_hit_from_finish_reason(
+            finish_reason,
+            length=length,
+            effective_max_tokens=effective_max_tokens,
+        ),
         loop_flag=int(first_loop_prefix is not None),
         first_loop_prefix=first_loop_prefix,
     )
@@ -142,11 +160,14 @@ def aggregate_prompt_profile(
     loop_n: int,
     loop_k: int,
     tail_threshold: float,
+    finish_reasons: list[str | None] | None = None,
 ) -> dict[str, object]:
     if not rollout_token_ids:
         raise ValueError("aggregate_prompt_profile requires at least one rollout.")
     if not 0.0 < tail_threshold <= 1.0:
         raise ValueError("tail_threshold must be in (0, 1].")
+    if finish_reasons is not None and len(finish_reasons) != len(rollout_token_ids):
+        raise ValueError("finish_reasons must align 1:1 with rollout_token_ids.")
 
     stats = [
         rollout_terminal_stats(
@@ -154,8 +175,13 @@ def aggregate_prompt_profile(
             effective_max_tokens=effective_max_tokens,
             loop_n=loop_n,
             loop_k=loop_k,
+            finish_reason=(
+                finish_reasons[idx]
+                if finish_reasons is not None
+                else None
+            ),
         )
-        for token_ids in rollout_token_ids
+        for idx, token_ids in enumerate(rollout_token_ids)
     ]
     num_rollouts = len(stats)
     lengths = [stat.length for stat in stats]

@@ -206,9 +206,16 @@ def _resolve_target_spec_from_manifest(manifest: dict[str, Any]) -> dict[str, ob
     if isinstance(target_spec, dict):
         return target_spec
     label_spec = manifest.get("label_spec")
+    if isinstance(label_spec, dict):
+        return {
+            "kind": "binary",
+            "name": label_spec.get("target", "eventual_loop"),
+            "horizon": label_spec.get("horizon"),
+        }
     return {
         "kind": "binary",
-        "name": label_spec.get("target", "eventual_loop") if isinstance(label_spec, dict) else "eventual_loop",
+        "name": "eventual_loop",
+        "horizon": None,
     }
 
 

@@ -7,7 +7,9 @@ import argparse
 import csv
 import json
 import math
+import os
 import sys
+import zlib
 from pathlib import Path
 from typing import Any
 
@@ -28,7 +30,13 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from loop_probe.adapters import math_freeform, multiple_choice_gpqa, multiple_choice_mmlupro
+from loop_probe.adapters import (
+    livecodebench_codegen,
+    math_freeform,
+    multiple_choice_gpqa,
+    multiple_choice_mmlupro,
+)
+from loop_probe.collector import LcbSampleRecord
 from loop_probe.types import DatasetSpec
 
 
@@ -180,11 +188,19 @@ def spec_from_manifest(spec_payload: dict[str, Any], *, args: argparse.Namespace
     dataset = args.source_dataset or str(spec_payload["dataset"])
     config = args.source_config or spec_payload.get("config")
     split = args.source_split or str(spec_payload["split"])
+    max_samples = spec_payload.get("max_samples")
+    if max_samples is not None:
+        try:
+            max_samples = int(max_samples)
+        except Exception as exc:
+            raise SystemExit(
+                f"Invalid max_samples in manifest spec payload: {max_samples!r}"
+            ) from exc
     return DatasetSpec(
         dataset=dataset,
         config=config,
         split=split,
-        max_samples=None,
+        max_samples=max_samples,
     )
 
 
@@ -204,10 +220,57 @@ def unique_specs(manifest: dict[str, Any], *, args: argparse.Namespace) -> list[
     return specs
 
 
+def spec_payload_for_split(manifest: dict[str, Any], split_name: str) -> dict[str, Any] | None:
+    split_source = str(manifest.get("split_source", ""))
+    if split_source == "same_train_test_source_count_split":
+        train_payload = manifest.get("train_spec")
+        test_payload = manifest.get("test_spec")
+        shared_payload = train_payload if isinstance(train_payload, dict) else test_payload
+        if isinstance(shared_payload, dict):
+            merged_payload = dict(shared_payload)
+            train_max = train_payload.get("max_samples") if isinstance(train_payload, dict) else None
+            test_max = test_payload.get("max_samples") if isinstance(test_payload, dict) else None
+            if train_max is not None and test_max is not None:
+                merged_payload["max_samples"] = int(train_max) + int(test_max)
+            return merged_payload
+        return None
+    if split_source == "same_train_test_source_ratio_split":
+        shared_payload = manifest.get("train_spec") or manifest.get("test_spec")
+        if isinstance(shared_payload, dict):
+            merged_payload = dict(shared_payload)
+            merged_payload["max_samples"] = None
+            return merged_payload
+        return None
+    if split_source in {
+        "single_dataset_split",
+        "same_train_test_spec_split",
+    }:
+        shared_payload = manifest.get("train_spec") or manifest.get("test_spec")
+        if isinstance(shared_payload, dict):
+            return shared_payload
+        return None
+    payload = manifest.get(f"{split_name}_spec")
+    if isinstance(payload, dict):
+        return payload
+    return None
+
+
+def question_field_for_spec(
+    spec_payload: dict[str, Any],
+    *,
+    default_question_field: str,
+) -> str:
+    dataset = str(spec_payload.get("dataset", ""))
+    if os.path.basename(dataset) == "aime_2024_2025.jsonl":
+        return "question"
+    return default_question_field
+
+
 def build_correctness_lookup(
     manifest: dict[str, Any],
     *,
     sample_keys: set[tuple[str, int]],
+    archive_lookup: dict[tuple[str, int], dict[str, Any]],
     args: argparse.Namespace,
 ) -> tuple[dict[tuple[str, int], dict[str, Any]], str]:
     task_kind = str(manifest.get("task_kind", ""))
@@ -228,7 +291,7 @@ def build_correctness_lookup(
     if task_kind == "multiple_choice_gpqa":
         lookup: dict[tuple[str, int], dict[str, Any]] = {}
         for split_name in ("train", "test"):
-            spec_payload = manifest.get(f"{split_name}_spec")
+            spec_payload = spec_payload_for_split(manifest, split_name)
             if spec_payload is None:
                 continue
             sample_ids = sample_ids_by_split.get(split_name, set())
@@ -245,7 +308,7 @@ def build_correctness_lookup(
     if task_kind == "multiple_choice_mmlupro":
         lookup = {}
         for split_name in ("train", "test"):
-            spec_payload = manifest.get(f"{split_name}_spec")
+            spec_payload = spec_payload_for_split(manifest, split_name)
             if spec_payload is None:
                 continue
             sample_ids = sample_ids_by_split.get(split_name, set())
@@ -265,16 +328,20 @@ def build_correctness_lookup(
         lookup = {}
         try:
             for split_name in ("train", "test"):
-                spec_payload = manifest.get(f"{split_name}_spec")
+                spec_payload = spec_payload_for_split(manifest, split_name)
                 if spec_payload is None:
                     continue
                 sample_ids = sample_ids_by_split.get(split_name, set())
                 if not sample_ids:
                     continue
                 spec = spec_from_manifest(spec_payload, args=args)
+                question_field = question_field_for_spec(
+                    spec_payload,
+                    default_question_field=prompt_field,
+                )
                 for record, gold_answer in math_freeform.load_samples(
                     spec,
-                    question_field=prompt_field,
+                    question_field=question_field,
                     answer_field=answer_field,
                 ):
                     if record.sample_id in sample_ids:
@@ -290,6 +357,179 @@ def build_correctness_lookup(
             )
             return {}, task_kind
         return lookup, task_kind
+    if task_kind == "livecodebench_codegen":
+        task_loader_config = manifest.get("task_loader_config")
+        if not isinstance(task_loader_config, dict):
+            raise SystemExit(
+                "LiveCodeBench correctness reconstruction requires task_loader_config "
+                "in the dataset manifest."
+            )
+        repo_path = str(task_loader_config.get("livecodebench_repo", "")).strip()
+        if not repo_path:
+            raise SystemExit(
+                "LiveCodeBench correctness reconstruction requires "
+                "task_loader_config.livecodebench_repo in the dataset manifest."
+            )
+        release_version = str(task_loader_config.get("release_version", "release_v6"))
+        lm_style_override = task_loader_config.get("lm_style_override")
+        if isinstance(lm_style_override, str) and not lm_style_override:
+            lm_style_override = None
+        rollout_config = manifest.get("rollout_config")
+        if not isinstance(rollout_config, dict):
+            raise SystemExit(
+                "LiveCodeBench correctness reconstruction requires rollout_config "
+                "in the dataset manifest."
+            )
+        model_id = str(rollout_config.get("model_id", "")).strip()
+        if not model_id:
+            raise SystemExit(
+                "LiveCodeBench correctness reconstruction requires "
+                "rollout_config.model_id in the dataset manifest."
+            )
+        max_model_len = rollout_config.get("max_model_len")
+        if max_model_len is None:
+            raise SystemExit(
+                "LiveCodeBench correctness reconstruction requires "
+                "rollout_config.max_model_len in the dataset manifest."
+            )
+        try:
+            max_model_len_int = int(max_model_len)
+        except Exception as exc:
+            raise SystemExit(
+                "LiveCodeBench correctness reconstruction requires an integer "
+                f"rollout_config.max_model_len, got {max_model_len!r}."
+            ) from exc
+
+        lookup = {}
+        for split_name in ("train", "test"):
+            spec_payload = spec_payload_for_split(manifest, split_name)
+            if spec_payload is None:
+                continue
+            sample_ids = sample_ids_by_split.get(split_name, set())
+            if not sample_ids:
+                continue
+            spec = spec_from_manifest(spec_payload, args=args)
+            effective_release_version = (
+                str(spec.config) if spec.config not in (None, "") else release_version
+            )
+            benchmark, format_prompt = livecodebench_codegen.load_benchmark(
+                repo_path,
+                effective_release_version,
+            )
+            normalized_split = str(spec.split).strip().lower()
+            if normalized_split not in ("", "all"):
+                if normalized_split == "train":
+                    benchmark = [
+                        row
+                        for row in benchmark
+                        if zlib.crc32(str(row.question_id).encode("utf-8")) % 10 < 8
+                    ]
+                elif normalized_split in ("validation", "val"):
+                    benchmark = [
+                        row
+                        for row in benchmark
+                        if zlib.crc32(str(row.question_id).encode("utf-8")) % 10 == 8
+                    ]
+                elif normalized_split == "test":
+                    benchmark = [
+                        row
+                        for row in benchmark
+                        if zlib.crc32(str(row.question_id).encode("utf-8")) % 10 == 9
+                    ]
+                else:
+                    raise SystemExit(
+                        "Unsupported LiveCodeBench split "
+                        f"'{spec.split}'. Use one of train/validation/test/all."
+                    )
+            prompt_records, _lm_style = livecodebench_codegen.build_prompts(
+                benchmark,
+                format_prompt,
+                repo_path=repo_path,
+                model_id=model_id,
+                lm_style_override=lm_style_override,
+                max_samples=spec.max_samples,
+            )
+            question_id_by_sample_id = {
+                idx: str(question_id) for idx, (question_id, _prompt) in enumerate(prompt_records)
+            }
+            selected_question_ids = []
+            for sample_id in sorted(sample_ids):
+                question_id = question_id_by_sample_id.get(int(sample_id))
+                if question_id is None:
+                    raise SystemExit(
+                        "LiveCodeBench correctness reconstruction could not map "
+                        f"sample_id={sample_id} in split '{split_name}' back to a question id."
+                    )
+                selected_question_ids.append(question_id)
+            selected_question_id_set = set(selected_question_ids)
+            selected_benchmark = [
+                row
+                for row in benchmark
+                if str(row.question_id) in selected_question_id_set
+            ]
+            if len(selected_benchmark) != len(selected_question_id_set):
+                raise SystemExit(
+                    "LiveCodeBench correctness reconstruction could not recover every "
+                    f"benchmark instance for split '{split_name}'."
+                )
+            records: list[LcbSampleRecord] = []
+            for sample_id in sorted(sample_ids):
+                archive_row = archive_lookup.get((split_name, int(sample_id)))
+                if archive_row is None:
+                    raise SystemExit(
+                        "Missing rollout archive row while reconstructing "
+                        f"LiveCodeBench correctness for split '{split_name}', sample_id={sample_id}."
+                    )
+                question_id = question_id_by_sample_id[int(sample_id)]
+                prompt_token_count = int(archive_row["prompt_token_count"])
+                effective_max_tokens = int(archive_row["effective_max_tokens"])
+                for rollout in archive_row["rollouts"]:
+                    rollout_index = int(rollout["rollout_index"])
+                    token_count = int(rollout["length"])
+                    first_loop_prefix = rollout.get("first_loop_prefix_length")
+                    records.append(
+                        LcbSampleRecord(
+                            question_id=question_id,
+                            generation_index=rollout_index,
+                            code_output=livecodebench_codegen.extract_code_output(
+                                str(rollout["completion_text"]),
+                                repo_path=repo_path,
+                                model_id=model_id,
+                                lm_style_override=lm_style_override,
+                            ),
+                            token_count=token_count,
+                            prompt_token_count=prompt_token_count,
+                            total_token_count=prompt_token_count + token_count,
+                            effective_max_tokens=effective_max_tokens,
+                            max_model_len=max_model_len_int,
+                            loop_flag=bool(int(rollout["loop_flag"])),
+                            max_length_hit=bool(int(rollout["cap_hit"])),
+                            finish_reason=str(rollout["finish_reason"]),
+                            prompt_too_long=False,
+                            first_loop_prefix_length=(
+                                int(first_loop_prefix)
+                                if first_loop_prefix is not None
+                                else None
+                            ),
+                        )
+                    )
+            _native_metrics, grading_by_record_key = livecodebench_codegen.evaluate_records(
+                selected_benchmark,
+                records,
+                repo_path=repo_path,
+                release_version=effective_release_version,
+            )
+            for sample_id in sample_ids:
+                question_id = question_id_by_sample_id[int(sample_id)]
+                archive_row = archive_lookup[(split_name, int(sample_id))]
+                rollout_grades: dict[int, bool] = {}
+                for rollout in archive_row["rollouts"]:
+                    rollout_index = int(rollout["rollout_index"])
+                    passed = grading_by_record_key.get((question_id, rollout_index))
+                    if passed is not None:
+                        rollout_grades[rollout_index] = bool(passed)
+                lookup[(split_name, int(sample_id))] = {"rollout_grades": rollout_grades}
+        return lookup, task_kind
     return {}, task_kind
 
 
@@ -297,6 +537,8 @@ def grade_rollout(
     task_kind: str,
     metadata: dict[str, Any] | None,
     completion_text: str,
+    *,
+    rollout_index: int | None = None,
 ) -> int | None:
     if metadata is None:
         return None
@@ -322,6 +564,16 @@ def grade_rollout(
                 str(metadata["gold_answer"]),
             )
         )
+    if task_kind == "livecodebench_codegen":
+        if rollout_index is None:
+            return None
+        rollout_grades = metadata.get("rollout_grades")
+        if not isinstance(rollout_grades, dict):
+            return None
+        passed = rollout_grades.get(int(rollout_index))
+        if passed is None:
+            return None
+        return int(bool(passed))
     return None
 
 
@@ -769,14 +1021,28 @@ def main() -> None:
         row["cluster_id"] = int(cluster_id)
         del row["vector"]
 
+    prompt_profile_files = manifest.get("prompt_profile_files")
+    if not isinstance(prompt_profile_files, dict):
+        raise SystemExit(
+            "Prompt-profile projection export requires manifest.prompt_profile_files. "
+            "Rebuilt datasets without compatible prompt-profile diagnostics cannot be "
+            "exported with this script."
+        )
+    prompt_rollout_archive_file = manifest.get("prompt_rollout_archive_file")
+    if not isinstance(prompt_rollout_archive_file, str) or not prompt_rollout_archive_file:
+        raise SystemExit(
+            "Prompt-profile projection export requires manifest.prompt_rollout_archive_file. "
+            "Rebuilt datasets without compatible prompt-profile diagnostics cannot be "
+            "exported with this script."
+        )
     prompt_profile_rows = (
-        read_jsonl(data_dir / manifest["prompt_profile_files"]["train"])
-        + read_jsonl(data_dir / manifest["prompt_profile_files"]["test"])
+        read_jsonl(data_dir / prompt_profile_files["train"])
+        + read_jsonl(data_dir / prompt_profile_files["test"])
     )
     prompt_profile_lookup = {
         (str(row["split"]), int(row["sample_id"])): row for row in prompt_profile_rows
     }
-    archive_rows = read_jsonl(data_dir / manifest["prompt_rollout_archive_file"])
+    archive_rows = read_jsonl(data_dir / prompt_rollout_archive_file)
     archive_lookup = {
         (str(row["split"]), int(row["sample_id"])): row for row in archive_rows
     }
@@ -787,6 +1053,7 @@ def main() -> None:
     correctness_lookup, task_kind = build_correctness_lookup(
         manifest,
         sample_keys=sample_key_set,
+        archive_lookup=archive_lookup,
         args=args,
     )
 
@@ -822,6 +1089,7 @@ def main() -> None:
                 task_kind,
                 sample_meta,
                 str(rollout["completion_text"]),
+                rollout_index=int(rollout["rollout_index"]),
             )
             if correct_flag is not None:
                 correct_flags.append(int(correct_flag))
@@ -856,6 +1124,7 @@ def main() -> None:
             ),
         }
 
+        row["graded_rollout_count"] = int(len(correct_flags))
         if correct_flags:
             correct_values = np.array(correct_flags, dtype=int)
             row["correct_rate"] = float(np.mean(correct_values))
@@ -913,6 +1182,7 @@ def main() -> None:
         "majority_finish_reason_length",
         "correct_rate",
         "majority_correct",
+        "graded_rollout_count",
         *threshold_fields,
         "rollout_count",
         "prompt_preview",
@@ -1031,8 +1301,15 @@ def main() -> None:
             ),
             "mean_correct_rate": (
                 None
-                if any(row["correct_rate"] == "" for row in prompt_rows)
-                else float(np.mean([float(row["correct_rate"]) for row in prompt_rows]))
+                if sum(int(row["graded_rollout_count"]) for row in prompt_rows) <= 0
+                else float(
+                    sum(
+                        float(row["correct_rate"]) * int(row["graded_rollout_count"])
+                        for row in prompt_rows
+                        if row["correct_rate"] != ""
+                    )
+                    / sum(int(row["graded_rollout_count"]) for row in prompt_rows)
+                )
             ),
         },
         "binary_label_alignment": binary_metrics,

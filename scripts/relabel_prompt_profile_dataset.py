@@ -18,6 +18,7 @@ if SRC not in sys.path:
     sys.path.insert(0, SRC)
 
 from loop_probe.dataloader import ActivationDataset, read_manifest, resolve_feature_key
+from loop_probe.labeling import cap_hit_from_finish_reason
 from loop_probe.serialization import save_split_shards, write_manifest
 
 TARGET_KIND_CHOICES = ("binary", "probability", "regression")
@@ -46,7 +47,7 @@ def _parse_args() -> argparse.Namespace:
         choices=PROFILE_TARGET_CHOICES,
         default=None,
     )
-    parser.add_argument("--profile-tail-threshold", type=float, default=0.9)
+    parser.add_argument("--profile-tail-threshold", type=float, default=0.5)
     parser.add_argument(
         "--balance-train",
         choices=BALANCE_CHOICES,
@@ -312,13 +313,17 @@ def _profile_from_archive_row(
             raise SystemExit("Archive rollout entry must be an object.")
         length = int(rollout["length"])
         relative_length = float(rollout.get("relative_length", length / effective_max_tokens))
-        cap_hit = int(rollout.get("cap_hit", int(length >= effective_max_tokens)))
+        finish_reason = rollout.get("finish_reason")
+        cap_hit = cap_hit_from_finish_reason(
+            finish_reason if isinstance(finish_reason, str) else None,
+            length=length,
+            effective_max_tokens=effective_max_tokens,
+        )
         first_loop_prefix = rollout.get("first_loop_prefix_length")
         if first_loop_prefix is not None:
             first_loop_prefix = int(first_loop_prefix)
         loop_flag = int(rollout.get("loop_flag", int(first_loop_prefix is not None)))
         tail_hit = int(relative_length >= tail_threshold)
-        finish_reason = rollout.get("finish_reason")
 
         lengths.append(length)
         relative_lengths.append(relative_length)
@@ -551,6 +556,20 @@ def main() -> None:
     base_test_dataset = ActivationDataset(source_dir, "test", feature_key=default_feature_key)
     train_sample_ids = [int(x) for x in base_train_dataset.sample_ids.tolist()]
     test_sample_ids = [int(x) for x in base_test_dataset.sample_ids.tolist()]
+    archive_train_sample_ids = {
+        sample_id for (split_name, sample_id) in archive_index.keys() if split_name == "train"
+    }
+    archive_test_sample_ids = {
+        sample_id for (split_name, sample_id) in archive_index.keys() if split_name == "test"
+    }
+    missing_train_ids = sorted(set(train_sample_ids) - archive_train_sample_ids)
+    missing_test_ids = sorted(set(test_sample_ids) - archive_test_sample_ids)
+    if missing_train_ids or missing_test_ids:
+        raise SystemExit(
+            "Source activation shards reference sample IDs that are missing from the "
+            "prompt rollout archive. Missing train/test sample IDs: "
+            f"{missing_train_ids[:10]} / {missing_test_ids[:10]}"
+        )
 
     train_labels, train_profile_rows, train_archive_rows = _rows_for_split(
         "train",
