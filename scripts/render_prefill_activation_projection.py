@@ -121,6 +121,22 @@ def style_axes(
     ax.grid(alpha=0.18, linewidth=0.6)
 
 
+def pc_axis_labels(summary: dict[str, Any]) -> tuple[str, str]:
+    explained = summary.get("explained_variance_ratio")
+    if not isinstance(explained, list):
+        explained = []
+
+    def _label(name: str, idx: int) -> str:
+        if idx >= len(explained):
+            return name
+        try:
+            return f"{name} ({float(explained[idx]) * 100:.1f}% var)"
+        except (TypeError, ValueError):
+            return name
+
+    return _label("PC1", 0), _label("PC2", 1)
+
+
 def render_prompt_panels(
     prompt_rows: list[dict[str, Any]],
     summary: dict[str, Any],
@@ -136,8 +152,7 @@ def render_prompt_panels(
     else:
         metrics.append(("target_value", "Target Value", "plasma"))
 
-    x_label = f"PC1 ({summary['explained_variance_ratio'][0] * 100:.1f}% var)"
-    y_label = f"PC2 ({summary['explained_variance_ratio'][1] * 100:.1f}% var)"
+    x_label, y_label = pc_axis_labels(summary)
     xlim, ylim = compute_limits(prompt_rows)
 
     fig, axes = plt.subplots(2, 2, figsize=(12.5, 10.0))
@@ -289,8 +304,7 @@ def render_rollout_panels(
     *,
     jitter_scale_fraction: float,
 ) -> None:
-    x_label = f"PC1 ({summary['explained_variance_ratio'][0] * 100:.1f}% var)"
-    y_label = f"PC2 ({summary['explained_variance_ratio'][1] * 100:.1f}% var)"
+    x_label, y_label = pc_axis_labels(summary)
     xlim, ylim = compute_limits(rollout_rows)
     base_scale = min(xlim[1] - xlim[0], ylim[1] - ylim[0]) * jitter_scale_fraction
     jittered_rows = add_rollout_jitter(rollout_rows, scale=base_scale)

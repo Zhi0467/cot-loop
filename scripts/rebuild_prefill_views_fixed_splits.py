@@ -10,6 +10,7 @@ import random
 import re
 import shutil
 import sys
+import zlib
 
 import torch
 
@@ -27,7 +28,11 @@ from loop_probe.prefill import (
 )
 from loop_probe.labeling import PROMPT_PROFILE_TARGET_CHOICES
 from loop_probe.serialization import save_split_shards, write_manifest
-from loop_probe.adapters import multiple_choice_gpqa, multiple_choice_mmlupro
+from loop_probe.adapters import (
+    livecodebench_codegen,
+    multiple_choice_gpqa,
+    multiple_choice_mmlupro,
+)
 from loop_probe.types import SampleRecord
 from utils import build_prompt
 
@@ -270,6 +275,115 @@ def _rows_by_sample_id(pool_rows: list[dict[str, object]]) -> dict[int, dict[str
     return lookup
 
 
+def _normalize_livecodebench_split(raw_split: object) -> str:
+    normalized = str(raw_split).strip().lower()
+    if normalized not in ("", "all", "train", "validation", "val", "test"):
+        raise SystemExit(
+            "Unsupported LiveCodeBench split "
+            f"'{raw_split}'. Use one of train/validation/test/all."
+        )
+    return normalized
+
+
+def _partition_livecodebench_benchmark(benchmark, raw_split: object):
+    normalized_split = _normalize_livecodebench_split(raw_split)
+    if normalized_split in ("", "all"):
+        return benchmark
+
+    def _partition_bucket(question_id: object) -> int:
+        return zlib.crc32(str(question_id).encode("utf-8")) % 10
+
+    if normalized_split == "train":
+        return [row for row in benchmark if _partition_bucket(row.question_id) < 8]
+    if normalized_split in ("validation", "val"):
+        return [row for row in benchmark if _partition_bucket(row.question_id) == 8]
+    return [row for row in benchmark if _partition_bucket(row.question_id) == 9]
+
+
+def _reference_split_spec(
+    reference_manifest: dict[str, object],
+    *,
+    split: str,
+) -> dict[str, object]:
+    spec_payload = reference_manifest.get(f"{split}_spec")
+    if isinstance(spec_payload, dict):
+        return spec_payload
+    if split == "test":
+        fallback = reference_manifest.get("train_spec")
+        if isinstance(fallback, dict):
+            fallback_payload = dict(fallback)
+            fallback_payload["split"] = "test"
+            return fallback_payload
+    raise SystemExit(f"Reference manifest is missing a usable {split}_spec payload.")
+
+
+def _build_livecodebench_prompt_lookup(
+    *,
+    reference_manifest: dict[str, object],
+    split: str,
+    model_id: str,
+) -> dict[int, str]:
+    task_loader_config = reference_manifest.get("task_loader_config")
+    if not isinstance(task_loader_config, dict):
+        raise SystemExit(
+            "LiveCodeBench fixed-split rebuild requires task_loader_config in the "
+            "reference manifest."
+        )
+    repo_path = str(task_loader_config.get("livecodebench_repo", "")).strip()
+    if not repo_path:
+        raise SystemExit(
+            "LiveCodeBench fixed-split rebuild requires "
+            "task_loader_config.livecodebench_repo in the reference manifest."
+        )
+    default_release_version = str(
+        task_loader_config.get("release_version", "")
+    ).strip()
+    if not default_release_version:
+        raise SystemExit(
+            "LiveCodeBench fixed-split rebuild requires "
+            "task_loader_config.release_version in the reference manifest."
+        )
+    lm_style_override_raw = task_loader_config.get("lm_style_override")
+    lm_style_override = (
+        None
+        if lm_style_override_raw in (None, "")
+        else str(lm_style_override_raw)
+    )
+
+    split_spec = _reference_split_spec(reference_manifest, split=split)
+    effective_release_version = (
+        str(split_spec.get("config", "")).strip() or default_release_version
+    )
+    benchmark, format_prompt = livecodebench_codegen.load_benchmark(
+        repo_path,
+        effective_release_version,
+    )
+    benchmark = _partition_livecodebench_benchmark(
+        benchmark,
+        split_spec.get("split", split),
+    )
+    max_samples_raw = split_spec.get("max_samples")
+    if max_samples_raw in (None, ""):
+        max_samples = None
+    else:
+        try:
+            max_samples = int(max_samples_raw)
+        except Exception as exc:
+            raise SystemExit(
+                "LiveCodeBench fixed-split rebuild requires an integer max_samples "
+                f"in the reference manifest, got {max_samples_raw!r}."
+            ) from exc
+    prompt_records, _lm_style = livecodebench_codegen.build_prompts(
+        benchmark,
+        format_prompt,
+        repo_path=repo_path,
+        model_id=model_id,
+        lm_style_override=lm_style_override,
+        max_samples=max_samples,
+    )
+    return {idx: prompt for idx, (_question_id, prompt) in enumerate(prompt_records)}
+
+
 def _load_reference_manifest(reference_data_dir: str) -> dict[str, object]:
     manifest_path = os.path.join(reference_data_dir, "manifest.json")
     with open(manifest_path, "r", encoding="utf-8") as f:
@@ -365,6 +479,7 @@ def _build_records(
     tokenizer,
     num_repetition: int,
     split: str,
+    livecodebench_prompt_lookup: dict[int, str] | None = None,
 ) -> list[SampleRecord]:
     records = []
     for sample_id in sample_ids.tolist():
@@ -376,15 +491,10 @@ def _build_records(
             )
         if task_kind == "multiple_choice_gpqa":
             prompt = row.get("Question")
-        elif task_kind == "multiple_choice_mmlupro":
-            prompt = row.get("question")
-        else:
-            prompt = row.get(prompt_field)
-        if not isinstance(prompt, str):
-            raise SystemExit(
-                f"Prompt field '{prompt_field}' missing/invalid for sample_id={sample_id_int}"
-            )
-        if task_kind == "multiple_choice_gpqa":
+            if not isinstance(prompt, str):
+                raise SystemExit(
+                    f"Prompt field 'Question' missing/invalid for sample_id={sample_id_int}"
+                )
             if num_repetition != 1:
                 raise SystemExit(
                     "GPQA prompt formatting does not support num_repetition != 1."
@@ -411,6 +521,11 @@ def _build_records(
                 [option for option, _ in shuffled],
             )
         elif task_kind == "multiple_choice_mmlupro":
+            prompt = row.get("question")
+            if not isinstance(prompt, str):
+                raise SystemExit(
+                    f"Prompt field 'question' missing/invalid for sample_id={sample_id_int}"
+                )
             if num_repetition != 1:
                 raise SystemExit(
                     "MMLU-Pro prompt formatting does not support num_repetition != 1."
@@ -433,13 +548,28 @@ def _build_records(
                 [str(option) for option in options],
             )
         elif task_kind == "math_freeform":
+            prompt = row.get(prompt_field)
+            if not isinstance(prompt, str):
+                raise SystemExit(
+                    f"Prompt field '{prompt_field}' missing/invalid for sample_id={sample_id_int}"
+                )
             prompt_text = build_prompt(tokenizer, prompt, num_repetition)
         elif task_kind == "livecodebench_codegen":
             if num_repetition != 1:
                 raise SystemExit(
                     "LiveCodeBench prompt formatting does not support num_repetition != 1."
                 )
-            prompt_text = prompt
+            if livecodebench_prompt_lookup is None:
+                raise SystemExit(
+                    "LiveCodeBench fixed-split rebuild requires a prompt lookup "
+                    "built from the original formatter."
+                )
+            prompt_text = livecodebench_prompt_lookup.get(sample_id_int)
+            if not isinstance(prompt_text, str):
+                raise SystemExit(
+                    "LiveCodeBench prompt lookup is missing "
+                    f"sample_id={sample_id_int}."
+                )
         else:
             raise SystemExit(
                 "Fixed-split rebuild currently supports task_kind in "
@@ -612,6 +742,13 @@ def main() -> None:
             if split == "train"
             else eval_pool_rows_by_sample_id
         )
+        livecodebench_prompt_lookup = None
+        if task_kind == "livecodebench_codegen":
+            livecodebench_prompt_lookup = _build_livecodebench_prompt_lookup(
+                reference_manifest=reference_manifest,
+                split=split,
+                model_id=model_id,
+            )
         records = _build_records(
             pool_rows_by_sample_id=pool_rows_by_sample_id,
             sample_ids=sample_ids,
@@ -621,6 +758,7 @@ def main() -> None:
             tokenizer=tokenizer,
             num_repetition=num_repetition,
             split=split,
+            livecodebench_prompt_lookup=livecodebench_prompt_lookup,
         )
         records_by_split[split] = records
         features_by_key = extract_prefill_features_multi(

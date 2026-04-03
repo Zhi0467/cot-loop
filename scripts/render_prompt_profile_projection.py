@@ -113,6 +113,22 @@ def style_axes(
     ax.grid(alpha=0.18, linewidth=0.6)
 
 
+def pc_axis_labels(summary: dict[str, Any]) -> tuple[str, str]:
+    explained = summary.get("explained_variance_ratio")
+    if not isinstance(explained, list):
+        explained = []
+
+    def _label(name: str, idx: int) -> str:
+        if idx >= len(explained):
+            return name
+        try:
+            return f"{name} ({float(explained[idx]) * 100:.1f}% var)"
+        except (TypeError, ValueError):
+            return name
+
+    return _label("PC1", 0), _label("PC2", 1)
+
+
 def figure_grid(num_panels: int, *, max_cols: int = 3) -> tuple[int, int]:
     cols = min(max_cols, max(1, num_panels))
     rows = math.ceil(num_panels / cols)
@@ -233,8 +249,7 @@ def render_binary_panels(
     fig, axes = plt.subplots(rows_n, cols_n, figsize=(4.6 * cols_n, 4.3 * rows_n))
     axes_arr = np.array(axes, dtype=object).reshape(rows_n, cols_n)
 
-    x_label = f"PC1 ({summary['explained_variance_ratio'][0] * 100:.1f}% var)"
-    y_label = f"PC2 ({summary['explained_variance_ratio'][1] * 100:.1f}% var)"
+    x_label, y_label = pc_axis_labels(summary)
     xlim, ylim = compute_limits(rows)
 
     color_cycle = {
@@ -326,8 +341,7 @@ def render_continuous_panels(
     fig, axes = plt.subplots(rows_n, cols_n, figsize=(4.9 * cols_n, 4.3 * rows_n))
     axes_arr = np.array(axes, dtype=object).reshape(rows_n, cols_n)
 
-    x_label = f"PC1 ({summary['explained_variance_ratio'][0] * 100:.1f}% var)"
-    y_label = f"PC2 ({summary['explained_variance_ratio'][1] * 100:.1f}% var)"
+    x_label, y_label = pc_axis_labels(summary)
     xlim, ylim = compute_limits(rows)
 
     flat_axes = list(axes_arr.flat)

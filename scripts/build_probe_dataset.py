@@ -442,12 +442,17 @@ def _prompt_token_lengths(tokenizer, records: list[SampleRecord]) -> list[int]:
     return [len(token_ids) for token_ids in _prompt_token_ids(tokenizer, records)]
 
 
-def _prompt_token_ids(tokenizer, records: list[SampleRecord]) -> list[list[int]]:
+def _prompt_token_ids(
+    tokenizer,
+    records: list[SampleRecord],
+    *,
+    add_special_tokens: bool = True,
+) -> list[list[int]]:
     if not records:
         return []
     encoded = tokenizer(
         [rec.prompt for rec in records],
-        add_special_tokens=False,
+        add_special_tokens=add_special_tokens,
     )["input_ids"]
     if len(encoded) != len(records):
         raise RuntimeError(
@@ -625,7 +630,7 @@ def _same_task_source(
             same_path = os.path.samefile(a.dataset, b.dataset)
         except OSError:
             same_path = os.path.abspath(a.dataset) == os.path.abspath(b.dataset)
-        return same_path and a.config == b.config and a.split == b.split
+        return same_path and a.config == b.config
     return _same_data_source(a, b)
 
 
@@ -640,6 +645,14 @@ def _with_max_samples(spec: DatasetSpec, max_samples: int | None) -> DatasetSpec
 
 def _split_source_uses_ratio(split_source: str) -> bool:
     return split_source in RATIO_SPLIT_SOURCES
+
+
+def _uses_native_test_split(task_kind: str) -> bool:
+    return task_kind in {
+        "multiple_choice_gpqa",
+        "multiple_choice_mmlupro",
+        "livecodebench_codegen",
+    }
 
 
 def _make_specs(args: argparse.Namespace) -> tuple[DatasetSpec, DatasetSpec | None]:
@@ -659,19 +672,6 @@ def _make_specs(args: argparse.Namespace) -> tuple[DatasetSpec, DatasetSpec | No
             max_samples=args.test_max_samples,
         )
 
-    if (
-        args.task_kind == "livecodebench_codegen"
-        and args.test_split is None
-        and args.test_config is None
-        and args.test_max_samples is None
-    ):
-        return train_spec, DatasetSpec(
-            dataset=args.train_dataset,
-            config=args.train_config,
-            split="test",
-            max_samples=None,
-        )
-
     if args.task_kind != "math_freeform":
         explicit_test_split = (
             args.test_split is not None
@@ -686,6 +686,15 @@ def _make_specs(args: argparse.Namespace) -> tuple[DatasetSpec, DatasetSpec | No
                 else args.train_config,
                 split=test_split,
                 max_samples=args.test_max_samples,
+            )
+        if _uses_native_test_split(str(args.task_kind)) and not os.path.isfile(
+            args.train_dataset
+        ):
+            return train_spec, DatasetSpec(
+                dataset=args.train_dataset,
+                config=args.train_config,
+                split="test",
+                max_samples=None,
             )
         return train_spec, None
 
