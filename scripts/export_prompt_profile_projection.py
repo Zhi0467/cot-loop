@@ -124,14 +124,39 @@ def write_csv(path: Path, fieldnames: list[str], rows: list[dict[str, Any]]) -> 
             writer.writerow(row)
 
 
-def resolve_projection_vectors(features: torch.Tensor, projection_view: str) -> np.ndarray:
+FLAT_ALL_LAYER_POOLINGS = {
+    "last_token_all_layers_concat",
+    "last16_all_layers_concat",
+    "last8_prev8_delta_all_layers_concat",
+    "last16_mid16_delta_all_layers_concat",
+    "last16_plus_delta8_all_layers_concat",
+}
+
+
+def resolve_projection_vectors(
+    features: torch.Tensor,
+    projection_view: str,
+    *,
+    saved_pooling: str | None,
+) -> np.ndarray:
     if features.ndim == 2:
-        if projection_view not in {"last_layer", "all_layers_flat"}:
+        if projection_view == "last_layer":
+            return features.float().cpu().numpy()
+        if (
+            projection_view == "all_layers_flat"
+            and saved_pooling in FLAT_ALL_LAYER_POOLINGS
+        ):
+            return features.float().cpu().numpy()
+        if projection_view == "all_layers_flat":
             raise SystemExit(
-                f"--projection-view={projection_view!r} requires stacked [layer, hidden] "
-                "features, but the loaded shards are already flat."
+                "--projection-view='all_layers_flat' requires either stacked "
+                "[layer, hidden] features or a saved all-layer concat view, but "
+                f"the loaded shards are flat with pooling={saved_pooling!r}."
             )
-        return features.float().cpu().numpy()
+        raise SystemExit(
+            f"--projection-view={projection_view!r} requires stacked [layer, hidden] "
+            "features, but the loaded shards are already flat."
+        )
     if features.ndim != 3:
         raise SystemExit(
             "Expected rank-2 or rank-3 feature tensor, "
@@ -168,12 +193,18 @@ def load_split_features(
     split_name: str,
     split_meta: dict[str, Any],
     projection_view: str,
+    *,
+    saved_pooling: str | None,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for rel_path in split_meta["shards"]:
         shard_path = data_dir / rel_path
         shard = torch.load(shard_path, map_location="cpu")
-        vectors = resolve_projection_vectors(shard["x"], projection_view)
+        vectors = resolve_projection_vectors(
+            shard["x"],
+            projection_view,
+            saved_pooling=saved_pooling,
+        )
         sample_ids = shard["sample_ids"].tolist()
         targets = shard["y"].tolist()
         for sample_id, target_value, vector in zip(sample_ids, targets, vectors):
@@ -991,6 +1022,21 @@ def main() -> None:
     out_dir = Path(args.out_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
     manifest = read_json(data_dir / "manifest.json")
+    feature_views = manifest.get("feature_views")
+    default_feature_key = manifest.get("default_feature_key")
+    saved_pooling: str | None = None
+    if isinstance(feature_views, dict) and isinstance(default_feature_key, str):
+        feature_info = feature_views.get(default_feature_key)
+        if isinstance(feature_info, dict):
+            pooling = feature_info.get("pooling")
+            if isinstance(pooling, str) and pooling:
+                saved_pooling = pooling
+    if saved_pooling is None:
+        feature_extraction = manifest.get("feature_extraction")
+        if isinstance(feature_extraction, dict):
+            pooling = feature_extraction.get("pooling")
+            if isinstance(pooling, str) and pooling:
+                saved_pooling = pooling
 
     thresholds = sorted({float(x) for x in args.tail_thresholds})
     if not thresholds:
@@ -1002,12 +1048,14 @@ def main() -> None:
             "train",
             manifest["train"],
             args.projection_view,
+            saved_pooling=saved_pooling,
         )
         + load_split_features(
             data_dir,
             "test",
             manifest["test"],
             args.projection_view,
+            saved_pooling=saved_pooling,
         )
     )
     if not feature_rows:
