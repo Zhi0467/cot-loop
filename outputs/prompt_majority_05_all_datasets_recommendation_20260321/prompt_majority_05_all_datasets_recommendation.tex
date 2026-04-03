@@ -1,0 +1,76 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+
+\title{Prompt-Majority $0.5$ Pilot Recommendation Across Datasets}
+\author{}
+\date{2026-03-21 23:54 UTC}
+
+\begin{document}
+\maketitle
+
+\section*{Bottom line}
+Use one prompt-level binary-majority predictor family across all five datasets, with threshold $0.5$ and $n=4$ rollouts per prompt:
+\[
+Y_{0.5} = \mathbf{1}\!\left[\sum_{r=1}^{4} \mathbf{1}[L_r / E \ge 0.5] > 2 \right].
+\]
+Keep the input surface unchanged on the current builder: one prefill activation vector from the last prompt token. Compare only the two probe surfaces already in the project:
+\begin{itemize}[leftmargin=1.5em]
+\item last-layer MLP;
+\item per-layer MLP with majority vote.
+\end{itemize}
+
+\section*{Implementation boundary}
+``Average the activations of the $n$ rollouts'' is still a no-op on the current prompt-profile path. Prefill activations are extracted once per prompt before sampling, so the four rollout prefill tensors are identical copies. On the current code path, this experiment is still one prompt-level feature vector mapped to one prompt-level terminal label.
+
+If we later want genuinely different rollout-conditioned activations, that is a different extractor after sampling begins, not a tweak to the present prefill builder.
+
+\section*{Why pilot all five datasets}
+The shared rollout-stat bundle already shows that the datasets live in clearly different long-tail regimes under the same decode policy:
+
+\begin{center}
+\begin{tabular}{lrr}
+\toprule
+Dataset & Loop rate & Max-length-hit rate \\
+\midrule
+GPQA & 16.4\% & 6.9\% \\
+AIME & 15.0\% & 12.7\% \\
+LiveCodeBench & 15.0\% & 10.8\% \\
+MMLU-Pro & 4.6\% & 0.9\% \\
+MATH-500 & 2.9\% & 1.5\% \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+So a five-dataset pilot is useful now, but the results should be read as separate per-dataset behaviors rather than pooled into one global score. The first three datasets are the likely positive-heavy regime; MMLU-Pro and MATH-500 are lower-tail controls.
+
+\section*{Exact run recipe}
+\begin{itemize}[leftmargin=1.5em]
+\item Decode policy: temperature $0.2$, $n=4$, max\_tokens $30000$, fixed max\_model\_len.
+\item Input: last-prompt-token prefill activation only.
+\item Label: rollout labels $y_r = \mathbf{1}[L_r / E \ge 0.5]$, then prompt-majority label $Y_{0.5} = \mathbf{1}[\sum_r y_r > 2]$.
+\item Split rule: prompt-disjoint only.
+\item Metrics: PR-AUC first, then ROC-AUC, macro-F1, positive precision/recall, prevalence.
+\item Baselines: prompt-length-only and effective-budget-only controls.
+\item Archive retention: per-rollout relative length, cap-hit, loop flag, and correctness so later relabeling does not require rerollout.
+\end{itemize}
+
+Recommended prompt budgets for the first all-dataset pass:
+\begin{itemize}[leftmargin=1.5em]
+\item GPQA: use the full 198-prompt set with a prompt-disjoint split, e.g. 158/40.
+\item AIME: use the full 60-prompt set, but report multiple split seeds or fold averages because a single 48/12 split will still be noisy.
+\item MATH-500: 400/100.
+\item MMLU-Pro: 640/160 from the current 800-prompt cap.
+\item LiveCodeBench: 640/160 from the current 800-prompt cap.
+\end{itemize}
+
+\section*{Interpretation}
+This pilot is no longer trying to prove that one threshold is universally correct. It is trying to answer a narrower question: with a fixed prompt-level prefill surface and a common binary-majority head, which datasets expose useful prompt-time signal and which collapse into near-all-negative control regimes?
+
+That is the right next step after the GPQA-only checks. The exact GPQA archive showed that majority labels at $0.6$ were still too sparse; moving the family default to $0.5$ and widening the pilot across datasets is the cleaner next read.
+
+\end{document}

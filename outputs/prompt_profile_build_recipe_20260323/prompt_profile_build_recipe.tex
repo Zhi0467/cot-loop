@@ -1,0 +1,143 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+
+\title{Prompt-Profile Build Recipe}
+\author{}
+\date{2026-03-23 06:42 UTC}
+
+\begin{document}
+\maketitle
+
+\section*{Bottom line}
+Treat the next prompt-prefill predictor as a prompt-level terminal-statistics model,
+not as another thresholded loop classifier.
+
+\begin{itemize}[leftmargin=1.5em]
+\item If exactly one head ships, ship \texttt{mean\_relative\_length = E[L / E]}.
+\item The default bundle should still include \texttt{p\_loop} as the cleaner
+failure-prox companion head.
+\item Use the per-layer ensemble with late aggregation as the default readout.
+\item Ship the ranking-oriented checkpoint (\texttt{best\_rank}), not the loss-best checkpoint.
+\end{itemize}
+
+\section*{Why this is the right current default}
+The finished direct-head table already separates the ``useful'' scalar from the
+``cleaner failure'' scalar:
+
+\begin{itemize}[leftmargin=1.5em]
+\item \textbf{\texttt{mean\_relative\_length}} is the strongest and steadiest head on the
+finished same-archive runs:
+  \begin{itemize}[leftmargin=1.5em]
+  \item \texttt{GPQA}: Spearman \texttt{0.649}
+  \item \texttt{AIME}: Spearman \texttt{0.769} at \texttt{best\_loss}, \texttt{0.853} at \texttt{best\_rank}
+  \item \texttt{MATH-500}: Spearman \texttt{0.716}
+  \item \texttt{MMLU-Pro}: Spearman \texttt{0.303}
+  \end{itemize}
+\item \textbf{\texttt{p\_loop}} stays worth training because it is more failure-proximal and
+less prompt-length-shaped on the heavier-tail slices:
+  \begin{itemize}[leftmargin=1.5em]
+  \item \texttt{GPQA}: Spearman \texttt{0.371}, top-\texttt{20\%} capture \texttt{0.318}
+  \item \texttt{AIME}: Spearman \texttt{0.475}, top-\texttt{20\%} capture \texttt{0.8}
+  \item \texttt{MMLU-Pro}: Spearman \texttt{0.335}, top-\texttt{20\%} capture \texttt{0.652}
+  \end{itemize}
+\item \textbf{\texttt{loop\_budget\_share}} did not survive the lower-tail controls cleanly
+enough to replace the current bundle.
+\item \textbf{\texttt{majority\_s\_t}} remains control-only: on \texttt{AIME}, prompt length
+alone already gets \texttt{PR-AUC 0.898} for \texttt{majority\_s\_0.5}.
+\end{itemize}
+
+That leaves a simple practical split:
+\begin{itemize}[leftmargin=1.5em]
+\item \texttt{mean\_relative\_length}: use when the requirement is ``be useful''.
+\item \texttt{p\_loop}: keep in the bundle so the system still scores something close to the
+actual failure event.
+\end{itemize}
+
+\section*{Exact next-build recipe}
+\textbf{Inputs}
+\begin{itemize}[leftmargin=1.5em]
+\item prompt-prefill activations only;
+\item one selected layer or per-layer independent heads with late aggregation;
+\item do \textbf{not} go back to stacking all layers into one vector as the main surface.
+\end{itemize}
+
+\textbf{Decode policy}
+\begin{itemize}[leftmargin=1.5em]
+\item fixed \texttt{temperature = 0.2};
+\item fixed \texttt{num\_generations};
+\item fixed \texttt{max\_tokens} and \texttt{max\_model\_len};
+\item prompt-disjoint, in-distribution train/test split.
+\end{itemize}
+
+\textbf{Targets}
+\begin{enumerate}[leftmargin=1.5em]
+\item Build one repeated-rollout archive per prompt.
+\item Relabel it to:
+  \begin{itemize}[leftmargin=1.5em]
+  \item \texttt{--target-kind regression --profile-target mean\_relative\_length}
+  \item \texttt{--target-kind probability --profile-target p\_loop}
+  \end{itemize}
+\item Train the ensemble view by default and keep last-layer as the cheap control.
+\end{enumerate}
+
+\textbf{Checkpointing}
+\begin{itemize}[leftmargin=1.5em]
+\item keep \texttt{best\_loss} for calibration-style reporting;
+\item ship \texttt{best\_rank} for utility-facing prompt ranking.
+\end{itemize}
+
+\section*{Required baselines and success criteria}
+Every run now needs three non-activation baselines:
+\begin{itemize}[leftmargin=1.5em]
+\item \texttt{prompt\_length} only;
+\item \texttt{effective\_budget} only;
+\item joint \texttt{prompt\_length + effective\_budget}.
+\end{itemize}
+
+The acceptance rule is not ``beat one scalar baseline on one metric.''
+
+\begin{itemize}[leftmargin=1.5em]
+\item For \texttt{mean\_relative\_length}, usefulness means:
+  \begin{itemize}[leftmargin=1.5em]
+  \item primary metric: held-out prompt Spearman;
+  \item secondary metric: top-\texttt{20\%} capture of the bad tail;
+  \item guardrail: MSE.
+  \end{itemize}
+\item For \texttt{p\_loop}, usefulness means:
+  \begin{itemize}[leftmargin=1.5em]
+  \item primary metric: top-\texttt{20\%} capture of looping prompts;
+  \item secondary metric: Spearman against empirical \texttt{p\_loop};
+  \item guardrail: Brier.
+  \end{itemize}
+\end{itemize}
+
+Do not call a head useful unless it beats the strongest non-degenerate baseline on
+its primary ranking metric.
+
+\section*{What to de-prioritize now}
+\begin{itemize}[leftmargin=1.5em]
+\item \texttt{majority\_s\_t} as a shipped objective: too leakage-shaped.
+\item \texttt{loop\_budget\_share} as the default scalar: too brittle outside the heavy tail.
+\item arbitrary threshold hunting over \texttt{s\_t}: it throws away information and
+invites length leakage.
+\item stacked-all-layer features as the main readout surface.
+\item loss-only checkpoint selection as the default ship criterion.
+\end{itemize}
+
+\section*{One fallback if LiveCodeBench contradicts the current ordering}
+If the unfinished \texttt{LiveCodeBench} lane comes back badly enough that one more
+binary head needs to be reopened, test direct \texttt{p\_cap} next.
+
+Do \textbf{not} reopen another thresholded \texttt{s\_t} sweep or promote
+\texttt{loop\_budget\_share} ahead of that.
+
+\end{document}

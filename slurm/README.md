@@ -7,6 +7,7 @@ This directory contains SLURM workflows for the CoT loop detector project.
 - `run_vllm_generate.sbatch`: Generate trajectories used for loop-label collection and detector analysis.
 - `analyze_prefill_stability.sbatch`: Prefill-loop sanity check and stability checks with greedy rollouts.
 - `run_probe_train_e2e.sbatch`: End-to-end probe pipeline for the canonical stacked prefill dataset (build + probe training, including optional multi-seed runs).
+- `run_prompt_profile_projection.sbatch`: One-GPU prompt-profile visualization path (build + prompt-level projection export, with optional render when `matplotlib` is available).
 - `run_k5_threeview_dataset.sbatch`: Historical multi-view dataset build for the k=5 / max_tokens=15000 ablation study.
 - `run_k5_threeview_ablation.sbatch`: Historical MLP sweep over the k=5 three-view ablation dataset.
 
@@ -17,8 +18,18 @@ This directory contains SLURM workflows for the CoT loop detector project.
 - `#SBATCH --gres=gpu:8` (job requests 8 GPUs by default)
 - rollout `tp/dp` comes from `src/loop_probe/configs.py` preset defaults
 - optional rollout concurrency override: `MAX_NUM_SEQS=...`
+- explicit rollout/runtime overrides: `MODEL_ID=...`, `TEMPERATURE=...`, `TP=...`, `DP=...`, `MAX_MODEL_LEN=...`, `MAX_NUM_BATCHED_TOKENS=...`
+- LiveCodeBench prompt inputs: `LIVECODEBENCH_REPO=...`, `RELEASE_VERSION=release_v6`, optional `LM_STYLE_OVERRIDE=...`
+- optional repeated-rollout override for prompt-level targets: `NUM_GENERATIONS=...`
 - optional prefill throughput override (single GPU): `PREFILL_BATCH_SIZE=...` (default: `32`)
 - optional rollout-completion feature throughput override: `COMPLETION_BATCH_SIZE=...` (default: `1`)
+- task-aware prompt formatting: `TASK_KIND=math_freeform|multiple_choice_gpqa|multiple_choice_mmlupro`
+- prompt-level target controls:
+  - `TARGET_KIND=binary` (legacy loop bit by default, or prompt-majority tail labels with `BINARY_TARGET_MODE=prompt_majority_tail`), `TARGET_KIND=probability` (prompt-level rate target such as `p_loop`, `p_cap`, or `s_t`), or `TARGET_KIND=regression` (prompt-level continuous target)
+  - `BINARY_TARGET_MODE=rollout_label|prompt_majority_tail`
+  - `PROFILE_TAIL_THRESHOLD=0.9` for `s_t` heads
+  - `PROFILE_TARGET=majority_tail` for prompt-majority binary, `PROFILE_TARGET=p_loop|p_cap|s_tail` for prompt-level probability heads, or `PROFILE_TARGET=mean_relative_length` for the dense realized-length regression head
+  - `SCORE_RULE=mean_prob` for non-binary ensembles
 - canonical prefill dataset controls:
   - `FEATURE_POOLING=last_token_all_layers_stack`
   - `FEATURE_LAYER=-1`
@@ -46,6 +57,110 @@ Example: build the default stacked dataset and train an ensemble over all layers
 FEATURE_POOLING=last_token_all_layers_stack \
 TRAIN_EXTRA_ARGS="--classifier-mode ensemble" \
 sbatch slurm/run_probe_train_e2e.sbatch
+```
+
+Example: run the prompt-level `p_loop` GPQA-style path with per-layer ensemble averaging:
+```bash
+MODEL_ID=Qwen/Qwen3-1.7B \
+TASK_KIND=multiple_choice_gpqa \
+TARGET_KIND=probability \
+PROFILE_TARGET=p_loop \
+NUM_GENERATIONS=10 \
+TEMPERATURE=0.2 \
+TRAIN_CONFIG=gpqa_diamond \
+TEST_CONFIG=gpqa_diamond \
+PROMPT_FIELD=Question \
+TRAIN_EXTRA_ARGS="--classifier-mode ensemble" \
+SCORE_RULE=mean_prob \
+sbatch slurm/run_probe_train_e2e.sbatch
+```
+
+Example: run the prompt-level `s_0.9` tail-rate GPQA-style path with per-layer ensemble averaging:
+```bash
+MODEL_ID=Qwen/Qwen3-1.7B \
+TASK_KIND=multiple_choice_gpqa \
+TARGET_KIND=probability \
+PROFILE_TARGET=s_tail \
+PROFILE_TAIL_THRESHOLD=0.9 \
+NUM_GENERATIONS=10 \
+TEMPERATURE=0.2 \
+TRAIN_CONFIG=gpqa_diamond \
+TEST_CONFIG=gpqa_diamond \
+PROMPT_FIELD=Question \
+TRAIN_EXTRA_ARGS="--classifier-mode ensemble" \
+SCORE_RULE=mean_prob \
+sbatch slurm/run_probe_train_e2e.sbatch
+```
+
+Example: run the prompt-majority `majority_s_0.5` GPQA-style path with per-layer majority vote:
+```bash
+MODEL_ID=Qwen/Qwen3-1.7B \
+TASK_KIND=multiple_choice_gpqa \
+TARGET_KIND=binary \
+BINARY_TARGET_MODE=prompt_majority_tail \
+PROFILE_TARGET=majority_tail \
+PROFILE_TAIL_THRESHOLD=0.5 \
+NUM_GENERATIONS=4 \
+TEMPERATURE=0.2 \
+TRAIN_CONFIG=gpqa_diamond \
+TEST_CONFIG=gpqa_diamond \
+PROMPT_FIELD=Question \
+TRAIN_EXTRA_ARGS="--classifier-mode ensemble" \
+SCORE_RULE=vote_fraction \
+sbatch slurm/run_probe_train_e2e.sbatch
+```
+
+Example: run the prompt-level mean-length-fraction regression path:
+```bash
+MODEL_ID=Qwen/Qwen3-1.7B \
+TASK_KIND=multiple_choice_gpqa \
+TARGET_KIND=regression \
+PROFILE_TARGET=mean_relative_length \
+NUM_GENERATIONS=10 \
+TEMPERATURE=0.2 \
+TRAIN_CONFIG=gpqa_diamond \
+TEST_CONFIG=gpqa_diamond \
+PROMPT_FIELD=Question \
+TRAIN_EXTRA_ARGS="--classifier-mode last_layer --classifier-layer -1" \
+SCORE_RULE=mean_prob \
+sbatch slurm/run_probe_train_e2e.sbatch
+```
+
+## Prompt-Level Projection Defaults
+
+`run_prompt_profile_projection.sbatch` defaults to:
+
+- `#SBATCH --gres=gpu:1`
+- prompt-profile build only (no probe training)
+- `PROFILE_TAIL_THRESHOLD=0.5` as the primary saved majority label
+- additional export thresholds `0.5 0.6 0.9`
+- prompt-level projection outputs under `OUT_PROJECTION_DIR/export` and figures under `OUT_PROJECTION_DIR/figures`
+
+Example: build and export the one-dot-per-prompt GPQA view:
+
+```bash
+MODEL_ID=Qwen/Qwen3-1.7B \
+TASK_KIND=multiple_choice_gpqa \
+TRAIN_DATASET=data/gpqa_diamond.csv \
+TEST_DATASET=data/gpqa_diamond.csv \
+TRAIN_SPLIT=train \
+TEST_SPLIT=train \
+TRAIN_MAX_SAMPLES=158 \
+TEST_MAX_SAMPLES=40 \
+PROMPT_FIELD=Question \
+NUM_GENERATIONS=4 \
+TEMPERATURE=0.2 \
+MAX_TOKENS=30000 \
+MAX_MODEL_LEN=40960 \
+TP=1 \
+DP=1 \
+PREFILL_BATCH_SIZE=8 \
+MAX_NUM_SEQS=4 \
+MAX_NUM_BATCHED_TOKENS=1024 \
+OUT_DATA_DIR=outputs/prompt_profile_projection_gpqa/data \
+OUT_PROJECTION_DIR=outputs/prompt_profile_projection_gpqa \
+FIGURE_LABEL=GPQA \
+sbatch slurm/run_prompt_profile_projection.sbatch
 ```
 
 ## Optional Trajectory Generation

@@ -1,10 +1,20 @@
 import multiprocessing as mp
 import os
+from dataclasses import dataclass
 from multiprocessing.connection import wait
 
 from transformers import AutoTokenizer, GenerationConfig
 
 from .configs import RolloutConfig
+
+DEFAULT_GROUPED_MAX_NUM_SEQS = 16
+
+
+@dataclass(frozen=True)
+class GeneratedRollout:
+    token_ids: list[int]
+    text: str
+    finish_reason: str | None
 
 
 def resolve_sampling_defaults(model_id: str) -> tuple[float, int]:
@@ -19,6 +29,17 @@ def resolve_sampling_defaults(model_id: str) -> tuple[float, int]:
     if top_k == 0:
         top_k = -1
     return top_p, top_k
+
+
+def _normalize_finish_reason(reason: object) -> str:
+    if hasattr(reason, "value"):
+        reason = getattr(reason, "value")
+    if reason is None:
+        return "unknown"
+    text = str(reason).strip()
+    if not text:
+        return "unknown"
+    return text.split(".")[-1].lower()
 
 
 def _get_visible_devices() -> list[str]:
@@ -82,13 +103,13 @@ def _suppress_sem_unlink_errors() -> None:
     rt._vllm_rt_patched = True
 
 
-def _generate_rollout_token_ids_single_process(
+def _generate_grouped_rollouts_single_process(
     prompts: list[str],
     cfg: RolloutConfig,
     *,
     seed: int,
     log_prefix: str,
-) -> list[list[int]]:
+) -> list[list[GeneratedRollout]]:
     try:
         from vllm import LLM, SamplingParams
     except Exception as exc:
@@ -100,6 +121,13 @@ def _generate_rollout_token_ids_single_process(
         return []
     if cfg.max_num_seqs is not None and cfg.max_num_seqs < 1:
         raise SystemExit("--max-num-seqs must be >= 1 when provided.")
+    if cfg.num_generations < 1:
+        raise SystemExit("--num-generations must be >= 1.")
+    if cfg.max_num_seqs is not None and cfg.max_num_seqs < cfg.num_generations:
+        raise SystemExit(
+            "--max-num-seqs must be >= --num-generations when repeated rollouts "
+            "are enabled."
+        )
 
     top_p, top_k = resolve_sampling_defaults(cfg.model_id)
 
@@ -135,9 +163,12 @@ def _generate_rollout_token_ids_single_process(
         llm_kwargs["max_num_batched_tokens"] = cfg.max_num_batched_tokens
 
     llm = LLM(**llm_kwargs)
-    all_token_ids: list[list[int]] = []
+    all_rollouts: list[list[GeneratedRollout]] = []
 
-    chunk_size = cfg.max_num_seqs if cfg.max_num_seqs is not None else len(prompts)
+    if cfg.max_num_seqs is not None:
+        chunk_size = max(cfg.max_num_seqs // cfg.num_generations, 1)
+    else:
+        chunk_size = max(DEFAULT_GROUPED_MAX_NUM_SEQS // cfg.num_generations, 1)
     for start in range(0, len(prompts), chunk_size):
         end = min(start + chunk_size, len(prompts))
         batch_prompts = prompts[start:end]
@@ -146,7 +177,7 @@ def _generate_rollout_token_ids_single_process(
             top_p=top_p,
             top_k=top_k,
             max_tokens=cfg.max_tokens,
-            n=1,
+            n=cfg.num_generations,
             repetition_penalty=1.0,
             seed=seed + start,
         )
@@ -158,19 +189,36 @@ def _generate_rollout_token_ids_single_process(
             )
 
         for out in outputs:
-            if len(out.outputs) != 1:
+            if len(out.outputs) != cfg.num_generations:
                 raise RuntimeError(
-                    f"Expected 1 rollout sample per prompt, got {len(out.outputs)}."
+                    "Expected "
+                    f"{cfg.num_generations} rollout sample(s) per prompt, got "
+                    f"{len(out.outputs)}."
                 )
-            sample = out.outputs[0]
-            token_ids = getattr(sample, "token_ids", None)
-            if not token_ids:
-                token_ids = tokenizer.encode(sample.text, add_special_tokens=False)
-            all_token_ids.append(list(token_ids))
+            prompt_rollouts: list[GeneratedRollout] = []
+            for sample in out.outputs:
+                token_ids = getattr(sample, "token_ids", None)
+                if not token_ids:
+                    token_ids = tokenizer.encode(sample.text, add_special_tokens=False)
+                finish_reason = getattr(sample, "finish_reason", None)
+                if finish_reason is None:
+                    finish_reason = getattr(sample, "stop_reason", None)
+                if finish_reason is None:
+                    finish_reason = getattr(out, "finish_reason", None)
+                if finish_reason is None:
+                    finish_reason = getattr(out, "stop_reason", None)
+                prompt_rollouts.append(
+                    GeneratedRollout(
+                        token_ids=list(token_ids),
+                        text=str(sample.text),
+                        finish_reason=_normalize_finish_reason(finish_reason),
+                    )
+                )
+            all_rollouts.append(prompt_rollouts)
 
         print(f"{log_prefix} generated {end}/{len(prompts)}", flush=True)
 
-    return all_token_ids
+    return all_rollouts
 
 
 def _dp_rollout_worker(
@@ -184,27 +232,27 @@ def _dp_rollout_worker(
     _suppress_sem_unlink_errors()
     os.environ["CUDA_VISIBLE_DEVICES"] = device
     prompts = [prompt for _, prompt in shard_items]
-    token_ids = _generate_rollout_token_ids_single_process(
+    grouped_rollouts = _generate_grouped_rollouts_single_process(
         prompts,
         cfg,
         seed=seed + rank * 100_000,
         log_prefix=f"[rollout-dp-rank {rank}]",
     )
-    indexed = [(idx, toks) for (idx, _), toks in zip(shard_items, token_ids)]
+    indexed = [(idx, rollouts) for (idx, _), rollouts in zip(shard_items, grouped_rollouts)]
     out_conn.send((rank, indexed))
     out_conn.close()
 
 
-def generate_rollout_token_ids(
+def generate_grouped_rollouts(
     prompts: list[str],
     cfg: RolloutConfig,
     *,
     seed: int,
-) -> list[list[int]]:
+) -> list[list[GeneratedRollout]]:
     if cfg.dp < 1:
         raise SystemExit("--dp must be >= 1.")
     if cfg.dp == 1:
-        return _generate_rollout_token_ids_single_process(
+        return _generate_grouped_rollouts_single_process(
             prompts,
             cfg,
             seed=seed,
@@ -238,7 +286,7 @@ def generate_rollout_token_ids(
         child_conn.close()
         processes.append(p)
 
-    by_rank: dict[int, list[tuple[int, list[int]]]] = {}
+    by_rank: dict[int, list[tuple[int, list[GeneratedRollout]]]] = {}
     pending = set(conn_to_rank.keys())
     while len(by_rank) < worker_count:
         ready = wait(list(pending), timeout=30)
@@ -289,12 +337,31 @@ def generate_rollout_token_ids(
     if failures:
         raise SystemExit(f"Rollout worker(s) failed: {failures}")
 
-    merged: list[list[int] | None] = [None] * len(prompts)
+    merged: list[list[GeneratedRollout] | None] = [None] * len(prompts)
     for rank in range(worker_count):
-        for idx, toks in by_rank.get(rank, []):
-            merged[idx] = toks
+        for idx, rollouts in by_rank.get(rank, []):
+            merged[idx] = rollouts
 
-    if any(toks is None for toks in merged):
+    if any(rollouts is None for rollouts in merged):
         raise SystemExit("Missing rollout outputs for some prompts.")
 
-    return [toks for toks in merged if toks is not None]
+    return [rollouts for rollouts in merged if rollouts is not None]
+
+
+def generate_rollout_token_ids(
+    prompts: list[str],
+    cfg: RolloutConfig,
+    *,
+    seed: int,
+) -> list[list[int]]:
+    if cfg.num_generations != 1:
+        raise SystemExit(
+            "generate_rollout_token_ids expects rollout_cfg.num_generations == 1. "
+            "Use generate_grouped_rollouts() for repeated rollouts."
+        )
+    grouped_rollouts = generate_grouped_rollouts(
+        prompts,
+        cfg,
+        seed=seed,
+    )
+    return [prompt_rollouts[0].token_ids for prompt_rollouts in grouped_rollouts]

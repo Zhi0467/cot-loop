@@ -1,0 +1,929 @@
+{
+  "bundle_paths": {
+    "display_name": "AIME",
+    "majority_ensemble_dir": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_majority05_aime_ensemble_seed0_20260322",
+    "majority_last_dir": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_majority05_aime_last_layer_seed0_20260322",
+    "mean_data_dir": "/data/scratch/murphy/outputs/cot-loop-detection/aime_mean_relative_from_archive_20260322",
+    "mean_ensemble_dir": "/data/scratch/murphy/outputs/cot-loop-detection/aime_mean_relative_from_archive_20260323_ensemble",
+    "mean_last_dir": "/data/scratch/murphy/outputs/cot-loop-detection/aime_mean_relative_from_archive_20260323_last_layer",
+    "p_loop_data_dir": "/data/scratch/murphy/outputs/cot-loop-detection/aime_p_loop_from_archive_20260322",
+    "p_loop_ensemble_dir": "/data/scratch/murphy/outputs/cot-loop-detection/aime_p_loop_from_archive_20260323_ensemble",
+    "p_loop_last_dir": "/data/scratch/murphy/outputs/cot-loop-detection/aime_p_loop_from_archive_20260323_last_layer",
+    "projection_root": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_projection_aime_majority05_seed0_20260322"
+  },
+  "display_name": "AIME",
+  "majority_s_0.5": {
+    "ensemble": {
+      "bucket": {
+        "accuracy": 0.25,
+        "accuracy_delta": -0.08333333333333331,
+        "bucket_fraction": 0.2,
+        "cap_rate": 0.5,
+        "cap_rate_enrichment": 3.0,
+        "loop_rate": 0.25,
+        "loop_rate_enrichment": 2.4,
+        "max_score": 0.8928571343421936,
+        "mean_score": 0.738095243771871,
+        "min_score": 0.6071428656578064,
+        "prompt_count": 3,
+        "rollout_count": 12.0,
+        "sample_ids": [
+          50,
+          47,
+          36
+        ]
+      },
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_majority05_aime_ensemble_seed0_20260322/best.pt",
+      "derived_test_metrics": {
+        "pr_auc": 0.9214285714285713,
+        "pred_mean": 0.4494047636787097,
+        "roc_auc": 0.8714285714285714,
+        "target_mean": 0.5833333333333334
+      },
+      "saved_metrics": {
+        "classifier_layer": -1,
+        "classifier_mode": "ensemble",
+        "epoch": 8,
+        "eval_accuracy": 0.8333333333333334,
+        "eval_macro_f1": 0.8333333333333334,
+        "eval_positive_f1": 0.8333333333333334,
+        "eval_positive_precision": 1.0,
+        "eval_positive_recall": 0.7142857142857143,
+        "eval_pr_auc": 0.9214285714285713,
+        "eval_prevalence": 0.5833333333333334,
+        "eval_roc_auc": 0.8714285714285714,
+        "feature_key": "last_token_all_layers_stack_final",
+        "lr": 2.9358222275240886e-05,
+        "resolved_classifier_layer": null,
+        "sample_shape": [
+          28,
+          2048
+        ],
+        "score_rule": "vote_fraction",
+        "seed": 0,
+        "selection_rule": "max(roc_auc), tie_break=max(macro_f1)",
+        "step": 8,
+        "target_kind": "binary",
+        "target_name": "majority_s_0.5",
+        "train_accuracy": 0.7291666666666666,
+        "train_loss": 0.9233259558677673,
+        "train_macro_f1": 0.7261956998683634,
+        "train_positive_f1": 0.6976744186046512,
+        "train_positive_precision": 0.7894736842105263,
+        "train_positive_recall": 0.625,
+        "train_pr_auc": 0.8028946411202603,
+        "train_prevalence": 0.5,
+        "train_roc_auc": 0.8211805555555557,
+        "vote_rule": "majority"
+      },
+      "score_by_sample_id": {
+        "5": 0.5714285969734192,
+        "7": 0.2142857164144516,
+        "12": 0.2142857164144516,
+        "29": 0.3571428656578064,
+        "33": 0.25,
+        "36": 0.6071428656578064,
+        "42": 0.4642857015132904,
+        "44": 0.25,
+        "47": 0.7142857313156128,
+        "50": 0.8928571343421936,
+        "55": 0.3214285671710968,
+        "58": 0.5357142686843872
+      }
+    },
+    "last_layer": {
+      "bucket": {
+        "accuracy": 0.3333333333333333,
+        "accuracy_delta": 0.0,
+        "bucket_fraction": 0.2,
+        "cap_rate": 0.25,
+        "cap_rate_enrichment": 1.5,
+        "loop_rate": 0.08333333333333333,
+        "loop_rate_enrichment": 0.7999999999999999,
+        "max_score": 0.5831186175346375,
+        "mean_score": 0.5702191591262817,
+        "min_score": 0.5634917616844177,
+        "prompt_count": 3,
+        "rollout_count": 12.0,
+        "sample_ids": [
+          50,
+          58,
+          5
+        ]
+      },
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_majority05_aime_last_layer_seed0_20260322/best.pt",
+      "derived_test_metrics": {
+        "pr_auc": 0.9367346938775509,
+        "pred_mean": 0.5497659792502722,
+        "roc_auc": 0.8857142857142857,
+        "target_mean": 0.5833333333333334
+      },
+      "saved_metrics": {
+        "classifier_layer": -1,
+        "classifier_mode": "last_layer",
+        "epoch": 1,
+        "eval_accuracy": 0.5833333333333334,
+        "eval_macro_f1": 0.3684210526315789,
+        "eval_positive_f1": 0.7368421052631579,
+        "eval_positive_precision": 0.5833333333333334,
+        "eval_positive_recall": 1.0,
+        "eval_pr_auc": 0.9367346938775509,
+        "eval_prevalence": 0.5833333333333334,
+        "eval_roc_auc": 0.8857142857142857,
+        "feature_key": "last_token_all_layers_stack_final",
+        "lr": 0.0001,
+        "resolved_classifier_layer": 27,
+        "sample_shape": [
+          28,
+          2048
+        ],
+        "score_rule": "vote_fraction",
+        "seed": 0,
+        "selection_rule": "max(roc_auc), tie_break=max(macro_f1)",
+        "step": 1,
+        "target_kind": "binary",
+        "target_name": "majority_s_0.5",
+        "train_accuracy": 0.4791666666666667,
+        "train_loss": 0.6998151540756226,
+        "train_macro_f1": 0.4771241830065359,
+        "train_positive_f1": 0.4444444444444444,
+        "train_positive_precision": 0.47619047619047616,
+        "train_positive_recall": 0.4166666666666667,
+        "train_pr_auc": 0.5749808167576913,
+        "train_prevalence": 0.5,
+        "train_roc_auc": 0.5017361111111112,
+        "vote_rule": "majority"
+      },
+      "score_by_sample_id": {
+        "5": 0.5634917616844177,
+        "7": 0.541847288608551,
+        "12": 0.5273048877716064,
+        "29": 0.5341956615447998,
+        "33": 0.5453139543533325,
+        "36": 0.5634233355522156,
+        "42": 0.5376341342926025,
+        "44": 0.5366663336753845,
+        "47": 0.5567377209663391,
+        "50": 0.5831186175346375,
+        "55": 0.5434109568595886,
+        "58": 0.56404709815979
+      }
+    }
+  },
+  "mean_relative_length": {
+    "ensemble": {
+      "bucket": {
+        "accuracy": 0.25,
+        "accuracy_delta": -0.08333333333333331,
+        "bucket_fraction": 0.2,
+        "cap_rate": 0.3333333333333333,
+        "cap_rate_enrichment": 2.0,
+        "loop_rate": 0.16666666666666666,
+        "loop_rate_enrichment": 1.5999999999999999,
+        "max_score": 0.6256757974624634,
+        "mean_score": 0.624387800693512,
+        "min_score": 0.6227779388427734,
+        "prompt_count": 3,
+        "rollout_count": 12.0,
+        "sample_ids": [
+          36,
+          50,
+          44
+        ]
+      },
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/aime_mean_relative_from_archive_20260323_ensemble/best_rank.pt",
+      "derived_test_metrics": {
+        "mae": 0.16151874396800994,
+        "mse": 0.035053785745384806,
+        "pred_mean": 0.6164819846550623,
+        "rmse": 0.18722656260633747,
+        "spearman": 0.8531468531468531,
+        "target_mean": 0.6255763888888889,
+        "top_10p_capture": 0.2126339042882675,
+        "top_20p_capture": 0.3197395735044348
+      },
+      "saved_metrics": {
+        "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/aime_mean_relative_from_archive_20260323_ensemble/_eval_ckpts/epoch_001.pt",
+        "classifier_layer": -1,
+        "classifier_mode": "ensemble",
+        "epoch": 1,
+        "eval_mae": 0.1615187476078669,
+        "eval_mse": 0.03505378777381418,
+        "eval_pred_mean": 0.6164819945891699,
+        "eval_rmse": 0.18722656802338225,
+        "eval_spearman": 0.8531468531468532,
+        "eval_target_mean": 0.6255763868490855,
+        "eval_top_10p_capture": 0.21263390014139646,
+        "eval_top_20p_capture": 0.3197395704648028,
+        "feature_key": "last_token_all_layers_stack_final",
+        "lr": 0.0001,
+        "resolved_classifier_layer": null,
+        "sample_shape": [
+          28,
+          2048
+        ],
+        "score_rule": "mean_prob",
+        "seed": 0,
+        "selection_kind": "best_rank",
+        "selection_rule": "within 10% of min(mse), max(spearman), tie_break=max(top_20p_capture), min(mse)",
+        "step": 1,
+        "target_kind": "regression",
+        "target_name": "mean_relative_length",
+        "train_loss": 0.16984976828098297,
+        "train_mae": 0.2742781308479607,
+        "train_mse": 0.10422927411107531,
+        "train_pred_mean": 0.38323143869638443,
+        "train_rmse": 0.3228455886504806,
+        "train_spearman": 0.20679548415110724,
+        "train_target_mean": 0.5879140640608966,
+        "train_top_10p_capture": 0.08971307150354882,
+        "train_top_20p_capture": 0.21220268900422082,
+        "vote_rule": "majority"
+      },
+      "score_by_sample_id": {
+        "5": 0.6167407035827637,
+        "7": 0.6129599809646606,
+        "12": 0.6077208518981934,
+        "29": 0.6108845472335815,
+        "33": 0.6081973910331726,
+        "36": 0.6256757974624634,
+        "42": 0.6130656003952026,
+        "44": 0.6227779388427734,
+        "47": 0.6203747987747192,
+        "50": 0.6247096657752991,
+        "55": 0.614326000213623,
+        "58": 0.6203505396842957
+      }
+    },
+    "last_layer": {
+      "bucket": {
+        "accuracy": 0.3333333333333333,
+        "accuracy_delta": 0.0,
+        "bucket_fraction": 0.2,
+        "cap_rate": 0.4166666666666667,
+        "cap_rate_enrichment": 2.5000000000000004,
+        "loop_rate": 0.25,
+        "loop_rate_enrichment": 2.4,
+        "max_score": 0.6391589045524597,
+        "mean_score": 0.6300045251846313,
+        "min_score": 0.6244790554046631,
+        "prompt_count": 3,
+        "rollout_count": 12.0,
+        "sample_ids": [
+          50,
+          36,
+          58
+        ]
+      },
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/aime_mean_relative_from_archive_20260323_last_layer/best_rank.pt",
+      "derived_test_metrics": {
+        "mae": 0.1590090637260013,
+        "mse": 0.0347404697196705,
+        "pred_mean": 0.6146192252635956,
+        "rmse": 0.1863879548674498,
+        "spearman": 0.5524475524475524,
+        "target_mean": 0.6255763888888889,
+        "top_10p_capture": 0.2126339042882675,
+        "top_20p_capture": 0.3244074908695314
+      },
+      "saved_metrics": {
+        "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/aime_mean_relative_from_archive_20260323_last_layer/_eval_ckpts/epoch_003.pt",
+        "classifier_layer": -1,
+        "classifier_mode": "last_layer",
+        "epoch": 3,
+        "eval_mae": 0.1590090791384379,
+        "eval_mse": 0.03474047884449657,
+        "eval_pred_mean": 0.6146192053953806,
+        "eval_rmse": 0.18638797934549473,
+        "eval_spearman": 0.5524475524475525,
+        "eval_target_mean": 0.6255763868490855,
+        "eval_top_10p_capture": 0.21263390014139646,
+        "eval_top_20p_capture": 0.32440749093641247,
+        "feature_key": "last_token_all_layers_stack_final",
+        "lr": 9.064177772475912e-05,
+        "resolved_classifier_layer": 27,
+        "sample_shape": [
+          28,
+          2048
+        ],
+        "score_rule": "mean_prob",
+        "seed": 0,
+        "selection_kind": "best_rank",
+        "selection_rule": "within 10% of min(mse), max(spearman), tie_break=max(top_20p_capture), min(mse)",
+        "step": 3,
+        "target_kind": "regression",
+        "target_name": "mean_relative_length",
+        "train_loss": 0.09322527796030045,
+        "train_mae": 0.2423094503271083,
+        "train_mse": 0.0932252788855223,
+        "train_pred_mean": 0.7498043340941271,
+        "train_rmse": 0.3053281495138015,
+        "train_spearman": -0.06621797655232306,
+        "train_target_mean": 0.5879140640608966,
+        "train_top_10p_capture": 0.1027951640323033,
+        "train_top_20p_capture": 0.19937544178234348,
+        "vote_rule": "majority"
+      },
+      "score_by_sample_id": {
+        "5": 0.6238015294075012,
+        "7": 0.6122815608978271,
+        "12": 0.5917308330535889,
+        "29": 0.599584698677063,
+        "33": 0.6168947815895081,
+        "36": 0.6263756155967712,
+        "42": 0.6046881079673767,
+        "44": 0.6061567664146423,
+        "47": 0.6192739605903625,
+        "50": 0.6391589045524597,
+        "55": 0.6110048890113831,
+        "58": 0.6244790554046631
+      }
+    }
+  },
+  "metadata_baselines": {
+    "mean_relative_length": {
+      "feature_sets": {
+        "effective_budget": {
+          "bucket": {
+            "accuracy": 0.6666666666666666,
+            "accuracy_delta": 0.3333333333333333,
+            "bucket_fraction": 0.2,
+            "cap_rate": 0.0,
+            "cap_rate_enrichment": 0.0,
+            "loop_rate": 0.0,
+            "loop_rate_enrichment": 0.0,
+            "max_score": 0.5879140625,
+            "mean_score": 0.5879140625,
+            "min_score": 0.5879140625,
+            "prompt_count": 3,
+            "rollout_count": 12.0,
+            "sample_ids": [
+              5,
+              7,
+              12
+            ]
+          },
+          "feature_names": [
+            "effective_max_tokens"
+          ],
+          "feature_set_label": "effective_budget",
+          "metrics": {
+            "mae": 0.16960321180555557,
+            "mse": 0.03839511882477937,
+            "pred_mean": 0.5879140625000001,
+            "rmse": 0.1959467244553462,
+            "spearman": NaN,
+            "target_mean": 0.6255763888888889,
+            "top_10p_capture": 0.1275357170609327,
+            "top_20p_capture": 0.18270372878345525
+          },
+          "model_payload": {
+            "coef": [
+              0.0
+            ],
+            "constant_value": null,
+            "feature_names": [
+              "effective_max_tokens"
+            ],
+            "intercept": 0.5879140625,
+            "scaler_mean": [
+              30000.0
+            ],
+            "scaler_scale": [
+              1.0
+            ]
+          }
+        },
+        "prompt_length": {
+          "bucket": {
+            "accuracy": 0.25,
+            "accuracy_delta": -0.08333333333333331,
+            "bucket_fraction": 0.2,
+            "cap_rate": 0.3333333333333333,
+            "cap_rate_enrichment": 2.0,
+            "loop_rate": 0.08333333333333333,
+            "loop_rate_enrichment": 0.7999999999999999,
+            "max_score": 0.8588071635989887,
+            "mean_score": 0.6972757104726224,
+            "min_score": 0.5942012921733169,
+            "prompt_count": 3,
+            "rollout_count": 12.0,
+            "sample_ids": [
+              50,
+              47,
+              5
+            ]
+          },
+          "feature_names": [
+            "prompt_token_count"
+          ],
+          "feature_set_label": "prompt_length",
+          "metrics": {
+            "mae": 0.14665969047888172,
+            "mse": 0.030904068974678196,
+            "pred_mean": 0.5854740493413617,
+            "rmse": 0.17579553172557658,
+            "spearman": 0.6760080419465041,
+            "target_mean": 0.6255763888888889,
+            "top_10p_capture": 0.2230565145476949,
+            "top_20p_capture": 0.3055226846352808
+          },
+          "model_payload": {
+            "coef": [
+              0.08704583173230504
+            ],
+            "constant_value": null,
+            "feature_names": [
+              "prompt_token_count"
+            ],
+            "intercept": 0.5879140625,
+            "scaler_mean": [
+              159.85416666666666
+            ],
+            "scaler_scale": [
+              140.46766970601772
+            ]
+          }
+        },
+        "prompt_length_plus_effective_budget": {
+          "bucket": {
+            "accuracy": 0.25,
+            "accuracy_delta": -0.08333333333333331,
+            "bucket_fraction": 0.2,
+            "cap_rate": 0.3333333333333333,
+            "cap_rate_enrichment": 2.0,
+            "loop_rate": 0.08333333333333333,
+            "loop_rate_enrichment": 0.7999999999999999,
+            "max_score": 0.8588071635989887,
+            "mean_score": 0.6972757104726224,
+            "min_score": 0.5942012921733169,
+            "prompt_count": 3,
+            "rollout_count": 12.0,
+            "sample_ids": [
+              50,
+              47,
+              5
+            ]
+          },
+          "feature_names": [
+            "prompt_token_count",
+            "effective_max_tokens"
+          ],
+          "feature_set_label": "prompt_length + effective_budget",
+          "metrics": {
+            "mae": 0.14665969047888172,
+            "mse": 0.030904068974678196,
+            "pred_mean": 0.5854740493413617,
+            "rmse": 0.17579553172557658,
+            "spearman": 0.6760080419465041,
+            "target_mean": 0.6255763888888889,
+            "top_10p_capture": 0.2230565145476949,
+            "top_20p_capture": 0.3055226846352808
+          },
+          "model_payload": {
+            "coef": [
+              0.08704583173230508,
+              0.0
+            ],
+            "constant_value": null,
+            "feature_names": [
+              "prompt_token_count",
+              "effective_max_tokens"
+            ],
+            "intercept": 0.5879140625,
+            "scaler_mean": [
+              159.85416666666666,
+              30000.0
+            ],
+            "scaler_scale": [
+              140.46766970601774,
+              1.0
+            ]
+          }
+        }
+      },
+      "selected_feature_set": "prompt_length"
+    },
+    "p_loop": {
+      "feature_sets": {
+        "effective_budget": {
+          "bucket": {
+            "accuracy": 0.6666666666666666,
+            "accuracy_delta": 0.3333333333333333,
+            "bucket_fraction": 0.2,
+            "cap_rate": 0.0,
+            "cap_rate_enrichment": 0.0,
+            "loop_rate": 0.0,
+            "loop_rate_enrichment": 0.0,
+            "max_score": 0.13543329980382904,
+            "mean_score": 0.13543329980382904,
+            "min_score": 0.13543329980382904,
+            "prompt_count": 3,
+            "rollout_count": 12.0,
+            "sample_ids": [
+              5,
+              7,
+              12
+            ]
+          },
+          "feature_names": [
+            "effective_max_tokens"
+          ],
+          "feature_set_label": "effective_budget",
+          "metrics": {
+            "brier": 0.026585241236622786,
+            "mae": 0.14931109993460967,
+            "pred_mean": 0.13543329980382904,
+            "rmse": 0.16304981213304964,
+            "spearman": NaN,
+            "target_mean": 0.10416666666666667,
+            "top_10p_capture": 0.0,
+            "top_20p_capture": 0.0
+          },
+          "model_payload": {
+            "coef": [
+              [
+                0.0
+              ]
+            ],
+            "constant_probability": null,
+            "feature_names": [
+              "effective_max_tokens"
+            ],
+            "intercept": [
+              -1.8537491900450014
+            ],
+            "scaler_mean": [
+              30000.0
+            ],
+            "scaler_scale": [
+              1.0
+            ]
+          }
+        },
+        "prompt_length": {
+          "bucket": {
+            "accuracy": 0.25,
+            "accuracy_delta": -0.08333333333333331,
+            "bucket_fraction": 0.2,
+            "cap_rate": 0.3333333333333333,
+            "cap_rate_enrichment": 2.0,
+            "loop_rate": 0.08333333333333333,
+            "loop_rate_enrichment": 0.7999999999999999,
+            "max_score": 0.2941769020159652,
+            "mean_score": 0.193850470836561,
+            "min_score": 0.13336718367866524,
+            "prompt_count": 3,
+            "rollout_count": 12.0,
+            "sample_ids": [
+              50,
+              47,
+              5
+            ]
+          },
+          "feature_names": [
+            "prompt_token_count"
+          ],
+          "feature_set_label": "prompt_length",
+          "metrics": {
+            "brier": 0.02980024385511278,
+            "mae": 0.15155316851439934,
+            "pred_mean": 0.13454089381192083,
+            "rmse": 0.17262747132224576,
+            "spearman": 0.45885077842347216,
+            "target_mean": 0.10416666666666667,
+            "top_10p_capture": 0.2,
+            "top_20p_capture": 0.2
+          },
+          "model_payload": {
+            "coef": [
+              [
+                0.3277554605282338
+              ]
+            ],
+            "constant_probability": null,
+            "feature_names": [
+              "prompt_token_count"
+            ],
+            "intercept": [
+              -1.8951827078804275
+            ],
+            "scaler_mean": [
+              159.85416666666666
+            ],
+            "scaler_scale": [
+              140.46766970601772
+            ]
+          }
+        },
+        "prompt_length_plus_effective_budget": {
+          "bucket": {
+            "accuracy": 0.25,
+            "accuracy_delta": -0.08333333333333331,
+            "bucket_fraction": 0.2,
+            "cap_rate": 0.3333333333333333,
+            "cap_rate_enrichment": 2.0,
+            "loop_rate": 0.08333333333333333,
+            "loop_rate_enrichment": 0.7999999999999999,
+            "max_score": 0.2941769020159652,
+            "mean_score": 0.193850470836561,
+            "min_score": 0.13336718367866524,
+            "prompt_count": 3,
+            "rollout_count": 12.0,
+            "sample_ids": [
+              50,
+              47,
+              5
+            ]
+          },
+          "feature_names": [
+            "prompt_token_count",
+            "effective_max_tokens"
+          ],
+          "feature_set_label": "prompt_length + effective_budget",
+          "metrics": {
+            "brier": 0.02980024385511278,
+            "mae": 0.15155316851439934,
+            "pred_mean": 0.13454089381192083,
+            "rmse": 0.17262747132224576,
+            "spearman": 0.45885077842347216,
+            "target_mean": 0.10416666666666667,
+            "top_10p_capture": 0.2,
+            "top_20p_capture": 0.2
+          },
+          "model_payload": {
+            "coef": [
+              [
+                0.3277554605282338,
+                0.0
+              ]
+            ],
+            "constant_probability": null,
+            "feature_names": [
+              "prompt_token_count",
+              "effective_max_tokens"
+            ],
+            "intercept": [
+              -1.8951827078804275
+            ],
+            "scaler_mean": [
+              159.85416666666666,
+              30000.0
+            ],
+            "scaler_scale": [
+              140.46766970601774,
+              1.0
+            ]
+          }
+        }
+      },
+      "selected_feature_set": "prompt_length"
+    },
+    "selected_overall": {
+      "bucket": {
+        "accuracy": 0.25,
+        "accuracy_delta": -0.08333333333333331,
+        "bucket_fraction": 0.2,
+        "cap_rate": 0.3333333333333333,
+        "cap_rate_enrichment": 2.0,
+        "loop_rate": 0.08333333333333333,
+        "loop_rate_enrichment": 0.7999999999999999,
+        "max_score": 0.2941769020159652,
+        "mean_score": 0.193850470836561,
+        "min_score": 0.13336718367866524,
+        "prompt_count": 3,
+        "rollout_count": 12.0,
+        "sample_ids": [
+          50,
+          47,
+          5
+        ]
+      },
+      "bucket_accuracy": 0.25,
+      "bucket_cap_rate": 0.3333333333333333,
+      "bucket_loop_rate": 0.08333333333333333,
+      "dataset_key": "aime",
+      "dataset_name": "AIME",
+      "feature_set_key": "prompt_length",
+      "feature_set_label": "prompt_length",
+      "metrics": {
+        "brier": 0.02980024385511278,
+        "mae": 0.15155316851439934,
+        "pred_mean": 0.13454089381192083,
+        "rmse": 0.17262747132224576,
+        "spearman": 0.45885077842347216,
+        "target_mean": 0.10416666666666667,
+        "top_10p_capture": 0.2,
+        "top_20p_capture": 0.2
+      },
+      "model_payload": {
+        "coef": [
+          [
+            0.3277554605282338
+          ]
+        ],
+        "constant_probability": null,
+        "feature_names": [
+          "prompt_token_count"
+        ],
+        "intercept": [
+          -1.8951827078804275
+        ],
+        "scaler_mean": [
+          159.85416666666666
+        ],
+        "scaler_scale": [
+          140.46766970601772
+        ]
+      },
+      "target_name": "p_loop"
+    }
+  },
+  "p_loop": {
+    "ensemble": {
+      "bucket": {
+        "accuracy": 0.0,
+        "accuracy_delta": -0.3333333333333333,
+        "bucket_fraction": 0.2,
+        "cap_rate": 0.4166666666666667,
+        "cap_rate_enrichment": 2.5000000000000004,
+        "loop_rate": 0.3333333333333333,
+        "loop_rate_enrichment": 3.1999999999999997,
+        "max_score": 0.13435764610767365,
+        "mean_score": 0.13197680314381918,
+        "min_score": 0.12834951281547546,
+        "prompt_count": 3,
+        "rollout_count": 12.0,
+        "sample_ids": [
+          47,
+          29,
+          36
+        ]
+      },
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/aime_p_loop_from_archive_20260323_ensemble/best_rank.pt",
+      "derived_test_metrics": {
+        "brier": 0.02508744656256666,
+        "mae": 0.14232813629011312,
+        "pred_mean": 0.12289731887479623,
+        "rmse": 0.15839017192542806,
+        "spearman": 0.47485698616250677,
+        "target_mean": 0.10416666666666667,
+        "top_10p_capture": 0.4,
+        "top_20p_capture": 0.8
+      },
+      "saved_metrics": {
+        "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/aime_p_loop_from_archive_20260323_ensemble/_eval_ckpts/epoch_010.pt",
+        "classifier_layer": -1,
+        "classifier_mode": "ensemble",
+        "epoch": 10,
+        "eval_brier": 0.025087446638007643,
+        "eval_mae": 0.1423281393945217,
+        "eval_pred_mean": 0.12289731452862422,
+        "eval_rmse": 0.15839017216357726,
+        "eval_spearman": 0.47485698616250677,
+        "eval_target_mean": 0.10416666666666667,
+        "eval_top_10p_capture": 0.4,
+        "eval_top_20p_capture": 0.8,
+        "feature_key": "last_token_all_layers_stack_final",
+        "lr": 2e-05,
+        "resolved_classifier_layer": null,
+        "sample_shape": [
+          28,
+          2048
+        ],
+        "score_rule": "mean_prob",
+        "seed": 0,
+        "selection_kind": "best_rank",
+        "selection_rule": "within 10% of min(brier), max(top_20p_capture), tie_break=max(spearman), min(brier)",
+        "step": 10,
+        "target_kind": "probability",
+        "target_name": "p_loop",
+        "train_brier": 0.053324077728863016,
+        "train_loss": 0.8476762175559998,
+        "train_mae": 0.18443164710576335,
+        "train_pred_mean": 0.13220773404464126,
+        "train_rmse": 0.23092006783487445,
+        "train_spearman": 0.11525639686829943,
+        "train_target_mean": 0.13541666666666666,
+        "train_top_10p_capture": 0.11538461538461539,
+        "train_top_20p_capture": 0.23076923076923078,
+        "vote_rule": "majority"
+      },
+      "score_by_sample_id": {
+        "5": 0.11708273738622665,
+        "7": 0.11086689680814743,
+        "12": 0.11335521191358566,
+        "29": 0.1332232505083084,
+        "33": 0.1257045567035675,
+        "36": 0.12834951281547546,
+        "42": 0.12523411214351654,
+        "44": 0.1281314343214035,
+        "47": 0.13435764610767365,
+        "50": 0.12329842895269394,
+        "55": 0.12267935276031494,
+        "58": 0.11248468607664108
+      }
+    },
+    "last_layer": {
+      "bucket": {
+        "accuracy": 0.3333333333333333,
+        "accuracy_delta": 0.0,
+        "bucket_fraction": 0.2,
+        "cap_rate": 0.4166666666666667,
+        "cap_rate_enrichment": 2.5000000000000004,
+        "loop_rate": 0.16666666666666666,
+        "loop_rate_enrichment": 1.5999999999999999,
+        "max_score": 0.0640895813703537,
+        "mean_score": 0.0630210389693578,
+        "min_score": 0.06197541952133179,
+        "prompt_count": 3,
+        "rollout_count": 12.0,
+        "sample_ids": [
+          50,
+          58,
+          47
+        ]
+      },
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/aime_p_loop_from_archive_20260323_last_layer/best_rank.pt",
+      "derived_test_metrics": {
+        "brier": 0.02729228673924203,
+        "mae": 0.1232142811641097,
+        "pred_mean": 0.05976250612487396,
+        "rmse": 0.1652037733807616,
+        "spearman": 0.3025637433955795,
+        "target_mean": 0.10416666666666667,
+        "top_10p_capture": 0.2,
+        "top_20p_capture": 0.4
+      },
+      "saved_metrics": {
+        "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/aime_p_loop_from_archive_20260323_last_layer/_eval_ckpts/epoch_010.pt",
+        "classifier_layer": -1,
+        "classifier_mode": "last_layer",
+        "epoch": 10,
+        "eval_brier": 0.027292288932842634,
+        "eval_mae": 0.12321428768336773,
+        "eval_pred_mean": 0.05976250643531481,
+        "eval_rmse": 0.16520378001983682,
+        "eval_spearman": 0.30256374339557957,
+        "eval_target_mean": 0.10416666666666667,
+        "eval_top_10p_capture": 0.2,
+        "eval_top_20p_capture": 0.4,
+        "feature_key": "last_token_all_layers_stack_final",
+        "lr": 2e-05,
+        "resolved_classifier_layer": 27,
+        "sample_shape": [
+          28,
+          2048
+        ],
+        "score_rule": "mean_prob",
+        "seed": 0,
+        "selection_kind": "best_rank",
+        "selection_rule": "within 10% of min(brier), max(top_20p_capture), tie_break=max(spearman), min(brier)",
+        "step": 10,
+        "target_kind": "probability",
+        "target_name": "p_loop",
+        "train_brier": 0.06231362464459692,
+        "train_loss": 0.4596831798553467,
+        "train_mae": 0.15671802207361907,
+        "train_pred_mean": 0.05873250988467286,
+        "train_rmse": 0.24962697098790612,
+        "train_spearman": -0.1119406202035037,
+        "train_target_mean": 0.13541666666666666,
+        "train_top_10p_capture": 0.07692307692307693,
+        "train_top_20p_capture": 0.19230769230769232,
+        "vote_rule": "majority"
+      },
+      "score_by_sample_id": {
+        "5": 0.06183189898729324,
+        "7": 0.05841878056526184,
+        "12": 0.05487186089158058,
+        "29": 0.05773548781871796,
+        "33": 0.05987957864999771,
+        "36": 0.06158032640814781,
+        "42": 0.0583905391395092,
+        "44": 0.056797321885824203,
+        "47": 0.06197541952133179,
+        "50": 0.0640895813703537,
+        "55": 0.0585811622440815,
+        "58": 0.06299811601638794
+      }
+    }
+  },
+  "selected_variants": {
+    "majority_s_0.5": "last_layer",
+    "mean_relative_length": "ensemble",
+    "metadata_baseline": {
+      "feature_set_key": "prompt_length",
+      "feature_set_label": "prompt_length",
+      "target_name": "p_loop"
+    },
+    "p_loop": "ensemble"
+  },
+  "test_overall_rates": {
+    "accuracy": 0.3333333333333333,
+    "cap_rate": 0.16666666666666666,
+    "loop_rate": 0.10416666666666667,
+    "prompt_count": 12.0,
+    "rollout_count": 48.0
+  }
+}

@@ -6,8 +6,11 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import random
 import re
+import shutil
 import sys
+import zlib
 
 import torch
 
@@ -23,11 +26,33 @@ from loop_probe.prefill import (
     extract_prefill_features_multi,
     load_prefill_model_and_tokenizer,
 )
+from loop_probe.labeling import PROMPT_PROFILE_TARGET_CHOICES
 from loop_probe.serialization import save_split_shards, write_manifest
+from loop_probe.adapters import (
+    livecodebench_codegen,
+    multiple_choice_gpqa,
+    multiple_choice_mmlupro,
+)
 from loop_probe.types import SampleRecord
 from utils import build_prompt
 
 FEATURE_KEY_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+$")
+
+
+def _is_prompt_profile_target_spec(target_spec: object) -> bool:
+    if not isinstance(target_spec, dict):
+        return False
+    profile_target = target_spec.get("profile_target")
+    if isinstance(profile_target, str) and profile_target in PROMPT_PROFILE_TARGET_CHOICES:
+        return True
+    target_name = target_spec.get("name")
+    if not isinstance(target_name, str):
+        return False
+    return (
+        target_name in PROMPT_PROFILE_TARGET_CHOICES
+        or target_name.startswith("s_")
+        or target_name.startswith("majority_s_")
+    )
 
 
 def _parse_args() -> argparse.Namespace:
@@ -192,10 +217,257 @@ def _load_jsonl_rows(path: str) -> list[dict[str, object]]:
     return rows
 
 
+def _reference_prompt_profile_rows_match_records(
+    *,
+    reference_data_dir: str,
+    reference_manifest: dict[str, object],
+    records_by_split: dict[str, list[SampleRecord]],
+) -> bool:
+    rel_path = reference_manifest.get("prompt_rollout_archive_file")
+    if not isinstance(rel_path, str) or not rel_path:
+        return False
+    archive_rows = _load_jsonl_rows(os.path.join(reference_data_dir, rel_path))
+    prompt_by_key: dict[tuple[str, int], str] = {}
+    for idx, row in enumerate(archive_rows):
+        split = row.get("split")
+        prompt = row.get("prompt")
+        raw_sample_id = row.get("sample_id")
+        if not isinstance(split, str) or not isinstance(prompt, str):
+            return False
+        try:
+            sample_id = int(raw_sample_id)
+        except Exception as exc:
+            raise SystemExit(
+                f"Reference prompt-profile archive row {idx} has invalid sample_id={raw_sample_id!r}."
+            ) from exc
+        key = (split, sample_id)
+        existing = prompt_by_key.get(key)
+        if existing is not None and existing != prompt:
+            raise SystemExit(
+                "Reference prompt-profile archive has conflicting prompt text for "
+                f"split='{split}', sample_id={sample_id}."
+            )
+        prompt_by_key[key] = prompt
+    for split, records in records_by_split.items():
+        for record in records:
+            if prompt_by_key.get((split, int(record.sample_id))) != record.prompt:
+                return False
+    return True
+
+
+def _rows_by_sample_id(pool_rows: list[dict[str, object]]) -> dict[int, dict[str, object]]:
+    lookup: dict[int, dict[str, object]] = {}
+    for idx, row in enumerate(pool_rows):
+        raw_sample_id = row.get("_source_sample_id", idx)
+        try:
+            sample_id = int(raw_sample_id)
+        except Exception as exc:
+            raise SystemExit(
+                f"Pool row {idx} has invalid _source_sample_id={raw_sample_id!r}."
+            ) from exc
+        if sample_id < 0:
+            raise SystemExit(f"Pool row {idx} has negative _source_sample_id={sample_id}.")
+        if sample_id in lookup:
+            raise SystemExit(
+                f"Duplicate _source_sample_id={sample_id} found while indexing pool rows."
+            )
+        lookup[sample_id] = row
+    return lookup
+
+
+def _normalize_livecodebench_split(raw_split: object) -> str:
+    normalized = str(raw_split).strip().lower()
+    if normalized not in ("", "all", "train", "validation", "val", "test"):
+        raise SystemExit(
+            "Unsupported LiveCodeBench split "
+            f"'{raw_split}'. Use one of train/validation/test/all."
+        )
+    return normalized
+
+
+def _partition_livecodebench_benchmark(benchmark, raw_split: object):
+    normalized_split = _normalize_livecodebench_split(raw_split)
+    if normalized_split in ("", "all"):
+        return benchmark
+
+    def _partition_bucket(question_id: object) -> int:
+        return zlib.crc32(str(question_id).encode("utf-8")) % 10
+
+    if normalized_split == "train":
+        return [row for row in benchmark if _partition_bucket(row.question_id) < 8]
+    if normalized_split in ("validation", "val"):
+        return [row for row in benchmark if _partition_bucket(row.question_id) == 8]
+    return [row for row in benchmark if _partition_bucket(row.question_id) == 9]
+
+
+def _reference_split_spec(
+    reference_manifest: dict[str, object],
+    *,
+    split: str,
+) -> dict[str, object]:
+    spec_payload = reference_manifest.get(f"{split}_spec")
+    if isinstance(spec_payload, dict):
+        return spec_payload
+    if split == "test":
+        fallback = reference_manifest.get("train_spec")
+        if isinstance(fallback, dict):
+            return dict(fallback)
+    raise SystemExit(f"Reference manifest is missing a usable {split}_spec payload.")
+
+
+def _payload_optional_int(payload: dict[str, object], key: str) -> int | None:
+    value = payload.get(key)
+    if value in (None, ""):
+        return None
+    try:
+        return int(value)
+    except Exception as exc:
+        raise SystemExit(
+            f"Reference manifest field {key!r} must be an integer or null, got {value!r}."
+        ) from exc
+
+
+def _livecodebench_lookup_spec(
+    reference_manifest: dict[str, object],
+    *,
+    split: str,
+) -> dict[str, object]:
+    split_source = str(reference_manifest.get("split_source", "")).strip()
+    train_spec = reference_manifest.get("train_spec")
+    test_spec = reference_manifest.get("test_spec")
+
+    if split_source == "same_train_test_source_count_split":
+        if not isinstance(train_spec, dict) or not isinstance(test_spec, dict):
+            raise SystemExit(
+                "LiveCodeBench fixed-split rebuild requires train_spec and test_spec "
+                "for same_train_test_source_count_split manifests."
+            )
+        lookup_spec = dict(train_spec)
+        train_max = _payload_optional_int(train_spec, "max_samples")
+        test_max = _payload_optional_int(test_spec, "max_samples")
+        if train_max is None or test_max is None:
+            raise SystemExit(
+                "LiveCodeBench fixed-split rebuild requires integer train/test "
+                "max_samples for same_train_test_source_count_split manifests."
+            )
+        lookup_spec["max_samples"] = train_max + test_max
+        return lookup_spec
+
+    if split_source in {
+        "single_dataset_split",
+        "same_train_test_spec_split",
+        "same_train_test_source_ratio_split",
+    }:
+        if not isinstance(train_spec, dict):
+            raise SystemExit(
+                "LiveCodeBench fixed-split rebuild requires train_spec in the "
+                "reference manifest."
+            )
+        lookup_spec = dict(train_spec)
+        if split_source == "same_train_test_source_ratio_split":
+            lookup_spec["max_samples"] = None
+        return lookup_spec
+
+    return _reference_split_spec(reference_manifest, split=split)
+
+
+def _build_livecodebench_prompt_lookup(
+    *,
+    reference_manifest: dict[str, object],
+    split: str,
+    model_id: str,
+) -> dict[int, str]:
+    task_loader_config = reference_manifest.get("task_loader_config")
+    if not isinstance(task_loader_config, dict):
+        raise SystemExit(
+            "LiveCodeBench fixed-split rebuild requires task_loader_config in the "
+            "reference manifest."
+        )
+    repo_path = str(task_loader_config.get("livecodebench_repo", "")).strip()
+    if not repo_path:
+        raise SystemExit(
+            "LiveCodeBench fixed-split rebuild requires "
+            "task_loader_config.livecodebench_repo in the reference manifest."
+        )
+    default_release_version = str(
+        task_loader_config.get("release_version", "")
+    ).strip()
+    if not default_release_version:
+        raise SystemExit(
+            "LiveCodeBench fixed-split rebuild requires "
+            "task_loader_config.release_version in the reference manifest."
+        )
+    lm_style_override_raw = task_loader_config.get("lm_style_override")
+    lm_style_override = (
+        None
+        if lm_style_override_raw in (None, "")
+        else str(lm_style_override_raw)
+    )
+
+    lookup_spec = _livecodebench_lookup_spec(reference_manifest, split=split)
+    effective_release_version = (
+        str(lookup_spec.get("config", "")).strip() or default_release_version
+    )
+    benchmark, format_prompt = livecodebench_codegen.load_benchmark(
+        repo_path,
+        effective_release_version,
+    )
+    benchmark = _partition_livecodebench_benchmark(
+        benchmark,
+        lookup_spec.get("split", split),
+    )
+    max_samples_raw = lookup_spec.get("max_samples")
+    if max_samples_raw in (None, ""):
+        max_samples = None
+    else:
+        try:
+            max_samples = int(max_samples_raw)
+        except Exception as exc:
+            raise SystemExit(
+                "LiveCodeBench fixed-split rebuild requires an integer max_samples "
+                f"in the reference manifest, got {max_samples_raw!r}."
+            ) from exc
+    prompt_records, _lm_style = livecodebench_codegen.build_prompts(
+        benchmark,
+        format_prompt,
+        repo_path=repo_path,
+        model_id=model_id,
+        lm_style_override=lm_style_override,
+        max_samples=max_samples,
+    )
+    return {idx: prompt for idx, (_question_id, prompt) in enumerate(prompt_records)}
+
+
 def _load_reference_manifest(reference_data_dir: str) -> dict[str, object]:
     manifest_path = os.path.join(reference_data_dir, "manifest.json")
     with open(manifest_path, "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def _resolve_reference_target_kind(
+    manifest: dict[str, object],
+    *,
+    split: str,
+) -> str:
+    split_info = manifest.get(split)
+    if isinstance(split_info, dict):
+        split_target_kind = split_info.get("target_kind")
+        if isinstance(split_target_kind, str) and split_target_kind:
+            target_kind = split_target_kind
+        else:
+            target_spec = manifest.get("target_spec")
+            target_kind = (
+                str(target_spec.get("kind", "binary"))
+                if isinstance(target_spec, dict)
+                else "binary"
+            )
+    else:
+        target_kind = "binary"
+    if target_kind not in ("binary", "probability", "regression"):
+        raise SystemExit(
+            f"Unsupported target kind '{target_kind}' in reference split '{split}'."
+        )
+    return target_kind
 
 
 def _resolve_built_splits(
@@ -232,6 +504,7 @@ def _load_reference_split(
     split_info = manifest.get(split)
     if not isinstance(split_info, dict):
         raise SystemExit(f"Reference manifest missing split '{split}'.")
+    target_kind = _resolve_reference_target_kind(manifest, split=split)
     shard_paths = split_info.get("shards")
     if not isinstance(shard_paths, list) or not shard_paths:
         raise SystemExit(f"Reference split '{split}' has no shard files.")
@@ -242,41 +515,146 @@ def _load_reference_split(
         if not isinstance(rel_path, str):
             raise SystemExit(f"Invalid shard path entry for split '{split}'.")
         shard = torch.load(os.path.join(reference_data_dir, rel_path), map_location="cpu")
-        labels.append(shard["y"].to(dtype=torch.uint8))
+        label_dtype = (
+            torch.float32 if target_kind in ("probability", "regression") else torch.uint8
+        )
+        labels.append(shard["y"].to(dtype=label_dtype))
         sample_ids.append(shard["sample_ids"].to(dtype=torch.int64))
     return torch.cat(labels, dim=0), torch.cat(sample_ids, dim=0)
 
 
 def _build_records(
     *,
-    pool_rows: list[dict[str, object]],
+    pool_rows_by_sample_id: dict[int, dict[str, object]],
     sample_ids: torch.Tensor,
     prompt_field: str,
+    task_kind: str,
+    seed: int,
     tokenizer,
     num_repetition: int,
     split: str,
+    livecodebench_prompt_lookup: dict[int, str] | None = None,
 ) -> list[SampleRecord]:
     records = []
     for sample_id in sample_ids.tolist():
         sample_id_int = int(sample_id)
-        if sample_id_int < 0 or sample_id_int >= len(pool_rows):
+        row = pool_rows_by_sample_id.get(sample_id_int)
+        if row is None:
             raise SystemExit(
-                f"sample_id={sample_id_int} out of range for pool size {len(pool_rows)}"
+                f"sample_id={sample_id_int} not found in the fixed-split source pool."
             )
-        row = pool_rows[sample_id_int]
-        prompt = row.get(prompt_field)
-        if not isinstance(prompt, str):
+        if task_kind == "multiple_choice_gpqa":
+            prompt = row.get("Question")
+            if not isinstance(prompt, str):
+                raise SystemExit(
+                    f"Prompt field 'Question' missing/invalid for sample_id={sample_id_int}"
+                )
+            if num_repetition != 1:
+                raise SystemExit(
+                    "GPQA prompt formatting does not support num_repetition != 1."
+                )
+            required = (
+                "Correct Answer",
+                "Incorrect Answer 1",
+                "Incorrect Answer 2",
+                "Incorrect Answer 3",
+            )
+            missing = [name for name in required if row.get(name) is None]
+            if missing:
+                raise SystemExit(
+                    f"GPQA row for sample_id={sample_id_int} is missing {missing}."
+                )
+            shuffled = [(str(row["Correct Answer"]), True)] + [
+                (str(row[f"Incorrect Answer {idx}"]), False) for idx in range(1, 4)
+            ]
+            rng = random.Random(seed ^ sample_id_int)
+            rng.shuffle(shuffled)
+            prompt_text = multiple_choice_gpqa.build_mcq_prompt(
+                tokenizer,
+                prompt,
+                [option for option, _ in shuffled],
+            )
+        elif task_kind == "multiple_choice_mmlupro":
+            prompt = row.get("question")
+            if not isinstance(prompt, str):
+                raise SystemExit(
+                    f"Prompt field 'question' missing/invalid for sample_id={sample_id_int}"
+                )
+            if num_repetition != 1:
+                raise SystemExit(
+                    "MMLU-Pro prompt formatting does not support num_repetition != 1."
+                )
+            options = row.get("options")
+            if isinstance(options, str):
+                try:
+                    options = json.loads(options)
+                except json.JSONDecodeError as exc:
+                    raise SystemExit(
+                        "MMLU-Pro row has string 'options' but it is not valid JSON."
+                    ) from exc
+            if not isinstance(options, list) or not options:
+                raise SystemExit(
+                    f"MMLU-Pro row for sample_id={sample_id_int} has invalid options."
+                )
+            prompt_text = multiple_choice_mmlupro.build_mcq_prompt(
+                tokenizer,
+                prompt,
+                [str(option) for option in options],
+            )
+        elif task_kind == "math_freeform":
+            prompt = row.get(prompt_field)
+            if not isinstance(prompt, str):
+                raise SystemExit(
+                    f"Prompt field '{prompt_field}' missing/invalid for sample_id={sample_id_int}"
+                )
+            prompt_text = build_prompt(tokenizer, prompt, num_repetition)
+        elif task_kind == "livecodebench_codegen":
+            if num_repetition != 1:
+                raise SystemExit(
+                    "LiveCodeBench prompt formatting does not support num_repetition != 1."
+                )
+            if livecodebench_prompt_lookup is None:
+                raise SystemExit(
+                    "LiveCodeBench fixed-split rebuild requires a prompt lookup "
+                    "built from the original formatter."
+                )
+            prompt_text = livecodebench_prompt_lookup.get(sample_id_int)
+            if not isinstance(prompt_text, str):
+                raise SystemExit(
+                    "LiveCodeBench prompt lookup is missing "
+                    f"sample_id={sample_id_int}."
+                )
+        else:
             raise SystemExit(
-                f"Prompt field '{prompt_field}' missing/invalid for sample_id={sample_id_int}"
+                "Fixed-split rebuild currently supports task_kind in "
+                "{math_freeform, multiple_choice_gpqa, multiple_choice_mmlupro, "
+                "livecodebench_codegen}; "
+                f"got '{task_kind}'."
             )
         records.append(
             SampleRecord(
                 sample_id=sample_id_int,
-                prompt=build_prompt(tokenizer, prompt, num_repetition),
+                prompt=prompt_text,
                 source_split=split,
             )
         )
     return records
+
+
+def _copy_reference_relpath(
+    *,
+    reference_data_dir: str,
+    out_dir: str,
+    rel_path: str,
+) -> None:
+    source_path = os.path.join(reference_data_dir, rel_path)
+    if not os.path.exists(source_path):
+        raise SystemExit(
+            f"Reference prompt-profile diagnostics are missing: {source_path}"
+        )
+    dest_path = os.path.join(out_dir, rel_path)
+    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+    shutil.copy2(source_path, dest_path)
 
 
 def _save_view_split(
@@ -289,6 +667,7 @@ def _save_view_split(
     labels: torch.Tensor,
     sample_ids: torch.Tensor,
     shard_size: int,
+    target_kind: str,
 ) -> dict[str, object]:
     if feature_key == primary_key:
         view_dir = out_dir
@@ -303,6 +682,7 @@ def _save_view_split(
         labels.tolist(),
         sample_ids.tolist(),
         shard_size=shard_size,
+        target_kind=target_kind,
     )
     if prefix:
         split_meta["shards"] = [
@@ -347,6 +727,32 @@ def main() -> None:
             num_repetition = candidate
     if num_repetition is None:
         num_repetition = 1
+    reference_num_repetition = 1
+    reference_prompt_template = reference_manifest.get("prompt_template")
+    if isinstance(reference_prompt_template, dict):
+        candidate = reference_prompt_template.get("num_repetition")
+        if isinstance(candidate, int) and candidate >= 1:
+            reference_num_repetition = candidate
+    reference_prompt_field = reference_manifest.get("prompt_field")
+    reference_model_id: str | None = None
+    if isinstance(rollout_config, dict):
+        candidate = rollout_config.get("model_id")
+        if isinstance(candidate, str) and candidate:
+            reference_model_id = candidate
+    prompt_profile_contract_compatible = (
+        isinstance(reference_prompt_field, str)
+        and prompt_field == reference_prompt_field
+        and reference_model_id is not None
+        and model_id == reference_model_id
+        and num_repetition == reference_num_repetition
+    )
+
+    task_kind = str(reference_manifest.get("task_kind", "math_freeform"))
+    manifest_seed = reference_manifest.get("seed", 0)
+    try:
+        seed = int(manifest_seed)
+    except Exception:
+        seed = 0
 
     primary_key, feature_views = _resolve_feature_views(args)
     feature_view_specs = {
@@ -354,8 +760,8 @@ def main() -> None:
         for key, spec in feature_views.items()
     }
 
-    train_pool_rows = _load_jsonl_rows(args.train_pool_jsonl)
-    eval_pool_rows = _load_jsonl_rows(args.eval_pool_jsonl)
+    train_pool_rows_by_sample_id = _rows_by_sample_id(_load_jsonl_rows(args.train_pool_jsonl))
+    eval_pool_rows_by_sample_id = _rows_by_sample_id(_load_jsonl_rows(args.eval_pool_jsonl))
 
     model, tokenizer, device = load_prefill_model_and_tokenizer(
         model_id=model_id,
@@ -370,6 +776,7 @@ def main() -> None:
         }
         for key, spec in feature_views.items()
     }
+    records_by_split: dict[str, list[SampleRecord]] = {}
 
     built_splits = _resolve_built_splits(reference_manifest, args.splits)
     print(
@@ -378,20 +785,36 @@ def main() -> None:
     )
 
     for split in built_splits:
+        target_kind = _resolve_reference_target_kind(reference_manifest, split=split)
         labels, sample_ids = _load_reference_split(
             reference_data_dir=args.reference_data_dir,
             manifest=reference_manifest,
             split=split,
         )
-        pool_rows = train_pool_rows if split == "train" else eval_pool_rows
+        pool_rows_by_sample_id = (
+            train_pool_rows_by_sample_id
+            if split == "train"
+            else eval_pool_rows_by_sample_id
+        )
+        livecodebench_prompt_lookup = None
+        if task_kind == "livecodebench_codegen":
+            livecodebench_prompt_lookup = _build_livecodebench_prompt_lookup(
+                reference_manifest=reference_manifest,
+                split=split,
+                model_id=model_id,
+            )
         records = _build_records(
-            pool_rows=pool_rows,
+            pool_rows_by_sample_id=pool_rows_by_sample_id,
             sample_ids=sample_ids,
             prompt_field=prompt_field,
+            task_kind=task_kind,
+            seed=seed,
             tokenizer=tokenizer,
             num_repetition=num_repetition,
             split=split,
+            livecodebench_prompt_lookup=livecodebench_prompt_lookup,
         )
+        records_by_split[split] = records
         features_by_key = extract_prefill_features_multi(
             model,
             tokenizer,
@@ -411,6 +834,7 @@ def main() -> None:
                 labels=labels,
                 sample_ids=sample_ids,
                 shard_size=args.shard_size,
+                target_kind=target_kind,
             )
             sample_shape = _sample_shape_from_features(features)
             prior_sample_shape = manifest_views[key].get("sample_shape")
@@ -423,8 +847,55 @@ def main() -> None:
             manifest_views[key]["input_dim"] = int(sample_shape[-1])
             manifest_views[key]["sample_shape"] = sample_shape
 
+    prompt_profile_metadata_compatible = (
+        prompt_profile_contract_compatible
+        and _reference_prompt_profile_rows_match_records(
+            reference_data_dir=args.reference_data_dir,
+            reference_manifest=reference_manifest,
+            records_by_split=records_by_split,
+        )
+    )
+    if (
+        not prompt_profile_metadata_compatible
+        and _is_prompt_profile_target_spec(reference_manifest.get("target_spec"))
+    ):
+        raise SystemExit(
+            "Cannot rebuild a prompt-profile target dataset unless the rebuilt "
+            "prompts still match the archived prompt-profile contract. Reuse the "
+            "original source pools or relabel from a fresh prompt-profile archive."
+        )
+
+    prompt_template_payload = reference_manifest.get("prompt_template")
+    if isinstance(prompt_template_payload, dict):
+        prompt_template_payload = dict(prompt_template_payload)
+        prompt_template_payload["num_repetition"] = num_repetition
+    else:
+        prompt_template_payload = {
+            "chat_template": True,
+            "num_repetition": num_repetition,
+            "source": "utils.build_prompt",
+        }
+
+    if prompt_profile_metadata_compatible:
+        prompt_profile_files = reference_manifest.get("prompt_profile_files")
+        if isinstance(prompt_profile_files, dict):
+            for rel_path in prompt_profile_files.values():
+                if isinstance(rel_path, str) and rel_path:
+                    _copy_reference_relpath(
+                        reference_data_dir=args.reference_data_dir,
+                        out_dir=args.out_dir,
+                        rel_path=rel_path,
+                    )
+        prompt_rollout_archive_file = reference_manifest.get("prompt_rollout_archive_file")
+        if isinstance(prompt_rollout_archive_file, str) and prompt_rollout_archive_file:
+            _copy_reference_relpath(
+                reference_data_dir=args.reference_data_dir,
+                out_dir=args.out_dir,
+                rel_path=prompt_rollout_archive_file,
+            )
+
     payload = {
-        "version": 4,
+        "version": 5,
         "created_from": args.reference_data_dir,
         "default_feature_key": primary_key,
         "feature_key": primary_key,
@@ -434,11 +905,7 @@ def main() -> None:
         "sample_shape": manifest_views[primary_key]["sample_shape"],
         "feature_views": manifest_views,
         "prompt_field": prompt_field,
-        "prompt_template": {
-            "chat_template": True,
-            "num_repetition": num_repetition,
-            "source": "utils.build_prompt",
-        },
+        "prompt_template": prompt_template_payload,
         "prefill_extraction": {
             "model_id": model_id,
             "trust_remote_code": trust_remote_code,
@@ -456,9 +923,20 @@ def main() -> None:
         "selection",
         "split_ratio",
         "split_source",
+        "task_kind",
         "test_spec",
+        "target_spec",
         "train_spec",
+        "answer_field",
+        "prompt_profile_files",
+        "prompt_rollout_archive_file",
+        "task_loader_config",
     ):
+        if (
+            key in {"prompt_profile_files", "prompt_rollout_archive_file"}
+            and not prompt_profile_metadata_compatible
+        ):
+            continue
         value = reference_manifest.get(key)
         if value is not None:
             payload[key] = value

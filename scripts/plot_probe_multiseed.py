@@ -214,6 +214,14 @@ def _plot_metric(
         ax.text(0.5, 0.5, "No data", ha="center", va="center")
 
 
+def _has_metric(by_seed: MetricSeries, key: str) -> bool:
+    for rows in by_seed.values():
+        for row in rows:
+            if _safe_float(row.get(key)) is not None:
+                return True
+    return False
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -238,9 +246,33 @@ def main() -> None:
         os.makedirs(out_dir, exist_ok=True)
 
     fig, axes = plt.subplots(2, 2, figsize=(12, 8))
-    _plot_metric(axes[0, 0], by_seed, "Accuracy", "train_accuracy", "accuracy")
-    _plot_metric(axes[0, 1], by_seed, "Macro-F1", "train_macro_f1", "macro_f1")
-    _plot_metric(axes[1, 0], by_seed, "ROC-AUC", "train_roc_auc", "roc_auc")
+    if _has_metric(by_seed, "eval_brier"):
+        _plot_metric(axes[0, 0], by_seed, "Brier", "train_brier", "eval_brier")
+        _plot_metric(axes[0, 1], by_seed, "MAE", "train_mae", "eval_mae")
+        _plot_metric(
+            axes[1, 0],
+            by_seed,
+            "Spearman",
+            "train_spearman",
+            "eval_spearman",
+        )
+    elif _has_metric(by_seed, "eval_mse"):
+        _plot_metric(axes[0, 0], by_seed, "MSE", "train_mse", "eval_mse")
+        _plot_metric(axes[0, 1], by_seed, "MAE", "train_mae", "eval_mae")
+        _plot_metric(
+            axes[1, 0],
+            by_seed,
+            "Spearman",
+            "train_spearman",
+            "eval_spearman",
+        )
+    else:
+        eval_accuracy_key = "eval_accuracy" if _has_metric(by_seed, "eval_accuracy") else "accuracy"
+        eval_macro_f1_key = "eval_macro_f1" if _has_metric(by_seed, "eval_macro_f1") else "macro_f1"
+        eval_roc_auc_key = "eval_roc_auc" if _has_metric(by_seed, "eval_roc_auc") else "roc_auc"
+        _plot_metric(axes[0, 0], by_seed, "Accuracy", "train_accuracy", eval_accuracy_key)
+        _plot_metric(axes[0, 1], by_seed, "Macro-F1", "train_macro_f1", eval_macro_f1_key)
+        _plot_metric(axes[1, 0], by_seed, "ROC-AUC", "train_roc_auc", eval_roc_auc_key)
     _plot_metric(axes[1, 1], by_seed, "Loss", "train_loss", None)
 
     run_name = os.path.basename(os.path.normpath(args.run_dir)) or args.run_dir

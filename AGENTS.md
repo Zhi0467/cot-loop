@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Focus
-This repository builds a chain-of-thought (CoT) loop detector from configurable activation views. The current focus is the repaired cross-dataset rollout-statistics rerun: `MATH-500`, `AIME`, `GPQA`, `MMLU-Pro`, and capped `LiveCodeBench release_v6` are now all recovered and reportable, with one explicit caveat that the crashed `LiveCodeBench` run left `avg_first_loop_prefix_length` irrecoverable even though the correctness / loop / max-length / native `pass@k` block was recovered.
+This repository builds a chain-of-thought (CoT) failure predictor from configurable activation views. The next full prompt-profile run is now locked to two train targets under one fixed prompt-prefill contract: regression `mean_relative_length = E[L / E]` and binary `majority_s_0.5`. `p_loop = E[1{rollout loops}]` remains implemented in-repo and still matters analytically, but it is no longer the default training objective for the next full pass. The clean execution object is: build one repeated-rollout archive per dataset, reuse that archive for both locked heads, train the ensemble view as the main surface, keep last-layer as the cheap control, and treat downstream bucket concentration as a diagnostic only. Repeated-rollout builds emit `diagnostics/prompt_rollout_archive.jsonl`, and `scripts/relabel_prompt_profile_dataset.py` can swap prompt-level targets onto a finished prompt-profile dataset without rerolling or re-extracting activations. The recovered five-dataset rollout bundle remains the empirical reference surface. The explicit `LiveCodeBench` caveat is unchanged: the crashed run still leaves `avg_first_loop_prefix_length` irrecoverable and prompt-level accuracy missing in the recovered projection artifact even though the correctness / loop / max-length / native `pass@k` block was partially recovered. Before launching work, read `docs/prompt-profile-eval-contract.md`, `docs/prompt-profile-risk-screen-2026-03-30.md`, and `docs/prompt-profile-full-train-plan-2026-04-02.md`.
 
 ## Project Structure & Module Organization
 - `src/loop_probe/`: Core library for prompt loading, prefill extraction, rollout generation, loop labeling, probe architectures, and training utilities.
@@ -9,14 +9,24 @@ This repository builds a chain-of-thought (CoT) loop detector from configurable 
 - `data/`: Local datasets and documentation. `data/README.md` defines the expected JSONL schema for non-HF local files.
 - `slurm/`: SLURM batch scripts for probe pipeline, generation, and prefill-stability experiments.
 - `outputs/`: Generated artifacts (prefill shards, checkpoints, metrics CSVs, figures).
+- `roadmap.md`: chronological experiment log and milestone status.
+- `backlog.md`: concrete next experiments and remaining measurement gaps.
 - `pyproject.toml` + `uv.lock`: Dependency definitions (Python >= 3.10).
+- `docs/prompt-profile-probe.md`: current prompt-profile implementation path and launch knobs.
+- `docs/prompt-profile-eval-contract.md`: exact prompt-profile target, baseline, and metric definitions; read this before making claims about prompt-length controls or `Spearman`/capture metrics.
 
 ## Build, Test, and Development Commands
 - Install dependencies: `uv sync`.
 - Build probe dataset shards:
   `python scripts/build_probe_dataset.py --train-dataset <dataset-or-jsonl> --train-split <split> --prompt-field <field> --model-preset openthinker3_1p5b --out-dir outputs/probe_data`.
+- Build prompt-profile dataset shards:
+  `python scripts/build_probe_dataset.py --train-dataset <dataset-or-jsonl> --train-split <split> --prompt-field <field> --target-kind probability --num-generations 10 --profile-tail-threshold 0.9 --out-dir outputs/probe_data`.
+- Build prompt-profile regression shards:
+  `python scripts/build_probe_dataset.py --train-dataset <dataset-or-jsonl> --train-split <split> --prompt-field <field> --target-kind regression --profile-target mean_relative_length --num-generations 10 --out-dir outputs/probe_data`.
 - Train probe:
   `python scripts/train_probe.py --data-dir outputs/probe_data --out-dir outputs/probe_runs/run1 --probe-preset linear --wandb-project cot-loop-probe`.
+- Train prompt-profile probe:
+  `python scripts/train_probe.py --data-dir outputs/probe_data --out-dir outputs/probe_runs/run1 --probe-preset mlp --classifier-mode ensemble --score-rule mean_prob --wandb-project cot-loop-probe`.
 - Run probe end-to-end on SLURM:
   `sbatch slurm/run_probe_train_e2e.sbatch`.
 - Generate rollout data for labeling/analysis (optional):

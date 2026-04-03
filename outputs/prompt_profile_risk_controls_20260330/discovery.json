@@ -1,0 +1,62 @@
+{
+  "aime": {
+    "display_name": "AIME",
+    "majority_ensemble_dir": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_majority05_aime_ensemble_seed0_20260322",
+    "majority_last_dir": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_majority05_aime_last_layer_seed0_20260322",
+    "mean_data_dir": "/data/scratch/murphy/outputs/cot-loop-detection/aime_mean_relative_from_archive_20260322",
+    "mean_ensemble_dir": "/data/scratch/murphy/outputs/cot-loop-detection/aime_mean_relative_from_archive_20260323_ensemble",
+    "mean_last_dir": "/data/scratch/murphy/outputs/cot-loop-detection/aime_mean_relative_from_archive_20260323_last_layer",
+    "p_loop_data_dir": "/data/scratch/murphy/outputs/cot-loop-detection/aime_p_loop_from_archive_20260322",
+    "p_loop_ensemble_dir": "/data/scratch/murphy/outputs/cot-loop-detection/aime_p_loop_from_archive_20260323_ensemble",
+    "p_loop_last_dir": "/data/scratch/murphy/outputs/cot-loop-detection/aime_p_loop_from_archive_20260323_last_layer",
+    "projection_root": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_projection_aime_majority05_seed0_20260322"
+  },
+  "gpqa": {
+    "display_name": "GPQA",
+    "majority_ensemble_dir": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_majority05_gpqa_ensemble_seed0_20260322",
+    "majority_last_dir": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_majority05_gpqa_last_layer_seed0_20260322",
+    "mean_data_dir": "/data/scratch/murphy/outputs/cot-loop-detection/gpqa_mean_relative_from_archive_20260322/data",
+    "mean_ensemble_dir": "/data/scratch/murphy/outputs/cot-loop-detection/gpqa_mean_relative_from_archive_20260323_ensemble",
+    "mean_last_dir": "/data/scratch/murphy/outputs/cot-loop-detection/gpqa_mean_relative_from_archive_20260323_last_layer",
+    "p_loop_data_dir": "/data/scratch/murphy/outputs/cot-loop-detection/gpqa_p_loop_from_archive_20260322/data",
+    "p_loop_ensemble_dir": "/data/scratch/murphy/outputs/cot-loop-detection/gpqa_p_loop_from_archive_20260323_ensemble",
+    "p_loop_last_dir": "/data/scratch/murphy/outputs/cot-loop-detection/gpqa_p_loop_from_archive_20260323_last_layer",
+    "projection_root": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_projection_gpqa_majority05_20260322"
+  },
+  "livecodebench": {
+    "display_name": "LiveCodeBench",
+    "majority_ensemble_dir": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_majority05_livecodebench_ensemble_seed0_20260323",
+    "majority_last_dir": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_majority05_livecodebench_last_layer_seed0_20260323",
+    "mean_data_dir": "/data/scratch/murphy/outputs/cot-loop-detection/livecodebench_mean_relative_from_archive_20260323",
+    "mean_ensemble_dir": "/data/scratch/murphy/outputs/cot-loop-detection/livecodebench_mean_relative_from_archive_20260323_ensemble",
+    "mean_last_dir": "/data/scratch/murphy/outputs/cot-loop-detection/livecodebench_mean_relative_from_archive_20260323_last_layer",
+    "p_loop_data_dir": "/data/scratch/murphy/outputs/cot-loop-detection/livecodebench_p_loop_from_archive_20260323",
+    "p_loop_ensemble_dir": "/data/scratch/murphy/outputs/cot-loop-detection/livecodebench_p_loop_from_archive_20260323_ensemble",
+    "p_loop_last_dir": "/data/scratch/murphy/outputs/cot-loop-detection/livecodebench_p_loop_from_archive_20260323_last_layer",
+    "projection_root": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_projection_livecodebench_majority05_seed0_20260323"
+  },
+  "math500": {
+    "display_name": "MATH-500",
+    "majority_ensemble_dir": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_majority05_math_ensemble_seed0_20260323",
+    "majority_last_dir": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_majority05_math_last_layer_seed0_20260323",
+    "mean_data_dir": "/data/scratch/murphy/outputs/cot-loop-detection/math_mean_relative_from_archive_20260323",
+    "mean_ensemble_dir": "/data/scratch/murphy/outputs/cot-loop-detection/math_mean_relative_from_archive_20260323_ensemble",
+    "mean_last_dir": "/data/scratch/murphy/outputs/cot-loop-detection/math_mean_relative_from_archive_20260323_last_layer",
+    "p_loop_data_dir": "/data/scratch/murphy/outputs/cot-loop-detection/math_p_loop_from_archive_20260323",
+    "p_loop_ensemble_dir": "/data/scratch/murphy/outputs/cot-loop-detection/math_p_loop_from_archive_20260323_ensemble",
+    "p_loop_last_dir": "/data/scratch/murphy/outputs/cot-loop-detection/math_p_loop_from_archive_20260323_last_layer",
+    "projection_root": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_projection_math500_majority05_seed0_20260322"
+  },
+  "mmlu_pro": {
+    "display_name": "MMLU-Pro",
+    "majority_ensemble_dir": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_majority05_mmlu_ensemble_seed0_20260322",
+    "majority_last_dir": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_majority05_mmlu_last_layer_seed0_20260322",
+    "mean_data_dir": "/data/scratch/murphy/outputs/cot-loop-detection/mmlu_mean_relative_from_archive_20260323",
+    "mean_ensemble_dir": "/data/scratch/murphy/outputs/cot-loop-detection/mmlu_mean_relative_from_archive_20260323_ensemble",
+    "mean_last_dir": "/data/scratch/murphy/outputs/cot-loop-detection/mmlu_mean_relative_from_archive_20260323_last_layer",
+    "p_loop_data_dir": "/data/scratch/murphy/outputs/cot-loop-detection/mmlu_p_loop_from_archive_20260323",
+    "p_loop_ensemble_dir": "/data/scratch/murphy/outputs/cot-loop-detection/mmlu_p_loop_from_archive_20260323_ensemble",
+    "p_loop_last_dir": "/data/scratch/murphy/outputs/cot-loop-detection/mmlu_p_loop_from_archive_20260323_last_layer",
+    "projection_root": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_projection_mmlu_majority05_seed0_20260322"
+  }
+}

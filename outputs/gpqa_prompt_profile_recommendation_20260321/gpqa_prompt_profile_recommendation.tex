@@ -1,0 +1,150 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{hyperref}
+
+\title{GPQA Prompt-Profile Predictor Recommendation After the First \texttt{s\_0.9} Pilot}
+\author{}
+\date{2026-03-21}
+
+\begin{document}
+\maketitle
+
+\paragraph{Bottom line.}
+The next predictor should still be a prompt-level terminal-statistics predictor
+from prefill activations, not another binary loop classifier. But after the
+first real 2026-03-21 GPQA pilot, I would \emph{not} keep
+\texttt{s\_0.9 = P(L / E >= 0.9)} as the sole first head. On this actual
+\texttt{GPQA}, \texttt{temperature=0.2}, \texttt{n=10}, \texttt{max\_tokens=30000}
+surface, \texttt{s\_0.9} collapsed exactly to \texttt{p(cap-hit)} prompt by
+prompt, so it did not deliver the intended cap-robust tail target. The next
+useful head should therefore be a denser terminal statistic:
+\begin{itemize}[leftmargin=1.5em]
+\item \textbf{ship next:} \texttt{mean\_relative\_length = E[L / E]}, and
+\item \textbf{optional event-style companion:} a lower-threshold tail event such
+as \texttt{s\_0.75} rather than \texttt{s\_0.9}.
+\end{itemize}
+Keep \texttt{p(max\_length\_hit)}, \texttt{p(loop)}, and correctness as
+diagnostic outputs, not the headline loss.
+
+\paragraph{Why the original \texttt{s\_0.9} idea was reasonable.}
+The 2026-03-16 common-policy rollout-stat bundle on GPQA under
+\texttt{Qwen/Qwen3-1.7B}, \texttt{temperature=0.2}, and \texttt{num\_generations=10}
+shows that the pathology lives in the long right tail rather than in a single
+binary cap-hit event:
+\begin{itemize}[leftmargin=1.5em]
+\item rollout success: \texttt{683/1980 = 34.5\%},
+\item looped rollouts: \texttt{325/1980 = 16.4\%},
+\item max-length hits: \texttt{137/1980 = 6.9\%},
+\item cap-hit conditional on loop: \texttt{137/325 = 42.2\%},
+\item loop conditional on cap-hit: \texttt{137/137 = 100.0\%},
+\item average generation length: \texttt{9.7k} tokens,
+\item average looped generation length: \texttt{23.5k} tokens.
+\end{itemize}
+So cap-hit is a precise fixed-policy alarm, but it only captures about
+\texttt{42\%} of looped GPQA rollouts. That is why a tail-profile target was the
+right initial direction: raw cap-hit alone discards much of the long-tail
+behavior and is too tied to the chosen ceiling.
+
+\paragraph{What the first real pilot changed.}
+The resumed 2026-03-21 GPQA pilot completed end to end on a \texttt{32 / 16}
+prompt split and produced the first actual \texttt{s\_0.9} probe artifact.
+The important findings are:
+\begin{itemize}[leftmargin=1.5em]
+\item \texttt{s\_0.9} equals \texttt{p(cap-hit)} for \emph{every} prompt in this
+pilot's archive; there were no prompts with substantial mass in the
+\texttt{0.9E} to \texttt{E} band that avoided exact cap hits.
+\item The target is very sparse: train target mean \texttt{0.0531}, test target
+mean \texttt{0.1063}, with only \texttt{1/32} train prompts and \texttt{2/16}
+test prompts at or above \texttt{0.5}.
+\item The trained ensemble does not yet beat a constant baseline:
+\begin{itemize}[leftmargin=1.5em]
+\item probe eval Brier \texttt{0.03456} vs constant-baseline Brier
+\texttt{0.03434},
+\item probe eval MAE \texttt{0.13843} vs constant-baseline MAE
+\texttt{0.13516},
+\item eval Spearman \texttt{-0.2799}.
+\end{itemize}
+\item Prompt length still carries moderate signal into the target
+(\texttt{Spearman(prompt\_len, s\_0.9) = 0.43} on test), so the leakage check
+remains necessary.
+\end{itemize}
+This is enough to say that, on the current GPQA/\texttt{30k} surface,
+\texttt{s\_0.9} is still too close to cap-hit to be the best first objective.
+
+\paragraph{Concrete build.}
+The first useful predictor should be:
+\begin{enumerate}[leftmargin=1.5em]
+\item \textbf{Dataset.} Same-source, prompt-disjoint GPQA split with the repaired
+multiple-choice prompt formatter. Keep the decode policy fixed at
+\texttt{temperature=0.2}, \texttt{num\_generations=10},
+\texttt{max\_model\_len=40960}, and the current long rollout cap.
+\item \textbf{Inputs.} Prefill activations only, using the last prompt token.
+Do not concatenate all layers into one input vector. Instead compare:
+\begin{itemize}[leftmargin=1.5em]
+\item one last-layer MLP probe, and
+\item one MLP per layer with probability aggregation by \texttt{mean\_prob}.
+\end{itemize}
+\item \textbf{Loss.} Use a dense terminal-statistics head first:
+\begin{itemize}[leftmargin=1.5em]
+\item regression on \texttt{mean\_relative\_length} for the next run, or
+\item if an event target is preferred, lower the tail threshold toward the actual
+GPQA loop-length regime (roughly \texttt{23.5k / 30k \(\approx\) 0.78}), for
+example \texttt{s\_0.75} rather than \texttt{s\_0.9}.
+\end{itemize}
+Keep correctness out of the first loss so the model does not mostly learn task
+difficulty.
+\item \textbf{Evaluation.} Use probability-target metrics:
+\texttt{Brier}, \texttt{MAE}, \texttt{Spearman}, and top-bucket capture for
+probability targets, or \texttt{MSE}/\texttt{MAE}/\texttt{Spearman} for the
+regression head. Report \texttt{p(max\_length\_hit)}, \texttt{p(loop)}, and
+correctness only as downstream diagnostics on the same prompts.
+\item \textbf{Baselines.} Hard-benchmark against prompt token count and effective
+budget $E$ alone. The probe is only interesting if it beats those leakage-style
+baselines.
+\end{enumerate}
+
+\paragraph{Recommended next sequence.}
+\begin{enumerate}[leftmargin=1.5em]
+\item Reuse the finished GPQA rollout archive to train a \texttt{mean\_relative\_length}
+head on the same prompts and same prefill features.
+\item If an event-style target is still wanted, rebuild only the labels from the
+same archive at a lower threshold such as \texttt{s\_0.75}.
+\item Keep \texttt{p(max\_length\_hit)} and \texttt{p(loop)} as readout
+diagnostics rather than the main objective.
+\end{enumerate}
+
+\paragraph{Same-archive regression check.}
+That first follow-up is already done on the exact same \texttt{32 / 16} prompts,
+with no second rollout. The denser target is directionally better than
+\texttt{s\_0.9} but still not good enough to call the predictor useful:
+\begin{itemize}[leftmargin=1.5em]
+\item best \texttt{mean\_relative\_length} run: eval MSE \texttt{0.0503}, eval
+MAE \texttt{0.1549}, eval Spearman \texttt{+0.0647};
+\item constant baseline on the same test targets: MSE \texttt{0.0311}, MAE
+\texttt{0.1342};
+\item prompt-length-only linear fit on the same split: MSE \texttt{0.0422}, MAE
+\texttt{0.1425}.
+\end{itemize}
+So the target swap helps the rank correlation sign, but it does not yet beat
+very weak baselines on a \texttt{48}-prompt pilot. The practical implication is
+that the next round should keep the denser target \emph{and} grow prompt count,
+instead of treating this micro-pilot as evidence that the predictor is already
+working.
+
+\paragraph{Current pilot status.}
+The resumed 2026-03-21 GPQA pilot on GPUs \texttt{0-2} finished cleanly in
+\texttt{37m22s}. It produced the full dataset archive, diagnostics, and probe
+checkpoints, so the blocker is no longer runtime feasibility. The blocker is now
+pilot scale plus objective choice: the fixed architecture and in-distribution
+setup are workable, but \texttt{s\_0.9} at this cap is not yet a useful target,
+and the denser same-archive regression head still needs more prompts before it
+can be taken seriously.
+
+\end{document}

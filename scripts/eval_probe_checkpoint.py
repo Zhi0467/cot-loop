@@ -172,6 +172,8 @@ def _evaluate(
     *,
     classifier_mode: str,
     resolved_classifier_layer: int | None,
+    target_kind: str,
+    score_rule: str,
 ) -> dict[str, float]:
     model.eval()
     all_logits = []
@@ -194,7 +196,34 @@ def _evaluate(
         labels_cat,
         logits_cat,
         classifier_mode=classifier_mode,
+        target_kind=target_kind,
+        score_rule=score_rule,
     )
+
+
+def _resolve_target_spec_from_manifest(manifest: dict[str, Any]) -> dict[str, object]:
+    target_spec = manifest.get("target_spec")
+    if isinstance(target_spec, dict):
+        return target_spec
+    label_spec = manifest.get("label_spec")
+    if isinstance(label_spec, dict):
+        return {
+            "kind": "binary",
+            "name": label_spec.get("target", "eventual_loop"),
+            "horizon": label_spec.get("horizon"),
+        }
+    return {
+        "kind": "binary",
+        "name": "eventual_loop",
+        "horizon": None,
+    }
+
+
+def _resolve_target_spec_from_checkpoint(payload: dict[str, Any]) -> dict[str, object] | None:
+    target_spec = payload.get("target_spec")
+    if isinstance(target_spec, dict):
+        return target_spec
+    return None
 
 
 def main() -> None:
@@ -212,6 +241,16 @@ def main() -> None:
 
     checkpoint_feature_key = payload.get("feature_key")
     manifest = read_manifest(args.data_dir)
+    target_spec = _resolve_target_spec_from_manifest(manifest)
+    checkpoint_target_spec = _resolve_target_spec_from_checkpoint(payload)
+    if checkpoint_target_spec is not None and checkpoint_target_spec != target_spec:
+        raise SystemExit(
+            "Checkpoint target_spec does not match dataset target_spec: "
+            f"{checkpoint_target_spec} vs {target_spec}"
+        )
+    target_kind = str(target_spec.get("kind", "binary"))
+    if target_kind not in ("binary", "probability", "regression"):
+        raise SystemExit(f"Unsupported manifest target kind '{target_kind}'.")
     resolved_feature_key_arg = args.feature_key
     if (
         (resolved_feature_key_arg is None or resolved_feature_key_arg == "")
@@ -276,6 +315,8 @@ def main() -> None:
         device,
         classifier_mode=probe_cfg.classifier_mode,
         resolved_classifier_layer=resolved_classifier_layer,
+        target_kind=target_kind,
+        score_rule=probe_cfg.score_rule,
     )
 
     out = {
@@ -283,6 +324,8 @@ def main() -> None:
         "data_dir": args.data_dir,
         "split": args.split,
         "feature_key": resolved_feature_key,
+        "target_kind": target_kind,
+        "target_spec": target_spec,
         "input_dim": input_dim,
         "sample_shape": list(sample_shape),
         "classifier_mode": probe_cfg.classifier_mode,
