@@ -1,6 +1,6 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-03 23:17 UTC
+Last updated: 2026-04-03 23:49 UTC
 
 ## Immediate Next Experiments
 
@@ -26,6 +26,8 @@ Last updated: 2026-04-03 23:17 UTC
   - The finished metadata + bucket pass still does not justify reopening it by default.
   - Only reopen `p_cap` if a later slice shows cap-hit isolation matters beyond what the locked pair and `p_loop` already surface.
 
+This should be similar to our previous experiments on training probes on loop label, only with different labels this time; reuse as much as possible. Come back with similar reports as we did with the previous loop label experiments.
+
 ## Fixed Experimental Surface
 
 - Keep the predictor input to prompt-prefill activations only.
@@ -49,15 +51,8 @@ Last updated: 2026-04-03 23:17 UTC
 - The original `LiveCodeBench` job crashed after grading and before writing its final JSON. Replay-based repair did not recover `avg_first_loop_prefix_length` exactly. That metric remains `null` in the recovered capped bundle. A fresh rerun would be required if exact prefix-length telemetry is still needed.
 - The recovered `LiveCodeBench` prompt-projection artifact still lacks prompt-level correctness, so the completed bucket test cannot report prompt-level accuracy there.
 
-## Open Implementation Issues
-
-- This workspace still does not have a local Torch runtime / project virtualenv. Code paths are syntax-checked locally; real Torch-backed build/train execution requires the remote pilot window.
-
 ## Conditional Next Step
 
 - The metadata-baseline pass and top-risk-bucket comparison no longer leave the binary-head choice unsettled. Keep direct `p_cap` closed unless a later contradictory slice forces it back open.
 
-## Open Review Surfaces
-
-- Upstream PR #7 (`Zhi0467/cot-loop`, branch `task/1773870804-prompt-profile-probe`) — prompt-profile implementation.
-- Upstream PR #6 (`Zhi0467/cot-loop`, branch `task/1773451376-common-policy-refresh`) — common-policy rollout bundle.
+Use GPU node for this, 2 GPUs.
