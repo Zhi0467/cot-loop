@@ -10,6 +10,7 @@ import os
 import random
 import re
 import sys
+import zlib
 from dataclasses import asdict
 
 import torch
@@ -556,6 +557,28 @@ def _load_task_records(
             livecodebench_repo,
             effective_release_version,
         )
+        normalized_split = str(spec.split).strip().lower()
+        if normalized_split not in ("", "all", "train", "validation", "val", "test"):
+            raise SystemExit(
+                "Unsupported LiveCodeBench split "
+                f"'{spec.split}'. Use one of train/validation/test/all."
+            )
+        if normalized_split not in ("", "all"):
+            def _partition_bucket(question_id: object) -> int:
+                return zlib.crc32(str(question_id).encode("utf-8")) % 10
+
+            if normalized_split == "train":
+                benchmark = [
+                    row for row in benchmark if _partition_bucket(row.question_id) < 8
+                ]
+            elif normalized_split in ("validation", "val"):
+                benchmark = [
+                    row for row in benchmark if _partition_bucket(row.question_id) == 8
+                ]
+            else:
+                benchmark = [
+                    row for row in benchmark if _partition_bucket(row.question_id) == 9
+                ]
         prompt_records, _lm_style = livecodebench_codegen.build_prompts(
             benchmark,
             format_prompt,
@@ -597,9 +620,7 @@ def _same_task_source(
     task_kind: str,
 ) -> bool:
     if task_kind == "livecodebench_codegen":
-        if os.path.isfile(a.dataset) or os.path.isfile(b.dataset):
-            return _same_data_source(a, b)
-        return a.dataset == b.dataset and a.config == b.config
+        return _same_data_source(a, b)
     return _same_data_source(a, b)
 
 
