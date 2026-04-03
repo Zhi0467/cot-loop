@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-04-03 23:15 UTC
+Last updated: 2026-04-03 23:17 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -41,6 +41,7 @@ Current live status:
 - The note `prompt-profile-plain-language-2026-03-30.md` is the collaborator-facing explanation of the same correction in plain words.
 - The note `understand-where-loop-and-max-length-come-from.md` is the exact label-semantics surface for `loop`, prompt-profile `cap_hit` / `p_cap`, rollout-stat `max_length_hit`, and `majority_s_0.5`.
 - The locked pair now has a canonical execution note and PDF on disk, so the next step is the run itself rather than another planning pass.
+- The run surface is now executable rather than purely documentary: `scripts/run_prompt_profile_full_train.py` is the canonical launcher, and `scripts/summarize_prompt_profile_full_train.py` is the canonical post-run ledger for the locked pair plus metadata controls.
 - The reset note `thread-reset-2026-03-25.md` is now the correct restart surface for Slack follow-up. It captures the collaborator's recent corrections, the proved-vs-unproved ledger, and the exact next work order.
 - `roadmap.md` is the chronological experiment log; `backlog.md` now carries the next objective run under the corrected selection rule.
 - `LiveCodeBench` is no longer pending, but its recovered projection artifact still lacks prompt-level accuracy.
