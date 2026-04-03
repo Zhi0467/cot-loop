@@ -838,12 +838,23 @@ def _resolve_split_source(
 def _task_loader_config(args: argparse.Namespace) -> dict[str, object] | None:
     if args.task_kind != "livecodebench_codegen":
         return None
+
     repo_path = str(args.livecodebench_repo).strip()
     return {
         "livecodebench_repo": os.path.realpath(repo_path) if repo_path else "",
         "release_version": str(args.release_version),
-        "lm_style_override": "" if args.lm_style_override in (None, "") else str(args.lm_style_override),
+        "lm_style_override": (
+            ""
+            if args.lm_style_override in (None, "")
+            else str(args.lm_style_override)
+        ),
     }
+
+
+def _manifest_answer_field(task_kind: str, answer_field: str) -> str | None:
+    if task_kind == "math_freeform":
+        return str(answer_field)
+    return None
 
 
 def _split_shards_exist(out_dir: str, split_info: object) -> bool:
@@ -912,7 +923,7 @@ def _probe_cache_status(
 
     expected = {
         "prompt_field": prompt_field,
-        "answer_field": answer_field,
+        "answer_field": _manifest_answer_field(task_kind, answer_field),
         "task_kind": task_kind,
         "split_source": split_source,
         "loop_detector": {"n": loop_n, "k": loop_k},
@@ -2047,8 +2058,9 @@ def main() -> None:
         "feature_views": feature_views_manifest,
         "task_kind": str(args.task_kind),
         "prompt_field": args.prompt_field,
-        "answer_field": (
-            str(args.answer_field) if args.task_kind == "math_freeform" else None
+        "answer_field": _manifest_answer_field(
+            str(args.task_kind),
+            str(args.answer_field),
         ),
         "prompt_template": {
             "source": (

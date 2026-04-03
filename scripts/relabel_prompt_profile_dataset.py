@@ -675,6 +675,7 @@ def main() -> None:
         "feature_views": feature_views_manifest or None,
         "task_kind": source_manifest.get("task_kind"),
         "prompt_field": source_manifest.get("prompt_field"),
+        "answer_field": source_manifest.get("answer_field"),
         "prompt_template": source_manifest.get("prompt_template"),
         "split_source": source_manifest.get("split_source"),
         "split_ratio": source_manifest.get("split_ratio"),
@@ -697,6 +698,7 @@ def main() -> None:
         "prompt_profile_source_archive_file": archive_rel_path,
         "train_spec": source_manifest.get("train_spec"),
         "test_spec": source_manifest.get("test_spec"),
+        "task_loader_config": source_manifest.get("task_loader_config"),
         "train": primary_train_meta,
         "test": primary_test_meta,
     }
