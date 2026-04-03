@@ -649,6 +649,7 @@ def _split_source_uses_ratio(split_source: str) -> bool:
 
 def _uses_native_test_split(task_kind: str) -> bool:
     return task_kind in {
+        "multiple_choice_gpqa",
         "multiple_choice_mmlupro",
         "livecodebench_codegen",
     }
