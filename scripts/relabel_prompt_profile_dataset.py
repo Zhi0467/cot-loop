@@ -263,18 +263,48 @@ def _subset_labels(values: list[int | float], keep_indices: list[int]) -> list[i
     return [values[idx] for idx in keep_indices]
 
 
-def _load_archive_index(
+def _resolve_archive_source(
     source_dir: str,
     manifest: dict[str, object],
-) -> tuple[dict[tuple[str, int], dict[str, object]], str]:
+) -> tuple[str, str]:
+    upstream_source_dir = manifest.get("prompt_profile_source_dir")
+    upstream_rel_path = manifest.get("prompt_profile_source_archive_file")
+    if isinstance(upstream_source_dir, str) and upstream_source_dir:
+        if not isinstance(upstream_rel_path, str) or not upstream_rel_path:
+            raise SystemExit(
+                "Source manifest has prompt_profile_source_dir but is missing "
+                "prompt_profile_source_archive_file."
+            )
+        archive_path = os.path.join(upstream_source_dir, upstream_rel_path)
+        if not os.path.exists(archive_path):
+            raise SystemExit(
+                "Recorded prompt-profile source archive not found: "
+                f"{archive_path}"
+            )
+        return upstream_source_dir, upstream_rel_path
+
     rel_path = manifest.get("prompt_rollout_archive_file")
     if not isinstance(rel_path, str) or not rel_path:
         raise SystemExit("Source manifest is missing prompt_rollout_archive_file.")
-    archive_path = os.path.join(source_dir, rel_path)
+    return source_dir, rel_path
+
+
+def _load_archive_index(
+    source_dir: str,
+    manifest: dict[str, object],
+) -> tuple[
+    dict[tuple[str, int], dict[str, object]],
+    dict[str, list[dict[str, object]]],
+    str,
+    str,
+]:
+    archive_source_dir, rel_path = _resolve_archive_source(source_dir, manifest)
+    archive_path = os.path.join(archive_source_dir, rel_path)
     if not os.path.exists(archive_path):
         raise SystemExit(f"Prompt rollout archive not found: {archive_path}")
 
     index: dict[tuple[str, int], dict[str, object]] = {}
+    rows_by_split: dict[str, list[dict[str, object]]] = {}
     for row in _read_jsonl(archive_path):
         split = row.get("split")
         sample_id = row.get("sample_id")
@@ -286,7 +316,8 @@ def _load_archive_index(
         if key in index:
             raise SystemExit(f"Duplicate archive row for split/sample_id {key}.")
         index[key] = row
-    return index, rel_path
+        rows_by_split.setdefault(split, []).append(row)
+    return index, rows_by_split, archive_source_dir, rel_path
 
 
 def _profile_from_archive_row(
@@ -525,7 +556,9 @@ def main() -> None:
     out_dir = os.path.abspath(args.out_dir)
 
     source_manifest = read_manifest(source_dir)
-    archive_index, archive_rel_path = _load_archive_index(source_dir, source_manifest)
+    archive_index, archive_rows_by_split, archive_source_dir, archive_rel_path = (
+        _load_archive_index(source_dir, source_manifest)
+    )
 
     if args.target_kind != "binary" and (
         args.balance_train != "none" or args.balance_test != "none"
@@ -571,15 +604,33 @@ def main() -> None:
             f"{missing_train_ids[:10]} / {missing_test_ids[:10]}"
         )
 
-    train_labels, train_profile_rows, train_archive_rows = _rows_for_split(
+    train_labels, train_profile_rows, _ = _rows_for_split(
         "train",
         train_sample_ids,
         archive_index,
         target_spec=target_spec,
     )
-    test_labels, test_profile_rows, test_archive_rows = _rows_for_split(
+    test_labels, test_profile_rows, _ = _rows_for_split(
         "test",
         test_sample_ids,
+        archive_index,
+        target_spec=target_spec,
+    )
+    full_train_archive_ids = [
+        int(row["sample_id"]) for row in archive_rows_by_split.get("train", [])
+    ]
+    full_test_archive_ids = [
+        int(row["sample_id"]) for row in archive_rows_by_split.get("test", [])
+    ]
+    _, _, full_train_archive_rows = _rows_for_split(
+        "train",
+        full_train_archive_ids,
+        archive_index,
+        target_spec=target_spec,
+    )
+    _, _, full_test_archive_rows = _rows_for_split(
+        "test",
+        full_test_archive_ids,
         archive_index,
         target_spec=target_spec,
     )
@@ -605,8 +656,6 @@ def main() -> None:
     test_labels = _subset_labels(test_labels, test_keep_idx)
     train_profile_rows = _subset_rows(train_profile_rows, train_keep_idx)
     test_profile_rows = _subset_rows(test_profile_rows, test_keep_idx)
-    train_archive_rows = _subset_rows(train_archive_rows, train_keep_idx)
-    test_archive_rows = _subset_rows(test_archive_rows, test_keep_idx)
     kept_train_ids = _subset_labels(train_sample_ids, train_keep_idx)
     kept_test_ids = _subset_labels(test_sample_ids, test_keep_idx)
 
@@ -678,7 +727,7 @@ def main() -> None:
     _write_jsonl_rows(os.path.join(out_dir, test_profile_path), test_profile_rows)
     _write_jsonl_rows(
         os.path.join(out_dir, prompt_rollout_archive_path),
-        train_archive_rows + test_archive_rows,
+        full_train_archive_rows + full_test_archive_rows,
     )
 
     manifest = {
@@ -713,7 +762,7 @@ def main() -> None:
             "test": test_profile_path,
         },
         "prompt_rollout_archive_file": prompt_rollout_archive_path,
-        "prompt_profile_source_dir": source_dir,
+        "prompt_profile_source_dir": archive_source_dir,
         "prompt_profile_source_archive_file": archive_rel_path,
         "train_spec": source_manifest.get("train_spec"),
         "test_spec": source_manifest.get("test_spec"),

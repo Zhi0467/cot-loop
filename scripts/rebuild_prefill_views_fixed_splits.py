@@ -311,10 +311,64 @@ def _reference_split_spec(
     if split == "test":
         fallback = reference_manifest.get("train_spec")
         if isinstance(fallback, dict):
-            fallback_payload = dict(fallback)
-            fallback_payload["split"] = "test"
-            return fallback_payload
+            return dict(fallback)
     raise SystemExit(f"Reference manifest is missing a usable {split}_spec payload.")
+
+
+def _payload_optional_int(payload: dict[str, object], key: str) -> int | None:
+    value = payload.get(key)
+    if value in (None, ""):
+        return None
+    try:
+        return int(value)
+    except Exception as exc:
+        raise SystemExit(
+            f"Reference manifest field {key!r} must be an integer or null, got {value!r}."
+        ) from exc
+
+
+def _livecodebench_lookup_spec(
+    reference_manifest: dict[str, object],
+    *,
+    split: str,
+) -> dict[str, object]:
+    split_source = str(reference_manifest.get("split_source", "")).strip()
+    train_spec = reference_manifest.get("train_spec")
+    test_spec = reference_manifest.get("test_spec")
+
+    if split_source == "same_train_test_source_count_split":
+        if not isinstance(train_spec, dict) or not isinstance(test_spec, dict):
+            raise SystemExit(
+                "LiveCodeBench fixed-split rebuild requires train_spec and test_spec "
+                "for same_train_test_source_count_split manifests."
+            )
+        lookup_spec = dict(train_spec)
+        train_max = _payload_optional_int(train_spec, "max_samples")
+        test_max = _payload_optional_int(test_spec, "max_samples")
+        if train_max is None or test_max is None:
+            raise SystemExit(
+                "LiveCodeBench fixed-split rebuild requires integer train/test "
+                "max_samples for same_train_test_source_count_split manifests."
+            )
+        lookup_spec["max_samples"] = train_max + test_max
+        return lookup_spec
+
+    if split_source in {
+        "single_dataset_split",
+        "same_train_test_spec_split",
+        "same_train_test_source_ratio_split",
+    }:
+        if not isinstance(train_spec, dict):
+            raise SystemExit(
+                "LiveCodeBench fixed-split rebuild requires train_spec in the "
+                "reference manifest."
+            )
+        lookup_spec = dict(train_spec)
+        if split_source == "same_train_test_source_ratio_split":
+            lookup_spec["max_samples"] = None
+        return lookup_spec
+
+    return _reference_split_spec(reference_manifest, split=split)
 
 
 def _build_livecodebench_prompt_lookup(
@@ -350,9 +404,9 @@ def _build_livecodebench_prompt_lookup(
         else str(lm_style_override_raw)
     )
 
-    split_spec = _reference_split_spec(reference_manifest, split=split)
+    lookup_spec = _livecodebench_lookup_spec(reference_manifest, split=split)
     effective_release_version = (
-        str(split_spec.get("config", "")).strip() or default_release_version
+        str(lookup_spec.get("config", "")).strip() or default_release_version
     )
     benchmark, format_prompt = livecodebench_codegen.load_benchmark(
         repo_path,
@@ -360,9 +414,9 @@ def _build_livecodebench_prompt_lookup(
     )
     benchmark = _partition_livecodebench_benchmark(
         benchmark,
-        split_spec.get("split", split),
+        lookup_spec.get("split", split),
     )
-    max_samples_raw = split_spec.get("max_samples")
+    max_samples_raw = lookup_spec.get("max_samples")
     if max_samples_raw in (None, ""):
         max_samples = None
     else:

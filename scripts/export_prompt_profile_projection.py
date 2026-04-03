@@ -126,7 +126,7 @@ def write_csv(path: Path, fieldnames: list[str], rows: list[dict[str, Any]]) -> 
 
 def resolve_projection_vectors(features: torch.Tensor, projection_view: str) -> np.ndarray:
     if features.ndim == 2:
-        if projection_view != "last_layer":
+        if projection_view not in {"last_layer", "all_layers_flat"}:
             raise SystemExit(
                 f"--projection-view={projection_view!r} requires stacked [layer, hidden] "
                 "features, but the loaded shards are already flat."

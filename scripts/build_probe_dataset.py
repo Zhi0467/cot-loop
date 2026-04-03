@@ -1968,8 +1968,6 @@ def main() -> None:
     if target_source == "prompt_profile":
         train_profile_rows = [train_profile_rows[idx] for idx in train_keep_idx]
         test_profile_rows = [test_profile_rows[idx] for idx in test_keep_idx]
-        train_archive_rows = [train_archive_rows[idx] for idx in train_keep_idx]
-        test_archive_rows = [test_archive_rows[idx] for idx in test_keep_idx]
     train_keep_idx_t = torch.tensor(train_keep_idx, dtype=torch.long)
     test_keep_idx_t = torch.tensor(test_keep_idx, dtype=torch.long)
 
