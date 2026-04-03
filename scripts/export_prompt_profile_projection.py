@@ -132,6 +132,24 @@ def resolve_projection_vectors(features: torch.Tensor, projection_view: str) -> 
     raise SystemExit(f"Unsupported projection view '{projection_view}'.")
 
 
+def project_2d(vectors: np.ndarray) -> tuple[np.ndarray, list[float]]:
+    num_points = int(vectors.shape[0])
+    if num_points < 1:
+        raise SystemExit("Expected at least one feature row for projection.")
+    if num_points == 1:
+        return np.zeros((1, 2), dtype=float), []
+
+    n_components = min(2, num_points, int(vectors.shape[1]))
+    pca = PCA(n_components=n_components)
+    coords = pca.fit_transform(vectors)
+    if coords.shape[1] == 1:
+        coords = np.concatenate(
+            [coords, np.zeros((coords.shape[0], 1), dtype=coords.dtype)],
+            axis=1,
+        )
+    return coords, [float(x) for x in pca.explained_variance_ratio_]
+
+
 def load_split_features(
     data_dir: Path,
     split_name: str,
@@ -189,42 +207,88 @@ def unique_specs(manifest: dict[str, Any], *, args: argparse.Namespace) -> list[
 def build_correctness_lookup(
     manifest: dict[str, Any],
     *,
-    sample_ids: set[int],
+    sample_keys: set[tuple[str, int]],
     args: argparse.Namespace,
-) -> tuple[dict[int, dict[str, Any]], str]:
+) -> tuple[dict[tuple[str, int], dict[str, Any]], str]:
     task_kind = str(manifest.get("task_kind", ""))
     prompt_field = str(manifest.get("prompt_field", "question"))
+    explicit_answer_field = manifest.get("answer_field")
+    answer_field = (
+        str(explicit_answer_field)
+        if isinstance(explicit_answer_field, str) and explicit_answer_field
+        else "answer"
+    )
+    sample_ids_by_split: dict[str, set[int]] = {}
+    for split_name, sample_id in sample_keys:
+        sample_ids_by_split.setdefault(split_name, set()).add(sample_id)
+    try:
+        gpqa_seed = int(manifest.get("seed", 0))
+    except Exception:
+        gpqa_seed = 0
     if task_kind == "multiple_choice_gpqa":
-        lookup: dict[int, dict[str, Any]] = {}
-        for spec in unique_specs(manifest, args=args):
+        lookup: dict[tuple[str, int], dict[str, Any]] = {}
+        for split_name in ("train", "test"):
+            spec_payload = manifest.get(f"{split_name}_spec")
+            if spec_payload is None:
+                continue
+            sample_ids = sample_ids_by_split.get(split_name, set())
+            if not sample_ids:
+                continue
+            spec = spec_from_manifest(spec_payload, args=args)
             for record, _options, gold_letter in multiple_choice_gpqa.load_and_shuffle(
                 spec,
-                int(manifest["seed"]),
+                gpqa_seed,
             ):
                 if record.sample_id in sample_ids:
-                    lookup[record.sample_id] = {"gold_letter": gold_letter}
+                    lookup[(split_name, record.sample_id)] = {"gold_letter": gold_letter}
         return lookup, task_kind
     if task_kind == "multiple_choice_mmlupro":
         lookup = {}
-        for spec in unique_specs(manifest, args=args):
+        for split_name in ("train", "test"):
+            spec_payload = manifest.get(f"{split_name}_spec")
+            if spec_payload is None:
+                continue
+            sample_ids = sample_ids_by_split.get(split_name, set())
+            if not sample_ids:
+                continue
+            spec = spec_from_manifest(spec_payload, args=args)
             for record, _options, gold_answer, gold_index in multiple_choice_mmlupro.load_samples(
                 spec
             ):
                 if record.sample_id in sample_ids:
-                    lookup[record.sample_id] = {
+                    lookup[(split_name, record.sample_id)] = {
                         "gold_answer": gold_answer,
                         "gold_index": gold_index,
                     }
         return lookup, task_kind
     if task_kind == "math_freeform":
         lookup = {}
-        for spec in unique_specs(manifest, args=args):
-            for record, gold_answer in math_freeform.load_samples(
-                spec,
-                question_field=prompt_field,
-            ):
-                if record.sample_id in sample_ids:
-                    lookup[record.sample_id] = {"gold_answer": gold_answer}
+        try:
+            for split_name in ("train", "test"):
+                spec_payload = manifest.get(f"{split_name}_spec")
+                if spec_payload is None:
+                    continue
+                sample_ids = sample_ids_by_split.get(split_name, set())
+                if not sample_ids:
+                    continue
+                spec = spec_from_manifest(spec_payload, args=args)
+                for record, gold_answer in math_freeform.load_samples(
+                    spec,
+                    question_field=prompt_field,
+                    answer_field=answer_field,
+                ):
+                    if record.sample_id in sample_ids:
+                        lookup[(split_name, record.sample_id)] = {"gold_answer": gold_answer}
+        except SystemExit:
+            if isinstance(explicit_answer_field, str) and explicit_answer_field:
+                raise
+            print(
+                "[export-prompt-profile] Skipping math correctness reconstruction "
+                "because the manifest does not record answer_field metadata.",
+                file=sys.stderr,
+                flush=True,
+            )
+            return {}, task_kind
         return lookup, task_kind
     return {}, task_kind
 
@@ -309,7 +373,14 @@ def choose_clusters(coords: np.ndarray, *, max_clusters: int) -> tuple[np.ndarra
             "candidate_scores": [],
         }
 
-    max_k = max(2, min(int(max_clusters), num_points - 1))
+    max_k = min(int(max_clusters), num_points - 1)
+    if max_k < 2:
+        return np.zeros(num_points, dtype=int), {
+            "k": 1,
+            "silhouette": None,
+            "inertia": 0.0,
+            "candidate_scores": [],
+        }
     best: dict[str, Any] | None = None
     candidate_scores: list[dict[str, Any]] = []
     for k in range(2, max_k + 1):
@@ -686,8 +757,7 @@ def main() -> None:
         raise SystemExit(f"No feature shards found under '{data_dir}'.")
 
     vectors = np.stack([row["vector"] for row in feature_rows], axis=0)
-    pca = PCA(n_components=2)
-    coords = pca.fit_transform(vectors)
+    coords, explained_variance_ratio = project_2d(vectors)
     cluster_ids, cluster_summary = choose_clusters(
         coords,
         max_clusters=int(args.max_clusters),
@@ -711,10 +781,12 @@ def main() -> None:
         (str(row["split"]), int(row["sample_id"])): row for row in archive_rows
     }
 
-    sample_id_set = {int(row["sample_id"]) for row in feature_rows}
+    sample_key_set = {
+        (str(row["split"]), int(row["sample_id"])) for row in feature_rows
+    }
     correctness_lookup, task_kind = build_correctness_lookup(
         manifest,
-        sample_ids=sample_id_set,
+        sample_keys=sample_key_set,
         args=args,
     )
 
@@ -733,7 +805,7 @@ def main() -> None:
             missing_archive.append(key)
             continue
 
-        sample_meta = correctness_lookup.get(int(feature_row["sample_id"]))
+        sample_meta = correctness_lookup.get(key)
         rollouts = list(archive_row["rollouts"])
         num_rollouts = len(rollouts)
         relative_lengths = np.array(
@@ -935,7 +1007,7 @@ def main() -> None:
         "task_kind": task_kind,
         "manifest_default_feature_key": manifest.get("default_feature_key"),
         "num_prompts": len(prompt_rows),
-        "explained_variance_ratio": [float(x) for x in pca.explained_variance_ratio_],
+        "explained_variance_ratio": explained_variance_ratio,
         "split_counts": {
             "prompts": {
                 "train": sum(1 for row in prompt_rows if row["split"] == "train"),

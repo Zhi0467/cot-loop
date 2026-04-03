@@ -423,11 +423,20 @@ def _log_row_fields(
     *,
     target_kind: str,
 ) -> dict[str, float]:
-    return {
+    payload = {
         f"{prefix}_{key}": float(value)
         for key, value in metrics.items()
         if isinstance(value, (int, float))
     }
+    if prefix == "eval":
+        payload.update(
+            {
+                key: float(value)
+                for key, value in metrics.items()
+                if isinstance(value, (int, float))
+            }
+        )
+    return payload
 
 
 def _print_metric_summary(
@@ -976,7 +985,6 @@ def main() -> None:
             "No eval checkpoints were logged (check --eval-every); best_metrics.json not written.",
             flush=True,
         )
-    shutil.rmtree(eval_ckpt_dir, ignore_errors=True)
     print(f"Saved checkpoints to {args.out_dir}", flush=True)
 
 

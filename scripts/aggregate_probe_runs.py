@@ -63,6 +63,12 @@ def _rank_value(value: object) -> float:
     return v
 
 
+def _metric_value(row: dict[str, object], metric: str) -> object:
+    if metric in row:
+        return row.get(metric)
+    return row.get(f"eval_{metric}")
+
+
 def _as_float_or_nan(value: object) -> float:
     try:
         return float(value)
@@ -106,8 +112,8 @@ def _best_row_from_jsonl(
                 raise SystemExit(f"Invalid JSON at {path}:{line_num}") from exc
 
             rank_key = (
-                _rank_value(row.get(selection_metric)),
-                _rank_value(row.get(tie_breaker)),
+                _rank_value(_metric_value(row, selection_metric)),
+                _rank_value(_metric_value(row, tie_breaker)),
             )
             if rank_key > best_key:
                 best_key = rank_key
@@ -139,14 +145,14 @@ def _format_row(run_dir: str, row: dict[str, object]) -> dict[str, object]:
         "seed": _infer_seed(run_dir, row),
         "epoch": row.get("epoch"),
         "step": row.get("step"),
-        "accuracy": _as_float_or_nan(row.get("accuracy")),
-        "macro_f1": _as_float_or_nan(row.get("macro_f1")),
-        "roc_auc": _as_float_or_nan(row.get("roc_auc")),
-        "pr_auc": _as_float_or_nan(row.get("pr_auc")),
-        "positive_precision": _as_float_or_nan(row.get("positive_precision")),
-        "positive_recall": _as_float_or_nan(row.get("positive_recall")),
-        "positive_f1": _as_float_or_nan(row.get("positive_f1")),
-        "prevalence": _as_float_or_nan(row.get("prevalence")),
+        "accuracy": _as_float_or_nan(_metric_value(row, "accuracy")),
+        "macro_f1": _as_float_or_nan(_metric_value(row, "macro_f1")),
+        "roc_auc": _as_float_or_nan(_metric_value(row, "roc_auc")),
+        "pr_auc": _as_float_or_nan(_metric_value(row, "pr_auc")),
+        "positive_precision": _as_float_or_nan(_metric_value(row, "positive_precision")),
+        "positive_recall": _as_float_or_nan(_metric_value(row, "positive_recall")),
+        "positive_f1": _as_float_or_nan(_metric_value(row, "positive_f1")),
+        "prevalence": _as_float_or_nan(_metric_value(row, "prevalence")),
     }
 
 

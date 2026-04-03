@@ -6,7 +6,9 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import random
 import re
+import shutil
 import sys
 
 import torch
@@ -24,6 +26,7 @@ from loop_probe.prefill import (
     load_prefill_model_and_tokenizer,
 )
 from loop_probe.serialization import save_split_shards, write_manifest
+from loop_probe.adapters import multiple_choice_gpqa, multiple_choice_mmlupro
 from loop_probe.types import SampleRecord
 from utils import build_prompt
 
@@ -282,6 +285,8 @@ def _build_records(
     pool_rows: list[dict[str, object]],
     sample_ids: torch.Tensor,
     prompt_field: str,
+    task_kind: str,
+    seed: int,
     tokenizer,
     num_repetition: int,
     split: str,
@@ -299,14 +304,78 @@ def _build_records(
             raise SystemExit(
                 f"Prompt field '{prompt_field}' missing/invalid for sample_id={sample_id_int}"
             )
+        if task_kind == "multiple_choice_gpqa":
+            required = (
+                "Correct Answer",
+                "Incorrect Answer 1",
+                "Incorrect Answer 2",
+                "Incorrect Answer 3",
+            )
+            missing = [name for name in required if row.get(name) is None]
+            if missing:
+                raise SystemExit(
+                    f"GPQA row for sample_id={sample_id_int} is missing {missing}."
+                )
+            shuffled = [(str(row["Correct Answer"]), True)] + [
+                (str(row[f"Incorrect Answer {idx}"]), False) for idx in range(1, 4)
+            ]
+            rng = random.Random(seed ^ sample_id_int)
+            rng.shuffle(shuffled)
+            prompt_text = multiple_choice_gpqa.build_mcq_prompt(
+                tokenizer,
+                prompt,
+                [option for option, _ in shuffled],
+            )
+        elif task_kind == "multiple_choice_mmlupro":
+            options = row.get("options")
+            if isinstance(options, str):
+                try:
+                    options = json.loads(options)
+                except json.JSONDecodeError as exc:
+                    raise SystemExit(
+                        "MMLU-Pro row has string 'options' but it is not valid JSON."
+                    ) from exc
+            if not isinstance(options, list) or not options:
+                raise SystemExit(
+                    f"MMLU-Pro row for sample_id={sample_id_int} has invalid options."
+                )
+            prompt_text = multiple_choice_mmlupro.build_mcq_prompt(
+                tokenizer,
+                prompt,
+                [str(option) for option in options],
+            )
+        elif task_kind == "math_freeform":
+            prompt_text = build_prompt(tokenizer, prompt, num_repetition)
+        else:
+            raise SystemExit(
+                "Fixed-split rebuild currently supports task_kind in "
+                "{math_freeform, multiple_choice_gpqa, multiple_choice_mmlupro}; "
+                f"got '{task_kind}'."
+            )
         records.append(
             SampleRecord(
                 sample_id=sample_id_int,
-                prompt=build_prompt(tokenizer, prompt, num_repetition),
+                prompt=prompt_text,
                 source_split=split,
             )
         )
     return records
+
+
+def _copy_reference_relpath(
+    *,
+    reference_data_dir: str,
+    out_dir: str,
+    rel_path: str,
+) -> None:
+    source_path = os.path.join(reference_data_dir, rel_path)
+    if not os.path.exists(source_path):
+        raise SystemExit(
+            f"Reference prompt-profile diagnostics are missing: {source_path}"
+        )
+    dest_path = os.path.join(out_dir, rel_path)
+    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+    shutil.copy2(source_path, dest_path)
 
 
 def _save_view_split(
@@ -380,6 +449,13 @@ def main() -> None:
     if num_repetition is None:
         num_repetition = 1
 
+    task_kind = str(reference_manifest.get("task_kind", "math_freeform"))
+    manifest_seed = reference_manifest.get("seed", 0)
+    try:
+        seed = int(manifest_seed)
+    except Exception:
+        seed = 0
+
     primary_key, feature_views = _resolve_feature_views(args)
     feature_view_specs = {
         key: (str(spec["pooling"]), int(spec["layer"]))
@@ -421,6 +497,8 @@ def main() -> None:
             pool_rows=pool_rows,
             sample_ids=sample_ids,
             prompt_field=prompt_field,
+            task_kind=task_kind,
+            seed=seed,
             tokenizer=tokenizer,
             num_repetition=num_repetition,
             split=split,
@@ -457,6 +535,34 @@ def main() -> None:
             manifest_views[key]["input_dim"] = int(sample_shape[-1])
             manifest_views[key]["sample_shape"] = sample_shape
 
+    prompt_template_payload = reference_manifest.get("prompt_template")
+    if isinstance(prompt_template_payload, dict):
+        prompt_template_payload = dict(prompt_template_payload)
+        prompt_template_payload["num_repetition"] = num_repetition
+    else:
+        prompt_template_payload = {
+            "chat_template": True,
+            "num_repetition": num_repetition,
+            "source": "utils.build_prompt",
+        }
+
+    prompt_profile_files = reference_manifest.get("prompt_profile_files")
+    if isinstance(prompt_profile_files, dict):
+        for rel_path in prompt_profile_files.values():
+            if isinstance(rel_path, str) and rel_path:
+                _copy_reference_relpath(
+                    reference_data_dir=args.reference_data_dir,
+                    out_dir=args.out_dir,
+                    rel_path=rel_path,
+                )
+    prompt_rollout_archive_file = reference_manifest.get("prompt_rollout_archive_file")
+    if isinstance(prompt_rollout_archive_file, str) and prompt_rollout_archive_file:
+        _copy_reference_relpath(
+            reference_data_dir=args.reference_data_dir,
+            out_dir=args.out_dir,
+            rel_path=prompt_rollout_archive_file,
+        )
+
     payload = {
         "version": 5,
         "created_from": args.reference_data_dir,
@@ -468,11 +574,7 @@ def main() -> None:
         "sample_shape": manifest_views[primary_key]["sample_shape"],
         "feature_views": manifest_views,
         "prompt_field": prompt_field,
-        "prompt_template": {
-            "chat_template": True,
-            "num_repetition": num_repetition,
-            "source": "utils.build_prompt",
-        },
+        "prompt_template": prompt_template_payload,
         "prefill_extraction": {
             "model_id": model_id,
             "trust_remote_code": trust_remote_code,
@@ -490,9 +592,14 @@ def main() -> None:
         "selection",
         "split_ratio",
         "split_source",
+        "task_kind",
         "test_spec",
         "target_spec",
         "train_spec",
+        "answer_field",
+        "prompt_profile_files",
+        "prompt_rollout_archive_file",
+        "task_loader_config",
     ):
         value = reference_manifest.get(key)
         if value is not None:

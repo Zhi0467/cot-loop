@@ -201,6 +201,24 @@ def _evaluate(
     )
 
 
+def _resolve_target_spec_from_manifest(manifest: dict[str, Any]) -> dict[str, object]:
+    target_spec = manifest.get("target_spec")
+    if isinstance(target_spec, dict):
+        return target_spec
+    label_spec = manifest.get("label_spec")
+    return {
+        "kind": "binary",
+        "name": label_spec.get("target", "eventual_loop") if isinstance(label_spec, dict) else "eventual_loop",
+    }
+
+
+def _resolve_target_spec_from_checkpoint(payload: dict[str, Any]) -> dict[str, object] | None:
+    target_spec = payload.get("target_spec")
+    if isinstance(target_spec, dict):
+        return target_spec
+    return None
+
+
 def main() -> None:
     args = _parse_args()
     if not os.path.exists(args.checkpoint):
@@ -216,13 +234,13 @@ def main() -> None:
 
     checkpoint_feature_key = payload.get("feature_key")
     manifest = read_manifest(args.data_dir)
-    target_spec = manifest.get("target_spec")
-    if not isinstance(target_spec, dict):
-        label_spec = manifest.get("label_spec")
-        target_spec = {
-            "kind": "binary",
-            "name": label_spec.get("target", "eventual_loop") if isinstance(label_spec, dict) else "eventual_loop",
-        }
+    target_spec = _resolve_target_spec_from_manifest(manifest)
+    checkpoint_target_spec = _resolve_target_spec_from_checkpoint(payload)
+    if checkpoint_target_spec is not None and checkpoint_target_spec != target_spec:
+        raise SystemExit(
+            "Checkpoint target_spec does not match dataset target_spec: "
+            f"{checkpoint_target_spec} vs {target_spec}"
+        )
     target_kind = str(target_spec.get("kind", "binary"))
     if target_kind not in ("binary", "probability", "regression"):
         raise SystemExit(f"Unsupported manifest target kind '{target_kind}'.")

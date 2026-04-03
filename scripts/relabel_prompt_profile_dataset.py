@@ -78,6 +78,27 @@ def _write_jsonl_rows(path: str, rows: list[dict[str, object]]) -> None:
             f.write(json.dumps(row, sort_keys=True) + "\n")
 
 
+def _source_shard_size(
+    source_dir: str,
+    split_meta: object,
+) -> int:
+    if isinstance(split_meta, dict):
+        shard_paths = split_meta.get("shards")
+        if isinstance(shard_paths, list) and shard_paths:
+            first_rel_path = shard_paths[0]
+            if isinstance(first_rel_path, str) and first_rel_path:
+                shard_path = os.path.join(source_dir, first_rel_path)
+                if os.path.exists(shard_path):
+                    shard = torch.load(shard_path, map_location="cpu")
+                    x = shard.get("x")
+                    if isinstance(x, torch.Tensor) and x.ndim >= 1 and int(x.shape[0]) >= 1:
+                        return int(x.shape[0])
+        num_samples = split_meta.get("num_samples")
+        if isinstance(num_samples, int) and num_samples >= 1:
+            return min(num_samples, 2048)
+    return 2048
+
+
 def _resolve_target_spec(
     *,
     target_kind: str,
@@ -574,6 +595,8 @@ def main() -> None:
     primary_train_meta: dict[str, object] | None = None
     primary_test_meta: dict[str, object] | None = None
     primary_input_dim: int | None = None
+    train_shard_size = _source_shard_size(source_dir, source_manifest.get("train"))
+    test_shard_size = _source_shard_size(source_dir, source_manifest.get("test"))
 
     for feature_key in _feature_keys(source_manifest):
         train_dataset = ActivationDataset(source_dir, "train", feature_key=feature_key)
@@ -595,7 +618,7 @@ def main() -> None:
             train_features,
             train_labels,
             kept_train_ids,
-            shard_size=int(source_manifest.get("train", {}).get("num_samples", 2048)) or 2048,
+            shard_size=train_shard_size,
             target_kind=args.target_kind,
         )
         test_meta = save_split_shards(
@@ -604,7 +627,7 @@ def main() -> None:
             test_features,
             test_labels,
             kept_test_ids,
-            shard_size=int(source_manifest.get("test", {}).get("num_samples", 2048)) or 2048,
+            shard_size=test_shard_size,
             target_kind=args.target_kind,
         )
 

@@ -89,6 +89,15 @@ def _parse_args() -> argparse.Namespace:
 
     parser.add_argument("--prompt-field", required=True)
     parser.add_argument(
+        "--answer-field",
+        default="answer",
+        help=(
+            "Gold-answer field for math-style datasets. This does not affect prompt "
+            "construction, but it is recorded in the manifest so downstream "
+            "correctness reconstruction can reuse the right column."
+        ),
+    )
+    parser.add_argument(
         "--task-kind",
         choices=TASK_KIND_CHOICES,
         default="math_freeform",
@@ -540,9 +549,12 @@ def _load_task_records(
             raise SystemExit(
                 "--livecodebench-repo is required when --task-kind=livecodebench_codegen."
             )
+        effective_release_version = (
+            str(spec.config) if spec.config not in (None, "") else release_version
+        )
         benchmark, format_prompt = livecodebench_codegen.load_benchmark(
             livecodebench_repo,
-            release_version,
+            effective_release_version,
         )
         prompt_records, _lm_style = livecodebench_codegen.build_prompts(
             benchmark,
@@ -578,6 +590,19 @@ def _same_data_source(a: DatasetSpec, b: DatasetSpec) -> bool:
     )
 
 
+def _same_task_source(
+    a: DatasetSpec,
+    b: DatasetSpec,
+    *,
+    task_kind: str,
+) -> bool:
+    if task_kind == "livecodebench_codegen":
+        if os.path.isfile(a.dataset) or os.path.isfile(b.dataset):
+            return _same_data_source(a, b)
+        return a.dataset == b.dataset and a.config == b.config
+    return _same_data_source(a, b)
+
+
 def _with_max_samples(spec: DatasetSpec, max_samples: int | None) -> DatasetSpec:
     return DatasetSpec(
         dataset=spec.dataset,
@@ -599,20 +624,44 @@ def _make_specs(args: argparse.Namespace) -> tuple[DatasetSpec, DatasetSpec | No
         max_samples=args.train_max_samples,
     )
 
-    test_dataset = args.test_dataset or DEFAULT_TEST_DATASET
-    if not args.test_dataset and not os.path.isfile(test_dataset):
+    if args.test_dataset:
+        return train_spec, DatasetSpec(
+            dataset=args.test_dataset,
+            config=args.test_config,
+            split=args.test_split,
+            max_samples=args.test_max_samples,
+        )
+
+    if args.task_kind != "math_freeform":
+        explicit_test_split = (
+            args.test_config is not None
+            or args.test_split != "test"
+            or args.test_max_samples is not None
+        )
+        if explicit_test_split:
+            return train_spec, DatasetSpec(
+                dataset=args.train_dataset,
+                config=args.test_config
+                if args.test_config is not None
+                else args.train_config,
+                split=args.test_split,
+                max_samples=args.test_max_samples,
+            )
+        return train_spec, None
+
+    test_dataset = DEFAULT_TEST_DATASET
+    if not os.path.isfile(test_dataset):
         raise SystemExit(
             f"Default test dataset '{test_dataset}' was not found. "
             "Pass --test-dataset explicitly or create the default file."
         )
 
-    test_spec = DatasetSpec(
+    return train_spec, DatasetSpec(
         dataset=test_dataset,
         config=args.test_config,
         split=args.test_split,
         max_samples=args.test_max_samples,
     )
-    return train_spec, test_spec
 
 
 def _resolve_splits(
@@ -660,7 +709,7 @@ def _resolve_splits(
         split_source = "same_train_test_spec_split"
         return train_records, test_records, split_source
 
-    if _same_data_source(train_spec, test_spec):
+    if _same_task_source(train_spec, test_spec, task_kind=str(args.task_kind)):
         train_max = train_spec.max_samples
         test_max = test_spec.max_samples
 
@@ -748,16 +797,32 @@ def _resolve_splits(
     return train_records, test_records, split_source
 
 
-def _resolve_split_source(train_spec: DatasetSpec, test_spec: DatasetSpec | None) -> str:
+def _resolve_split_source(
+    train_spec: DatasetSpec,
+    test_spec: DatasetSpec | None,
+    *,
+    task_kind: str,
+) -> str:
     if test_spec is None:
         return "single_dataset_split"
     if specs_equal(train_spec, test_spec):
         return "same_train_test_spec_split"
-    if _same_data_source(train_spec, test_spec):
+    if _same_task_source(train_spec, test_spec, task_kind=task_kind):
         if train_spec.max_samples is not None and test_spec.max_samples is not None:
             return "same_train_test_source_count_split"
         return "same_train_test_source_ratio_split"
     return "separate_specs"
+
+
+def _task_loader_config(args: argparse.Namespace) -> dict[str, object] | None:
+    if args.task_kind != "livecodebench_codegen":
+        return None
+    repo_path = str(args.livecodebench_repo).strip()
+    return {
+        "livecodebench_repo": os.path.realpath(repo_path) if repo_path else "",
+        "release_version": str(args.release_version),
+        "lm_style_override": "" if args.lm_style_override in (None, "") else str(args.lm_style_override),
+    }
 
 
 def _split_shards_exist(out_dir: str, split_info: object) -> bool:
@@ -811,6 +876,8 @@ def _probe_cache_status(
     balance_train: str,
     balance_test: str,
     balance_seed: int,
+    answer_field: str,
+    task_loader_config: dict[str, object] | None,
 ) -> tuple[bool, str]:
     manifest_path = os.path.join(out_dir, "manifest.json")
     if not os.path.exists(manifest_path):
@@ -824,12 +891,14 @@ def _probe_cache_status(
 
     expected = {
         "prompt_field": prompt_field,
+        "answer_field": answer_field,
         "task_kind": task_kind,
         "split_source": split_source,
         "loop_detector": {"n": loop_n, "k": loop_k},
         "rollout_config": rollout_config,
         "train_spec": asdict(train_spec),
         "test_spec": asdict(test_spec) if test_spec else None,
+        "task_loader_config": task_loader_config,
     }
     if _split_source_uses_ratio(split_source):
         expected["split_ratio"] = split_ratio
@@ -1557,7 +1626,11 @@ def main() -> None:
         raise SystemExit(str(exc)) from exc
 
     train_spec, test_spec = _make_specs(args)
-    split_source = _resolve_split_source(train_spec, test_spec)
+    split_source = _resolve_split_source(
+        train_spec,
+        test_spec,
+        task_kind=str(args.task_kind),
+    )
     primary_feature_key, feature_views = _resolve_feature_views(args)
     prefill_feature_views, completion_feature_views = _split_feature_views_by_stage(
         feature_views
@@ -1569,11 +1642,17 @@ def main() -> None:
         label_spec=label_spec,
     )
     target_source = _target_source(target_spec)
+    task_loader_config = _task_loader_config(args)
     balance_seed = args.seed if args.balance_seed is None else args.balance_seed
     if target_source == "prompt_profile":
         if completion_feature_views:
             raise SystemExit(
                 "Prompt-profile targets currently support prefill feature views only."
+            )
+        if float(rollout_cfg.temperature) <= 0.0:
+            raise SystemExit(
+                "Prompt-profile targets require stochastic repeated rollouts; "
+                "pass --temperature > 0."
             )
         if target_spec["kind"] != "binary" and (
             args.balance_train != "none" or args.balance_test != "none"
@@ -1602,6 +1681,8 @@ def main() -> None:
             balance_train=args.balance_train,
             balance_test=args.balance_test,
             balance_seed=balance_seed,
+            answer_field=str(args.answer_field),
+            task_loader_config=task_loader_config,
         )
         if cache_hit:
             print(
@@ -1945,6 +2026,9 @@ def main() -> None:
         "feature_views": feature_views_manifest,
         "task_kind": str(args.task_kind),
         "prompt_field": args.prompt_field,
+        "answer_field": (
+            str(args.answer_field) if args.task_kind == "math_freeform" else None
+        ),
         "prompt_template": {
             "source": (
             "loop_probe.adapters.multiple_choice_gpqa.build_mcq_prompt"
@@ -1962,6 +2046,7 @@ def main() -> None:
             "num_repetition": 1,
             "chat_template": True,
         },
+        "task_loader_config": task_loader_config,
         "split_source": split_source,
         "split_ratio": args.split_ratio if _split_source_uses_ratio(split_source) else None,
         "seed": args.seed,
