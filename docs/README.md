@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-04-02 23:04 UTC
+Last updated: 2026-04-03 23:15 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -17,6 +17,7 @@ Core docs:
 - Thread reset / new-thread handoff: thread-reset-2026-03-25.md
 - Prompt-profile projection/export path: prompt-profile-projection.md
 - Prefill-activation visualization note: prefill-activation-visualization.md
+- Loop vs max-length semantics note: understand-where-loop-and-max-length-come-from.md
 
 Key outputs:
 - Common-policy rollout report PDF: ../outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/qwen3_1p7b_cross_dataset_rollout_report.pdf
@@ -38,6 +39,7 @@ Current live status:
 - `p_loop` still wins the old bucket diagnostic for concentrating looping prompts, but that is no longer treated as proof that it should be the main training objective.
 - The note `prompt-profile-risk-screen-2026-03-30.md` is now the technical decision surface for this predictability-first correction.
 - The note `prompt-profile-plain-language-2026-03-30.md` is the collaborator-facing explanation of the same correction in plain words.
+- The note `understand-where-loop-and-max-length-come-from.md` is the exact label-semantics surface for `loop`, prompt-profile `cap_hit` / `p_cap`, rollout-stat `max_length_hit`, and `majority_s_0.5`.
 - The locked pair now has a canonical execution note and PDF on disk, so the next step is the run itself rather than another planning pass.
 - The reset note `thread-reset-2026-03-25.md` is now the correct restart surface for Slack follow-up. It captures the collaborator's recent corrections, the proved-vs-unproved ledger, and the exact next work order.
 - `roadmap.md` is the chronological experiment log; `backlog.md` now carries the next objective run under the corrected selection rule.
