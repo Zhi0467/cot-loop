@@ -7,6 +7,7 @@ This directory contains SLURM workflows for the CoT loop detector project.
 - `run_vllm_generate.sbatch`: Generate trajectories used for loop-label collection and detector analysis.
 - `analyze_prefill_stability.sbatch`: Prefill-loop sanity check and stability checks with greedy rollouts.
 - `run_probe_train_e2e.sbatch`: End-to-end probe pipeline for the canonical stacked prefill dataset (build + probe training, including optional multi-seed runs).
+- `run_prompt_profile_full_train.sbatch`: 2-GPU wrapper for the locked `mean_relative_length` + `majority_s_0.5` full-train path, reusing the saved March prompt-profile archives and writing the standardized `outputs/full_train/` ledger.
 - `run_prompt_profile_projection.sbatch`: One-GPU prompt-profile visualization path (build + prompt-level projection export, with optional render when `matplotlib` is available).
 - `run_k5_threeview_dataset.sbatch`: Historical multi-view dataset build for the k=5 / max_tokens=15000 ablation study.
 - `run_k5_threeview_ablation.sbatch`: Historical MLP sweep over the k=5 three-view ablation dataset.
@@ -124,6 +125,22 @@ PROMPT_FIELD=Question \
 TRAIN_EXTRA_ARGS="--classifier-mode last_layer --classifier-layer -1" \
 SCORE_RULE=mean_prob \
 sbatch slurm/run_probe_train_e2e.sbatch
+```
+
+## Locked Full-Train Wrapper
+
+`run_prompt_profile_full_train.sbatch` defaults to:
+
+- `#SBATCH --gres=gpu:2`
+- `OUT_ROOT=outputs/full_train`
+- `ARCHIVE_SOURCE_ROOT=/data/scratch/${USER}/outputs/cot-loop-detection`
+- reuse of the saved March `mean_relative_length` archives for `GPQA`, `AIME`, `MATH-500`, `MMLU-Pro`, and `LiveCodeBench`
+- sequential execution of the locked regression train, `majority_s_0.5` relabel, binary train, and summary ledger stages
+
+Submit with defaults:
+```bash
+CONDA_ENV=swe311 \
+sbatch slurm/run_prompt_profile_full_train.sbatch
 ```
 
 ## Prompt-Level Projection Defaults
