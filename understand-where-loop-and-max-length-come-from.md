@@ -5,81 +5,29 @@ This document is a plan to understand where loop and max-length come from.
 
 Clarification:
 
-- we call both loop and max-length hits degenerate rollouts;
-- our earlier statistics-collection work showed that max-length hits are usually a subset of looped rollouts;
-- mean rollout length plus binary length-threshold labels can proxy this regime and are easier to predict at prefill time;
-- but the research question here is not "which proxy is easiest to predict?" The research question is where these degenerate rollouts enter the model family in the first place.
+- here "degenerate rollouts" means the older rollout-statistics object already used in this repo: looping rollouts plus max-length-hit rollouts under the shared collector contract;
+- the intended statistics are the ones we already collected for the Qwen3 common-policy bundle via `scripts/collect_model_stats.py`, `src/loop_probe/collector.py`, and `scripts/build_cross_dataset_rollout_report.py`;
+- that older line already established the qualitative pattern we care about:
+  - max-length hits usually sit inside looped rollouts;
+  - looped rollouts are much longer than the average rollout;
+  - looped and max-length-hit rollouts are much less accurate on the harder datasets;
+- mean rollout length plus binary length-threshold labels are still useful prompt-level proxies, but this note is not about choosing among those proxies. This note is about where the degenerate-rollout regime enters the model family.
 
-Companion note:
+## Existing Reference Surface
 
-- for the exact saved definitions of `loop`, prompt-profile `cap_hit` / `p_cap`, rollout-stat `max_length_hit`, `effective_max_tokens`, and `majority_s_0.5`, see `docs/understand-where-loop-and-max-length-come-from.md`.
-
-## Objective
-
-Test the hypothesis that the base model should have very few degenerate rollouts, and that this behavior is introduced mainly during SFT or RLVR.
-
-Plainly:
-
-- base -> learns semantics and syntax;
-- SFT -> may start introducing format-following or answer-shape behaviors that lengthen or destabilize reasoning;
-- RLVR -> may further amplify those behaviors if the reward and policy dynamics favor pathological long trajectories.
-
-The job is to measure that progression, not assume it.
-
-## Main Axis
-
-Use the OLMo-3 progression:
-
-1. `Olmo-3-7B`
-2. `Olmo-3-7B-Instruct-SFT`
-3. `Olmo-3-7B-Instruct`
-
-Interpret that as:
-
-- base
-- SFT
-- RLVR
-
-## Collection Path
-
-Reuse the current statistics-collection module rather than inventing a second path.
+Use the older rollout-statistics bundle as the reference object, not thread memory.
 
 Current repo surfaces to reuse:
 
 - `scripts/collect_model_stats.py`
+- `src/loop_probe/collector.py`
 - `scripts/build_cross_dataset_rollout_report.py`
-- `outputs/qwen3_1p7b_cross_dataset_rollout_stats/`
 - `outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/`
+- `outputs/rollout_stats_module_audit/rollout_stats_module_audit.pdf`
 
-The requirement is that the OLMo collection should be as reproducible as the existing Qwen3 bundle.
+If anyone needs the exact saved field definitions, the background appendix is `docs/understand-where-loop-and-max-length-come-from.md`. That appendix is not the main object here; it is just the definitions sheet behind the rollout-stat bundle.
 
-That means:
-
-- same metric schema;
-- same output JSON/CSV shape where possible;
-- one explicit report bundle per checkpoint;
-- one progression summary built from those checkpoint bundles rather than from thread text.
-
-## Dataset And Decode Contract
-
-Default choice:
-
-- use the same benchmark families as the repaired Qwen3 common-policy bundle so the new result is directly comparable:
-  - `MATH-500`
-  - `AIME`
-  - `GPQA`
-  - `MMLU-Pro`
-  - capped `LiveCodeBench release_v6`
-
-Default decode rule:
-
-- keep one shared decode policy across all three checkpoints unless an OLMo-specific runtime constraint forces a documented deviation.
-
-The point is not to search for each checkpoint's best decode. The point is to compare the progression under one fixed measurement contract.
-
-## Statistics To Track
-
-At minimum, carry forward the current rollout-stat bundle:
+The per-checkpoint bundle should carry forward the same metric family:
 
 - `success_fraction`
 - `loop_fraction`
@@ -95,73 +43,38 @@ At minimum, carry forward the current rollout-stat bundle:
 - `avg_wrong_generation_length`
 - `generation_length_variance`
 
-Also keep the sanity/context fields:
+Keep the raw counts too:
 
 - prompt count
 - generated count
 - graded count
 - prompt-too-long count
-- prompt length statistics if available
+- looped count
+- max-length-hit count
+- overlap counts between loop, max-length hit, and correctness
 
-These metrics are enough to answer three separate questions:
+## Plan
 
-1. does degenerate behavior exist at all?
-2. does it rise from base -> SFT -> RLVR?
-3. is the rise mostly "more looping", "more literal cap hits", or both?
+The hypothesis is the base model should barely have any degenerate rollouts. The key question is whether this behavior is introduced during SFT, amplified during RLVR, or already present in the base model.
 
-## Visualization Plan
+So we do this:
 
-### Within One Checkpoint
-
-Replace the current bar-style overlap view with a Sankey plot when the goal is to show subset and overlap structure such as:
-
-- correct vs wrong
-- loop vs non-loop
-- max-length-hit vs not
-
-Use Sankey when the question is:
-
-- how much of `max_length` sits inside `loop`?
-- how much of `loop` is still correct?
-- how much failure mass moves between these buckets?
-
-### Across Checkpoints
-
-Do not use Sankey for the progression question.
-
-For base -> SFT -> RLVR, use line plots.
-
-Each metric above should be plotted across:
-
-- checkpoint stage
-- dataset
-
-because the research question is about progression, not one checkpoint's internal partition.
-
-## Concrete Run Plan
-
-1. Materialize a clean OLMo stats workspace on the GPU node.
-2. Run the existing stats collector for `Olmo-3-7B`.
-3. Run the same collector for `Olmo-3-7B-Instruct-SFT`.
-4. Run the same collector for `Olmo-3-7B-Instruct`.
-5. Build one per-checkpoint report bundle in the current JSON/CSV/PDF style.
-6. Add one progression summary artifact:
-   - line plots for each metric across base -> SFT -> RLVR;
-   - per-dataset tables;
-   - one short conclusion on whether degeneracy is already present in base or introduced later.
-
-## Decision Rule
-
-The hypothesis is supported if:
-
-- the base checkpoint has little or no degenerate rollout mass under the shared contract;
-- SFT or RLVR shows a clear increase in loop rate, cap-hit rate, or both;
-- the increase is visible across multiple datasets rather than being driven by one outlier only.
-
-The hypothesis is weakened if:
-
-- the base model already shows substantial degeneracy under the same measurement rule;
-- or the progression is flat and noisy rather than stage-linked.
+1. Take `Olmo-3-7B`, `Olmo-3-7B-Instruct-SFT`, and `Olmo-3-7B-Instruct` as the progression axis from base -> SFT -> RLVR.
+2. For each checkpoint, collect the same rollout-stat bundle we already used for Qwen3.
+   - reuse the same report shape and metric schema;
+   - reuse the same benchmark family where possible: `MATH-500`, `AIME`, `GPQA`, `MMLU-Pro`, and capped `LiveCodeBench release_v6`;
+   - keep one shared decode policy across the three checkpoints unless an OLMo-specific runtime constraint forces a documented deviation.
+3. Replace the within-checkpoint overlap visualization with a Sankey plot when the question is subset structure:
+   - correct vs wrong;
+   - loop vs non-loop;
+   - max-length-hit vs not.
+4. Collect stats for all three checkpoints using the GPU node and build one JSON/CSV/PDF bundle per checkpoint in the current collector/report style.
+5. Compare the checkpoints directly.
+   - for the progression question, do not use Sankey;
+   - use line plots for each metric across base -> SFT -> RLVR, broken out by dataset.
+6. Draw conclusions on the hypothesis.
+   - supported if the base checkpoint has little degenerate-rollout mass and SFT or RLVR shows a clear rise in loop rate, max-length-hit rate, or both across multiple datasets;
+   - weakened if the base model already shows substantial degeneracy under the same contract, or if the progression is flat and noisy rather than stage-linked.
 
 ## Deliverables
 
@@ -173,7 +86,5 @@ We want three layers of output:
 
 The final conclusion should stay on this object:
 
-- where degenerate rollouts enter the model family
-- whether the progression points to base, SFT, RLVR, or no clean stage break
-
-not on the older prompt-profile target-selection question.
+- where degenerate rollouts enter the model family;
+- whether the progression points to base, SFT, RLVR, or no clean stage break.
