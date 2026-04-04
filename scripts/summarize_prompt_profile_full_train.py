@@ -562,43 +562,15 @@ def dataset_summary(dataset_key: str, out_root: Path) -> dict[str, Any]:
     dataset_root = out_root / dataset_key
     shared_archive = dataset_root / "shared_archive"
     binary_data = dataset_root / "majority_s_0.5" / "data"
+    resolved_regression_data = regression_data_dir(dataset_root)
 
     summary: dict[str, Any] = {
         "dataset": dataset_key,
         "dataset_root": str(dataset_root),
         "shared_archive": str(shared_archive),
         "binary_data_dir": str(binary_data),
-        "regression_data_dir": str(regression_data_dir(dataset_root)),
+        "regression_data_dir": str(resolved_regression_data),
         "status": "missing",
-    }
-
-    if not manifest_path(shared_archive).exists():
-        summary["status"] = "missing_shared_archive"
-        return summary
-
-    resolved_regression_data = regression_data_dir(dataset_root)
-    regression_baseline_dir = (
-        resolved_regression_data
-        if manifest_path(resolved_regression_data).exists()
-        else shared_archive
-    )
-    train_reg_rows, test_reg_rows = load_prompt_profile_rows(regression_baseline_dir)
-    regression_baselines = {
-        "prompt_length": summarize_regression_baseline(
-            train_reg_rows,
-            test_reg_rows,
-            feature_names=("prompt_token_count",),
-        ),
-        "effective_budget": summarize_regression_baseline(
-            train_reg_rows,
-            test_reg_rows,
-            feature_names=("effective_max_tokens",),
-        ),
-        "prompt_length_plus_effective_budget": summarize_regression_baseline(
-            train_reg_rows,
-            test_reg_rows,
-            feature_names=("prompt_token_count", "effective_max_tokens"),
-        ),
     }
 
     regression_views = {
@@ -612,8 +584,37 @@ def dataset_summary(dataset_key: str, out_root: Path) -> dict[str, Any]:
         ),
     }
 
-    regression_status = "complete"
-    if any(component_status(payload) != "complete" for payload in regression_views.values()):
+    regression_baselines: dict[str, Any] | None = None
+    regression_status = "missing_data"
+    regression_baseline_dir: Path | None = None
+    if manifest_path(resolved_regression_data).exists():
+        regression_baseline_dir = resolved_regression_data
+    elif manifest_path(shared_archive).exists():
+        regression_baseline_dir = shared_archive
+
+    if regression_baseline_dir is not None:
+        train_reg_rows, test_reg_rows = load_prompt_profile_rows(regression_baseline_dir)
+        regression_baselines = {
+            "prompt_length": summarize_regression_baseline(
+                train_reg_rows,
+                test_reg_rows,
+                feature_names=("prompt_token_count",),
+            ),
+            "effective_budget": summarize_regression_baseline(
+                train_reg_rows,
+                test_reg_rows,
+                feature_names=("effective_max_tokens",),
+            ),
+            "prompt_length_plus_effective_budget": summarize_regression_baseline(
+                train_reg_rows,
+                test_reg_rows,
+                feature_names=("prompt_token_count", "effective_max_tokens"),
+            ),
+        }
+        regression_status = "complete"
+        if any(component_status(payload) != "complete" for payload in regression_views.values()):
+            regression_status = "partial"
+    elif any(component_status(payload) != "missing" for payload in regression_views.values()):
         regression_status = "partial"
 
     binary_status = "missing"
@@ -651,7 +652,7 @@ def dataset_summary(dataset_key: str, out_root: Path) -> dict[str, Any]:
 
     summary["mean_relative_length"] = {
         "status": regression_status,
-        "data_dir": str(regression_baseline_dir),
+        "data_dir": (str(regression_baseline_dir) if regression_baseline_dir else None),
         "metadata_baselines": regression_baselines,
         "views": regression_views,
     }
