@@ -285,6 +285,54 @@ So the base chain (`2091`-`2095`) has now been canceled, and the live collection
 
 So the immediate deliverable for this thread is no longer a three-stage progression table. It is the instruct-stage rollout-stat bundle across the remaining datasets, with base deferred because it is currently the runtime bottleneck rather than the most decision-relevant object.
 
+That instruct-stage bundle is now complete under the bounded `temperature=0.1` contract:
+
+- SFT:
+  - `MATH-500`: `41 / 80` correct, `0 / 80` looped, `0 / 80` max-length hits, `avg_generation_length = 379.125`
+  - `AIME`: `17 / 80` correct, `1 / 80` looped, `1 / 80` max-length hits, `avg_generation_length = 1136.05`
+  - `GPQA`: `27 / 80` correct, `0 / 80` looped, `0 / 80` max-length hits, `avg_generation_length = 7.0`
+  - `MMLU-Pro`: `36 / 80` correct, `1 / 80` looped, `1 / 80` max-length hits, `avg_generation_length = 590.55`
+  - `LiveCodeBench`: `0 / 80` correct, `0 / 80` looped, `0 / 80` max-length hits, `avg_generation_length = 155.4125`
+- RLVR:
+  - `MATH-500`: `50 / 80` correct, `0 / 80` looped, `0 / 80` max-length hits, `avg_generation_length = 555.4125`
+  - `AIME`: `38 / 80` correct, `0 / 80` looped, `0 / 80` max-length hits, `avg_generation_length = 7293.2`
+  - `GPQA`: `43 / 80` correct, `0 / 80` looped, `0 / 80` max-length hits, `avg_generation_length = 291.0625`
+  - `MMLU-Pro`: `0 / 80` correct, `0 / 80` looped, `0 / 80` max-length hits, `avg_generation_length = 6.15`
+  - `LiveCodeBench`: `8 / 80` correct, `0 / 80` looped, `0 / 80` max-length hits, `avg_generation_length = 766.0125`
+
+So on this bounded instruct-only pass:
+
+- RLVR stayed loop-free and max-length-hit-free on every collected dataset;
+- the only observed degeneracy mass was on SFT, and even there it was light (`1 / 80` on `AIME`, `1 / 80` on `MMLU-Pro`);
+- that means the current live question is no longer "what do SFT and RLVR look like?" but "what do we do next about the deferred base stage?"
+
+## Why The New Lengths Are Much Shorter Than Qwen3
+
+The correct comparison object here is the saved Qwen3 common-policy bundle:
+
+- `outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/`
+
+That bundle is still the right reference surface, but it is larger and much more degenerate than this bounded OLMo instruct-only slice.
+
+Two things are happening at once:
+
+1. This OLMo pass is only the first `8` prompts per dataset, while the Qwen3 v2 bundle is the full saved rollout surface.
+2. More importantly, the Qwen3 v2 means are inflated by much heavier loop / cap mass.
+
+Concrete examples:
+
+- `AIME`: Qwen3 v2 has `avg_generation_length = 20340.26`, `loop_fraction = 0.150`, `max_length_hit_fraction = 0.1267`; current OLMo gives SFT `1136.05` with `1 / 80` loop and RLVR `7293.2` with `0 / 80` loops.
+- `GPQA`: Qwen3 v2 has `avg_generation_length = 9687.16`, `loop_fraction = 0.1641`, `max_length_hit_fraction = 0.0692`; current OLMo gives SFT `7.0` and RLVR `291.06`, both with `0 / 80` loops and `0 / 80` max-length hits.
+- `MMLU-Pro`: Qwen3 v2 has `avg_generation_length = 3702.36`, `loop_fraction = 0.0456`, `max_length_hit_fraction = 0.0095`; current OLMo gives SFT `590.55` with `1 / 80` loop and RLVR `6.15` with `0 / 80`.
+
+So the short lengths are not mainly coming from a silent prompt-contract change. The current GPQA / MMLU-Pro adapters still use the same JSON-answer surface as the saved Qwen3 v2 bundle. The best current explanation is behavioral: far less loop / cap mass on this bounded OLMo instruct slice, plus some prompts where the model simply emits the requested short JSON answer and stops.
+
+One automation footnote:
+
+- I attempted to rebuild per-stage and instruct-only progression reports after the queue finished.
+- The clean GPU-node checkout's default `python3` lacks `matplotlib`, so the report scripts fail at import time.
+- The raw JSON bundle is complete, and this note is now the readable summary surface for the finished instruct-only pass.
+
 ## Deliverables
 
 We want three layers of output:
