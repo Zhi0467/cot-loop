@@ -76,6 +76,51 @@ So we do this:
    - supported if the base checkpoint has little degenerate-rollout mass and SFT or RLVR shows a clear rise in loop rate, max-length-hit rate, or both across multiple datasets;
    - weakened if the base model already shows substantial degeneracy under the same contract, or if the progression is flat and noisy rather than stage-linked.
 
+## Execution Update (2026-04-04)
+
+The first execution pass changed one important assumption in this plan.
+
+- A forced shared `raw` prompt contract across all three checkpoints is **not** the right object for OLMo.
+- A direct `MATH-500` probe on samples `4` and `5` with `max_tokens=2048` showed:
+  - base `raw` produces substantive long-form math completions (`2048` tokens with `finish_reason=length` on sample `4`, `1711` tokens with `finish_reason=stop` on sample `5`);
+  - SFT `raw` and RLVR `raw` often collapse to an instruction echo or blank (`24` / `1` tokens for SFT, `31` / `1` tokens for RLVR on those same samples);
+  - SFT `chat_template` and RLVR `chat_template` produce normal math solutions on the same prompts.
+- So the corrected comparison object is:
+  - base checkpoint on native `raw`;
+  - SFT checkpoint on native `chat_template`;
+  - RLVR checkpoint on native `chat_template`;
+  - same collector and same decode policy otherwise.
+
+The first bounded collection under that corrected object already landed:
+
+- output root: `/data/scratch/murphy/outputs/cot-loop-detection/olmo3_degeneration_origin_progression/math8_cap4096_gen1_pilot/`
+- dataset slice: first `8` `MATH-500` prompts
+- decode settings: `temperature=0.2`, `num_generations=1`, `max_tokens=4096`
+
+Observed rollout-stat bundle on that slice:
+
+- base `raw`:
+  - `4 / 8` correct
+  - `1 / 8` looped
+  - `0 / 8` max-length hits
+  - `avg_generation_length = 2136.125`
+- SFT `chat_template`:
+  - `4 / 8` correct
+  - `0 / 8` looped
+  - `0 / 8` max-length hits
+  - `avg_generation_length = 371.875`
+- RLVR `chat_template`:
+  - `5 / 8` correct
+  - `0 / 8` looped
+  - `0 / 8` max-length hits
+  - `avg_generation_length = 495.0`
+
+Current interpretation:
+
+- on the first corrected slice, the degeneration signal appears in the base checkpoint rather than first appearing at SFT or RLVR;
+- that is still a small-sample result, not the final conclusion;
+- the right next step is a larger bounded slice under the same corrected contract, not a return to the invalid all-raw comparison.
+
 ## Deliverables
 
 We want three layers of output:
