@@ -84,6 +84,10 @@ def manifest_path(data_dir: Path) -> Path:
     return data_dir / "manifest.json"
 
 
+def regression_data_dir(dataset_root: Path) -> Path:
+    return dataset_root / "mean_relative_length" / "data"
+
+
 def feature_matrix(rows: list[dict[str, Any]], feature_names: tuple[str, ...]) -> np.ndarray:
     matrix: list[list[float]] = []
     for row in rows:
@@ -564,6 +568,7 @@ def dataset_summary(dataset_key: str, out_root: Path) -> dict[str, Any]:
         "dataset_root": str(dataset_root),
         "shared_archive": str(shared_archive),
         "binary_data_dir": str(binary_data),
+        "regression_data_dir": str(regression_data_dir(dataset_root)),
         "status": "missing",
     }
 
@@ -571,7 +576,13 @@ def dataset_summary(dataset_key: str, out_root: Path) -> dict[str, Any]:
         summary["status"] = "missing_shared_archive"
         return summary
 
-    train_reg_rows, test_reg_rows = load_prompt_profile_rows(shared_archive)
+    resolved_regression_data = regression_data_dir(dataset_root)
+    regression_baseline_dir = (
+        resolved_regression_data
+        if manifest_path(resolved_regression_data).exists()
+        else shared_archive
+    )
+    train_reg_rows, test_reg_rows = load_prompt_profile_rows(regression_baseline_dir)
     regression_baselines = {
         "prompt_length": summarize_regression_baseline(
             train_reg_rows,
@@ -640,6 +651,7 @@ def dataset_summary(dataset_key: str, out_root: Path) -> dict[str, Any]:
 
     summary["mean_relative_length"] = {
         "status": regression_status,
+        "data_dir": str(regression_baseline_dir),
         "metadata_baselines": regression_baselines,
         "views": regression_views,
     }

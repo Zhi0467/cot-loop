@@ -136,6 +136,31 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Defaults to <out-root>/summary when omitted.",
     )
+    parser.add_argument(
+        "--source-out-root",
+        default=None,
+        help=(
+            "Optional root to read existing shared archives from while writing "
+            "new runs under --out-root."
+        ),
+    )
+    parser.add_argument(
+        "--regression-data-mode",
+        choices=("natural", "reuse_binary_subset"),
+        default="natural",
+        help=(
+            "Use the natural shared-archive regression data, or relabel "
+            "mean_relative_length onto the balanced binary prompt subset."
+        ),
+    )
+    parser.add_argument(
+        "--regression-subset-root",
+        default=None,
+        help=(
+            "When --regression-data-mode=reuse_binary_subset, read sample IDs from "
+            "<root>/<dataset>/majority_s_0.5/data. Defaults to --out-root."
+        ),
+    )
     parser.add_argument("--python-bin", default=sys.executable)
     parser.add_argument("--wandb-project", default="cot-loop-probe")
     parser.add_argument("--probe-preset", default="mlp")
@@ -226,8 +251,25 @@ def shared_archive_dir(out_root: Path, spec: DatasetSpec) -> Path:
     return dataset_root(out_root, spec) / "shared_archive"
 
 
+def source_shared_archive_dir(
+    args: argparse.Namespace,
+    out_root: Path,
+    spec: DatasetSpec,
+) -> Path:
+    source_root = (
+        Path(args.source_out_root).resolve()
+        if args.source_out_root
+        else out_root.resolve()
+    )
+    return shared_archive_dir(source_root, spec)
+
+
 def regression_run_dir(out_root: Path, spec: DatasetSpec, view_name: str) -> Path:
     return dataset_root(out_root, spec) / "mean_relative_length" / view_name
+
+
+def regression_data_dir(out_root: Path, spec: DatasetSpec) -> Path:
+    return dataset_root(out_root, spec) / "mean_relative_length" / "data"
 
 
 def binary_data_dir(out_root: Path, spec: DatasetSpec) -> Path:
@@ -257,6 +299,23 @@ def relabel_target_spec(source_manifest: dict[str, Any]) -> dict[str, Any]:
         "tail_threshold": 0.5,
         "num_generations": num_generations,
         "positive_rule": "strict_majority",
+    }
+
+
+def regression_target_spec(source_manifest: dict[str, Any]) -> dict[str, Any]:
+    rollout_cfg = source_manifest.get("rollout_config")
+    if not isinstance(rollout_cfg, dict):
+        raise SystemExit("Source manifest is missing rollout_config for regression relabel.")
+    num_generations = rollout_cfg.get("num_generations")
+    if not isinstance(num_generations, int):
+        raise SystemExit("Source manifest rollout_config is missing integer num_generations.")
+    return {
+        "kind": "regression",
+        "name": "mean_relative_length",
+        "profile_target": "mean_relative_length",
+        "tail_threshold": 0.5,
+        "num_generations": num_generations,
+        "loss": "sigmoid_mse",
     }
 
 
@@ -308,6 +367,67 @@ def relabel_output_matches_source(
         },
         "prompt_profile_source_dir": str(source_dir),
         "prompt_profile_source_archive_file": expected_archive_file,
+    }
+    for key in RELABEL_SOURCE_MANIFEST_KEYS:
+        expected_values[key] = source_manifest.get(key)
+
+    for key, expected in expected_values.items():
+        if out_manifest.get(key) != expected:
+            return False
+    return True
+
+
+def regression_subset_source_dir(
+    args: argparse.Namespace,
+    *,
+    out_root: Path,
+    spec: DatasetSpec,
+) -> Path | None:
+    if args.regression_data_mode != "reuse_binary_subset":
+        return None
+    root = (
+        Path(args.regression_subset_root).resolve()
+        if args.regression_subset_root
+        else out_root.resolve()
+    )
+    return binary_data_dir(root, spec)
+
+
+def regression_data_matches_source(
+    *,
+    source_dir: Path,
+    out_dir: Path,
+    subset_source_dir: Path,
+) -> bool:
+    out_manifest_path = manifest_path(out_dir)
+    source_manifest_path = manifest_path(source_dir)
+    subset_manifest_path = manifest_path(subset_source_dir)
+    if (
+        not out_manifest_path.exists()
+        or not source_manifest_path.exists()
+        or not subset_manifest_path.exists()
+    ):
+        return False
+
+    source_manifest = read_json(source_manifest_path)
+    out_manifest = read_json(out_manifest_path)
+    expected_archive_file = source_manifest.get("prompt_rollout_archive_file")
+    if not isinstance(expected_archive_file, str) or not expected_archive_file:
+        return False
+
+    expected_values: dict[str, Any] = {
+        "target_spec": regression_target_spec(source_manifest),
+        "balancing": {
+            "train": "none",
+            "test": "none",
+            "seed": 0,
+        },
+        "prompt_profile_source_dir": str(source_dir),
+        "prompt_profile_source_archive_file": expected_archive_file,
+        "sample_id_subset_source": {
+            "train": str(subset_source_dir),
+            "test": str(subset_source_dir),
+        },
     }
     for key in RELABEL_SOURCE_MANIFEST_KEYS:
         expected_values[key] = source_manifest.get(key)
@@ -503,6 +623,31 @@ def relabel_cmd(
     ]
 
 
+def regression_relabel_cmd(
+    args: argparse.Namespace,
+    *,
+    source_dir: Path,
+    out_dir: Path,
+    subset_source_dir: Path,
+) -> list[str]:
+    return [
+        args.python_bin,
+        str(SCRIPTS_DIR / "relabel_prompt_profile_dataset.py"),
+        "--source-dir",
+        str(source_dir),
+        "--out-dir",
+        str(out_dir),
+        "--target-kind",
+        "regression",
+        "--profile-target",
+        "mean_relative_length",
+        "--reuse-train-sample-ids-from",
+        str(subset_source_dir),
+        "--reuse-test-sample-ids-from",
+        str(subset_source_dir),
+    ]
+
+
 def summary_cmd(
     args: argparse.Namespace,
     *,
@@ -530,10 +675,37 @@ def run_build(args: argparse.Namespace, spec: DatasetSpec, out_root: Path) -> No
 
 
 def run_regression(args: argparse.Namespace, spec: DatasetSpec, out_root: Path) -> None:
-    data_dir = shared_archive_dir(out_root, spec)
+    source_dir = source_shared_archive_dir(args, out_root, spec)
+    data_dir = source_dir
+    if args.regression_data_mode == "reuse_binary_subset":
+        subset_source_dir = regression_subset_source_dir(args, out_root=out_root, spec=spec)
+        if subset_source_dir is None or not manifest_path(subset_source_dir).exists():
+            raise SystemExit(
+                f"Missing balanced binary sample-id source for {spec.display_name}: "
+                f"{subset_source_dir}"
+            )
+        data_dir = regression_data_dir(out_root, spec)
+        if regression_data_matches_source(
+            source_dir=source_dir,
+            out_dir=data_dir,
+            subset_source_dir=subset_source_dir,
+        ):
+            print(f"[skip] regression data {spec.key} already matches balanced subset", flush=True)
+        else:
+            if data_dir.exists():
+                print(f"[rebuild] regression data {spec.key} from balanced binary subset", flush=True)
+                if not args.dry_run:
+                    shutil.rmtree(data_dir)
+            cmd = regression_relabel_cmd(
+                args,
+                source_dir=source_dir,
+                out_dir=data_dir,
+                subset_source_dir=subset_source_dir,
+            )
+            run_command(cmd, cwd=ROOT, dry_run=args.dry_run)
     if not manifest_path(data_dir).exists() and not args.dry_run:
         raise SystemExit(
-            f"Missing shared archive manifest for {spec.display_name}: {data_dir}"
+            f"Missing regression data manifest for {spec.display_name}: {data_dir}"
         )
     for view_name in ("ensemble", "last_layer"):
         root_run_dir = regression_run_dir(out_root, spec, view_name)
@@ -568,7 +740,7 @@ def run_regression(args: argparse.Namespace, spec: DatasetSpec, out_root: Path) 
 
 
 def run_relabel(args: argparse.Namespace, spec: DatasetSpec, out_root: Path) -> None:
-    source_dir = shared_archive_dir(out_root, spec)
+    source_dir = source_shared_archive_dir(args, out_root, spec)
     out_dir = binary_data_dir(out_root, spec)
     if relabel_output_matches_source(
         source_dir=source_dir,
