@@ -189,9 +189,17 @@ def _get_lm_style(model_id: str, override: str | None = None, repo_path: str = "
             if hasattr(lm_style_cls, override):
                 return getattr(lm_style_cls, override)
             raise
-    if model_id.lower().startswith("qwen/"):
+    model_id_lower = model_id.lower()
+    model_basename = os.path.basename(model_id.rstrip("/")).lower()
+    if model_id_lower.startswith("qwen/") or model_basename.startswith("qwen"):
         return lm_style_cls.CodeQwenInstruct
-    return lm_style_cls.CodeQwenInstruct
+    raise ValueError(
+        "No default LiveCodeBench LM style mapping is defined for "
+        f"model_id={model_id!r}. Pass --lm-style-override with a repo-supported "
+        "LMStyle. LiveCodeBench's own docs require adding new model families to "
+        "lcb_runner/lm_styles.py and prompt formatting support before treating a "
+        "new model family as benchmark-comparable."
+    )
 
 
 def _normalize_metric_value(value: Any) -> Any:

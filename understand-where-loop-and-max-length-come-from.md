@@ -325,6 +325,41 @@ There is also a real smaller-model fallback, but it is not within the same OLMo 
   - `OLMo-2-0425-1B-Instruct`
 - that would still change families and training details, so it should be treated as a fallback debug object after auditing the current OLMo 3 bounded outputs, not as a silent replacement for them.
 
+## Local Audit Before The OLMo 2 Pivot (2026-04-04 07:25 UTC)
+
+I checked the weird rows against the local collector / adapter code before trying to trust or rerun them blindly.
+
+One concrete bug explains why the current `LiveCodeBench` row should not be treated as canonical for OLMo:
+
+- our `livecodebench_codegen` adapter was silently defaulting every non-Qwen model family to `CodeQwenInstruct` LM style when no explicit override was supplied;
+- the official LiveCodeBench repo does **not** recommend that fallback. Their README says new model families should be added explicitly in `lcb_runner/lm_styles.py` and `prompts/generation.py` before evaluation is treated as benchmark-comparable;
+- so the bounded OLMo 3 `LiveCodeBench` rows were not on a model-native codegen surface. That means `SFT / LiveCodeBench = 0 / 80` is not strong evidence about where degeneration enters the model family. It is confounded by the benchmark wrapper.
+
+I patched the adapter to fail fast on that case instead of silently reusing the Qwen codegen style for unrelated model families. Future non-Qwen `LiveCodeBench` runs now require an explicit `--lm-style-override` backed by actual LiveCodeBench prompt / extraction support.
+
+`MMLU-Pro` is a different story. The local code audit does **not** show the same kind of easy explanation there:
+
+- the current grader already accepts terminal JSON, boxed letters, bare letters, and `answer is X` style endings;
+- the older parser audit we already saved in-repo (`outputs/mcq_parser_pilot_2026-03-16/mcq_parser_pilot_summary.md`) showed that on the JSON-contract `MMLU-Pro` pilot, strict JSON and the tightened terminal parser were identical;
+- so `RLVR / MMLU-Pro = 0 / 80` is unlikely to be explained by "the model forgot the exact JSON wrapper" alone.
+
+That row is still suspicious, but the remaining possibilities are narrower:
+
+- a real model-side prompt/interface mismatch on that dataset;
+- a strongly wrong-but-short response pattern on this tiny `8`-prompt slice;
+- or some sample-level issue in the saved completions that only direct output inspection can settle.
+
+That last step is currently blocked by infrastructure, not by missing local analysis:
+
+- `ssh tianhaowang-gpu0` still times out during banner exchange, so I cannot inspect the saved remote `MMLU-Pro` completions yet;
+- the same SSH failure also blocks launching the OLMo 2 `1B` fallback sweep right now.
+
+So the current honest read is:
+
+- `LiveCodeBench` has a confirmed wrapper bug and should be removed from any OLMo stage claim until we have a model-native LM style for that family;
+- `MMLU-Pro` still needs direct saved-output inspection before I can call the `0 / 80` row either a true model behavior or a bad interface surface;
+- OLMo 2 `1B` remains the right cheaper fallback once the node is reachable again, but I cannot run it from this workstation while the GPU node is rejecting SSH.
+
 ## Why The New Lengths Are Much Shorter Than Qwen3
 
 The correct comparison object here is the saved Qwen3 common-policy bundle:
