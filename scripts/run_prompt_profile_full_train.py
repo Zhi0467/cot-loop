@@ -4,17 +4,19 @@
 from __future__ import annotations
 
 import argparse
+import json
 import shlex
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS_DIR = ROOT / "scripts"
 DEFAULT_OUT_ROOT = ROOT / "outputs" / "full_train"
-DEFAULT_SUMMARY_DIR = DEFAULT_OUT_ROOT / "summary"
 
 
 @dataclass(frozen=True)
@@ -129,7 +131,11 @@ def parse_args() -> argparse.Namespace:
         help="Which portion of the full-train surface to execute.",
     )
     parser.add_argument("--out-root", default=str(DEFAULT_OUT_ROOT))
-    parser.add_argument("--summary-dir", default=str(DEFAULT_SUMMARY_DIR))
+    parser.add_argument(
+        "--summary-dir",
+        default=None,
+        help="Defaults to <out-root>/summary when omitted.",
+    )
     parser.add_argument("--python-bin", default=sys.executable)
     parser.add_argument("--wandb-project", default="cot-loop-probe")
     parser.add_argument("--probe-preset", default="mlp")
@@ -189,6 +195,11 @@ def run_command(cmd: list[str], *, cwd: Path, dry_run: bool) -> None:
     subprocess.run(cmd, cwd=str(cwd), check=True)
 
 
+def read_json(path: Path) -> dict[str, Any]:
+    with path.open("r", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
 def dataset_root(out_root: Path, spec: DatasetSpec) -> Path:
     return out_root / spec.key
 
@@ -211,6 +222,82 @@ def binary_run_dir(out_root: Path, spec: DatasetSpec, view_name: str) -> Path:
 
 def manifest_path(data_dir: Path) -> Path:
     return data_dir / "manifest.json"
+
+
+def relabel_target_spec(source_manifest: dict[str, Any]) -> dict[str, Any]:
+    rollout_cfg = source_manifest.get("rollout_config")
+    if not isinstance(rollout_cfg, dict):
+        raise SystemExit("Source manifest is missing rollout_config for relabel comparison.")
+    num_generations = rollout_cfg.get("num_generations")
+    if not isinstance(num_generations, int):
+        raise SystemExit("Source manifest rollout_config is missing integer num_generations.")
+    return {
+        "kind": "binary",
+        "source": "prompt_profile",
+        "name": "majority_s_0.5",
+        "profile_target": "majority_tail",
+        "tail_threshold": 0.5,
+        "num_generations": num_generations,
+        "positive_rule": "strict_majority",
+    }
+
+
+RELABEL_SOURCE_MANIFEST_KEYS = (
+    "version",
+    "input_dim",
+    "sample_shape",
+    "default_feature_key",
+    "feature_extraction",
+    "feature_views",
+    "task_kind",
+    "prompt_field",
+    "answer_field",
+    "prompt_template",
+    "split_source",
+    "split_ratio",
+    "seed",
+    "loop_detector",
+    "rollout_config",
+    "train_spec",
+    "test_spec",
+    "task_loader_config",
+)
+
+
+def relabel_output_matches_source(
+    *,
+    source_dir: Path,
+    out_dir: Path,
+    dataset_seed: int,
+) -> bool:
+    out_manifest_path = manifest_path(out_dir)
+    source_manifest_path = manifest_path(source_dir)
+    if not out_manifest_path.exists() or not source_manifest_path.exists():
+        return False
+
+    source_manifest = read_json(source_manifest_path)
+    out_manifest = read_json(out_manifest_path)
+    expected_archive_file = source_manifest.get("prompt_rollout_archive_file")
+    if not isinstance(expected_archive_file, str) or not expected_archive_file:
+        return False
+
+    expected_values: dict[str, Any] = {
+        "target_spec": relabel_target_spec(source_manifest),
+        "balancing": {
+            "train": "downsample",
+            "test": "none",
+            "seed": dataset_seed,
+        },
+        "prompt_profile_source_dir": str(source_dir),
+        "prompt_profile_source_archive_file": expected_archive_file,
+    }
+    for key in RELABEL_SOURCE_MANIFEST_KEYS:
+        expected_values[key] = source_manifest.get(key)
+
+    for key, expected in expected_values.items():
+        if out_manifest.get(key) != expected:
+            return False
+    return True
 
 
 def train_run_complete(run_dir: Path, seeds: list[int]) -> bool:
@@ -458,9 +545,17 @@ def run_regression(args: argparse.Namespace, spec: DatasetSpec, out_root: Path) 
 def run_relabel(args: argparse.Namespace, spec: DatasetSpec, out_root: Path) -> None:
     source_dir = shared_archive_dir(out_root, spec)
     out_dir = binary_data_dir(out_root, spec)
-    if manifest_path(out_dir).exists():
+    if relabel_output_matches_source(
+        source_dir=source_dir,
+        out_dir=out_dir,
+        dataset_seed=args.dataset_seed,
+    ):
         print(f"[skip] relabel {spec.key} already complete", flush=True)
         return
+    if out_dir.exists():
+        print(f"[rebuild] relabel {spec.key} from refreshed shared archive", flush=True)
+        if not args.dry_run:
+            shutil.rmtree(out_dir)
     cmd = relabel_cmd(args, source_dir=source_dir, out_dir=out_dir)
     run_command(cmd, cwd=ROOT, dry_run=args.dry_run)
 
@@ -505,7 +600,11 @@ def main() -> None:
     args = parse_args()
     selected_datasets = resolve_datasets(args.dataset)
     out_root = Path(args.out_root).resolve()
-    summary_dir = Path(args.summary_dir).resolve()
+    summary_dir = (
+        Path(args.summary_dir).resolve()
+        if args.summary_dir
+        else (out_root / "summary").resolve()
+    )
     out_root.mkdir(parents=True, exist_ok=True)
 
     if args.stage in {"all", "build"}:

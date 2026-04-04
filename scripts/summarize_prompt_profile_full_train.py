@@ -17,7 +17,6 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 DEFAULT_OUT_ROOT = ROOT / "outputs" / "full_train"
-DEFAULT_SUMMARY_DIR = DEFAULT_OUT_ROOT / "summary"
 DATASET_ORDER = ("gpqa", "aime", "math500", "mmlu_pro", "livecodebench")
 REGRESSION_METRICS = (
     "mse",
@@ -44,7 +43,11 @@ BINARY_METRICS = (
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out-root", default=str(DEFAULT_OUT_ROOT))
-    parser.add_argument("--summary-dir", default=str(DEFAULT_SUMMARY_DIR))
+    parser.add_argument(
+        "--summary-dir",
+        default=None,
+        help="Defaults to <out-root>/summary when omitted.",
+    )
     parser.add_argument(
         "--dataset",
         action="append",
@@ -75,6 +78,10 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
     with path.open("w", encoding="utf-8") as handle:
         json.dump(payload, handle, indent=2, sort_keys=True)
         handle.write("\n")
+
+
+def manifest_path(data_dir: Path) -> Path:
+    return data_dir / "manifest.json"
 
 
 def feature_matrix(rows: list[dict[str, Any]], feature_names: tuple[str, ...]) -> np.ndarray:
@@ -149,10 +156,20 @@ def binary_roc_auc(y_true: np.ndarray, scores: np.ndarray) -> float | None:
     negatives = int(np.sum(y_true == 0))
     if positives < 1 or negatives < 1:
         return None
-    order = np.argsort(scores.astype(float), kind="mergesort")
-    ranks = np.empty_like(order, dtype=np.float64)
-    ranks[order] = np.arange(1, len(scores) + 1, dtype=np.float64)
-    positive_ranks = float(np.sum(ranks[y_true == 1]))
+    if np.isnan(scores).any():
+        return None
+    sorted_order = np.argsort(scores.astype(float), kind="mergesort")
+    sorted_scores = scores[sorted_order].astype(float)
+    sorted_true = y_true[sorted_order].astype(int)
+    positive_ranks = 0.0
+    start = 0
+    while start < sorted_scores.size:
+        stop = start + 1
+        while stop < sorted_scores.size and sorted_scores[stop] == sorted_scores[start]:
+            stop += 1
+        average_rank = float((start + 1 + stop) / 2.0)
+        positive_ranks += float(np.sum(sorted_true[start:stop] == 1)) * average_rank
+        start = stop
     numerator = positive_ranks - (positives * (positives + 1) / 2.0)
     denominator = float(positives * negatives)
     if denominator <= 0.0:
@@ -164,14 +181,29 @@ def binary_pr_auc(y_true: np.ndarray, scores: np.ndarray) -> float | None:
     positives = int(np.sum(y_true == 1))
     if positives < 1:
         return None
+    if np.isnan(scores).any():
+        return None
     order = np.argsort(-scores, kind="mergesort")
+    sorted_scores = scores[order].astype(float)
     ranked_true = y_true[order].astype(int)
-    tp = np.cumsum(ranked_true)
-    fp = np.cumsum(1 - ranked_true)
-    precision = tp / np.maximum(tp + fp, 1)
-    recall = tp / float(positives)
-    recall_prev = np.concatenate(([0.0], recall[:-1]))
-    return float(np.sum((recall - recall_prev) * precision))
+    tp = 0
+    fp = 0
+    average_precision = 0.0
+    previous_recall = 0.0
+    start = 0
+    while start < sorted_scores.size:
+        stop = start + 1
+        while stop < sorted_scores.size and sorted_scores[stop] == sorted_scores[start]:
+            stop += 1
+        group_true = ranked_true[start:stop]
+        tp += int(np.sum(group_true == 1))
+        fp += int(group_true.size - np.sum(group_true == 1))
+        precision = float(tp / max(tp + fp, 1))
+        recall = float(tp / positives)
+        average_precision += (recall - previous_recall) * precision
+        previous_recall = recall
+        start = stop
+    return float(average_precision)
 
 
 def binary_threshold_metrics(y_true: np.ndarray, predictions: np.ndarray) -> dict[str, float]:
@@ -360,7 +392,10 @@ def summarize_regression_baseline(
 
 
 def load_prompt_profile_rows(data_dir: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    manifest = read_json(data_dir / "manifest.json")
+    manifest_file = data_dir / "manifest.json"
+    if not manifest_file.exists():
+        raise SystemExit(f"Dataset manifest is missing: {data_dir}")
+    manifest = read_json(manifest_file)
     prompt_profile_files = manifest.get("prompt_profile_files")
     if not isinstance(prompt_profile_files, dict):
         raise SystemExit(f"Dataset is missing prompt_profile_files: {data_dir}")
@@ -512,6 +547,13 @@ def flatten_metadata_row(
     return row
 
 
+def component_status(payload: dict[str, Any] | None) -> str:
+    if not isinstance(payload, dict):
+        return "missing"
+    status = payload.get("status")
+    return status if isinstance(status, str) else "missing"
+
+
 def dataset_summary(dataset_key: str, out_root: Path) -> dict[str, Any]:
     dataset_root = out_root / dataset_key
     shared_archive = dataset_root / "shared_archive"
@@ -525,7 +567,7 @@ def dataset_summary(dataset_key: str, out_root: Path) -> dict[str, Any]:
         "status": "missing",
     }
 
-    if not shared_archive.exists():
+    if not manifest_path(shared_archive).exists():
         summary["status"] = "missing_shared_archive"
         return summary
 
@@ -559,9 +601,14 @@ def dataset_summary(dataset_key: str, out_root: Path) -> dict[str, Any]:
         ),
     }
 
+    regression_status = "complete"
+    if any(component_status(payload) != "complete" for payload in regression_views.values()):
+        regression_status = "partial"
+
+    binary_status = "missing"
     binary_baselines: dict[str, Any] | None = None
     binary_views: dict[str, Any] | None = None
-    if binary_data.exists():
+    if manifest_path(binary_data).exists():
         train_bin_rows, test_bin_rows = load_prompt_profile_rows(binary_data)
         binary_baselines = {
             "prompt_length": summarize_binary_baseline(
@@ -585,16 +632,28 @@ def dataset_summary(dataset_key: str, out_root: Path) -> dict[str, Any]:
                 metric_names=BINARY_METRICS,
             ),
         }
+        binary_status = "complete"
+        if any(component_status(payload) != "complete" for payload in binary_views.values()):
+            binary_status = "partial"
+    elif binary_data.exists():
+        binary_status = "partial"
 
-    summary["status"] = "complete" if binary_baselines is not None else "missing_binary"
     summary["mean_relative_length"] = {
+        "status": regression_status,
         "metadata_baselines": regression_baselines,
         "views": regression_views,
     }
     summary["majority_s_0.5"] = {
+        "status": binary_status,
         "metadata_baselines": binary_baselines,
         "views": binary_views,
     }
+    if binary_status == "missing":
+        summary["status"] = "missing_binary"
+    elif regression_status != "complete" or binary_status != "complete":
+        summary["status"] = "partial"
+    else:
+        summary["status"] = "complete"
     return summary
 
 
@@ -611,7 +670,11 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
 def main() -> None:
     args = parse_args()
     out_root = Path(args.out_root).resolve()
-    summary_dir = Path(args.summary_dir).resolve()
+    summary_dir = (
+        Path(args.summary_dir).resolve()
+        if args.summary_dir
+        else (out_root / "summary").resolve()
+    )
     selected = args.dataset or list(DATASET_ORDER)
 
     all_payload: dict[str, Any] = {
