@@ -440,7 +440,7 @@ def _load_prompt_items(
         args.livecodebench_repo,
         args.release_version,
     )
-    prompt_records, lm_style, resolved_prompt_format = livecodebench_codegen.build_prompts(
+    prompt_records, lm_style = livecodebench_codegen.build_prompts(
         benchmark,
         format_prompt,
         repo_path=args.livecodebench_repo,
@@ -448,6 +448,7 @@ def _load_prompt_items(
         lm_style_override=args.lm_style_override,
         max_samples=args.max_samples,
     )
+    resolved_prompt_format = livecodebench_codegen.prompt_format_for_lm_style(lm_style)
     selected_benchmark = benchmark if args.max_samples is None else benchmark[: args.max_samples]
     items = [
         PromptWorkItem(

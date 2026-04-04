@@ -216,7 +216,15 @@ def _load_stats_payloads(stats_dir: Path) -> list[tuple[Path, dict[str, Any]]]:
 
 def _prompt_format_text(row: dict[str, Any], info: DatasetInfo) -> str:
     if info.task_kind == "livecodebench_codegen":
+        resolved = row.get("prompt_format_resolved")
         lm_style = row.get("lm_style")
+        if resolved == "chat_template":
+            if lm_style:
+                return (
+                    "Tokenizer chat template around the LiveCodeBench generic prompt "
+                    f"with LM style {lm_style}."
+                )
+            return "Tokenizer chat template around the LiveCodeBench generic prompt."
         if lm_style:
             return (
                 "Raw string prompt from LiveCodeBench format_prompt_generation "

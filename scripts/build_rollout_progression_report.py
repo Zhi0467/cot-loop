@@ -434,12 +434,12 @@ def _build_findings(stages: list[dict[str, Any]]) -> str:
         last_cap = _average_metric(last, "max_length_hit_fraction")
         if not math.isnan(base_loop) and not math.isnan(last_loop):
             lines.append(
-                f"Average loop fraction rises from {100.0 * base_loop:.1f}\\% on {base['label']} "
+                f"Average loop fraction moves from {100.0 * base_loop:.1f}\\% on {base['label']} "
                 f"to {100.0 * last_loop:.1f}\\% on {last['label']}."
             )
         if not math.isnan(base_cap) and not math.isnan(last_cap):
             lines.append(
-                f"Average max-length-hit fraction rises from {100.0 * base_cap:.1f}\\% on {base['label']} "
+                f"Average max-length-hit fraction moves from {100.0 * base_cap:.1f}\\% on {base['label']} "
                 f"to {100.0 * last_cap:.1f}\\% on {last['label']}."
             )
 
