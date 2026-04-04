@@ -115,11 +115,36 @@ Observed rollout-stat bundle on that slice:
   - `0 / 8` max-length hits
   - `avg_generation_length = 495.0`
 
+The larger bounded follow-up under that same corrected object also landed:
+
+- output root: `/data/scratch/murphy/outputs/cot-loop-detection/olmo3_degeneration_origin_progression/math32_cap4096_gen1_pilot/`
+- dataset slice: first `32` `MATH-500` prompts
+- decode settings: unchanged (`temperature=0.2`, `num_generations=1`, `max_tokens=4096`)
+
+Observed rollout-stat bundle on that larger slice:
+
+- base `raw`:
+  - `9 / 32` correct
+  - `3 / 32` looped
+  - `0 / 32` max-length hits
+  - `avg_generation_length = 2375.65625`
+- SFT `chat_template`:
+  - `17 / 32` correct
+  - `0 / 32` looped
+  - `0 / 32` max-length hits
+  - `avg_generation_length = 348.5`
+- RLVR `chat_template`:
+  - `16 / 32` correct
+  - `0 / 32` looped
+  - `0 / 32` max-length hits
+  - `avg_generation_length = 1146.0`
+
 Current interpretation:
 
-- on the first corrected slice, the degeneration signal appears in the base checkpoint rather than first appearing at SFT or RLVR;
-- that is still a small-sample result, not the final conclusion;
-- the right next step is a larger bounded slice under the same corrected contract, not a return to the invalid all-raw comparison.
+- the larger corrected slice keeps the same qualitative result as the 8-prompt pilot: observed looping is still confined to the base checkpoint;
+- on these bounded `MATH-500` slices, SFT and RLVR do not show loop or max-length-hit mass at all under the corrected prompt surfaces;
+- this is now enough to reject the earlier all-raw comparison, but it is still not the final multi-dataset answer to the full note hypothesis;
+- the next expansion should keep the corrected prompt-surface split fixed and scale the same rollout-stat object outward, rather than revisiting the invalid shared-raw contract.
 
 ## Deliverables
 
