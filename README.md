@@ -16,11 +16,11 @@ Latest status:
 - the readable common-policy artifact is `outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/qwen3_1p7b_cross_dataset_rollout_report.pdf`, while the separate benchmark-style `GPQA` calibration lives in `outputs/gpqa_json_official_temp0p6_gen1/` and should not be conflated with the shared-policy table.
 - one explicit caveat remains on that recovered `LiveCodeBench` block: the original job crashed after grading and before writing the final JSON, and replay-based repair did not reproduce the stored generations exactly enough to recover `avg_first_loop_prefix_length`. That single metric therefore remains `null` for the recovered capped run.
 - the target-choice question is no longer open for the next run: Wangzhi locked `mean_relative_length` as the regression train target and `majority_s_0.5` as the binary train target.
-- the missing collaborator-requested prompt-profile artifact is now narrower than the older notes suggest: it is the balanced-train / natural-test regression rerun on the saved April prompt subset, not another binary-only rewrite. The code path and dedicated `2`-GPU Slurm wrapper now exist, but the rerun is still blocked because `tianhaowang-gpu0` accepts TCP on `22` without returning an SSH banner.
-- the active OLMo degeneration-origin audit is also narrower than the raw bounded bundle:
-  - `LiveCodeBench` is not a valid current OLMo-stage comparison because the old adapter silently defaulted non-Qwen families to a Qwen-specific wrapper style;
-  - `RLVR / MMLU-Pro = 0 / 80` remains unresolved rather than explained away;
-  - OLMo 2 `1B` is the next cheaper fallback only after that audit or node access returns.
+- the collaborator-requested balanced-train / natural-test regression rerun is now complete and should be cited directly, not described as a blocked wrapper path. The durable note/PDF live at `docs/prompt-profile-balanced-regression-2026-04-04.md` and `outputs/prompt_profile_balanced_regression_20260404/prompt_profile_balanced_regression_20260404.pdf`.
+- the OLMo degeneration-origin audit is now on a corrected result surface rather than an unresolved warning:
+  - `RLVR / MMLU-Pro = 0 / 80` was a grader bug on relaxed terminal JSON-like forms such as `{"answer": I}`;
+  - OLMo now has a model-native `LiveCodeBench` adapter path instead of the old silent Qwen-wrapper fallback;
+  - the cheap full-ladder control is now the bounded OLMo 2 `1B` progression, which shows heavy loop / cap mass in base, reduced but still present mass in SFT, and much smaller mass in `RLVR1` / instruct.
 - the full-train plan is now pinned in both doc and PDF form:
   - `docs/prompt-profile-full-train-plan-2026-04-02.md`
   - `outputs/prompt_profile_full_train_plan_20260402/prompt_profile_full_train_plan_20260402.pdf`
@@ -28,10 +28,9 @@ Latest status:
 - the current docs now lock one distinction that had kept drifting in-thread:
   - for binary `majority_s_0.5`, prompt length already means a true one-feature held-out scorer;
   - for the current continuous-head decision, the raw association table has now been superseded by the trained metadata-control bundle in `outputs/prompt_profile_risk_controls_20260330/`.
-- the current open work is now execution-focused rather than definitional:
-  - run the balanced-train / natural-test regression rerun once the node admits SSH again;
-  - audit the suspect OLMo `LiveCodeBench` and `MMLU-Pro` rows before scaling or pivoting model families;
-  - recover `LiveCodeBench` prompt-level accuracy only if a full `5 / 5` accuracy bucket table becomes necessary.
+- the current open work is now post-audit rather than pre-audit:
+  - decide whether to scale the bounded OLMo2 ladder to a larger prompt slice or spend the next node budget on a smaller targeted OLMo3 base comparison;
+  - keep `LiveCodeBench` prompt-level accuracy recovery in reserve unless a full `5 / 5` accuracy bucket table becomes necessary.
 
 **Workflow:**
 1. Build model-formatted chat prompts (shared `utils.build_prompt` source)

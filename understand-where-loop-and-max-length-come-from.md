@@ -468,6 +468,8 @@ Completed rows on disk so far:
 - base:
   - `MATH-500`: `3 / 80` correct, `27 / 80` looped, `29 / 80` max-length hits, `avg_generation_length = 1536.3375`
   - `AIME`: `0 / 80` correct, `48 / 80` looped, `48 / 80` max-length hits, `avg_generation_length = 2456.0875`
+  - `GPQA`: `2 / 80` correct, `42 / 80` looped, `46 / 80` max-length hits, `avg_generation_length = 2265.7125`
+  - `MMLU-Pro`: `6 / 80` correct, `37 / 80` looped, `49 / 80` max-length hits, `avg_generation_length = 2491.0875`
 - SFT:
   - `MATH-500`: `8 / 80` correct, `7 / 80` looped, `9 / 80` max-length hits, `avg_generation_length = 891.3875`
   - `AIME`: `0 / 80` correct, `11 / 80` looped, `11 / 80` max-length hits, `avg_generation_length = 1664.6875`
@@ -506,3 +508,8 @@ So the full fallback read is sharper than the broken original OLMo 3 bundle:
 - loop / cap mass is heaviest in base;
 - SFT still carries substantial degeneracy on several datasets, including `LiveCodeBench`;
 - `RLVR1` and instruct largely remove loop / cap mass on this bounded object, even though some datasets are still simply low-accuracy rather than degenerate.
+
+The collaborator-facing summary surface for this whole arc now lives at:
+
+- `docs/olmo-degeneration-origin-audit-2026-04-04.md`
+- `outputs/olmo_degeneration_origin_audit_20260404/olmo_degeneration_origin_audit_20260404.pdf`

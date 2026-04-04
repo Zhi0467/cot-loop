@@ -1,6 +1,6 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-04 21:43 UTC
+Last updated: 2026-04-04 22:54 UTC
 
 ## Immediate Next Experiments
 
@@ -24,16 +24,23 @@ Last updated: 2026-04-04 21:43 UTC
     - Slurm wrappers now honor explicit `CONDA_ENV` before any stale repo-local `.venv`
     - `scripts/summarize_prompt_profile_full_train.py` now summarizes regression-only reruns instead of marking them `missing_shared_archive`
   - If prompt-profile regression is pushed further, the next honest follow-up is not "rerun balanced regression again." It is a small layer-subset or capacity sweep on this same balanced regression split, while keeping `top_20p_capture` primary and `RMSE` secondary.
-- Audit the weird bounded OLMo instruct bundle before scaling it or swapping model families.
-  - The current bundle is under `/data/scratch/murphy/outputs/cot-loop-detection/olmo3_degeneration_origin_progression/bound8_temp0p1_gen10_ctx40960_topkneg1/`.
-  - `RLVR / MMLU-Pro = 0 / 80` with mean length `6.15` is too suspicious to treat as a clean capability read.
-  - `SFT / LiveCodeBench = 0 / 80` also needs the native-codegen surface checked before being treated as an ordinary rollout-success result.
-  - Run the cheap audit first:
-    - inspect terminal answer forms on saved `MMLU-Pro` responses with the relaxed structured parser, not only the strict JSON grader;
-    - inspect `LiveCodeBench` extracted code plus native `pass@k` on the same saved bundle, not only rollout-success;
-    - only after that decide whether the current OLMo 3 surface is scientifically usable.
-  - If a smaller progression is still needed after the audit, the smallest public fallback is the April 2025 OLMo 2 `1B` chain (`OLMo-2-0425-1B -> OLMo-2-0425-1B-SFT -> OLMo-2-0425-1B-RLVR1 -> OLMo-2-0425-1B-Instruct`).
-  - Do not describe that as a smaller OLMo 3 run: the public OLMo 3 instruct ladder is only `7B` and `32B`.
+- The corrected OLMo degeneration-origin package now exists and should be cited directly.
+  - Result note: `docs/olmo-degeneration-origin-audit-2026-04-04.md`
+  - Result PDF: `outputs/olmo_degeneration_origin_audit_20260404/olmo_degeneration_origin_audit_20260404.pdf`
+  - Main repairs:
+    - `RLVR / MMLU-Pro = 0 / 80` was a grader bug on relaxed terminal forms such as `{"answer": I}`;
+    - OLMo now has a model-native `LiveCodeBench` path instead of the old silent Qwen-wrapper fallback.
+  - Main corrected OLMo3 read:
+    - bounded OLMo3 SFT now lands at `34 / 80` on `MMLU-Pro` with `1 / 80` loop and `1 / 80` max hit;
+    - bounded OLMo3 RLVR now lands at `27 / 80` on `MMLU-Pro` with `0 / 80` loops and `0 / 80` max hits;
+    - bounded OLMo3 `LiveCodeBench` is now `6 / 80` for SFT with `1 / 80` loop and `22 / 80` for RLVR with `0 / 80` loops.
+  - Main OLMo2 fallback read:
+    - heavy loop / cap mass in base;
+    - reduced but still present mass in SFT;
+    - much smaller mass in `RLVR1` / instruct.
+  - What is still open:
+    - decide whether the next honest follow-up is a larger bounded OLMo2 slice or a smaller targeted OLMo3 base comparison;
+    - do not reopen interface debugging unless a new row breaks the corrected surface again.
 - The combined April prompt-profile report is now background context, not the current balanced-regression deliverable.
   - Result note: `docs/prompt-profile-full-surface-update-2026-04-04.md`
   - Result PDF: `outputs/prompt_profile_full_surface_update_20260404/prompt_profile_full_surface_update_20260404.pdf`
