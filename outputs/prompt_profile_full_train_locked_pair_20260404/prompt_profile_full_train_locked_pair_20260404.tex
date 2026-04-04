@@ -1,0 +1,121 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+
+\title{Prompt-Profile Full Train: Locked Pair Results}
+\author{}
+\date{2026-04-04 00:17 UTC}
+
+\begin{document}
+\maketitle
+
+\section*{Question}
+What does the first locked full-train pass say about the current two-head prompt-profile surface under the fixed saved contract?
+
+\begin{itemize}[leftmargin=1.5em]
+\item regression head: \texttt{mean\_relative\_length}
+\item binary head: \texttt{majority\_s\_0.5}
+\item feature surface: prompt-prefill activations only
+\item view comparison: layerwise \texttt{ensemble} versus \texttt{last\_layer}
+\end{itemize}
+
+\section*{Setup}
+\begin{itemize}[leftmargin=1.5em]
+\item Runtime object: Slurm job \texttt{2043} on \texttt{2} GPUs, completed at \texttt{2026-04-04 00:10 UTC}.
+\item Data object: reused the saved March prompt-profile archives; no rerollout.
+\item Selector: report the standardized \texttt{best\_loss} ledger and keep \texttt{best\_rank} diagnostic-only.
+\item Mechanism split:
+  \begin{itemize}[leftmargin=1.5em]
+  \item for regression \texttt{mean\_relative\_length}, \texttt{ensemble} means one MLP per layer with \texttt{mean\_prob} aggregation;
+  \item for binary \texttt{majority\_s\_0.5}, \texttt{ensemble} means one MLP per layer with \texttt{vote\_fraction} aggregation over the per-layer 0/1 predictions.
+  \end{itemize}
+\item Metadata baselines below are train-fit held-out scorers, not raw correlations.
+\item \texttt{effective\_budget} is constant at \texttt{30000} on this run, so the joint regression control collapses to prompt length.
+\end{itemize}
+
+\section*{Main Results}
+\subsection*{Regression \texttt{mean\_relative\_length}}
+The activation ensemble beats the last-layer control on all five datasets in \texttt{Spearman rank correlation}, but that is not the same as beating metadata.
+
+\begin{center}
+\small
+\setlength{\tabcolsep}{4pt}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+Dataset & Ensemble Spearman & Last-layer Spearman & Prompt-length Spearman & Ensemble RMSE & Last-layer RMSE & Prompt-length RMSE \\
+\midrule
+GPQA & 0.419 $\pm$ 0.045 & 0.175 $\pm$ 0.225 & 0.116 & 0.160 & 0.164 & 0.165 \\
+AIME & 0.639 $\pm$ 0.090 & 0.483 $\pm$ 0.138 & 0.676 & 0.183 & 0.189 & 0.176 \\
+MATH-500 & 0.351 $\pm$ 0.199 & 0.158 $\pm$ 0.426 & 0.461 & 0.162 & 0.169 & 0.154 \\
+MMLU-Pro & 0.348 $\pm$ 0.034 & -0.019 $\pm$ 0.293 & 0.393 & 0.133 & 0.138 & 0.126 \\
+LiveCodeBench & 0.805 $\pm$ 0.002 & 0.784 $\pm$ 0.006 & 0.405 & 0.248 & 0.242 & 0.279 \\
+\bottomrule
+\end{tabular}
+}
+\end{center}
+
+Clean read:
+\begin{itemize}[leftmargin=1.5em]
+\item The activation ensemble is clearly better than \texttt{last\_layer} on the regression head.
+\item The activation ensemble only beats the trained prompt-length baseline on \texttt{GPQA} and \texttt{LiveCodeBench}.
+\item \texttt{AIME}, \texttt{MATH-500}, and \texttt{MMLU-Pro} remain metadata-dominated on this regression target.
+\end{itemize}
+
+\subsection*{Binary \texttt{majority\_s\_0.5}}
+The binary head is the stronger part of the locked pair. The main ranking metric here is \texttt{PR-AUC}, especially on the low-prevalence datasets.
+
+\begin{center}
+\small
+\setlength{\tabcolsep}{4pt}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{@{}lrrrrrrr@{}}
+\toprule
+Dataset & Ensemble PR-AUC & Last-layer PR-AUC & Prompt-length PR-AUC & Ensemble macro-F1 & Last-layer macro-F1 & Prompt-length macro-F1 & Prevalence \\
+\midrule
+GPQA & 0.420 $\pm$ 0.029 & 0.230 $\pm$ 0.278 & 0.066 & 0.382 & 0.414 & 0.286 & 0.050 \\
+AIME & 0.922 $\pm$ 0.024 & 0.904 $\pm$ 0.028 & 0.898 & 0.798 & 0.391 & 0.667 & 0.583 \\
+MATH-500 & 0.135 $\pm$ 0.005 & 0.151 $\pm$ 0.071 & 0.100 & 0.444 & 0.468 & 0.458 & 0.040 \\
+MMLU-Pro & 0.184 $\pm$ 0.037 & 0.056 $\pm$ 0.012 & 0.110 & 0.562 & 0.357 & 0.397 & 0.013 \\
+LiveCodeBench & 0.711 $\pm$ 0.036 & 0.712 $\pm$ 0.023 & 0.576 & 0.747 & 0.714 & 0.646 & 0.338 \\
+\bottomrule
+\end{tabular}
+}
+\end{center}
+
+Clean read:
+\begin{itemize}[leftmargin=1.5em]
+\item Ensemble \texttt{PR-AUC} beats the prompt-length baseline on all five datasets.
+\item The clearest finished wins are \texttt{AIME}, \texttt{LiveCodeBench}, and \texttt{MMLU-Pro}.
+\item \texttt{GPQA} is a real ranking win over metadata, but fixed-threshold metrics stay unstable because only \texttt{5\%} of test prompts are positive.
+\item \texttt{MATH-500} remains weak overall; it is a small ranking lift over metadata, not a clean threshold-quality win.
+\end{itemize}
+
+\section*{Interpretation}
+\begin{itemize}[leftmargin=1.5em]
+\item The earlier Slack snippets were regression-only early checkpoints. The full locked run says the binary head is the more convincing part of this pair.
+\item ``Ensemble beats last layer'' is too coarse:
+  \begin{itemize}[leftmargin=1.5em]
+  \item for regression, that does not imply a metadata win;
+  \item for binary, the gain is real but still prevalence-sensitive on the rare-event datasets.
+  \end{itemize}
+\item The regression result should now be stated narrowly: \texttt{mean\_relative\_length} is still the stronger activation regression target relative to \texttt{last\_layer}, but this full-train pass does not show robust lift over the train-fit prompt-length control across the five-dataset suite.
+\item The binary result is cleaner: \texttt{majority\_s\_0.5} is still not a pure loop label, but it is the stronger finished activation-lift surface on this run.
+\end{itemize}
+
+\section*{Bottom Line}
+The locked full-train backlog item is now complete and reported in the same surface as the earlier loop-label experiment notes.
+
+What changed after actually running it:
+\begin{itemize}[leftmargin=1.5em]
+\item The binary head looks materially stronger than the regression head as a finished deployment-facing surface.
+\item The regression head still needs a stricter metadata-lift answer before it should be treated as a clear activation win.
+\item Future handoffs should cite this result note and the copied ledger directly instead of the early GPQA/AIME-only Slack checkpoints.
+\end{itemize}
+
+\end{document}

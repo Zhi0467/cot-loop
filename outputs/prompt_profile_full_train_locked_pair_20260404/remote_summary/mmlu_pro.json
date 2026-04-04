@@ -1,0 +1,845 @@
+{
+  "binary_data_dir": "/data/scratch/murphy/projects/cot-loop-detection-runtime/outputs/full_train/mmlu_pro/majority_s_0.5/data",
+  "dataset": "mmlu_pro",
+  "dataset_root": "/data/scratch/murphy/projects/cot-loop-detection-runtime/outputs/full_train/mmlu_pro",
+  "majority_s_0.5": {
+    "metadata_baselines": {
+      "effective_budget": {
+        "constant_prediction": 1,
+        "feature_names": [
+          "effective_max_tokens"
+        ],
+        "selection_rule": "orientation=max(train_pr_auc), tie_break=max(train_roc_auc); threshold=max(train_macro_f1), tie_break=max(train_positive_f1), max(train_accuracy)",
+        "test": {
+          "accuracy": 0.0125,
+          "macro_f1": 0.01234567901234568,
+          "positive_f1": 0.02469135802469136,
+          "positive_precision": 0.0125,
+          "positive_recall": 1.0,
+          "pr_auc": null,
+          "prevalence": 0.0125,
+          "roc_auc": null
+        },
+        "test_unique_values": 1,
+        "train": {
+          "accuracy": 0.5,
+          "macro_f1": 0.3333333333333333,
+          "positive_f1": 0.6666666666666666,
+          "positive_precision": 0.5,
+          "positive_recall": 1.0,
+          "pr_auc": null,
+          "prevalence": 0.5,
+          "roc_auc": null
+        },
+        "train_unique_values": 1
+      },
+      "prompt_length": {
+        "direction": "higher_is_more_positive",
+        "feature_names": [
+          "prompt_token_count"
+        ],
+        "selection_rule": "orientation=max(train_pr_auc), tie_break=max(train_roc_auc); threshold=max(train_macro_f1), tie_break=max(train_positive_f1), max(train_accuracy)",
+        "test": {
+          "accuracy": 0.5875,
+          "macro_f1": 0.3965714285714286,
+          "positive_f1": 0.05714285714285715,
+          "positive_precision": 0.029411764705882353,
+          "positive_recall": 1.0,
+          "pr_auc": 0.11036036036036036,
+          "prevalence": 0.0125,
+          "roc_auc": 0.8734177215189873
+        },
+        "test_unique_values": 116,
+        "threshold": 227.0,
+        "train": {
+          "accuracy": 1.0,
+          "macro_f1": 1.0,
+          "positive_f1": 1.0,
+          "positive_precision": 1.0,
+          "positive_recall": 1.0,
+          "pr_auc": 1.0,
+          "prevalence": 0.5,
+          "roc_auc": 1.0
+        },
+        "train_unique_values": 13
+      }
+    },
+    "views": {
+      "ensemble": {
+        "aggregate": {
+          "best_loss": {
+            "accuracy": {
+              "count": 3,
+              "mean": 0.8833333333333333,
+              "std": 0.08156988312688288
+            },
+            "macro_f1": {
+              "count": 3,
+              "mean": 0.5623921213966615,
+              "std": 0.06698628161440333
+            },
+            "positive_f1": {
+              "count": 3,
+              "mean": 0.18888888888888888,
+              "std": 0.08784821652077276
+            },
+            "positive_precision": {
+              "count": 3,
+              "mean": 0.11717171717171719,
+              "std": 0.0733141305520164
+            },
+            "positive_recall": {
+              "count": 3,
+              "mean": 0.8333333333333334,
+              "std": 0.28867513459481287
+            },
+            "pr_auc": {
+              "count": 3,
+              "mean": 0.18373015873015874,
+              "std": 0.03669937728726286
+            },
+            "prevalence": {
+              "count": 3,
+              "mean": 0.012500000000000002,
+              "std": 0.0
+            },
+            "roc_auc": {
+              "count": 3,
+              "mean": 0.9636075949367089,
+              "std": 0.008221760162510538
+            }
+          },
+          "best_rank": {
+            "accuracy": {
+              "count": 3,
+              "mean": 0.86875,
+              "std": 0.08749999999999998
+            },
+            "macro_f1": {
+              "count": 3,
+              "mean": 0.5518100469681756,
+              "std": 0.07232431109642276
+            },
+            "positive_f1": {
+              "count": 3,
+              "mean": 0.1763440860215054,
+              "std": 0.09500392399255946
+            },
+            "positive_precision": {
+              "count": 3,
+              "mean": 0.10985719261581332,
+              "std": 0.07817777447034663
+            },
+            "positive_recall": {
+              "count": 3,
+              "mean": 0.8333333333333334,
+              "std": 0.28867513459481287
+            },
+            "pr_auc": {
+              "count": 3,
+              "mean": 0.18625541125541126,
+              "std": 0.03386027945492001
+            },
+            "prevalence": {
+              "count": 3,
+              "mean": 0.012500000000000002,
+              "std": 0.0
+            },
+            "roc_auc": {
+              "count": 3,
+              "mean": 0.9625527426160337,
+              "std": 0.00927130581816827
+            }
+          }
+        },
+        "missing_seed_dirs": [],
+        "per_seed": [
+          {
+            "best_loss": {
+              "accuracy": 0.875,
+              "macro_f1": 0.5495495495495496,
+              "positive_f1": 0.16666666666666666,
+              "positive_precision": 0.09090909090909091,
+              "positive_recall": 1.0,
+              "pr_auc": 0.15476190476190477,
+              "prevalence": 0.0125,
+              "roc_auc": 0.9588607594936709
+            },
+            "best_rank": {
+              "accuracy": 0.83125,
+              "macro_f1": 0.517803326264092,
+              "positive_f1": 0.12903225806451613,
+              "positive_precision": 0.06896551724137931,
+              "positive_recall": 1.0,
+              "pr_auc": 0.16233766233766234,
+              "prevalence": 0.0125,
+              "roc_auc": 0.9556962025316456
+            },
+            "seed_dir": "/data/scratch/murphy/projects/cot-loop-detection-runtime/outputs/full_train/mmlu_pro/majority_s_0.5/ensemble/seed_0"
+          },
+          {
+            "best_loss": {
+              "accuracy": 0.80625,
+              "macro_f1": 0.5027568922305764,
+              "positive_f1": 0.11428571428571428,
+              "positive_precision": 0.06060606060606061,
+              "positive_recall": 1.0,
+              "pr_auc": 0.17142857142857143,
+              "prevalence": 0.0125,
+              "roc_auc": 0.9588607594936709
+            },
+            "best_rank": {
+              "accuracy": 0.80625,
+              "macro_f1": 0.5027568922305764,
+              "positive_f1": 0.11428571428571428,
+              "positive_precision": 0.06060606060606061,
+              "positive_recall": 1.0,
+              "pr_auc": 0.17142857142857143,
+              "prevalence": 0.0125,
+              "roc_auc": 0.9588607594936709
+            },
+            "seed_dir": "/data/scratch/murphy/projects/cot-loop-detection-runtime/outputs/full_train/mmlu_pro/majority_s_0.5/ensemble/seed_1"
+          },
+          {
+            "best_loss": {
+              "accuracy": 0.96875,
+              "macro_f1": 0.6348699224098585,
+              "positive_f1": 0.2857142857142857,
+              "positive_precision": 0.2,
+              "positive_recall": 0.5,
+              "pr_auc": 0.225,
+              "prevalence": 0.0125,
+              "roc_auc": 0.9731012658227849
+            },
+            "best_rank": {
+              "accuracy": 0.96875,
+              "macro_f1": 0.6348699224098585,
+              "positive_f1": 0.2857142857142857,
+              "positive_precision": 0.2,
+              "positive_recall": 0.5,
+              "pr_auc": 0.225,
+              "prevalence": 0.0125,
+              "roc_auc": 0.9731012658227849
+            },
+            "seed_dir": "/data/scratch/murphy/projects/cot-loop-detection-runtime/outputs/full_train/mmlu_pro/majority_s_0.5/ensemble/seed_2"
+          }
+        ],
+        "run_dir": "/data/scratch/murphy/projects/cot-loop-detection-runtime/outputs/full_train/mmlu_pro/majority_s_0.5/ensemble",
+        "seed_count": 3,
+        "status": "complete"
+      },
+      "last_layer": {
+        "aggregate": {
+          "best_loss": {
+            "accuracy": {
+              "count": 3,
+              "mean": 0.5416666666666666,
+              "std": 0.275307593126912
+            },
+            "macro_f1": {
+              "count": 3,
+              "mean": 0.35714930542674167,
+              "std": 0.13968902211045114
+            },
+            "positive_f1": {
+              "count": 3,
+              "mean": 0.048264226609754025,
+              "std": 0.016516085630071797
+            },
+            "positive_precision": {
+              "count": 3,
+              "mean": 0.02499145299145299,
+              "std": 0.00868490469616194
+            },
+            "positive_recall": {
+              "count": 3,
+              "mean": 0.8333333333333334,
+              "std": 0.28867513459481287
+            },
+            "pr_auc": {
+              "count": 3,
+              "mean": 0.055852466442552984,
+              "std": 0.011919466701946838
+            },
+            "prevalence": {
+              "count": 3,
+              "mean": 0.012500000000000002,
+              "std": 0.0
+            },
+            "roc_auc": {
+              "count": 3,
+              "mean": 0.8259493670886077,
+              "std": 0.022151898734177205
+            }
+          },
+          "best_rank": {
+            "accuracy": {
+              "count": 3,
+              "mean": 0.5416666666666666,
+              "std": 0.275307593126912
+            },
+            "macro_f1": {
+              "count": 3,
+              "mean": 0.35714930542674167,
+              "std": 0.13968902211045114
+            },
+            "positive_f1": {
+              "count": 3,
+              "mean": 0.048264226609754025,
+              "std": 0.016516085630071797
+            },
+            "positive_precision": {
+              "count": 3,
+              "mean": 0.02499145299145299,
+              "std": 0.00868490469616194
+            },
+            "positive_recall": {
+              "count": 3,
+              "mean": 0.8333333333333334,
+              "std": 0.28867513459481287
+            },
+            "pr_auc": {
+              "count": 3,
+              "mean": 0.055852466442552984,
+              "std": 0.011919466701946838
+            },
+            "prevalence": {
+              "count": 3,
+              "mean": 0.012500000000000002,
+              "std": 0.0
+            },
+            "roc_auc": {
+              "count": 3,
+              "mean": 0.8259493670886077,
+              "std": 0.022151898734177205
+            }
+          }
+        },
+        "missing_seed_dirs": [],
+        "per_seed": [
+          {
+            "best_loss": {
+              "accuracy": 0.75625,
+              "macro_f1": 0.4544977707841595,
+              "positive_f1": 0.04878048780487805,
+              "positive_precision": 0.02564102564102564,
+              "positive_recall": 0.5,
+              "pr_auc": 0.06818181818181818,
+              "prevalence": 0.0125,
+              "roc_auc": 0.8354430379746836
+            },
+            "best_rank": {
+              "accuracy": 0.75625,
+              "macro_f1": 0.4544977707841595,
+              "positive_f1": 0.04878048780487805,
+              "positive_precision": 0.02564102564102564,
+              "positive_recall": 0.5,
+              "pr_auc": 0.06818181818181818,
+              "prevalence": 0.0125,
+              "roc_auc": 0.8354430379746836
+            },
+            "seed_dir": "/data/scratch/murphy/projects/cot-loop-detection-runtime/outputs/full_train/mmlu_pro/majority_s_0.5/last_layer/seed_0"
+          },
+          {
+            "best_loss": {
+              "accuracy": 0.6375,
+              "macro_f1": 0.4198549637409352,
+              "positive_f1": 0.06451612903225806,
+              "positive_precision": 0.03333333333333333,
+              "positive_recall": 1.0,
+              "pr_auc": 0.04439024390243902,
+              "prevalence": 0.0125,
+              "roc_auc": 0.8006329113924051
+            },
+            "best_rank": {
+              "accuracy": 0.6375,
+              "macro_f1": 0.4198549637409352,
+              "positive_f1": 0.06451612903225806,
+              "positive_precision": 0.03333333333333333,
+              "positive_recall": 1.0,
+              "pr_auc": 0.04439024390243902,
+              "prevalence": 0.0125,
+              "roc_auc": 0.8006329113924051
+            },
+            "seed_dir": "/data/scratch/murphy/projects/cot-loop-detection-runtime/outputs/full_train/mmlu_pro/majority_s_0.5/last_layer/seed_1"
+          },
+          {
+            "best_loss": {
+              "accuracy": 0.23125,
+              "macro_f1": 0.19709518175513036,
+              "positive_f1": 0.031496062992125984,
+              "positive_precision": 0.016,
+              "positive_recall": 1.0,
+              "pr_auc": 0.05498533724340176,
+              "prevalence": 0.0125,
+              "roc_auc": 0.8417721518987342
+            },
+            "best_rank": {
+              "accuracy": 0.23125,
+              "macro_f1": 0.19709518175513036,
+              "positive_f1": 0.031496062992125984,
+              "positive_precision": 0.016,
+              "positive_recall": 1.0,
+              "pr_auc": 0.05498533724340176,
+              "prevalence": 0.0125,
+              "roc_auc": 0.8417721518987342
+            },
+            "seed_dir": "/data/scratch/murphy/projects/cot-loop-detection-runtime/outputs/full_train/mmlu_pro/majority_s_0.5/last_layer/seed_2"
+          }
+        ],
+        "run_dir": "/data/scratch/murphy/projects/cot-loop-detection-runtime/outputs/full_train/mmlu_pro/majority_s_0.5/last_layer",
+        "seed_count": 3,
+        "status": "complete"
+      }
+    }
+  },
+  "mean_relative_length": {
+    "metadata_baselines": {
+      "effective_budget": {
+        "feature_names": [
+          "effective_max_tokens"
+        ],
+        "model_payload": {
+          "coef": [
+            0.0
+          ],
+          "intercept": 0.11895332031249999,
+          "scaler_mean": [
+            30000.0
+          ],
+          "scaler_scale": [
+            1.0
+          ]
+        },
+        "test": {
+          "mae": 0.09842493326822917,
+          "mse": 0.017519734610823737,
+          "pred_mean": 0.11895332031249997,
+          "rmse": 0.13236213435429234,
+          "spearman": NaN,
+          "target_mean": 0.12173562499999999,
+          "top_10p_capture": 0.12946300983517903,
+          "top_20p_capture": 0.2223585604734303
+        },
+        "train": {
+          "mae": 0.10263510213216145,
+          "mse": 0.018115453582617017,
+          "pred_mean": 0.11895332031249997,
+          "rmse": 0.13459366100458453,
+          "spearman": NaN,
+          "target_mean": 0.11895332031249999,
+          "top_10p_capture": 0.0910665565481908,
+          "top_20p_capture": 0.190081893775077
+        }
+      },
+      "prompt_length": {
+        "feature_names": [
+          "prompt_token_count"
+        ],
+        "model_payload": {
+          "coef": [
+            0.04842179290889947
+          ],
+          "intercept": 0.1189533203125,
+          "scaler_mean": [
+            236.075
+          ],
+          "scaler_scale": [
+            92.77382106499657
+          ]
+        },
+        "test": {
+          "mae": 0.09600185251193427,
+          "mse": 0.015765427747345184,
+          "pred_mean": 0.12632237314210762,
+          "rmse": 0.12556045455216058,
+          "spearman": 0.39305748822881714,
+          "target_mean": 0.12173562499999999,
+          "top_10p_capture": 0.16926023093075673,
+          "top_20p_capture": 0.2916510505176005
+        },
+        "train": {
+          "mae": 0.0906692202806623,
+          "mse": 0.01577078355410467,
+          "pred_mean": 0.11895332031250001,
+          "rmse": 0.1255817803429489,
+          "spearman": 0.4489981080121227,
+          "target_mean": 0.11895332031249999,
+          "top_10p_capture": 0.1762947541024879,
+          "top_20p_capture": 0.32469231682815014
+        }
+      },
+      "prompt_length_plus_effective_budget": {
+        "feature_names": [
+          "prompt_token_count",
+          "effective_max_tokens"
+        ],
+        "model_payload": {
+          "coef": [
+            0.048421792908899544,
+            0.0
+          ],
+          "intercept": 0.11895332031250001,
+          "scaler_mean": [
+            236.075,
+            30000.0
+          ],
+          "scaler_scale": [
+            92.77382106499668,
+            1.0
+          ]
+        },
+        "test": {
+          "mae": 0.09600185251193427,
+          "mse": 0.01576542774734518,
+          "pred_mean": 0.12632237314210765,
+          "rmse": 0.12556045455216058,
+          "spearman": 0.39305748822881714,
+          "target_mean": 0.12173562499999999,
+          "top_10p_capture": 0.16926023093075673,
+          "top_20p_capture": 0.2916510505176005
+        },
+        "train": {
+          "mae": 0.0906692202806623,
+          "mse": 0.01577078355410467,
+          "pred_mean": 0.11895332031250001,
+          "rmse": 0.1255817803429489,
+          "spearman": 0.4489981080121227,
+          "target_mean": 0.11895332031249999,
+          "top_10p_capture": 0.1762947541024879,
+          "top_20p_capture": 0.32469231682815014
+        }
+      }
+    },
+    "views": {
+      "ensemble": {
+        "aggregate": {
+          "best_loss": {
+            "mae": {
+              "count": 3,
+              "mean": 0.09321387956636802,
+              "std": 0.0003683911468595539
+            },
+            "mse": {
+              "count": 3,
+              "mean": 0.017759256771575388,
+              "std": 3.9833488370347685e-05
+            },
+            "pred_mean": {
+              "count": 3,
+              "mean": 0.10221739037272831,
+              "std": 0.0013204059826916292
+            },
+            "rmse": {
+              "count": 3,
+              "mean": 0.13326380556220202,
+              "std": 0.00014949241621076275
+            },
+            "spearman": {
+              "count": 3,
+              "mean": 0.3482958318684324,
+              "std": 0.03440111144041849
+            },
+            "target_mean": {
+              "count": 3,
+              "mean": 0.12173562516982202,
+              "std": 0.0
+            },
+            "top_10p_capture": {
+              "count": 3,
+              "mean": 0.20895519844716082,
+              "std": 0.022186615764589083
+            },
+            "top_20p_capture": {
+              "count": 3,
+              "mean": 0.3554259770237402,
+              "std": 0.024705832166691453
+            }
+          },
+          "best_rank": {
+            "mae": {
+              "count": 3,
+              "mean": 0.09321387956636802,
+              "std": 0.0003683911468595539
+            },
+            "mse": {
+              "count": 3,
+              "mean": 0.017759256771575388,
+              "std": 3.9833488370347685e-05
+            },
+            "pred_mean": {
+              "count": 3,
+              "mean": 0.10221739037272831,
+              "std": 0.0013204059826916292
+            },
+            "rmse": {
+              "count": 3,
+              "mean": 0.13326380556220202,
+              "std": 0.00014949241621076275
+            },
+            "spearman": {
+              "count": 3,
+              "mean": 0.3482958318684324,
+              "std": 0.03440111144041849
+            },
+            "target_mean": {
+              "count": 3,
+              "mean": 0.12173562516982202,
+              "std": 0.0
+            },
+            "top_10p_capture": {
+              "count": 3,
+              "mean": 0.20895519844716082,
+              "std": 0.022186615764589083
+            },
+            "top_20p_capture": {
+              "count": 3,
+              "mean": 0.3554259770237402,
+              "std": 0.024705832166691453
+            }
+          }
+        },
+        "missing_seed_dirs": [],
+        "per_seed": [
+          {
+            "best_loss": {
+              "mae": 0.09281371560355182,
+              "mse": 0.01779014411495985,
+              "pred_mean": 0.10086231213063002,
+              "rmse": 0.13337969903609714,
+              "spearman": 0.3876655338099144,
+              "target_mean": 0.12173562516982202,
+              "top_10p_capture": 0.1839205850268712,
+              "top_20p_capture": 0.3785683957910907
+            },
+            "best_rank": {
+              "mae": 0.09281371560355182,
+              "mse": 0.01779014411495985,
+              "pred_mean": 0.10086231213063002,
+              "rmse": 0.13337969903609714,
+              "spearman": 0.3876655338099144,
+              "target_mean": 0.12173562516982202,
+              "top_10p_capture": 0.1839205850268712,
+              "top_20p_capture": 0.3785683957910907
+            },
+            "seed_dir": "/data/scratch/murphy/projects/cot-loop-detection-runtime/outputs/full_train/mmlu_pro/mean_relative_length/ensemble/seed_0"
+          },
+          {
+            "best_loss": {
+              "mae": 0.09328900699911173,
+              "mse": 0.017773328956803437,
+              "pred_mean": 0.10228970707394183,
+              "rmse": 0.13331664921082975,
+              "spearman": 0.3240331653580218,
+              "target_mean": 0.12173562516982202,
+              "top_10p_capture": 0.2261838762165626,
+              "top_20p_capture": 0.3294083326733971
+            },
+            "best_rank": {
+              "mae": 0.09328900699911173,
+              "mse": 0.017773328956803437,
+              "pred_mean": 0.10228970707394183,
+              "rmse": 0.13331664921082975,
+              "spearman": 0.3240331653580218,
+              "target_mean": 0.12173562516982202,
+              "top_10p_capture": 0.2261838762165626,
+              "top_20p_capture": 0.3294083326733971
+            },
+            "seed_dir": "/data/scratch/murphy/projects/cot-loop-detection-runtime/outputs/full_train/mmlu_pro/mean_relative_length/ensemble/seed_1"
+          },
+          {
+            "best_loss": {
+              "mae": 0.09353891609644052,
+              "mse": 0.01771429724296288,
+              "pred_mean": 0.10350015191361309,
+              "rmse": 0.13309506843967917,
+              "spearman": 0.3331887964373609,
+              "target_mean": 0.12173562516982202,
+              "top_10p_capture": 0.21676113409804862,
+              "top_20p_capture": 0.35830120260673276
+            },
+            "best_rank": {
+              "mae": 0.09353891609644052,
+              "mse": 0.01771429724296288,
+              "pred_mean": 0.10350015191361309,
+              "rmse": 0.13309506843967917,
+              "spearman": 0.3331887964373609,
+              "target_mean": 0.12173562516982202,
+              "top_10p_capture": 0.21676113409804862,
+              "top_20p_capture": 0.35830120260673276
+            },
+            "seed_dir": "/data/scratch/murphy/projects/cot-loop-detection-runtime/outputs/full_train/mmlu_pro/mean_relative_length/ensemble/seed_2"
+          }
+        ],
+        "run_dir": "/data/scratch/murphy/projects/cot-loop-detection-runtime/outputs/full_train/mmlu_pro/mean_relative_length/ensemble",
+        "seed_count": 3,
+        "status": "complete"
+      },
+      "last_layer": {
+        "aggregate": {
+          "best_loss": {
+            "mae": {
+              "count": 3,
+              "mean": 0.09073694606098191,
+              "std": 0.0004666673998152419
+            },
+            "mse": {
+              "count": 3,
+              "mean": 0.019057513227277247,
+              "std": 0.0012924655887620686
+            },
+            "pred_mean": {
+              "count": 3,
+              "mean": 0.08389102700166405,
+              "std": 0.011478202493671446
+            },
+            "rmse": {
+              "count": 3,
+              "mean": 0.13799515216512534,
+              "std": 0.004719831490819956
+            },
+            "spearman": {
+              "count": 3,
+              "mean": -0.019096449080042193,
+              "std": 0.29333016331268197
+            },
+            "target_mean": {
+              "count": 3,
+              "mean": 0.12173562516982202,
+              "std": 0.0
+            },
+            "top_10p_capture": {
+              "count": 3,
+              "mean": 0.09365311211701444,
+              "std": 0.06196276065128334
+            },
+            "top_20p_capture": {
+              "count": 3,
+              "mean": 0.18462181531116992,
+              "std": 0.09776789624471739
+            }
+          },
+          "best_rank": {
+            "mae": {
+              "count": 3,
+              "mean": 0.09073694606098191,
+              "std": 0.0004666673998152419
+            },
+            "mse": {
+              "count": 3,
+              "mean": 0.019057513227277247,
+              "std": 0.0012924655887620686
+            },
+            "pred_mean": {
+              "count": 3,
+              "mean": 0.08389102700166405,
+              "std": 0.011478202493671446
+            },
+            "rmse": {
+              "count": 3,
+              "mean": 0.13799515216512534,
+              "std": 0.004719831490819956
+            },
+            "spearman": {
+              "count": 3,
+              "mean": -0.019096449080042193,
+              "std": 0.29333016331268197
+            },
+            "target_mean": {
+              "count": 3,
+              "mean": 0.12173562516982202,
+              "std": 0.0
+            },
+            "top_10p_capture": {
+              "count": 3,
+              "mean": 0.09365311211701444,
+              "std": 0.06196276065128334
+            },
+            "top_20p_capture": {
+              "count": 3,
+              "mean": 0.18462181531116992,
+              "std": 0.09776789624471739
+            }
+          }
+        },
+        "missing_seed_dirs": [],
+        "per_seed": [
+          {
+            "best_loss": {
+              "mae": 0.09027957258222159,
+              "mse": 0.019496558441340746,
+              "pred_mean": 0.07927909274585546,
+              "rmse": 0.13963007713720116,
+              "spearman": -0.1630112504394703,
+              "target_mean": 0.12173562516982202,
+              "top_10p_capture": 0.054925204795101615,
+              "top_20p_capture": 0.12502460056264164
+            },
+            "best_rank": {
+              "mae": 0.09027957258222159,
+              "mse": 0.019496558441340746,
+              "pred_mean": 0.07927909274585546,
+              "rmse": 0.13963007713720116,
+              "spearman": -0.1630112504394703,
+              "target_mean": 0.12173562516982202,
+              "top_10p_capture": 0.054925204795101615,
+              "top_20p_capture": 0.12502460056264164
+            },
+            "seed_dir": "/data/scratch/murphy/projects/cot-loop-detection-runtime/outputs/full_train/mmlu_pro/mean_relative_length/last_layer/seed_0"
+          },
+          {
+            "best_loss": {
+              "mae": 0.09071888274920639,
+              "mse": 0.017602718677254794,
+              "pred_mean": 0.09695788067765534,
+              "rmse": 0.1326752376189875,
+              "spearman": 0.31839622641509435,
+              "target_mean": 0.12173562516982202,
+              "top_10p_capture": 0.16511788730102578,
+              "top_20p_capture": 0.2974546959211358
+            },
+            "best_rank": {
+              "mae": 0.09071888274920639,
+              "mse": 0.017602718677254794,
+              "pred_mean": 0.09695788067765534,
+              "rmse": 0.1326752376189875,
+              "spearman": 0.31839622641509435,
+              "target_mean": 0.12173562516982202,
+              "top_10p_capture": 0.16511788730102578,
+              "top_20p_capture": 0.2974546959211358
+            },
+            "seed_dir": "/data/scratch/murphy/projects/cot-loop-detection-runtime/outputs/full_train/mmlu_pro/mean_relative_length/last_layer/seed_1"
+          },
+          {
+            "best_loss": {
+              "mae": 0.09121238285151775,
+              "mse": 0.020073262563236206,
+              "pred_mean": 0.07543610758148134,
+              "rmse": 0.1416801417391873,
+              "spearman": -0.21267432321575064,
+              "target_mean": 0.12173562516982202,
+              "top_10p_capture": 0.06091624425491589,
+              "top_20p_capture": 0.13138614944973231
+            },
+            "best_rank": {
+              "mae": 0.09121238285151775,
+              "mse": 0.020073262563236206,
+              "pred_mean": 0.07543610758148134,
+              "rmse": 0.1416801417391873,
+              "spearman": -0.21267432321575064,
+              "target_mean": 0.12173562516982202,
+              "top_10p_capture": 0.06091624425491589,
+              "top_20p_capture": 0.13138614944973231
+            },
+            "seed_dir": "/data/scratch/murphy/projects/cot-loop-detection-runtime/outputs/full_train/mmlu_pro/mean_relative_length/last_layer/seed_2"
+          }
+        ],
+        "run_dir": "/data/scratch/murphy/projects/cot-loop-detection-runtime/outputs/full_train/mmlu_pro/mean_relative_length/last_layer",
+        "seed_count": 3,
+        "status": "complete"
+      }
+    }
+  },
+  "shared_archive": "/data/scratch/murphy/projects/cot-loop-detection-runtime/outputs/full_train/mmlu_pro/shared_archive",
+  "status": "complete"
+}
