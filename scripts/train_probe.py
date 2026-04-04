@@ -11,6 +11,7 @@ import shutil
 import sys
 
 import torch
+from torch.utils.data import DataLoader, WeightedRandomSampler
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "src")
@@ -18,7 +19,7 @@ if SRC not in sys.path:
     sys.path.insert(0, SRC)
 
 from loop_probe.dataloader import (
-    make_dataloader,
+    ActivationDataset,
     read_manifest,
     resolve_input_dim,
     resolve_sample_shape,
@@ -110,6 +111,15 @@ def _parse_args() -> argparse.Namespace:
             "probability targets."
         ),
     )
+    parser.add_argument(
+        "--train-balance-reference-data-dir",
+        default=None,
+        help=(
+            "Optional dataset dir whose binary train labels define a balanced "
+            "sampling distribution for the current train split. The current "
+            "train split keeps all prompts; only the train sampler changes."
+        ),
+    )
 
     parser.add_argument("--wandb-project", required=True)
     parser.add_argument("--wandb-run-name", default=None)
@@ -198,6 +208,82 @@ def _evaluate(
 def _write_jsonl(path: str, row: dict[str, object]) -> None:
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(row, sort_keys=True) + "\n")
+
+
+def _build_balanced_sampler(
+    *,
+    train_dataset: ActivationDataset,
+    reference_data_dir: str,
+    feature_key: str | None,
+) -> tuple[WeightedRandomSampler, dict[str, int]]:
+    reference_dataset = ActivationDataset(
+        data_dir=reference_data_dir,
+        split="train",
+        feature_key=feature_key,
+    )
+    reference_labels: dict[int, int] = {}
+    for sample_id, raw_label in zip(
+        reference_dataset.sample_ids.tolist(),
+        reference_dataset.y.tolist(),
+    ):
+        sample_id_i = int(sample_id)
+        label_f = float(raw_label)
+        label_i = int(round(label_f))
+        if label_i not in (0, 1) or abs(label_f - float(label_i)) > 1e-6:
+            raise SystemExit(
+                "Balanced-train reference dataset must be binary-labeled, "
+                f"got sample_id={sample_id_i} label={label_f!r}."
+            )
+        if sample_id_i in reference_labels:
+            raise SystemExit(
+                "Balanced-train reference dataset repeats sample_id "
+                f"{sample_id_i}."
+            )
+        reference_labels[sample_id_i] = label_i
+
+    missing_sample_ids: list[int] = []
+    positive_count = 0
+    negative_count = 0
+    ordered_labels: list[int] = []
+    for sample_id in train_dataset.sample_ids.tolist():
+        sample_id_i = int(sample_id)
+        label_i = reference_labels.get(sample_id_i)
+        if label_i is None:
+            missing_sample_ids.append(sample_id_i)
+            continue
+        ordered_labels.append(label_i)
+        if label_i == 1:
+            positive_count += 1
+        else:
+            negative_count += 1
+
+    if missing_sample_ids:
+        preview = missing_sample_ids[:10]
+        raise SystemExit(
+            "Balanced-train reference dataset is missing train sample_ids "
+            f"needed by the current run: {preview}"
+        )
+    if positive_count < 1 or negative_count < 1:
+        raise SystemExit(
+            "Balanced-train reference dataset must contain both classes on the "
+            f"current train split (pos={positive_count}, neg={negative_count})."
+        )
+
+    positive_weight = 0.5 / positive_count
+    negative_weight = 0.5 / negative_count
+    sample_weights = [
+        positive_weight if label_i == 1 else negative_weight
+        for label_i in ordered_labels
+    ]
+    sampler = WeightedRandomSampler(
+        torch.tensor(sample_weights, dtype=torch.double),
+        num_samples=len(sample_weights),
+        replacement=True,
+    )
+    return sampler, {
+        "num_positive": positive_count,
+        "num_negative": negative_count,
+    }
 
 
 def _is_nan(value: object) -> bool:
@@ -722,23 +808,45 @@ def main() -> None:
             probe_cfg.classifier_layer,
         )
 
-    train_loader = make_dataloader(
-        args.data_dir,
-        "train",
-        batch_size=args.batch_size,
-        shuffle=True,
-        num_workers=args.num_workers,
-        pin_memory=(device.type == "cuda"),
+    train_dataset = ActivationDataset(
+        data_dir=args.data_dir,
+        split="train",
         feature_key=resolved_feature_key,
     )
-    test_loader = make_dataloader(
-        args.data_dir,
-        "test",
+    train_sampler: WeightedRandomSampler | None = None
+    train_sampler_summary: dict[str, int] | None = None
+    if args.train_balance_reference_data_dir:
+        train_sampler, train_sampler_summary = _build_balanced_sampler(
+            train_dataset=train_dataset,
+            reference_data_dir=args.train_balance_reference_data_dir,
+            feature_key=resolved_feature_key,
+        )
+        print(
+            "train sampler balanced from "
+            f"{args.train_balance_reference_data_dir} "
+            f"(pos={train_sampler_summary['num_positive']}, "
+            f"neg={train_sampler_summary['num_negative']})",
+            flush=True,
+        )
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=args.batch_size,
+        shuffle=(train_sampler is None),
+        sampler=train_sampler,
+        num_workers=args.num_workers,
+        pin_memory=(device.type == "cuda"),
+    )
+    test_dataset = ActivationDataset(
+        data_dir=args.data_dir,
+        split="test",
+        feature_key=resolved_feature_key,
+    )
+    test_loader = DataLoader(
+        test_dataset,
         batch_size=args.batch_size,
         shuffle=False,
         num_workers=args.num_workers,
         pin_memory=(device.type == "cuda"),
-        feature_key=resolved_feature_key,
     )
     steps_per_epoch = len(train_loader)
     if steps_per_epoch < 1:
@@ -804,6 +912,17 @@ def main() -> None:
             "vote_rule": probe_cfg.vote_rule,
             "score_rule": probe_cfg.score_rule,
             "probe_config": probe_cfg.to_dict(),
+            "train_balance_reference_data_dir": args.train_balance_reference_data_dir,
+            "train_balance_reference_positive_count": (
+                train_sampler_summary["num_positive"]
+                if train_sampler_summary is not None
+                else None
+            ),
+            "train_balance_reference_negative_count": (
+                train_sampler_summary["num_negative"]
+                if train_sampler_summary is not None
+                else None
+            ),
         },
     )
 
@@ -966,6 +1085,17 @@ def main() -> None:
                 "resolved_classifier_layer": resolved_classifier_layer,
                 "vote_rule": probe_cfg.vote_rule,
                 "score_rule": probe_cfg.score_rule,
+                "train_balance_reference_data_dir": args.train_balance_reference_data_dir,
+                "train_balance_reference_positive_count": (
+                    train_sampler_summary["num_positive"]
+                    if train_sampler_summary is not None
+                    else None
+                ),
+                "train_balance_reference_negative_count": (
+                    train_sampler_summary["num_negative"]
+                    if train_sampler_summary is not None
+                    else None
+                ),
             }
             log_row.update(
                 _log_row_fields(

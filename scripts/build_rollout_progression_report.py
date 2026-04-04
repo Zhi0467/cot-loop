@@ -154,6 +154,8 @@ def _validate_progression_contract(stages: list[dict[str, Any]]) -> None:
         generation = payload.get("common_generation_config", {})
         for key in (
             "temperature",
+            "top_p",
+            "top_k",
             "num_generations",
             "max_tokens",
             "max_model_len",

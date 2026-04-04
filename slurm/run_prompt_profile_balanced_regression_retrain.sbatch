@@ -57,8 +57,7 @@ export XDG_CACHE_HOME="${XDG_CACHE_HOME:-${CACHE_BASE}}"
 mkdir -p "${HF_HOME}" "${HUGGINGFACE_HUB_CACHE}" "${TRANSFORMERS_CACHE}" "${VLLM_CACHE_ROOT}" "${TORCH_HOME}" "${XDG_CACHE_HOME}"
 
 SOURCE_ROOT="${SOURCE_ROOT:-/data/scratch/${USER}/outputs/cot-loop-detection/full_train_locked_pair_20260404}"
-SUBSET_ROOT="${SUBSET_ROOT:-${SOURCE_ROOT}}"
-OUT_ROOT="${OUT_ROOT:-/data/scratch/${USER}/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced}"
+OUT_ROOT="${OUT_ROOT:-/data/scratch/${USER}/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced_sampler}"
 SUMMARY_DIR="${SUMMARY_DIR:-${OUT_ROOT}/summary}"
 DATASET_LIST="${DATASET_LIST:-gpqa aime math500 mmlu_pro livecodebench}"
 SEEDS="${SEEDS:-0 1 2}"
@@ -85,7 +84,6 @@ fi
 mkdir -p "${OUT_ROOT}" "${SUMMARY_DIR}"
 
 echo "[prompt-profile-regression-balanced] SOURCE_ROOT=${SOURCE_ROOT}"
-echo "[prompt-profile-regression-balanced] SUBSET_ROOT=${SUBSET_ROOT}"
 echo "[prompt-profile-regression-balanced] OUT_ROOT=${OUT_ROOT}"
 echo "[prompt-profile-regression-balanced] SUMMARY_DIR=${SUMMARY_DIR}"
 echo "[prompt-profile-regression-balanced] DATASETS=${DATASET_LIST}"
@@ -98,13 +96,8 @@ echo "[prompt-profile-regression-balanced] VLLM_CACHE_ROOT=${VLLM_CACHE_ROOT}"
 check_dataset_inputs() {
   local dataset="$1"
   local archive_manifest="${SOURCE_ROOT}/${dataset}/shared_archive/manifest.json"
-  local subset_manifest="${SUBSET_ROOT}/${dataset}/majority_s_0.5/data/manifest.json"
   if [[ ! -f "${archive_manifest}" ]]; then
     echo "[prompt-profile-regression-balanced] missing shared archive manifest: ${archive_manifest}" >&2
-    exit 1
-  fi
-  if [[ ! -f "${subset_manifest}" ]]; then
-    echo "[prompt-profile-regression-balanced] missing balanced subset manifest: ${subset_manifest}" >&2
     exit 1
   fi
 }
@@ -119,8 +112,8 @@ REGRESSION_CMD=(
   --out-root "${OUT_ROOT}"
   --summary-dir "${SUMMARY_DIR}"
   --source-out-root "${SOURCE_ROOT}"
-  --regression-data-mode reuse_binary_subset
-  --regression-subset-root "${SUBSET_ROOT}"
+  --regression-data-mode natural
+  --regression-train-balance-mode binary_sampler
   --python-bin "${PYTHON_BIN}"
   --wandb-project "${WANDB_PROJECT}"
   --probe-preset "${PROBE_PRESET}"

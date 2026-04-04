@@ -7,6 +7,7 @@ import sys
 from collections import defaultdict
 from contextlib import contextmanager
 from datetime import datetime
+from functools import lru_cache
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
@@ -188,19 +189,10 @@ def _load_codegen_benchmark(
     return benchmark, symbols["format_prompt_generation"]
 
 
-def _get_lm_style(model_id: str, override: str | None = None, repo_path: str = ""):
+@lru_cache(maxsize=None)
+def _infer_default_lm_style(model_id: str, repo_path: str = ""):
     symbols = _import_lcb_symbols(repo_path)
     lm_style_cls = symbols["LMStyle"]
-    override_normalized = override.strip() if override else ""
-    if override_normalized.lower() == _HF_CHAT_TEMPLATE_STYLE.lower():
-        return _HF_CHAT_TEMPLATE_STYLE
-    if override:
-        try:
-            return lm_style_cls(override)
-        except ValueError:
-            if hasattr(lm_style_cls, override):
-                return getattr(lm_style_cls, override)
-            raise
     model_id_lower = model_id.lower()
     model_basename = os.path.basename(model_id.rstrip("/")).lower()
     if model_id_lower.startswith("qwen/") or model_basename.startswith("qwen"):
@@ -219,6 +211,23 @@ def _get_lm_style(model_id: str, override: str | None = None, repo_path: str = "
     )
 
 
+def _get_lm_style(model_id: str, override: str | None = None, repo_path: str = ""):
+    symbols = _import_lcb_symbols(repo_path)
+    lm_style_cls = symbols["LMStyle"]
+    override_normalized = override.strip() if override else ""
+    if override_normalized.lower() == _HF_CHAT_TEMPLATE_STYLE.lower():
+        return _HF_CHAT_TEMPLATE_STYLE
+    if override:
+        try:
+            return lm_style_cls(override)
+        except ValueError:
+            if hasattr(lm_style_cls, override):
+                return getattr(lm_style_cls, override)
+            raise
+    return _infer_default_lm_style(model_id, repo_path=repo_path)
+
+
+@lru_cache(maxsize=None)
 def _load_tokenizer(model_id: str):
     try:
         from transformers import AutoTokenizer

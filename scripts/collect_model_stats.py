@@ -1158,6 +1158,9 @@ def main() -> None:
         )
 
     metrics = compute_metrics(agg, statistics)
+    resolved_generation_config = rollout_cfg.to_dict()
+    resolved_generation_config["top_p"] = top_p
+    resolved_generation_config["top_k"] = top_k
 
     payload = {
         "metadata": {
@@ -1166,7 +1169,7 @@ def main() -> None:
             "split": args.split,
             "task_kind": args.task_kind,
             "model_id": rollout_cfg.model_id,
-            "generation_config": rollout_cfg.to_dict(),
+            "generation_config": resolved_generation_config,
             "stats_contract_version": STATS_CONTRACT_VERSION,
             "seed": args.seed,
             "statistics": statistics,

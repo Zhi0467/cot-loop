@@ -161,6 +161,25 @@ def parse_args() -> argparse.Namespace:
             "<root>/<dataset>/majority_s_0.5/data. Defaults to --out-root."
         ),
     )
+    parser.add_argument(
+        "--regression-train-balance-mode",
+        choices=("none", "binary_sampler"),
+        default="none",
+        help=(
+            "Keep the natural regression dataset but optionally balance train "
+            "batch sampling using binary labels from majority_s_0.5."
+        ),
+    )
+    parser.add_argument(
+        "--regression-train-balance-source-root",
+        default=None,
+        help=(
+            "When --regression-train-balance-mode=binary_sampler, read "
+            "balanced-sampler labels from "
+            "<root>/<dataset>/majority_s_0.5_balance_reference/data. "
+            "Defaults to --out-root."
+        ),
+    )
     parser.add_argument("--python-bin", default=sys.executable)
     parser.add_argument("--wandb-project", default="cot-loop-probe")
     parser.add_argument("--probe-preset", default="mlp")
@@ -264,6 +283,43 @@ def source_shared_archive_dir(
     return shared_archive_dir(source_root, spec)
 
 
+def ensure_local_shared_archive_link(
+    *,
+    source_dir: Path,
+    out_root: Path,
+    spec: DatasetSpec,
+    dry_run: bool,
+) -> None:
+    target_dir = shared_archive_dir(out_root, spec)
+    source_resolved = source_dir.resolve()
+    if target_dir.exists() or target_dir.is_symlink():
+        try:
+            target_resolved = target_dir.resolve()
+        except FileNotFoundError:
+            target_resolved = None
+        if target_resolved == source_resolved:
+            return
+        if source_resolved == target_dir:
+            return
+        if dry_run:
+            print(
+                f"$ rm -rf {target_dir} && ln -s {source_resolved} {target_dir}",
+                flush=True,
+            )
+            return
+        if target_dir.is_symlink() or target_dir.is_file():
+            target_dir.unlink()
+        else:
+            shutil.rmtree(target_dir)
+    elif source_resolved == target_dir:
+        return
+    if dry_run:
+        print(f"$ ln -s {source_resolved} {target_dir}", flush=True)
+        return
+    target_dir.parent.mkdir(parents=True, exist_ok=True)
+    target_dir.symlink_to(source_resolved, target_is_directory=True)
+
+
 def regression_run_dir(out_root: Path, spec: DatasetSpec, view_name: str) -> Path:
     return dataset_root(out_root, spec) / "mean_relative_length" / view_name
 
@@ -278,6 +334,10 @@ def binary_data_dir(out_root: Path, spec: DatasetSpec) -> Path:
 
 def binary_run_dir(out_root: Path, spec: DatasetSpec, view_name: str) -> Path:
     return dataset_root(out_root, spec) / "majority_s_0.5" / view_name
+
+
+def regression_balance_reference_data_dir(out_root: Path, spec: DatasetSpec) -> Path:
+    return dataset_root(out_root, spec) / "majority_s_0.5_balance_reference" / "data"
 
 
 def manifest_path(data_dir: Path) -> Path:
@@ -393,6 +453,22 @@ def regression_subset_source_dir(
     return binary_data_dir(root, spec)
 
 
+def regression_train_balance_source_dir(
+    args: argparse.Namespace,
+    *,
+    out_root: Path,
+    spec: DatasetSpec,
+) -> Path | None:
+    if args.regression_train_balance_mode != "binary_sampler":
+        return None
+    root = (
+        Path(args.regression_train_balance_source_root).resolve()
+        if args.regression_train_balance_source_root
+        else out_root.resolve()
+    )
+    return regression_balance_reference_data_dir(root, spec)
+
+
 def regression_data_matches_source(
     *,
     source_dir: Path,
@@ -428,6 +504,41 @@ def regression_data_matches_source(
             "train": str(subset_source_dir),
             "test": str(subset_source_dir),
         },
+    }
+    for key in RELABEL_SOURCE_MANIFEST_KEYS:
+        expected_values[key] = source_manifest.get(key)
+
+    for key, expected in expected_values.items():
+        if out_manifest.get(key) != expected:
+            return False
+    return True
+
+
+def regression_balance_reference_matches_source(
+    *,
+    source_dir: Path,
+    out_dir: Path,
+) -> bool:
+    out_manifest_path = manifest_path(out_dir)
+    source_manifest_path = manifest_path(source_dir)
+    if not out_manifest_path.exists() or not source_manifest_path.exists():
+        return False
+
+    source_manifest = read_json(source_manifest_path)
+    out_manifest = read_json(out_manifest_path)
+    expected_archive_file = source_manifest.get("prompt_rollout_archive_file")
+    if not isinstance(expected_archive_file, str) or not expected_archive_file:
+        return False
+
+    expected_values: dict[str, Any] = {
+        "target_spec": relabel_target_spec(source_manifest),
+        "balancing": {
+            "train": "none",
+            "test": "none",
+            "seed": 0,
+        },
+        "prompt_profile_source_dir": str(source_dir),
+        "prompt_profile_source_archive_file": expected_archive_file,
     }
     for key in RELABEL_SOURCE_MANIFEST_KEYS:
         expected_values[key] = source_manifest.get(key)
@@ -551,6 +662,7 @@ def train_probe_cmd(
     target_kind: str,
     view_name: str,
     wandb_run_name: str,
+    train_balance_reference_data_dir: Path | None = None,
 ) -> list[str]:
     view_args = BINARY_VIEW_ARGS if target_kind == "binary" else REGRESSION_VIEW_ARGS
     cmd = [
@@ -591,6 +703,13 @@ def train_probe_cmd(
         cmd.extend(["--mlp-depth", str(args.mlp_depth)])
     if args.mlp_dropout is not None:
         cmd.extend(["--mlp-dropout", str(args.mlp_dropout)])
+    if train_balance_reference_data_dir is not None:
+        cmd.extend(
+            [
+                "--train-balance-reference-data-dir",
+                str(train_balance_reference_data_dir),
+            ]
+        )
     cmd.extend(view_args[view_name])
     return cmd
 
@@ -600,6 +719,8 @@ def relabel_cmd(
     *,
     source_dir: Path,
     out_dir: Path,
+    balance_train: str = "downsample",
+    balance_test: str = "none",
 ) -> list[str]:
     return [
         args.python_bin,
@@ -615,9 +736,9 @@ def relabel_cmd(
         "--profile-tail-threshold",
         "0.5",
         "--balance-train",
-        "downsample",
+        balance_train,
         "--balance-test",
-        "none",
+        balance_test,
         "--balance-seed",
         str(args.dataset_seed),
     ]
@@ -676,6 +797,12 @@ def run_build(args: argparse.Namespace, spec: DatasetSpec, out_root: Path) -> No
 
 def run_regression(args: argparse.Namespace, spec: DatasetSpec, out_root: Path) -> None:
     source_dir = source_shared_archive_dir(args, out_root, spec)
+    ensure_local_shared_archive_link(
+        source_dir=source_dir,
+        out_root=out_root,
+        spec=spec,
+        dry_run=args.dry_run,
+    )
     data_dir = source_dir
     if args.regression_data_mode == "reuse_binary_subset":
         subset_source_dir = regression_subset_source_dir(args, out_root=out_root, spec=spec)
@@ -707,6 +834,41 @@ def run_regression(args: argparse.Namespace, spec: DatasetSpec, out_root: Path) 
         raise SystemExit(
             f"Missing regression data manifest for {spec.display_name}: {data_dir}"
         )
+    train_balance_reference_data_dir = regression_train_balance_source_dir(
+        args,
+        out_root=out_root,
+        spec=spec,
+    )
+    if train_balance_reference_data_dir is not None:
+        if regression_balance_reference_matches_source(
+            source_dir=source_dir,
+            out_dir=train_balance_reference_data_dir,
+        ):
+            print(
+                f"[skip] regression balance reference {spec.key} already complete",
+                flush=True,
+            )
+        else:
+            if train_balance_reference_data_dir.exists():
+                print(
+                    f"[rebuild] regression balance reference {spec.key}",
+                    flush=True,
+                )
+                if not args.dry_run:
+                    shutil.rmtree(train_balance_reference_data_dir)
+            cmd = relabel_cmd(
+                args,
+                source_dir=source_dir,
+                out_dir=train_balance_reference_data_dir,
+                balance_train="none",
+                balance_test="none",
+            )
+            run_command(cmd, cwd=ROOT, dry_run=args.dry_run)
+        if not manifest_path(train_balance_reference_data_dir).exists() and not args.dry_run:
+            raise SystemExit(
+                "Missing regression train-balance reference data for "
+                f"{spec.display_name}: {train_balance_reference_data_dir}"
+            )
     for view_name in ("ensemble", "last_layer"):
         root_run_dir = regression_run_dir(out_root, spec, view_name)
         if train_run_complete(root_run_dir, args.seeds):
@@ -722,6 +884,7 @@ def run_regression(args: argparse.Namespace, spec: DatasetSpec, out_root: Path) 
                 target_kind="regression",
                 view_name=view_name,
                 wandb_run_name=f"{spec.key}-mean_relative_length-{view_name}-seed{args.seeds[0]}",
+                train_balance_reference_data_dir=train_balance_reference_data_dir,
             )
             run_command(cmd, cwd=ROOT, dry_run=args.dry_run)
             continue
@@ -735,6 +898,7 @@ def run_regression(args: argparse.Namespace, spec: DatasetSpec, out_root: Path) 
                 target_kind="regression",
                 view_name=view_name,
                 wandb_run_name=f"{spec.key}-mean_relative_length-{view_name}-seed{seed}",
+                train_balance_reference_data_dir=train_balance_reference_data_dir,
             )
             run_command(cmd, cwd=ROOT, dry_run=args.dry_run)
 
