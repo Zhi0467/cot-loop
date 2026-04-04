@@ -10,10 +10,13 @@ from datetime import datetime
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
+from ..prompt_format import tokenizer_has_chat_template
+
 if TYPE_CHECKING:
     from ..collector import LcbSampleRecord
 
 _LCB_DATASET_REPO = "livecodebench/code_generation_lite"
+_HF_CHAT_TEMPLATE_STYLE = "HFChatTemplate"
 _LCB_RELEASE_FILES = {
     "release_v1": ["test.jsonl"],
     "release_v2": ["test.jsonl", "test2.jsonl"],
@@ -75,6 +78,10 @@ def _import_lcb_symbols(repo_path: str) -> dict[str, Any]:
             from lcb_runner.benchmarks.code_generation import CodeGenerationProblem
             from lcb_runner.lm_styles import LMStyle
             from lcb_runner.prompts import format_prompt_generation
+            from lcb_runner.prompts.code_generation import (
+                PromptConstants,
+                get_generic_question_template_answer,
+            )
             from lcb_runner.runner.scenario_router import (
                 get_metrics,
                 sort_and_extract_save_results,
@@ -91,6 +98,8 @@ def _import_lcb_symbols(repo_path: str) -> dict[str, Any]:
         "CodeGenerationProblem": CodeGenerationProblem,
         "LMStyle": LMStyle,
         "format_prompt_generation": format_prompt_generation,
+        "PromptConstants": PromptConstants,
+        "get_generic_question_template_answer": get_generic_question_template_answer,
         "get_metrics": get_metrics,
         "sort_and_extract_save_results": sort_and_extract_save_results,
         "extract_code": extract_code,
@@ -182,6 +191,9 @@ def _load_codegen_benchmark(
 def _get_lm_style(model_id: str, override: str | None = None, repo_path: str = ""):
     symbols = _import_lcb_symbols(repo_path)
     lm_style_cls = symbols["LMStyle"]
+    override_normalized = override.strip() if override else ""
+    if override_normalized.lower() == _HF_CHAT_TEMPLATE_STYLE.lower():
+        return _HF_CHAT_TEMPLATE_STYLE
     if override:
         try:
             return lm_style_cls(override)
@@ -193,12 +205,49 @@ def _get_lm_style(model_id: str, override: str | None = None, repo_path: str = "
     model_basename = os.path.basename(model_id.rstrip("/")).lower()
     if model_id_lower.startswith("qwen/") or model_basename.startswith("qwen"):
         return lm_style_cls.CodeQwenInstruct
+    if "olmo" in model_id_lower:
+        tokenizer = _load_tokenizer(model_id)
+        if tokenizer_has_chat_template(tokenizer):
+            return _HF_CHAT_TEMPLATE_STYLE
+        return lm_style_cls.GenericBase
     raise ValueError(
         "No default LiveCodeBench LM style mapping is defined for "
         f"model_id={model_id!r}. Pass --lm-style-override with a repo-supported "
         "LMStyle. LiveCodeBench's own docs require adding new model families to "
         "lcb_runner/lm_styles.py and prompt formatting support before treating a "
         "new model family as benchmark-comparable."
+    )
+
+
+def _load_tokenizer(model_id: str):
+    try:
+        from transformers import AutoTokenizer
+    except Exception as exc:
+        raise ImportError(
+            "Failed to import transformers.AutoTokenizer for LiveCodeBench prompt building."
+        ) from exc
+    return AutoTokenizer.from_pretrained(
+        model_id,
+        trust_remote_code=True,
+    )
+
+
+def _build_hf_chat_template_prompt(instance, *, tokenizer, symbols: dict[str, Any]) -> str:
+    user_content = symbols["get_generic_question_template_answer"](instance)
+    messages = [
+        {
+            "role": "system",
+            "content": symbols["PromptConstants"].SYSTEM_MESSAGE_GENERIC,
+        },
+        {
+            "role": "user",
+            "content": user_content,
+        },
+    ]
+    return tokenizer.apply_chat_template(
+        messages,
+        tokenize=False,
+        add_generation_prompt=True,
     )
 
 
@@ -254,18 +303,29 @@ def build_prompts(
         override=lm_style_override,
         repo_path=repo_path,
     )
+    symbols = _import_lcb_symbols(repo_path)
+    tokenizer = _load_tokenizer(model_id) if lm_style == _HF_CHAT_TEMPLATE_STYLE else None
     prompt_records: list[tuple[str, str]] = []
     selected = benchmark if max_samples is None else benchmark[:max_samples]
     with _repo_cwd(repo_path):
         for instance in selected:
-            prompt = format_prompt(instance, lm_style)
+            if lm_style == _HF_CHAT_TEMPLATE_STYLE:
+                prompt = _build_hf_chat_template_prompt(
+                    instance,
+                    tokenizer=tokenizer,
+                    symbols=symbols,
+                )
+            else:
+                prompt = format_prompt(instance, lm_style)
             if not isinstance(prompt, str):
                 raise SystemExit(
                     "LiveCodeBench prompt builder returned a non-string prompt. "
                     "Use an --lm-style-override that produces raw string prompts."
                 )
             prompt_records.append((str(instance.question_id), prompt))
-    return prompt_records, lm_style.value
+    return prompt_records, (
+        lm_style if isinstance(lm_style, str) else lm_style.value
+    )
 
 
 def extract_code_output(
@@ -282,7 +342,18 @@ def extract_code_output(
         repo_path=repo_path,
     )
     with _repo_cwd(repo_path):
-        extracted = symbols["extract_code"](response_text, lm_style)
+        if lm_style == _HF_CHAT_TEMPLATE_STYLE:
+            extracted = symbols["extract_code"](
+                response_text,
+                symbols["LMStyle"].CodeQwenInstruct,
+            )
+            if not extracted:
+                extracted = symbols["extract_code"](
+                    response_text,
+                    symbols["LMStyle"].GenericBase,
+                )
+        else:
+            extracted = symbols["extract_code"](response_text, lm_style)
     return "" if extracted is None else str(extracted)
 
 

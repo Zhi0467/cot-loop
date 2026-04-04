@@ -399,3 +399,110 @@ The final conclusion should stay on this object:
 
 - where degenerate rollouts enter the model family;
 - whether the progression points to base, SFT, RLVR, or no clean stage break.
+
+## Remote Audit Correction And OLMo 2 Follow-Through (2026-04-04 22:07 UTC)
+
+This supersedes the earlier "SSH blocked / drop LiveCodeBench" state.
+
+The GPU node is reachable again, so I finished the first direct audit on the suspicious OLMo 3 rows instead of reasoning only from aggregate shapes.
+
+`MMLU-Pro` first:
+
+- the weird `RLVR / MMLU-Pro = 0 / 80` row was a grader artifact, not a real zero-accuracy collapse;
+- saved RLVR completions often end in relaxed JSON-like forms such as `{"answer": I}` that carry the correct terminal letter but are not strict JSON;
+- our old parser rejected that exact form even when the answer letter matched, so I patched `_extract_json_answer_field` in `src/loop_probe/adapters/_common.py` to accept it;
+- I then reran the bounded RLVR audit under the same contract and wrote the corrected row to:
+  - `/data/scratch/murphy/outputs/cot-loop-detection/olmo3_degeneration_origin_progression/mmlu_audit_temp0p1_gen10_ctx40960_topkneg1/rlvr/mmlu_pro.json`
+- corrected RLVR `MMLU-Pro` metrics on that same `8`-prompt / `80`-rollout object:
+  - `27 / 80` correct
+  - `0 / 80` looped
+  - `0 / 80` max-length hits
+  - `avg_generation_length = 6.15`
+- so the old suspicious part of that row was grading, not degeneracy;
+- the matching SFT audit is also finished now:
+  - output: `/data/scratch/murphy/outputs/cot-loop-detection/olmo3_degeneration_origin_progression/mmlu_audit_temp0p1_gen10_ctx40960_topkneg1/sft/mmlu_pro.json`
+  - `34 / 80` correct
+  - `1 / 80` looped
+  - `1 / 80` max-length hits
+  - `avg_generation_length = 589.9375`
+
+`LiveCodeBench` next:
+
+- the earlier fail-fast guard was too narrow; OLMo does have a model-native evaluation path here;
+- instruct-stage OLMo tokenizers expose a chat template, and LiveCodeBench only requires a raw string prompt plus code extraction, so the right fix is an explicit OLMo path rather than banning the benchmark;
+- `src/loop_probe/adapters/livecodebench_codegen.py` now does three OLMo-specific things:
+  - maps OLMo instruct checkpoints to a new `HFChatTemplate` style and raw/base checkpoints to `GenericBase`;
+  - builds the prompt by wrapping LiveCodeBench's standard generic system message plus question template inside the model's own tokenizer chat template;
+  - extracts code with a fenced-code parse first, then falls back to raw-code extraction so bare code completions are still captured;
+- remote smoke confirmed that `allenai/Olmo-3-7B-Instruct` now serializes the prompt through the model-native chat surface and returns extractable code on that path;
+- the bounded SFT rerun is already finished on that native path:
+  - output: `/data/scratch/murphy/outputs/cot-loop-detection/olmo3_degeneration_origin_progression/livecodebench_hfchat_temp0p1_gen10_ctx40960/sft/livecodebench.json`
+  - `6 / 80` correct
+  - `1 / 80` looped
+  - `1 / 80` max-length hits
+  - `avg_generation_length = 656.5375`
+- the first RLVR rerun did generate successfully enough to write the full records checkpoint, but the grading step exceeded the original `32G` host-memory reservation and was killed by Slurm;
+- I resumed grading from that saved checkpoint as job `2210` with `64G` host memory, and that finished cleanly;
+- final bounded RLVR native row:
+  - output: `/data/scratch/murphy/outputs/cot-loop-detection/olmo3_degeneration_origin_progression/livecodebench_hfchat_temp0p1_gen10_ctx40960/rlvr/livecodebench.json`
+  - `22 / 80` correct
+  - `0 / 80` looped
+  - `0 / 80` max-length hits
+  - `avg_generation_length = 1317.15`
+
+With the 7B audit unblocked, I also started the requested smaller fallback:
+
+- released OLMo 2 progression:
+  - `allenai/OLMo-2-0425-1B`
+  - `allenai/OLMo-2-0425-1B-SFT`
+  - `allenai/OLMo-2-0425-1B-RLVR1`
+  - `allenai/OLMo-2-0425-1B-Instruct`
+- one mechanical correction was needed first: the `1B` checkpoints only support `max_model_len=4096`, so the first `40960`-context submissions were canceled and relaunched at `4096`;
+- active bounded output root:
+  - `/data/scratch/murphy/outputs/cot-loop-detection/olmo2_1b_degeneration_origin_progression/bound8_temp0p1_gen10_ctx4096_topkneg1/`
+
+The fallback is already far enough along to show a stage-shaped degeneration pattern.
+
+Completed rows on disk so far:
+
+- base:
+  - `MATH-500`: `3 / 80` correct, `27 / 80` looped, `29 / 80` max-length hits, `avg_generation_length = 1536.3375`
+  - `AIME`: `0 / 80` correct, `48 / 80` looped, `48 / 80` max-length hits, `avg_generation_length = 2456.0875`
+- SFT:
+  - `MATH-500`: `8 / 80` correct, `7 / 80` looped, `9 / 80` max-length hits, `avg_generation_length = 891.3875`
+  - `AIME`: `0 / 80` correct, `11 / 80` looped, `11 / 80` max-length hits, `avg_generation_length = 1664.6875`
+  - `GPQA`: `20 / 80` correct, `11 / 80` looped, `11 / 80` max-length hits, `avg_generation_length = 785.2375`
+  - `MMLU-Pro`: `16 / 80` correct, `0 / 80` looped, `0 / 80` max-length hits, `avg_generation_length = 136.6125`
+- RLVR1:
+  - `MATH-500`: `14 / 80` correct, `1 / 80` looped, `1 / 80` max-length hits, `avg_generation_length = 538.025`
+- instruct:
+  - `MATH-500`: `22 / 80` correct, `1 / 80` looped, `1 / 80` max-length hits, `avg_generation_length = 614.4`
+  - `AIME`: `0 / 80` correct, `3 / 80` looped, `5 / 80` max-length hits, `avg_generation_length = 1196.7125`
+  - `GPQA`: `10 / 80` correct, `5 / 80` looped, `10 / 80` max-length hits, `avg_generation_length = 908.4375`
+  - `MMLU-Pro`: `8 / 80` correct, `0 / 80` looped, `0 / 80` max-length hits, `avg_generation_length = 85.575`
+
+So the cheaper OLMo 2 fallback is already producing the kind of stage progression this note is trying to isolate:
+
+- strong degeneracy in base;
+- reduced but still present loop / cap mass in SFT;
+- much smaller loop / cap mass in `RLVR1` / instruct on the first completed `MATH-500` leg.
+
+The bounded OLMo 2 `1B` ladder is now complete on the same `8`-prompt / `80`-rollout contract:
+
+- base:
+  - `LiveCodeBench`: `0 / 80` correct, `32 / 80` looped, `62 / 80` max-length hits, `avg_generation_length = 2134.2125`
+- SFT:
+  - `LiveCodeBench`: `0 / 80` correct, `15 / 80` looped, `23 / 80` max-length hits, `avg_generation_length = 1149.9`
+- RLVR1:
+  - `AIME`: `3 / 80` correct, `4 / 80` looped, `5 / 80` max-length hits, `avg_generation_length = 1212.6`
+  - `GPQA`: `9 / 80` correct, `1 / 80` looped, `1 / 80` max-length hits, `avg_generation_length = 406.0125`
+  - `MMLU-Pro`: `0 / 80` correct, `0 / 80` looped, `0 / 80` max-length hits, `avg_generation_length = 64.975`
+  - `LiveCodeBench`: `0 / 80` correct, `0 / 80` looped, `0 / 80` max-length hits, `avg_generation_length = 412.8875`
+- instruct:
+  - `LiveCodeBench`: `0 / 80` correct, `0 / 80` looped, `0 / 80` max-length hits, `avg_generation_length = 510.7875`
+
+So the full fallback read is sharper than the broken original OLMo 3 bundle:
+
+- loop / cap mass is heaviest in base;
+- SFT still carries substantial degeneracy on several datasets, including `LiveCodeBench`;
+- `RLVR1` and instruct largely remove loop / cap mass on this bounded object, even though some datasets are still simply low-accuracy rather than degenerate.

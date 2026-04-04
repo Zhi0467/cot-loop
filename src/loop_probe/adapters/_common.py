@@ -18,6 +18,10 @@ _BOXED_LETTER_PATTERN = re.compile(
     r"\\boxed\{\s*(?:\\text\{)?\s*(?:answer\s*[:：]\s*)?([A-Z])(?:\})?\s*\}",
     re.IGNORECASE,
 )
+_JSONISH_ANSWER_PATTERN = re.compile(
+    r'^\{\s*["\']answer["\']\s*:\s*["\']?\s*([A-Z])\s*["\']?\s*\}$',
+    re.IGNORECASE,
+)
 _LEADING_DECORATION_PATTERN = re.compile(r"^[>*#\-\s]+")
 _WRAPPER_ONLY_LINE_PATTERN = re.compile(r"^(?:[`~$*_>|#-]+\s*)+$")
 
@@ -191,6 +195,12 @@ def _extract_json_answer_field(candidate: str, allowed: set[str]) -> str | None:
     try:
         payload = json.loads(fragment)
     except json.JSONDecodeError:
+        relaxed_match = _JSONISH_ANSWER_PATTERN.fullmatch(fragment)
+        if not relaxed_match:
+            return None
+        letter = relaxed_match.group(1).upper()
+        if letter in allowed:
+            return letter
         return None
     if not isinstance(payload, dict):
         return None
