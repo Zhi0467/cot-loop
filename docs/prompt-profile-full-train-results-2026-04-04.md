@@ -23,8 +23,7 @@ What does the first locked full-train pass say about the current two-head surfac
 - On this fixed run surface, `effective_budget` is constant at `30000`, so the joint regression control collapses to the prompt-length-only baseline.
 
 Copied ledger for this run:
-- `outputs/prompt_profile_full_train_locked_pair_20260404/summary/`
-- `outputs/prompt_profile_full_train_locked_pair_20260404/logs/`
+- `outputs/prompt_profile_full_train_locked_pair_20260404/remote_summary/`
 - `outputs/prompt_profile_full_train_locked_pair_20260404/regression_summary.csv`
 - `outputs/prompt_profile_full_train_locked_pair_20260404/binary_summary.csv`
 

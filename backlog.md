@@ -7,7 +7,7 @@ Last updated: 2026-04-04 00:17 UTC
 - Interpret the finished locked full-train pass before reopening targets.
   - Result note: `docs/prompt-profile-full-train-results-2026-04-04.md`
   - Result PDF: `outputs/prompt_profile_full_train_locked_pair_20260404/prompt_profile_full_train_locked_pair_20260404.pdf`
-  - Copied summary ledger: `outputs/prompt_profile_full_train_locked_pair_20260404/summary/`
+  - Copied summary ledger: `outputs/prompt_profile_full_train_locked_pair_20260404/remote_summary/`
   - The run contract stayed fixed to the saved prompt-profile surface: `Qwen/Qwen3-1.7B`, `temperature=0.2`, `num_generations=4`, `loop_n=30`, `loop_k=20`, prompt-prefill only.
   - Aggregation rule matters: regression `ensemble` uses `mean_prob`, while binary `ensemble` uses `vote_fraction`.
   - Regression read: ensemble beats last-layer on all five datasets, but the train-fit prompt-length baseline still wins on `AIME`, `MATH-500`, and `MMLU-Pro`.
