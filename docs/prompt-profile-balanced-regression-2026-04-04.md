@@ -1,5 +1,12 @@
 # Balanced Prompt-Profile Regression Rerun
 
+Superseded on 2026-04-04 23:12 UTC.
+
+This note trained regression on the downsampled balanced binary subset, not on the full saved Qwen3 train splits.
+Use `docs/prompt-profile-balanced-regression-corrected-2026-04-04.md` and
+`outputs/prompt_profile_balanced_regression_corrected_20260404/` for the corrected
+full-train sampler rerun.
+
 Generated: 2026-04-04 UTC
 
 ## Object

@@ -151,10 +151,11 @@ sbatch slurm/run_prompt_profile_full_train.sbatch
 
 - `#SBATCH --gres=gpu:2`
 - `SOURCE_ROOT=/data/scratch/${USER}/outputs/cot-loop-detection/full_train_locked_pair_20260404`
-- `SUBSET_ROOT=${SOURCE_ROOT}`
-- `OUT_ROOT=/data/scratch/${USER}/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced`
+- `OUT_ROOT=/data/scratch/${USER}/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced_sampler`
 - reuse of the saved shared `mean_relative_length` archives under `SOURCE_ROOT`
-- reuse of the saved balanced `majority_s_0.5` train/test sample IDs under `SUBSET_ROOT`
+- reuse of the natural `majority_s_0.5` labels only as a train-balance reference
+- full shared regression train/test splits stay intact; train balancing happens through the sampler rather than by downsampling the regression rows
+- the rerun now leaves a local `shared_archive` link under `OUT_ROOT`, so the summary step can still recover the prompt-length baseline cleanly
 - regression-only retraining plus a fresh summary ledger under `OUT_ROOT/summary/`
 - default probe settings stay on the locked family unless you override them with env vars such as `MLP_HIDDEN_DIM`, `MLP_DEPTH`, and `MLP_DROPOUT`
 

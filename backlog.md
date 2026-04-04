@@ -1,29 +1,40 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-04 22:54 UTC
+Last updated: 2026-04-04 23:12 UTC
 
 ## Immediate Next Experiments
 
-- The balanced-only prompt-profile regression rerun now exists and should be cited directly.
-  - Result note: `docs/prompt-profile-balanced-regression-2026-04-04.md`
-  - Result PDF: `outputs/prompt_profile_balanced_regression_20260404/prompt_profile_balanced_regression_20260404.pdf`
-  - Copied summary ledger: `outputs/prompt_profile_balanced_regression_20260404/remote_summary/`
+- The corrected balanced-only prompt-profile regression rerun now exists and supersedes the earlier downsampled-subset note.
+  - Corrected result note: `docs/prompt-profile-balanced-regression-corrected-2026-04-04.md`
+  - Corrected result PDF: `outputs/prompt_profile_balanced_regression_corrected_20260404/prompt_profile_balanced_regression_corrected_20260404.pdf`
+  - Corrected copied summary ledger: `outputs/prompt_profile_balanced_regression_corrected_20260404/remote_summary/`
+  - Superseded note for provenance only: `docs/prompt-profile-balanced-regression-2026-04-04.md`
   - Exact split contract:
-    - reuse the saved balanced `majority_s_0.5` train/test prompt IDs from `/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/`
-    - relabel those same prompts with `mean_relative_length`
-    - keep train balanced on the binary split and test natural
+    - keep the full saved Qwen3 `mean_relative_length` train/test splits under `/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/`
+    - use the natural `majority_s_0.5` labels only to weight a balanced train sampler
+    - keep test natural and do not downsample the regression labels
     - keep the default regression probe family (`hidden_dim=128`, `depth=1`, `dropout=0.1`)
+  - The train-count correction is large on three datasets:
+    - `GPQA`: `18 -> 158` train prompts
+    - `MATH-500`: `44 -> 400`
+    - `MMLU-Pro`: `14 -> 640`
   - Main screening read at frozen `best_loss`:
-    - cross-dataset mean `top_20p_capture`: ensemble `0.344`, prompt length `0.262`, last-layer `0.257`
+    - cross-dataset mean `top_20p_capture`: ensemble `0.345`, last-layer `0.299`, prompt length `0.261`
+    - ensemble beats last-layer on all `5 / 5`
     - ensemble beats prompt length on `GPQA`, `MATH-500`, `MMLU-Pro`, and `LiveCodeBench`
-    - `AIME` is the only non-win against the prompt-length baseline on that metric
+    - `AIME` is still the only non-win against the prompt-length baseline on that metric
   - Calibration caveat:
-    - cross-dataset mean `RMSE`: last-layer `0.191`, ensemble `0.205`, prompt length `0.265`
+    - cross-dataset mean `RMSE`: prompt length `0.180`, ensemble `0.192`, last-layer `0.195`
+    - prompt length is now the best calibrated baseline on `4 / 5` datasets
     - this keeps `mean_relative_length` as a screening-first surface rather than a clean calibrated regressor
-  - Two code-path fixes landed during the rerun and should be treated as part of the durable execution surface:
+  - Durable code-path fixes on this surface:
     - Slurm wrappers now honor explicit `CONDA_ENV` before any stale repo-local `.venv`
+    - regression reruns that read a saved source root now leave a local `shared_archive` link so the summary path can still recover metadata baselines cleanly
     - `scripts/summarize_prompt_profile_full_train.py` now summarizes regression-only reruns instead of marking them `missing_shared_archive`
-  - If prompt-profile regression is pushed further, the next honest follow-up is not "rerun balanced regression again." It is a small layer-subset or capacity sweep on this same balanced regression split, while keeping `top_20p_capture` primary and `RMSE` secondary.
+  - If prompt-profile regression is pushed further, the next honest follow-up is tuning on this same corrected full-train sampler surface:
+    - small layer-subset sweep for the ensemble
+    - small capacity sweep
+    - keep `top_20p_capture` primary and `RMSE` secondary
 - The corrected OLMo degeneration-origin package now exists and should be cited directly.
   - Result note: `docs/olmo-degeneration-origin-audit-2026-04-04.md`
   - Result PDF: `outputs/olmo_degeneration_origin_audit_20260404/olmo_degeneration_origin_audit_20260404.pdf`
@@ -48,7 +59,7 @@ Last updated: 2026-04-04 22:54 UTC
   - It makes the object split explicit:
     - regression `mean_relative_length` stays on the locked full-train surface
     - the balanced rerun section in that report changes only the binary `majority_s_0.5` head
-    - the collaborator-requested balanced regression rerun is now answered by `docs/prompt-profile-balanced-regression-2026-04-04.md`
+    - the collaborator-requested balanced regression rerun is now answered by `docs/prompt-profile-balanced-regression-corrected-2026-04-04.md`
   - For the collaborator-correct balanced-only regression question, cite the balanced regression note above instead of this combined note.
   - Main combined read:
     - regression is still mixed and should be reported screening-first with `top_20p_capture`
