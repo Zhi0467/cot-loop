@@ -10,11 +10,17 @@ The project now has two active evidence streams:
 
 Latest status:
 - the best prefill-only arm is still the Round 6 all-layer last-token anchor; later metadata-aware prefill rounds did not overturn the completion-view advantage.
+- upstream PR `#7` is now merged; the current extra prompt-profile and OLMo work is ahead on `task/1773870804-prompt-profile-probe` rather than sitting in a fresh upstream PR.
 - the common-policy rollout-statistics bundle is now refreshed under one shared decode policy (`temperature=0.2`, `num_generations=10`, and `max prompts <= 800` where applicable) across `MATH-500`, `AIME`, `GPQA`, capped `MMLU-Pro`, and capped `LiveCodeBench release_v6`.
 - the repaired MC rows are materially different from the stale pre-refresh bundle: `GPQA` now reports `34.5%` rollout success instead of `3.1%`, and `MMLU-Pro` now reports `65.2%` instead of `14.2%`, both under the terminal JSON-answer contract.
 - the readable common-policy artifact is `outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/qwen3_1p7b_cross_dataset_rollout_report.pdf`, while the separate benchmark-style `GPQA` calibration lives in `outputs/gpqa_json_official_temp0p6_gen1/` and should not be conflated with the shared-policy table.
 - one explicit caveat remains on that recovered `LiveCodeBench` block: the original job crashed after grading and before writing the final JSON, and replay-based repair did not reproduce the stored generations exactly enough to recover `avg_first_loop_prefix_length`. That single metric therefore remains `null` for the recovered capped run.
 - the target-choice question is no longer open for the next run: Wangzhi locked `mean_relative_length` as the regression train target and `majority_s_0.5` as the binary train target.
+- the missing collaborator-requested prompt-profile artifact is now narrower than the older notes suggest: it is the balanced-train / natural-test regression rerun on the saved April prompt subset, not another binary-only rewrite. The code path and dedicated `2`-GPU Slurm wrapper now exist, but the rerun is still blocked because `tianhaowang-gpu0` accepts TCP on `22` without returning an SSH banner.
+- the active OLMo degeneration-origin audit is also narrower than the raw bounded bundle:
+  - `LiveCodeBench` is not a valid current OLMo-stage comparison because the old adapter silently defaulted non-Qwen families to a Qwen-specific wrapper style;
+  - `RLVR / MMLU-Pro = 0 / 80` remains unresolved rather than explained away;
+  - OLMo 2 `1B` is the next cheaper fallback only after that audit or node access returns.
 - the full-train plan is now pinned in both doc and PDF form:
   - `docs/prompt-profile-full-train-plan-2026-04-02.md`
   - `outputs/prompt_profile_full_train_plan_20260402/prompt_profile_full_train_plan_20260402.pdf`
@@ -23,7 +29,8 @@ Latest status:
   - for binary `majority_s_0.5`, prompt length already means a true one-feature held-out scorer;
   - for the current continuous-head decision, the raw association table has now been superseded by the trained metadata-control bundle in `outputs/prompt_profile_risk_controls_20260330/`.
 - the current open work is now execution-focused rather than definitional:
-  - run the next full train pass on that locked pair with the architecture/view/checkpoint rule fixed up front;
+  - run the balanced-train / natural-test regression rerun once the node admits SSH again;
+  - audit the suspect OLMo `LiveCodeBench` and `MMLU-Pro` rows before scaling or pivoting model families;
   - recover `LiveCodeBench` prompt-level accuracy only if a full `5 / 5` accuracy bucket table becomes necessary.
 
 **Workflow:**
