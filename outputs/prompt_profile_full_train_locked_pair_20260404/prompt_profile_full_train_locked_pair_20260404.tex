@@ -9,7 +9,7 @@
 
 \title{Prompt-Profile Full Train: Locked Pair Results}
 \author{}
-\date{2026-04-04 00:17 UTC}
+\date{2026-04-04 02:58 UTC}
 
 \begin{document}
 \maketitle
@@ -29,18 +29,32 @@ What does the first locked full-train pass say about the current two-head prompt
 \item Runtime object: Slurm job \texttt{2043} on \texttt{2} GPUs, completed at \texttt{2026-04-04 00:10 UTC}.
 \item Data object: reused the saved March prompt-profile archives; no rerollout.
 \item Selector: report the standardized \texttt{best\_loss} ledger and keep \texttt{best\_rank} diagnostic-only.
+\item Regression eval pair: each held-out prompt \texttt{i} contributes one aligned pair \texttt{(\^{}y\_i, y\_i)}, where \texttt{y\_i} is that same prompt's saved \texttt{mean\_relative\_length} and \texttt{\^{}y\_i} is the probe prediction for that same prompt.
+\item Binary eval pair: each held-out prompt \texttt{i} contributes one aligned pair \texttt{(\^{}s\_i, y\_i)}, where \texttt{y\_i} is that same prompt's \texttt{majority\_s\_0.5} label and \texttt{\^{}s\_i} is the probe score for that same prompt.
 \item Mechanism split:
   \begin{itemize}[leftmargin=1.5em]
   \item for regression \texttt{mean\_relative\_length}, \texttt{ensemble} means one MLP per layer with \texttt{mean\_prob} aggregation;
   \item for binary \texttt{majority\_s\_0.5}, \texttt{ensemble} means one MLP per layer with \texttt{vote\_fraction} aggregation over the per-layer 0/1 predictions.
   \end{itemize}
-\item Metadata baselines below are train-fit held-out scorers, not raw correlations.
-\item \texttt{effective\_budget} is constant at \texttt{30000} on this run, so the joint regression control collapses to prompt length.
+\item Metric roles:
+  \begin{itemize}[leftmargin=1.5em]
+  \item regression primary metric: \texttt{RMSE};
+  \item regression \texttt{Spearman}: diagnostic only, measuring monotone association across the aligned held-out prompt pairs above;
+  \item binary primary ranking metric: \texttt{PR-AUC}, with fixed-threshold metrics secondary.
+  \end{itemize}
+\item ``Metadata baseline'' in this note means train-fit prompt-only scorers:
+  \begin{itemize}[leftmargin=1.5em]
+  \item inputs: \texttt{prompt\_token\_count}, and separately \texttt{effective\_max\_tokens};
+  \item excluded inputs: no activations, no prompt text, no dataset/source identity, no model identifier, no architecture features, no generated output;
+  \item regression baseline: standardized linear regression fit on the train split and evaluated on the held-out test split;
+  \item binary baseline: a 1D score rule fit on the train split, with direction chosen by train \texttt{PR-AUC} and threshold chosen by train macro-F1 / positive-F1 / accuracy, then evaluated once on held-out test.
+  \end{itemize}
+\item \texttt{effective\_budget} is constant at \texttt{30000} on this run, so the only nontrivial metadata feature is prompt length. The joint regression control is identical to prompt length, and the binary \texttt{effective\_budget} control is just a constant predictor.
 \end{itemize}
 
 \section*{Main Results}
 \subsection*{Regression \texttt{mean\_relative\_length}}
-The activation ensemble beats the last-layer control on all five datasets in \texttt{Spearman rank correlation}, but that is not the same as beating metadata.
+The correct question here is prompt-level regression quality on held-out prompts. \texttt{RMSE} is the main fit metric. \texttt{Spearman} stays in the table only as a secondary diagnostic over the aligned prompt-level pairs above.
 
 \begin{center}
 \small
@@ -48,13 +62,13 @@ The activation ensemble beats the last-layer control on all five datasets in \te
 \resizebox{\textwidth}{!}{
 \begin{tabular}{@{}lrrrrrr@{}}
 \toprule
-Dataset & Ensemble Spearman & Last-layer Spearman & Prompt-length Spearman & Ensemble RMSE & Last-layer RMSE & Prompt-length RMSE \\
+Dataset & Ensemble RMSE & Last-layer RMSE & Prompt-length RMSE & Ensemble Spearman (diag.) & Last-layer Spearman (diag.) & Prompt-length Spearman (diag.) \\
 \midrule
-GPQA & 0.419 $\pm$ 0.045 & 0.175 $\pm$ 0.225 & 0.116 & 0.160 & 0.164 & 0.165 \\
-AIME & 0.639 $\pm$ 0.090 & 0.483 $\pm$ 0.138 & 0.676 & 0.183 & 0.189 & 0.176 \\
-MATH-500 & 0.351 $\pm$ 0.199 & 0.158 $\pm$ 0.426 & 0.461 & 0.162 & 0.169 & 0.154 \\
-MMLU-Pro & 0.348 $\pm$ 0.034 & -0.019 $\pm$ 0.293 & 0.393 & 0.133 & 0.138 & 0.126 \\
-LiveCodeBench & 0.805 $\pm$ 0.002 & 0.784 $\pm$ 0.006 & 0.405 & 0.248 & 0.242 & 0.279 \\
+GPQA & 0.160 & 0.164 & 0.165 & 0.419 $\pm$ 0.045 & 0.175 $\pm$ 0.225 & 0.116 \\
+AIME & 0.183 & 0.189 & 0.176 & 0.639 $\pm$ 0.090 & 0.483 $\pm$ 0.138 & 0.676 \\
+MATH-500 & 0.162 & 0.169 & 0.154 & 0.351 $\pm$ 0.199 & 0.158 $\pm$ 0.426 & 0.461 \\
+MMLU-Pro & 0.133 & 0.138 & 0.126 & 0.348 $\pm$ 0.034 & -0.019 $\pm$ 0.293 & 0.393 \\
+LiveCodeBench & 0.248 & 0.242 & 0.279 & 0.805 $\pm$ 0.002 & 0.784 $\pm$ 0.006 & 0.405 \\
 \bottomrule
 \end{tabular}
 }
@@ -62,9 +76,10 @@ LiveCodeBench & 0.805 $\pm$ 0.002 & 0.784 $\pm$ 0.006 & 0.405 & 0.248 & 0.242 & 
 
 Clean read:
 \begin{itemize}[leftmargin=1.5em]
-\item The activation ensemble is clearly better than \texttt{last\_layer} on the regression head.
-\item The activation ensemble only beats the trained prompt-length baseline on \texttt{GPQA} and \texttt{LiveCodeBench}.
-\item \texttt{AIME}, \texttt{MATH-500}, and \texttt{MMLU-Pro} remain metadata-dominated on this regression target.
+\item On prompt-level error, ensemble beats \texttt{last\_layer} on \texttt{GPQA}, \texttt{AIME}, \texttt{MATH-500}, and \texttt{MMLU-Pro}, but \texttt{last\_layer} is slightly better on \texttt{LiveCodeBench}.
+\item Against the train-fit prompt-length baseline, the activation ensemble only wins on \texttt{GPQA} and \texttt{LiveCodeBench}.
+\item \texttt{AIME}, \texttt{MATH-500}, and \texttt{MMLU-Pro} remain prompt-length-dominated on this regression target.
+\item The old ``ensemble wins on all five'' phrasing was only true for the secondary \texttt{Spearman} diagnostic, not for the main prompt-level error metric.
 \end{itemize}
 
 \subsection*{Binary \texttt{majority\_s\_0.5}}
@@ -93,7 +108,7 @@ Clean read:
 \item Ensemble \texttt{PR-AUC} beats the prompt-length baseline on all five datasets.
 \item The clearest finished wins are \texttt{AIME}, \texttt{LiveCodeBench}, and \texttt{MMLU-Pro}.
 \item \texttt{GPQA} is a real ranking win over metadata, but fixed-threshold metrics stay unstable because only \texttt{5\%} of test prompts are positive.
-\item \texttt{MATH-500} remains weak overall; it is a small ranking lift over metadata, not a clean threshold-quality win.
+\item \texttt{MATH-500} remains weak overall; it is a small ranking lift over the prompt-length baseline, not a clean threshold-quality win.
 \end{itemize}
 
 \section*{Interpretation}
@@ -101,10 +116,12 @@ Clean read:
 \item The earlier Slack snippets were regression-only early checkpoints. The full locked run says the binary head is the more convincing part of this pair.
 \item ``Ensemble beats last layer'' is too coarse:
   \begin{itemize}[leftmargin=1.5em]
-  \item for regression, that does not imply a metadata win;
+  \item for regression, it depends on which metric you mean;
+  \item \texttt{Spearman} says the ensemble orders prompts better, but \texttt{RMSE} says \texttt{last\_layer} still edges it on \texttt{LiveCodeBench};
+  \item neither statement implies a prompt-length-baseline win;
   \item for binary, the gain is real but still prevalence-sensitive on the rare-event datasets.
   \end{itemize}
-\item The regression result should now be stated narrowly: \texttt{mean\_relative\_length} is still the stronger activation regression target relative to \texttt{last\_layer}, but this full-train pass does not show robust lift over the train-fit prompt-length control across the five-dataset suite.
+\item The regression result should now be stated narrowly: \texttt{mean\_relative\_length} is still a usable activation regression target, but this full-train pass does not show robust lift over the train-fit prompt-length control across the five-dataset suite.
 \item The binary result is cleaner: \texttt{majority\_s\_0.5} is still not a pure loop label, but it is the stronger finished activation-lift surface on this run.
 \end{itemize}
 
@@ -114,7 +131,7 @@ The locked full-train backlog item is now complete and reported in the same surf
 What changed after actually running it:
 \begin{itemize}[leftmargin=1.5em]
 \item The binary head looks materially stronger than the regression head as a finished deployment-facing surface.
-\item The regression head still needs a stricter metadata-lift answer before it should be treated as a clear activation win.
+\item The regression head should now be described with \texttt{RMSE} first and \texttt{Spearman} second; once that is done, the claim shrinks to ``activation beats prompt length on \texttt{2 / 5} datasets.''
 \item Future handoffs should cite this result note and the copied ledger directly instead of the early GPQA/AIME-only Slack checkpoints.
 \end{itemize}
 
