@@ -1,100 +1,214 @@
 # Prompt-Profile Full Train Results
 
-Last updated: 2026-04-04 02:58 UTC
+Last updated: 2026-04-04 04:36 UTC
 
-## Question
+## Executive Summary
 
-What does the first locked full-train pass say about the current two-head surface under the fixed saved prompt-profile contract?
+- This report covers the first locked prompt-profile full-train run on the fixed five-dataset saved surface. It is not a new target-choice experiment.
+- Runtime object: Slurm job `2043` on `2` GPUs, completed at `2026-04-04 00:10 UTC`.
+- Model/policy object: `Qwen/Qwen3-1.7B`, `temperature=0.2`, `num_generations=4`, `max_tokens=30000`, prompt-prefill activations only, loop detector `n=30`, `k=20`.
+- Continuous head (`mean_relative_length`): if the use is screening degenerate prompts, the right headline metric is held-out top-k capture on the frozen `best_loss` checkpoint, not `Spearman`. On `top_20p_capture`, ensemble beats the train-fit prompt-length baseline on `GPQA`, `MMLU-Pro`, and `LiveCodeBench`, but not on `AIME` or `MATH-500`. On `RMSE`, the win shrinks to `GPQA` and `LiveCodeBench` only.
+- Binary head (`majority_s_0.5`): this is still the cleaner finished surface. Ensemble `PR-AUC` beats the prompt-length baseline on all five datasets.
+- Recommendation from this run:
+  - if the goal is deployment-facing degenerate-prompt screening, lead with `majority_s_0.5`;
+  - if `mean_relative_length` is still reported, use `top_20p_capture` first, `RMSE` second, and `Spearman` only as a tertiary diagnostic.
+
+## Exact Question
+
+What does the first locked full-train pass say about the current two-head prompt-profile surface under the fixed saved contract?
 
 - regression head: `mean_relative_length`
 - binary head: `majority_s_0.5`
 - feature surface: prompt-prefill activations only
-- views compared: layerwise `ensemble` vs `last_layer`
+- views compared: layerwise `ensemble` versus `last_layer`
+- checkpoint rule: keep `best_loss` as the frozen reporting checkpoint and keep `best_rank` diagnostic-only
 
-## Setup
+## Frozen Run Contract
 
-- Runtime object: Slurm job `2043` on `2` GPUs, completed at `2026-04-04 00:10 UTC`.
-- Data object: reused the saved March prompt-profile archives; this pass did not reroll prompts or rebuild labels from scratch.
-- Evaluation object: use the standardized ledger from `scripts/summarize_prompt_profile_full_train.py`, with `best_loss` as the main checkpoint and `best_rank` left diagnostic-only.
-- Regression eval pair: each held-out prompt `i` contributes one aligned pair `(\hat y_i, y_i)`, where `y_i` is that same prompt's saved `mean_relative_length` and `\hat y_i` is the probe prediction for that same prompt.
-- Binary eval pair: each held-out prompt `i` contributes one aligned pair `(\hat s_i, y_i)`, where `y_i` is that same prompt's `majority_s_0.5` label and `\hat s_i` is the probe score for that same prompt.
-- Important mechanism split:
-  - for regression `mean_relative_length`, `ensemble` means one MLP per layer with `mean_prob` aggregation;
-  - for binary `majority_s_0.5`, `ensemble` means one MLP per layer with `vote_fraction` aggregation over the per-layer 0/1 predictions.
-- Metric roles in this note:
-  - regression primary metric: `RMSE`;
-  - regression `Spearman`: diagnostic only, measuring monotone association across the aligned held-out prompt pairs above;
-  - binary primary ranking metric: `PR-AUC`, with fixed-threshold metrics secondary.
-- "Metadata baseline" in this note means train-fit prompt-only scorers:
-  - inputs: `prompt_token_count`, and separately `effective_max_tokens`;
-  - excluded inputs: no activations, no prompt text, no dataset/source identity, no model identifier, no architecture features, no generated output;
-  - regression baseline: standardized linear regression fit on the train split and evaluated on the held-out test split;
-  - binary baseline: a 1D score rule fit on the train split, with direction chosen by train `PR-AUC` and threshold chosen by train macro-F1 / positive-F1 / accuracy, then evaluated once on held-out test.
-- On this fixed run surface, `effective_budget` is constant at `30000`, so the only nontrivial metadata feature is prompt length. The joint regression control is therefore identical to the prompt-length-only control, and the binary `effective_budget` control is just a constant predictor.
+- Data object: reuse the saved March prompt-profile archives. This run does not reroll prompts and does not rebuild the prompt-profile surface from scratch.
+- Optimizer seeds: `0`, `1`, `2`. All ensemble/last-layer means below are means across those three seeds, with `+/-` showing seed standard deviation.
+- Dataset seed and prompt splits stay fixed. Only optimizer seed varies.
+
+| Dataset | Task kind | Train prompts | Test prompts | Runtime note |
+| --- | --- | ---: | ---: | --- |
+| `GPQA` | `multiple_choice_gpqa` | `158` | `40` | saved prompt field `Question` |
+| `AIME` | `math_freeform` | `48` | `12` | saved prompt field `question` |
+| `MATH-500` | `math_freeform` | `400` | `100` | saved prompt field `problem` |
+| `MMLU-Pro` | `multiple_choice_mmlupro` | `640` | `160` | saved prompt field `problem` |
+| `LiveCodeBench` | `livecodebench_codegen` | `640` | `160` | saved prompt field `problem` |
+
+## Definitions
+
+### Targets
+
+- `mean_relative_length`
+  - For prompt `i`, this is the repeated-rollout mean of `L_r / E`, where `L_r` is the rollout length and `E` is the prompt's effective token budget.
+- `majority_s_0.5`
+  - For prompt `i`, this is `1` if a strict majority of the repeated rollouts satisfy `L_r / E >= 0.5`, otherwise `0`.
+
+### Views
+
+- `ensemble` for regression
+  - one MLP per layer with `mean_prob` aggregation.
+- `ensemble` for binary
+  - one MLP per layer with `vote_fraction` aggregation over per-layer `0/1` predictions.
+- `last_layer`
+  - the same probe family restricted to the final layer only.
+
+### Evaluation pairs
+
+- Regression eval pair
+  - each held-out prompt `i` contributes one aligned pair `(\hat y_i, y_i)`, where `y_i` is that same prompt's realized `mean_relative_length`.
+- Binary eval pair
+  - each held-out prompt `i` contributes one aligned pair `(\hat s_i, y_i)`, where `y_i` is that same prompt's realized `majority_s_0.5` label.
+
+### Metrics
+
+- `top_10p_capture` / `top_20p_capture`
+  - sort held-out prompts by predicted score, keep the top `10%` or `20%`, and ask what fraction of the total target mass falls inside that bucket.
+  - for `mean_relative_length`, target mass means summed realized relative-length mass over held-out prompts.
+- `RMSE`
+  - pointwise error on those aligned held-out prompt pairs.
+- `Spearman`
+  - monotone ordering agreement on those same aligned prompt pairs. It is not the task definition.
+- `PR-AUC`
+  - ranking metric for the binary head across thresholds.
+
+### Metadata baseline
+
+- This report uses train-fit prompt-only baselines:
+  - allowed inputs: `prompt_token_count`, and separately `effective_max_tokens`;
+  - excluded inputs: no activations, no prompt text, no dataset/source identity, no model identifier, no architecture features, no generated output features.
+- Regression baseline
+  - standardized linear regression fit on the train split, evaluated once on held-out test.
+- Binary baseline
+  - train-fit 1D score rule, with direction chosen by train `PR-AUC` and threshold chosen by train macro-F1 / positive-F1 / accuracy, evaluated once on held-out test.
+- Important fixed-run nuance
+  - `effective_max_tokens=30000` is constant on this run, so prompt length is the only nontrivial metadata feature here. The joint regression control collapses to prompt length, and the binary `effective_budget` control is effectively constant.
+
+## Regression Results: `mean_relative_length`
+
+The continuous head can be read in two different ways:
+
+- screening read
+  - use `top_k` capture because the product question is "do we catch degenerate prompts?"
+- calibration read
+  - use `RMSE` because the target is still continuous
+
+This report keeps the checkpoint frozen and changes only the reporting lens.
+
+### Screening Table: Top-10 Capture
+
+| Dataset | Ensemble `top_10p_capture` | Last-layer `top_10p_capture` | Prompt-length baseline `top_10p_capture` |
+| --- | ---: | ---: | ---: |
+| `GPQA` | `0.132 +/- 0.019` | `0.089 +/- 0.006` | `0.070` |
+| `AIME` | `0.204 +/- 0.015` | `0.221 +/- 0.004` | `0.223` |
+| `MATH-500` | `0.129 +/- 0.033` | `0.117 +/- 0.061` | `0.151` |
+| `MMLU-Pro` | `0.209 +/- 0.022` | `0.094 +/- 0.062` | `0.169` |
+| `LiveCodeBench` | `0.170 +/- 0.004` | `0.156 +/- 0.000` | `0.137` |
+
+### Screening Table: Top-20 Capture
+
+| Dataset | Ensemble `top_20p_capture` | Last-layer `top_20p_capture` | Prompt-length baseline `top_20p_capture` |
+| --- | ---: | ---: | ---: |
+| `GPQA` | `0.247 +/- 0.018` | `0.216 +/- 0.039` | `0.168` |
+| `AIME` | `0.305 +/- 0.017` | `0.321 +/- 0.020` | `0.306` |
+| `MATH-500` | `0.262 +/- 0.058` | `0.243 +/- 0.094` | `0.290` |
+| `MMLU-Pro` | `0.355 +/- 0.025` | `0.185 +/- 0.098` | `0.292` |
+| `LiveCodeBench` | `0.340 +/- 0.005` | `0.317 +/- 0.010` | `0.248` |
+
+### Calibration And Diagnostic Table
+
+| Dataset | Ensemble `RMSE` | Last-layer `RMSE` | Prompt-length baseline `RMSE` | Ensemble `Spearman` | Last-layer `Spearman` | Prompt-length baseline `Spearman` |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `GPQA` | `0.160 +/- 0.002` | `0.164 +/- 0.003` | `0.165` | `0.419 +/- 0.045` | `0.175 +/- 0.225` | `0.116` |
+| `AIME` | `0.183 +/- 0.006` | `0.189 +/- 0.004` | `0.176` | `0.639 +/- 0.090` | `0.483 +/- 0.138` | `0.676` |
+| `MATH-500` | `0.162 +/- 0.002` | `0.169 +/- 0.018` | `0.154` | `0.351 +/- 0.199` | `0.158 +/- 0.426` | `0.461` |
+| `MMLU-Pro` | `0.133 +/- 0.000` | `0.138 +/- 0.005` | `0.126` | `0.348 +/- 0.034` | `-0.019 +/- 0.293` | `0.393` |
+| `LiveCodeBench` | `0.248 +/- 0.018` | `0.242 +/- 0.011` | `0.279` | `0.805 +/- 0.002` | `0.784 +/- 0.006` | `0.405` |
+
+### Regression Interpretation
+
+- Screening read, ensemble versus prompt length
+  - wins: `GPQA`, `MMLU-Pro`, `LiveCodeBench`
+  - losses: `AIME`, `MATH-500`
+- Calibration read, ensemble versus prompt length
+  - wins: `GPQA`, `LiveCodeBench`
+  - losses: `AIME`, `MATH-500`, `MMLU-Pro`
+- Ensemble versus last-layer
+  - on `top_20p_capture`, ensemble wins `4 / 5`; only `AIME` slightly favors `last_layer`
+  - on `RMSE`, ensemble also wins `4 / 5`, but the exception is different: `LiveCodeBench`
+- Most important split
+  - `LiveCodeBench` flips depending on the object:
+    - `last_layer` is slightly better calibrated by `RMSE`
+    - ensemble is better for screening by both `top_10p_capture` and `top_20p_capture`
+- Practical read
+  - `mean_relative_length` is still a usable score, but it is not a uniform activation-lift story over prompt length. It is mixed even after freezing the target and the run contract.
+
+## Binary Results: `majority_s_0.5`
+
+This is the cleaner finished head from the locked pair.
+
+### Ranking Table
+
+| Dataset | Ensemble `PR-AUC` | Last-layer `PR-AUC` | Prompt-length baseline `PR-AUC` | Test prevalence |
+| --- | ---: | ---: | ---: | ---: |
+| `GPQA` | `0.420 +/- 0.029` | `0.230 +/- 0.278` | `0.066` | `0.050` |
+| `AIME` | `0.922 +/- 0.024` | `0.904 +/- 0.028` | `0.898` | `0.583` |
+| `MATH-500` | `0.135 +/- 0.005` | `0.151 +/- 0.071` | `0.100` | `0.040` |
+| `MMLU-Pro` | `0.184 +/- 0.037` | `0.056 +/- 0.012` | `0.110` | `0.013` |
+| `LiveCodeBench` | `0.711 +/- 0.036` | `0.712 +/- 0.023` | `0.576` | `0.338` |
+
+### Threshold Table: Ensemble Versus Prompt-Length Baseline
+
+| Dataset | Ensemble precision | Ensemble recall | Ensemble macro-F1 | Prompt-length precision | Prompt-length recall | Prompt-length macro-F1 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `GPQA` | `0.110 +/- 0.050` | `1.000 +/- 0.000` | `0.382 +/- 0.244` | `0.038` | `0.500` | `0.286` |
+| `AIME` | `0.926 +/- 0.128` | `0.762 +/- 0.218` | `0.798 +/- 0.044` | `0.800` | `0.571` | `0.667` |
+| `MATH-500` | `0.091 +/- 0.020` | `1.000 +/- 0.000` | `0.444 +/- 0.060` | `0.079` | `0.750` | `0.458` |
+| `MMLU-Pro` | `0.117 +/- 0.073` | `0.833 +/- 0.289` | `0.562 +/- 0.067` | `0.029` | `1.000` | `0.397` |
+| `LiveCodeBench` | `0.609 +/- 0.046` | `0.827 +/- 0.091` | `0.747 +/- 0.014` | `0.494` | `0.722` | `0.646` |
+
+### Binary Interpretation
+
+- Ensemble `PR-AUC` beats prompt length on all five datasets.
+- The cleanest wins are:
+  - `AIME`
+    - strong ranking and strong fixed-threshold behavior
+  - `MMLU-Pro`
+    - large ranking gain despite tiny prevalence
+  - `LiveCodeBench`
+    - large ranking gain with solid precision/recall
+- Caveats by dataset
+  - `GPQA`
+    - real ranking lift, but only `5%` test prevalence, so threshold metrics are unstable
+  - `MATH-500`
+    - ranking lift over prompt length exists, but the absolute threshold-quality story is still weak
+
+## What This Run Does And Does Not Show
+
+- This run does show
+  - the locked pair can be trained end-to-end on the full saved surface under one frozen contract
+  - `majority_s_0.5` is the cleaner finished activation-lift head today
+  - `mean_relative_length` is usable as a screening score, but only with a mixed cross-dataset read
+- This run does not show
+  - that `Spearman` should be the primary regression metric
+  - that `mean_relative_length` beats prompt length uniformly
+  - that `majority_s_0.5` is a pure loop label
+  - that `p_loop` should be reopened as the default train target after the fact
+
+## Recommendation
+
+- Default finished surface from this run
+  - `majority_s_0.5`
+- How to report the continuous head
+  - if the use is screening high-risk prompts, report `top_20p_capture` first, `top_10p_capture` second if tighter budget matters, `RMSE` as calibration context, and `Spearman` only as a tertiary diagnostic
+- Most honest one-line summary
+  - on the frozen locked run, the binary head is a `5 / 5` prompt-length-baseline win by `PR-AUC`, while the continuous head is a `3 / 5` win by screening capture and only a `2 / 5` win by calibration error
+
+## Artifact Bundle
 
 Copied ledger for this run:
 - `outputs/prompt_profile_full_train_locked_pair_20260404/remote_summary/`
 - `outputs/prompt_profile_full_train_locked_pair_20260404/regression_summary.csv`
 - `outputs/prompt_profile_full_train_locked_pair_20260404/binary_summary.csv`
-
-## Main Results
-
-### Regression `mean_relative_length`
-
-The correct question here is prompt-level regression quality on held-out prompts. `RMSE` is the main fit metric. `Spearman` stays in the table only as a secondary diagnostic over the aligned prompt-level pairs above.
-
-| Dataset | Ensemble `RMSE` | Last-layer `RMSE` | Prompt-length baseline `RMSE` | Ensemble `Spearman` (diag.) | Last-layer `Spearman` (diag.) | Prompt-length baseline `Spearman` (diag.) |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `GPQA` | `0.160` | `0.164` | `0.165` | `0.419 +/- 0.045` | `0.175 +/- 0.225` | `0.116` |
-| `AIME` | `0.183` | `0.189` | `0.176` | `0.639 +/- 0.090` | `0.483 +/- 0.138` | `0.676` |
-| `MATH-500` | `0.162` | `0.169` | `0.154` | `0.351 +/- 0.199` | `0.158 +/- 0.426` | `0.461` |
-| `MMLU-Pro` | `0.133` | `0.138` | `0.126` | `0.348 +/- 0.034` | `-0.019 +/- 0.293` | `0.393` |
-| `LiveCodeBench` | `0.248` | `0.242` | `0.279` | `0.805 +/- 0.002` | `0.784 +/- 0.006` | `0.405` |
-
-Clean read:
-- On prompt-level error, ensemble beats `last_layer` on `GPQA`, `AIME`, `MATH-500`, and `MMLU-Pro`, but `last_layer` is slightly better on `LiveCodeBench`.
-- Against the train-fit prompt-length baseline, the activation ensemble only wins on `GPQA` and `LiveCodeBench`.
-- `AIME`, `MATH-500`, and `MMLU-Pro` remain prompt-length-dominated on this regression target.
-- The old "ensemble wins on all five" phrasing was only true for the secondary `Spearman` diagnostic, not for the main prompt-level error metric.
-
-### Binary `majority_s_0.5`
-
-The binary head is the stronger part of the locked pair. The main ranking metric here is `PR-AUC`, especially on the very low-prevalence datasets.
-
-| Dataset | Ensemble `PR-AUC` | Last-layer `PR-AUC` | Prompt-length baseline `PR-AUC` | Ensemble macro-F1 | Last-layer macro-F1 | Prompt-length baseline macro-F1 | Test prevalence |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `GPQA` | `0.420 +/- 0.029` | `0.230 +/- 0.278` | `0.066` | `0.382` | `0.414` | `0.286` | `0.050` |
-| `AIME` | `0.922 +/- 0.024` | `0.904 +/- 0.028` | `0.898` | `0.798` | `0.391` | `0.667` | `0.583` |
-| `MATH-500` | `0.135 +/- 0.005` | `0.151 +/- 0.071` | `0.100` | `0.444` | `0.468` | `0.458` | `0.040` |
-| `MMLU-Pro` | `0.184 +/- 0.037` | `0.056 +/- 0.012` | `0.110` | `0.562` | `0.357` | `0.397` | `0.013` |
-| `LiveCodeBench` | `0.711 +/- 0.036` | `0.712 +/- 0.023` | `0.576` | `0.747` | `0.714` | `0.646` | `0.338` |
-
-Clean read:
-- Ensemble `PR-AUC` beats the prompt-length baseline on all five datasets.
-- The clearest finished wins are `AIME`, `LiveCodeBench`, and `MMLU-Pro`.
-- `GPQA` is a real ranking win over metadata, but fixed-threshold metrics are unstable because only `5%` of the test prompts are positive.
-- `MATH-500` remains weak overall; it is a small ranking lift over the prompt-length baseline, not a clean threshold-quality win.
-
-## Interpretation
-
-- The earlier thread snippets were regression-only early checkpoints. The full locked run says the binary head is the more convincing part of this pair.
-- Saying only "ensemble beats last layer" is too coarse:
-  - for regression, it depends on which metric you mean;
-  - `Spearman` says the ensemble orders prompts better, but `RMSE` says `last_layer` still edges it on `LiveCodeBench`;
-  - neither statement implies a prompt-length-baseline win;
-  - for binary, the gain is real but still prevalence-sensitive on the rare-event datasets.
-- The repo should now describe the regression result precisely:
-  - `mean_relative_length` is still a usable activation regression target,
-  - but this full-train pass does not show robust lift over the train-fit prompt-length control across the five-dataset suite.
-- The repo should also describe the binary result precisely:
-  - `majority_s_0.5` is still not a pure loop label,
-  - but it is the cleaner finished activation-lift surface on this run.
-
-## Bottom Line
-
-The locked full-train item from `backlog.md` is now complete and reported in the same style as the earlier loop-label experiment notes.
-
-What changed after actually running it:
-- The binary head looks materially stronger than the regression head as a finished deployment-facing surface.
-- The regression head should now be described with `RMSE` first and `Spearman` second; once that is done, the claim shrinks to "activation beats prompt length on `2 / 5` datasets."
-- Future handoffs should cite this result note and the copied ledger directly instead of falling back to the early GPQA/AIME-only Slack checkpoints.

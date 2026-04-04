@@ -1,6 +1,6 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-04 02:58 UTC
+Last updated: 2026-04-04 04:25 UTC
 
 ## Immediate Next Experiments
 
@@ -10,10 +10,10 @@ Last updated: 2026-04-04 02:58 UTC
   - Copied summary ledger: `outputs/prompt_profile_full_train_locked_pair_20260404/remote_summary/`
   - The run contract stayed fixed to the saved prompt-profile surface: `Qwen/Qwen3-1.7B`, `temperature=0.2`, `num_generations=4`, `loop_n=30`, `loop_k=20`, prompt-prefill only.
   - Aggregation rule matters: regression `ensemble` uses `mean_prob`, while binary `ensemble` uses `vote_fraction`.
-  - Regression read: on held-out prompt-level `RMSE`, ensemble beats last-layer on `4 / 5` datasets, loses slightly on `LiveCodeBench`, and still loses to the train-fit prompt-length baseline on `AIME`, `MATH-500`, and `MMLU-Pro`.
+  - Regression read: on held-out prompt-level screening `top_20p_capture` at the frozen `best_loss` checkpoint, ensemble beats last-layer on `4 / 5` datasets and beats the train-fit prompt-length baseline on `GPQA`, `MMLU-Pro`, and `LiveCodeBench`, but still loses on `AIME` and `MATH-500`.
   - Binary read: ensemble `PR-AUC` beats the prompt-length baseline on all five datasets, with the clearest finished wins on `AIME`, `LiveCodeBench`, and `MMLU-Pro`.
-  - Regression `Spearman` is still useful, but only as a diagnostic monotone-ordering statistic over aligned held-out prompt pairs; it should not be the headline regression claim.
-  - Keep `best_loss` as the main checkpoint for target-fit reporting; keep `best_rank` diagnostic only.
+  - Keep `best_loss` as the frozen checkpoint for this run; do not reseat the regression checkpoint after the fact just because the reporting lens moved to screening.
+  - For this run, keep `top_20p_capture` as the operational regression metric, `RMSE` as calibration context, and `Spearman` only as a tertiary monotone-ordering diagnostic over aligned held-out prompt pairs.
 - Keep the old bucket test in the diagnostic lane only.
   - The `top 20%` loop-enrichment slice is still useful downstream.
   - It should not re-open target selection by itself.
@@ -46,6 +46,7 @@ This should be similar to our previous experiments on training probes on loop la
 - Older thread notes used "rank correlation" as shorthand. Future writeups should say `Spearman rank correlation` explicitly and always name the target being ranked.
 - Older notes also used "prompt-length baseline" too loosely. Future writeups should say whether this means a train-fit 1D scorer or only a raw held-out association statistic.
 - For the locked full-train run specifically, "metadata baseline" means prompt-only scorers on `prompt_token_count` and `effective_max_tokens`; since `effective_max_tokens=30000` is constant here, the only nontrivial baseline feature is prompt length.
+- Future writeups must say whether `mean_relative_length` is being used as a calibrated regression target or as a screening score. The same frozen run supports both reads, but they lead to different headline claims.
 - Do not describe the project goal as "ranking prompts." The target-choice question is classification/regression-label selection from prompt-prefill activations; the `top 20%` bucket is only one common held-out diagnostic used to compare candidate targets.
 
 ## Known Data Gaps
