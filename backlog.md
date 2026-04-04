@@ -1,9 +1,19 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-04 06:33 UTC
+Last updated: 2026-04-04 06:55 UTC
 
 ## Immediate Next Experiments
 
+- Audit the weird bounded OLMo instruct bundle before scaling it or swapping model families.
+  - The current bundle is under `/data/scratch/murphy/outputs/cot-loop-detection/olmo3_degeneration_origin_progression/bound8_temp0p1_gen10_ctx40960_topkneg1/`.
+  - `RLVR / MMLU-Pro = 0 / 80` with mean length `6.15` is too suspicious to treat as a clean capability read.
+  - `SFT / LiveCodeBench = 0 / 80` also needs the native-codegen surface checked before being treated as an ordinary rollout-success result.
+  - Run the cheap audit first:
+    - inspect terminal answer forms on saved `MMLU-Pro` responses with the relaxed structured parser, not only the strict JSON grader;
+    - inspect `LiveCodeBench` extracted code plus native `pass@k` on the same saved bundle, not only rollout-success;
+    - only after that decide whether the current OLMo 3 surface is scientifically usable.
+  - If a smaller progression is still needed after the audit, the smallest public fallback is the April 2025 OLMo 2 `1B` chain (`OLMo-2-0425-1B -> OLMo-2-0425-1B-SFT -> OLMo-2-0425-1B-RLVR1 -> OLMo-2-0425-1B-Instruct`).
+  - Do not describe that as a smaller OLMo 3 run: the public OLMo 3 instruct ladder is only `7B` and `32B`.
 - The combined April prompt-profile report now exists as the main collaborator-facing surface.
   - Result note: `docs/prompt-profile-full-surface-update-2026-04-04.md`
   - Result PDF: `outputs/prompt_profile_full_surface_update_20260404/prompt_profile_full_surface_update_20260404.pdf`

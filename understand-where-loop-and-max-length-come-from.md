@@ -311,8 +311,19 @@ Two follow-up cautions matter before treating this bundle as directly comparable
 - `RLVR / MMLU-Pro` came back at `0 / 80` correct with `avg_generation_length = 6.15` under the same `chat_template` surface that was otherwise working on the other MCQ tasks. That shape looks more like a terminal-answer or grading mismatch than a stable capability read.
 - `LiveCodeBench` is on a different interface from the MCQ tasks by construction: it stays on the benchmark's raw-string prompt builder for every stage, so its numbers should not be read as one more ordinary MCQ point.
 - `LiveCodeBench` is also not obviously a total generation failure. The saved RLVR JSON includes native codegen metrics of `pass@1 = 0.10` and `pass@10 = 0.375` on this `8`-problem slice, and the paired `livecodebench__lcb_records.json` file contains substantive code outputs rather than blanks.
+- the public `Olmo-3-7B-Instruct` model card is also a weak sanity check against reading these two suspect rows too literally: Ai2 reports nonzero coding and knowledge performance on that surface, so a total collapse on bounded `MMLU-Pro` or `LiveCodeBench` is not the default expectation. That is still only a sanity check, not a matched eval, because their table uses different benchmarks and settings.
 
 So the current live question is no longer only "what do we do next about the deferred base stage?" It is also "do we need a terminal-format / grading sanity pass on the weird instruct-side datasets, especially `MMLU-Pro`, before making a stronger SFT-versus-RLVR claim?"
+
+There is also a real smaller-model fallback, but it is not within the same OLMo 3 family.
+
+- the public OLMo 3 instruct release currently exposes the progression only at `7B` and `32B`, so there is no smaller same-family `Olmo-3-*-Instruct-SFT -> Olmo-3-*-Instruct` ladder to substitute into this exact note;
+- the smallest public progression with closely related post-training stages is instead the April 2025 OLMo 2 `1B` chain:
+  - `OLMo-2-0425-1B`
+  - `OLMo-2-0425-1B-SFT`
+  - `OLMo-2-0425-1B-RLVR1`
+  - `OLMo-2-0425-1B-Instruct`
+- that would still change families and training details, so it should be treated as a fallback debug object after auditing the current OLMo 3 bounded outputs, not as a silent replacement for them.
 
 ## Why The New Lengths Are Much Shorter Than Qwen3
 
