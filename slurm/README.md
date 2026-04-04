@@ -8,6 +8,7 @@ This directory contains SLURM workflows for the CoT loop detector project.
 - `analyze_prefill_stability.sbatch`: Prefill-loop sanity check and stability checks with greedy rollouts.
 - `run_probe_train_e2e.sbatch`: End-to-end probe pipeline for the canonical stacked prefill dataset (build + probe training, including optional multi-seed runs).
 - `run_prompt_profile_full_train.sbatch`: 2-GPU wrapper for the locked `mean_relative_length` + `majority_s_0.5` full-train path, reusing the saved March prompt-profile archives and writing the standardized `outputs/full_train/` ledger.
+- `run_prompt_profile_balanced_regression_retrain.sbatch`: 2-GPU wrapper for rerunning only the regression head on the balanced-train / natural-test prompt subset already defined by the saved `majority_s_0.5` data.
 - `run_prompt_profile_binary_retrain.sbatch`: 1-GPU wrapper for rerunning only the balanced `majority_s_0.5` binary probes from an existing locked full-train output root, with explicit MLP-width/depth overrides.
 - `run_prompt_profile_projection.sbatch`: One-GPU prompt-profile visualization path (build + prompt-level projection export, with optional render when `matplotlib` is available).
 - `run_k5_threeview_dataset.sbatch`: Historical multi-view dataset build for the k=5 / max_tokens=15000 ablation study.
@@ -142,6 +143,34 @@ Submit with defaults:
 ```bash
 CONDA_ENV=swe311 \
 sbatch slurm/run_prompt_profile_full_train.sbatch
+```
+
+## Balanced Regression Retrain Wrapper
+
+`run_prompt_profile_balanced_regression_retrain.sbatch` defaults to:
+
+- `#SBATCH --gres=gpu:2`
+- `SOURCE_ROOT=/data/scratch/${USER}/outputs/cot-loop-detection/full_train_locked_pair_20260404`
+- `SUBSET_ROOT=${SOURCE_ROOT}`
+- `OUT_ROOT=/data/scratch/${USER}/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced`
+- reuse of the saved shared `mean_relative_length` archives under `SOURCE_ROOT`
+- reuse of the saved balanced `majority_s_0.5` train/test sample IDs under `SUBSET_ROOT`
+- regression-only retraining plus a fresh summary ledger under `OUT_ROOT/summary/`
+- default probe settings stay on the locked family unless you override them with env vars such as `MLP_HIDDEN_DIM`, `MLP_DEPTH`, and `MLP_DROPOUT`
+
+Submit with defaults:
+```bash
+CONDA_ENV=swe311 \
+sbatch slurm/run_prompt_profile_balanced_regression_retrain.sbatch
+```
+
+Example width-only follow-up on the same balanced regression object:
+```bash
+CONDA_ENV=swe311 \
+MLP_HIDDEN_DIM=256 \
+MLP_DEPTH=1 \
+WEIGHT_DECAY=0.05 \
+sbatch slurm/run_prompt_profile_balanced_regression_retrain.sbatch
 ```
 
 ## Locked Binary Retrain Wrapper

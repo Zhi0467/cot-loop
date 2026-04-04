@@ -1,9 +1,22 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-04 06:55 UTC
+Last updated: 2026-04-04 07:15 UTC
 
 ## Immediate Next Experiments
 
+- The missing prompt-profile rerun is now balanced regression, not another binary-only rewrite.
+  - The runnable code path now exists:
+    - `scripts/run_prompt_profile_full_train.py --regression-data-mode reuse_binary_subset`
+    - `slurm/run_prompt_profile_balanced_regression_retrain.sbatch`
+  - Default rerun surface:
+    - read shared `mean_relative_length` archives from `/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/`
+    - reuse the balanced `majority_s_0.5` train/test sample IDs from that same saved root
+    - write the regression-only balanced rerun under `/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced/`
+    - keep the collaborator-correct contract on the GPU node: `2` GPUs
+  - Current blocker is infrastructure, not the launch surface:
+    - `tianhaowang-gpu0.ucsd.edu:22` accepts TCP
+    - SSH still times out during banner exchange, so Slurm submission is not reachable yet
+  - Do not treat the combined April note as satisfying the balanced-only request until this rerun exists.
 - Audit the weird bounded OLMo instruct bundle before scaling it or swapping model families.
   - The current bundle is under `/data/scratch/murphy/outputs/cot-loop-detection/olmo3_degeneration_origin_progression/bound8_temp0p1_gen10_ctx40960_topkneg1/`.
   - `RLVR / MMLU-Pro = 0 / 80` with mean length `6.15` is too suspicious to treat as a clean capability read.
@@ -20,7 +33,8 @@ Last updated: 2026-04-04 06:55 UTC
   - It puts the locked full-train report and the balanced binary capacity rerun back into one self-contained artifact.
   - It makes the object split explicit:
     - regression `mean_relative_length` stays on the locked full-train surface
-    - balanced reruns change only the binary `majority_s_0.5` head
+    - the balanced rerun section in that report changes only the binary `majority_s_0.5` head
+    - the collaborator-requested balanced regression rerun is still a separate missing object
   - Main combined read:
     - regression is still mixed and should be reported screening-first with `top_20p_capture`
     - binary remains the cleaner deployment-facing head
