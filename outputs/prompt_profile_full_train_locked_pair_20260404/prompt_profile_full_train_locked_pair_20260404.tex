@@ -7,24 +7,25 @@
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{0.6em}
 
-\title{Prompt-Profile Full Train: Locked Pair Results}
+\title{Prompt-Profile Full Train Results With Binary Capacity Follow-Up}
 \author{}
-\date{2026-04-04 05:33 UTC}
+\date{2026-04-04 06:39 UTC}
 
 \begin{document}
 \maketitle
 
 \section*{Executive Summary}
 \begin{itemize}[leftmargin=1.5em]
-\item This report covers the first locked prompt-profile full-train run on the fixed five-dataset saved surface. It is not a new target-choice experiment.
+\item This report now keeps the whole current object in one place: the first locked prompt-profile full-train run on the fixed five-dataset saved surface, plus the later balanced-binary capacity follow-up on the same saved April \texttt{majority\_s\_0.5} data.
 \item Runtime object: Slurm job \texttt{2043} on \texttt{2} GPUs, completed at \texttt{2026-04-04 00:10 UTC}.
 \item Model/policy object: \texttt{Qwen/Qwen3-1.7B}, \texttt{temperature=0.2}, \texttt{num\_generations=4}, \texttt{max\_tokens=30000}, prompt-prefill activations only, loop detector \texttt{n=30}, \texttt{k=20}.
 \item Split contract: regression keeps the natural prompt-disjoint train/test split; binary relabel keeps test natural but downsample-balances the train split to \texttt{50/50}.
 \item Continuous head (\texttt{mean\_relative\_length}): if the use is screening degenerate prompts, the right headline metric is held-out top-k capture on the frozen \texttt{best\_loss} checkpoint, not \texttt{Spearman}. On \texttt{top\_20p\_capture}, ensemble beats the train-fit prompt-length baseline on \texttt{GPQA}, \texttt{MMLU-Pro}, and \texttt{LiveCodeBench}, but not on \texttt{AIME} or \texttt{MATH-500}. On \texttt{RMSE}, the win shrinks to \texttt{GPQA} and \texttt{LiveCodeBench} only.
 \item Binary head (\texttt{majority\_s\_0.5}): this is still the cleaner finished surface. Ensemble \texttt{PR-AUC} beats the prompt-length baseline on all five datasets.
-\item Recommendation from this run:
+\item Balanced-binary capacity follow-up: the locked run above used the default \texttt{h128 d1} binary probes. The later \texttt{2106} / \texttt{2107} / \texttt{2108} follow-up reran only the balanced binary head with \texttt{h128 d1}, \texttt{h256 d1}, and \texttt{h256 d2} on the same saved April relabeled data. On that follow-up, the best single global binary ensemble surface is \texttt{h256 d1}, not default \texttt{h128 d1} and not deeper \texttt{h256 d2}. This changes the recommended binary probe family only; it does not change the regression lane above.
+\item Recommendation from the combined surface:
   \begin{itemize}[leftmargin=1.5em]
-  \item if the goal is deployment-facing degenerate-prompt screening, lead with \texttt{majority\_s\_0.5};
+  \item if the goal is deployment-facing degenerate-prompt screening, lead with \texttt{majority\_s\_0.5} using ensemble \texttt{h256 d1};
   \item if \texttt{mean\_relative\_length} is still reported, use \texttt{top\_20p\_capture} first, \texttt{RMSE} second, and \texttt{Spearman} only as a tertiary diagnostic.
   \end{itemize}
 \end{itemize}
@@ -252,6 +253,108 @@ LiveCodeBench & 0.609 $\pm$ 0.046 & 0.827 $\pm$ 0.091 & 0.747 $\pm$ 0.014 & 0.49
   \end{itemize}
 \end{itemize}
 
+\section*{Follow-Up: Balanced-Binary Capacity Controls}
+This section is separate from the frozen locked \texttt{2043} tables above.
+
+\begin{itemize}[leftmargin=1.5em]
+\item Why it exists: Wangzhi explicitly asked for the newer train-balanced / test-natural binary surface, with probe size called out literally rather than inherited from the old default.
+\item What stayed fixed:
+  \begin{itemize}[leftmargin=1.5em]
+  \item same saved April relabeled binary data under \texttt{outputs/prompt\_profile\_full\_train\_locked\_pair\_20260404/}
+  \item same binary target \texttt{majority\_s\_0.5}
+  \item same train-balanced / test-natural split contract
+  \item same prompt-prefill feature surface with sample shape \texttt{[28, 2048]}
+  \item same seeds \texttt{0,1,2}
+  \item same optimizer settings \texttt{epochs=15}, \texttt{batch\_size=256}, \texttt{lr=1e-4}, \texttt{weight\_decay=0.05}, \texttt{dropout=0.1}
+  \end{itemize}
+\item What changed:
+  \begin{itemize}[leftmargin=1.5em]
+  \item default binary probes \texttt{h128 d1}
+  \item width-only control \texttt{h256 d1}
+  \item width+depth control \texttt{h256 d2}
+  \end{itemize}
+\item Follow-up jobs: \texttt{2106} (\texttt{LiveCodeBench}-only pilot caused by the first dataset-list bug), \texttt{2107} (corrected five-dataset \texttt{h256 d2} rerun), and \texttt{2108} (width-only \texttt{h256 d1} control).
+\end{itemize}
+
+\subsection*{Balanced-Binary Ranking Table: Test \texttt{PR-AUC}}
+\begin{center}
+\small
+\setlength{\tabcolsep}{4pt}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{@{}lrrrrrrrr@{}}
+\toprule
+Dataset & Test prevalence & Prompt length & Ensemble \texttt{h128 d1} & Ensemble \texttt{h256 d1} & Ensemble \texttt{h256 d2} & Last-layer \texttt{h128 d1} & Last-layer \texttt{h256 d1} & Last-layer \texttt{h256 d2} \\
+\midrule
+GPQA & 0.0500 & 0.0657 & 0.4198 & 0.5833 & 0.5025 & 0.2298 & 0.3071 & 0.3176 \\
+AIME & 0.5833 & 0.8976 & 0.9218 & 0.9120 & 0.9090 & 0.9043 & 0.8436 & 0.8479 \\
+MATH-500 & 0.0400 & 0.1002 & 0.1354 & 0.1663 & 0.1596 & 0.1506 & 0.1315 & 0.1322 \\
+MMLU-Pro & 0.0125 & 0.1104 & 0.1837 & 0.2116 & 0.2023 & 0.0559 & 0.0701 & 0.0959 \\
+LiveCodeBench & 0.3375 & 0.5760 & 0.7111 & 0.7143 & 0.6865 & 0.7116 & 0.7452 & 0.7575 \\
+\bottomrule
+\end{tabular}
+}
+\end{center}
+
+\subsection*{Balanced-Binary Mean \texttt{PR-AUC}}
+\begin{center}
+\small
+\begin{tabular}{@{}lrr@{}}
+\toprule
+Surface & \texttt{best\_loss} mean test \texttt{PR-AUC} & \texttt{best\_rank} mean test \texttt{PR-AUC} \\
+\midrule
+Prompt length baseline & 0.3500 & 0.3500 \\
+Ensemble \texttt{h128 d1} & 0.4744 & 0.4744 \\
+Ensemble \texttt{h256 d1} & 0.5175 & 0.5385 \\
+Ensemble \texttt{h256 d2} & 0.4920 & 0.5215 \\
+Last-layer \texttt{h128 d1} & 0.4104 & 0.4104 \\
+Last-layer \texttt{h256 d1} & 0.4195 & 0.4552 \\
+Last-layer \texttt{h256 d2} & 0.4302 & 0.4359 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection*{Balanced-Binary Threshold Behavior For The Recommended Surface}
+Held fixed to ensemble \texttt{h256 d1} at the frozen \texttt{best\_loss} checkpoint.
+
+\begin{center}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+Dataset & Test prevalence & Positive precision & Positive recall & Positive \texttt{F1} & Macro \texttt{F1} \\
+\midrule
+GPQA & 0.0500 & 0.2143 & 1.0000 & 0.3452 & 0.6069 \\
+AIME & 0.5833 & 0.9048 & 0.4762 & 0.5639 & 0.6143 \\
+MATH-500 & 0.0400 & 0.0539 & 0.6667 & 0.0996 & 0.4391 \\
+MMLU-Pro & 0.0125 & 0.1249 & 1.0000 & 0.2176 & 0.5746 \\
+LiveCodeBench & 0.3375 & 0.6143 & 0.6543 & 0.5138 & 0.5809 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection*{Balanced-Binary Follow-Up Interpretation}
+\begin{itemize}[leftmargin=1.5em]
+\item What is now proved:
+  \begin{itemize}[leftmargin=1.5em]
+  \item for the per-layer \texttt{ensemble}, width is the useful change and added depth hurts
+  \item \texttt{ensemble h256 d1} is the best single global binary surface under the frozen \texttt{best\_loss} rule
+  \item \texttt{ensemble h256 d1} also stays ahead of \texttt{h256 d2} under \texttt{best\_rank}, so the main ensemble choice is not just a checkpoint-selection accident
+  \item \texttt{ensemble h256 d1} still beats the prompt-length baseline on all five datasets by \texttt{PR-AUC}
+  \end{itemize}
+\item What did not stay stable:
+  \begin{itemize}[leftmargin=1.5em]
+  \item the \texttt{last\_layer} ranking is not robust in the same way
+  \item under \texttt{best\_loss}, \texttt{last\_layer h256 d2} is slightly ahead of \texttt{h256 d1}
+  \item under \texttt{best\_rank}, \texttt{last\_layer h256 d1} is ahead of \texttt{h256 d2}
+  \end{itemize}
+\item Practical consequence:
+  \begin{itemize}[leftmargin=1.5em]
+  \item the robust tuning conclusion is about the ensemble, not about promoting a separate last-layer champion
+  \item threshold metrics on the natural test split remain recall-heavy on rare-positive datasets, so \texttt{PR-AUC} should stay primary and threshold metrics should stay diagnostic
+  \item the next honest tuning step is layer subset / view selection on the same balanced binary data, not another vague capacity increase
+  \end{itemize}
+\end{itemize}
+
 \section*{What This Run Does And Does Not Show}
 \begin{itemize}[leftmargin=1.5em]
 \item This run does show:
@@ -288,6 +391,7 @@ LiveCodeBench & 0.609 $\pm$ 0.046 & 0.827 $\pm$ 0.091 & 0.747 $\pm$ 0.014 & 0.49
 \section*{Recommendation}
 \begin{itemize}[leftmargin=1.5em]
 \item Default finished surface from this run: \texttt{majority\_s\_0.5}
+\item Default binary probe family after the balanced follow-up: ensemble \texttt{h256 d1}
 \item How to report the continuous head:
   \begin{itemize}[leftmargin=1.5em]
   \item if the use is screening high-risk prompts, report \texttt{top\_20p\_capture} first
@@ -296,6 +400,7 @@ LiveCodeBench & 0.609 $\pm$ 0.046 & 0.827 $\pm$ 0.091 & 0.747 $\pm$ 0.014 & 0.49
   \item keep \texttt{Spearman} only as a tertiary diagnostic
   \end{itemize}
 \item Most honest one-line summary: on the frozen locked run, the binary head is a \texttt{5 / 5} prompt-length-baseline win by \texttt{PR-AUC}, while the continuous head is a \texttt{3 / 5} win by screening capture and only a \texttt{2 / 5} win by calibration error.
+\item Balanced-binary follow-up summary: the better global ensemble default is \texttt{h256 d1}, not deeper \texttt{h256 d2}.
 \end{itemize}
 
 \section*{Artifact Bundle}
@@ -303,6 +408,9 @@ LiveCodeBench & 0.609 $\pm$ 0.046 & 0.827 $\pm$ 0.091 & 0.747 $\pm$ 0.014 & 0.49
 \item \texttt{outputs/prompt\_profile\_full\_train\_locked\_pair\_20260404/remote\_summary/}
 \item \texttt{outputs/prompt\_profile\_full\_train\_locked\_pair\_20260404/regression\_summary.csv}
 \item \texttt{outputs/prompt\_profile\_full\_train\_locked\_pair\_20260404/binary\_summary.csv}
+\item \texttt{outputs/prompt\_profile\_binary\_capacity\_controls\_20260404/capacity\_comparison\_summary.json}
+\item \texttt{outputs/prompt\_profile\_binary\_capacity\_controls\_20260404/capacity\_comparison\_metrics.csv}
+\item \texttt{outputs/prompt\_profile\_binary\_capacity\_controls\_20260404/prompt\_profile\_binary\_capacity\_controls\_20260404.pdf}
 \end{itemize}
 
 \end{document}

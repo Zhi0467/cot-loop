@@ -1,9 +1,20 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-04 06:31 UTC
+Last updated: 2026-04-04 06:33 UTC
 
 ## Immediate Next Experiments
 
+- The combined April prompt-profile report now exists as the main collaborator-facing surface.
+  - Result note: `docs/prompt-profile-full-surface-update-2026-04-04.md`
+  - Result PDF: `outputs/prompt_profile_full_surface_update_20260404/prompt_profile_full_surface_update_20260404.pdf`
+  - It puts the locked full-train report and the balanced binary capacity rerun back into one self-contained artifact.
+  - It makes the object split explicit:
+    - regression `mean_relative_length` stays on the locked full-train surface
+    - balanced reruns change only the binary `majority_s_0.5` head
+  - Main combined read:
+    - regression is still mixed and should be reported screening-first with `top_20p_capture`
+    - binary remains the cleaner deployment-facing head
+    - current global ensemble recommendation on the balanced binary object is `h256 d1`
 - The binary capacity-control sweep now exists as the latest result surface.
   - Result note: `docs/prompt-profile-binary-capacity-controls-2026-04-04.md`
   - Result PDF: `outputs/prompt_profile_binary_capacity_controls_20260404/prompt_profile_binary_capacity_controls_20260404.pdf`

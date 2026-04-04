@@ -1,0 +1,463 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+
+\title{Prompt-Profile Full Surface Update: Locked Pair Plus Balanced Binary Capacity Controls}
+\author{}
+\date{2026-04-04 06:33 UTC}
+
+\begin{document}
+\maketitle
+
+\section*{Executive Summary}
+\begin{itemize}[leftmargin=1.5em]
+\item This report puts the whole April surface back in one place: locked full-train run \texttt{2043}, plus balanced binary capacity reruns \texttt{2107} and \texttt{2108}.
+\item The regression lane and the balanced binary rerun are different objects.
+  \begin{itemize}[leftmargin=1.5em]
+  \item \texttt{mean\_relative\_length} comes from the locked full-train run and keeps the natural prompt-disjoint train/test split.
+  \item \texttt{majority\_s\_0.5} keeps test natural but downsample-balances train to \texttt{50/50}.
+  \item The follow-up retrains only changed binary probe capacity; they did not rerun or rebalance the continuous target.
+  \end{itemize}
+\item Regression read on the frozen \texttt{best\_loss} checkpoint:
+  \begin{itemize}[leftmargin=1.5em]
+  \item if the use is screening degenerate prompts, the main metric is \texttt{top\_20p\_capture}, not \texttt{Spearman}
+  \item ensemble beats the train-fit prompt-length baseline on \texttt{GPQA}, \texttt{MMLU-Pro}, and \texttt{LiveCodeBench}
+  \item ensemble still loses to the prompt-length baseline on \texttt{AIME} and \texttt{MATH-500}
+  \end{itemize}
+\item Binary read on the locked run: ensemble \texttt{PR-AUC} beats the prompt-length baseline on all five datasets.
+\item Binary capacity-control read on the same saved April binary data:
+  \begin{itemize}[leftmargin=1.5em]
+  \item for \texttt{ensemble}, width is the useful change and extra depth hurts
+  \item for \texttt{last\_layer}, extra depth helps modestly on top of width
+  \item if one single global binary ensemble surface is needed today, it should be \texttt{h256 d1}, not \texttt{h256 d2}
+  \end{itemize}
+\item Secondary sanity check on that binary choice:
+  \begin{itemize}[leftmargin=1.5em]
+  \item under \texttt{best\_rank}, the ensemble ordering stays the same (\texttt{h256 d1 0.539 > h256 d2 0.522 > h128 d1 0.474})
+  \item the \texttt{last\_layer} ordering does not stay fixed across checkpoint rules, so that view should remain a cheap control rather than the promoted tuning target
+  \end{itemize}
+\item Threshold caveat on the balanced binary reruns:
+  \begin{itemize}[leftmargin=1.5em]
+  \item train is balanced but test is natural
+  \item rare-positive datasets therefore stay recall-heavy at the train-fit threshold
+  \item keep \texttt{PR-AUC} primary and treat threshold metrics as behavior diagnostics only
+  \end{itemize}
+\item Most honest combined summary:
+  \begin{itemize}[leftmargin=1.5em]
+  \item the cleaner deployment-facing head is still \texttt{majority\_s\_0.5}
+  \item the regression lane is still mixed and should be reported as a screening score, not as a blanket win over prompt length
+  \end{itemize}
+\end{itemize}
+
+\section*{Exact Objects}
+This report combines two April result surfaces that were split across separate PDFs in-thread.
+
+\subsection*{Object A: Locked Full-Train Run}
+\begin{itemize}[leftmargin=1.5em]
+\item Slurm job: \texttt{2043}
+\item Runtime: \texttt{2026-04-03 23:57 UTC} to \texttt{2026-04-04 00:10 UTC}
+\item Targets: regression \texttt{mean\_relative\_length}; binary \texttt{majority\_s\_0.5}
+\item Views: \texttt{ensemble} and \texttt{last\_layer}
+\item Fixed reporting rule: keep \texttt{best\_loss} as the headline checkpoint and keep \texttt{best\_rank} diagnostic-only
+\end{itemize}
+
+\subsection*{Object B: Balanced Binary Capacity Reruns}
+\begin{itemize}[leftmargin=1.5em]
+\item Slurm jobs: \texttt{2107} for the corrected five-dataset \texttt{h256 d2} retrain, and \texttt{2108} for the width-only \texttt{h256 d1} control
+\item Runtime:
+  \begin{itemize}[leftmargin=1.5em]
+  \item \texttt{2107}: \texttt{2026-04-04 05:57:19 UTC} to \texttt{2026-04-04 06:04:55 UTC}
+  \item \texttt{2108}: \texttt{2026-04-04 06:13:02 UTC} to \texttt{2026-04-04 06:22:07 UTC}
+  \end{itemize}
+\item Fixed object: same saved prompt-prefill activations as the April locked run, same binary target \texttt{majority\_s\_0.5}, same train-balanced / test-natural split contract, same seeds \texttt{0,1,2}, same optimizer settings
+\item Only intentional change: probe capacity for the binary head
+\end{itemize}
+
+\subsection*{Why Regression Is Not ``Balanced''}
+\begin{itemize}[leftmargin=1.5em]
+\item \texttt{mean\_relative\_length} is a continuous target, so the April locked run keeps the natural prompt-disjoint split.
+\item The explicit train-balanced / test-natural contract applies to the binary relabel \texttt{majority\_s\_0.5}.
+\item So the follow-up capacity reruns are binary-only by design. They do not replace the regression lane; they sit next to it.
+\end{itemize}
+
+\section*{Frozen Dataset Surface}
+\begin{center}
+\small
+\setlength{\tabcolsep}{4pt}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{@{}lrrll@{}}
+\toprule
+Dataset & Train prompts & Test prompts & Task kind & Prompt field \\
+\midrule
+GPQA & 158 & 40 & \texttt{multiple\_choice\_gpqa} & \texttt{Question} \\
+AIME & 48 & 12 & \texttt{math\_freeform} & \texttt{question} \\
+MATH-500 & 400 & 100 & \texttt{math\_freeform} & \texttt{problem} \\
+MMLU-Pro & 640 & 160 & \texttt{multiple\_choice\_mmlupro} & \texttt{problem} \\
+LiveCodeBench & 640 & 160 & \texttt{livecodebench\_codegen} & \texttt{problem} \\
+\bottomrule
+\end{tabular}
+}
+\end{center}
+
+Common model/policy object:
+\begin{itemize}[leftmargin=1.5em]
+\item model: \texttt{Qwen/Qwen3-1.7B}
+\item \texttt{temperature=0.2}
+\item \texttt{num\_generations=4}
+\item \texttt{max\_tokens=30000}
+\item feature surface: prompt-prefill activations only
+\item loop detector: \texttt{n=30}, \texttt{k=20}
+\end{itemize}
+
+\section*{Definitions}
+\subsection*{Targets}
+\begin{itemize}[leftmargin=1.5em]
+\item \texttt{mean\_relative\_length}: for prompt \texttt{i}, this is the repeated-rollout mean of \texttt{L\_r / E}, where \texttt{L\_r} is rollout length and \texttt{E} is the prompt's effective token budget.
+\item \texttt{majority\_s\_0.5}: for prompt \texttt{i}, this is \texttt{1} if a strict majority of repeated rollouts satisfy \texttt{L\_r / E >= 0.5}, else \texttt{0}.
+\end{itemize}
+
+\subsection*{Views}
+\begin{itemize}[leftmargin=1.5em]
+\item regression \texttt{ensemble}: one MLP per layer with \texttt{mean\_prob} aggregation
+\item binary \texttt{ensemble}: one MLP per layer across all \texttt{28} saved layers with \texttt{vote\_fraction} aggregation
+\item \texttt{last\_layer}: the same probe family restricted to the final layer only
+\end{itemize}
+
+\subsection*{Probe Families For The Binary Reruns}
+\begin{itemize}[leftmargin=1.5em]
+\item default April binary probe: \texttt{hidden\_dim=128}, \texttt{depth=1}, \texttt{dropout=0.1}
+\item width-only control: \texttt{hidden\_dim=256}, \texttt{depth=1}, \texttt{dropout=0.1}
+\item width+depth control: \texttt{hidden\_dim=256}, \texttt{depth=2}, \texttt{dropout=0.1}
+\item optimizer settings kept fixed: \texttt{epochs=15}, \texttt{lr=1e-4}, \texttt{weight\_decay=0.05}
+\end{itemize}
+
+\subsection*{Score, Capture, And Mass}
+\begin{itemize}[leftmargin=1.5em]
+\item regression \texttt{score}: each held-out prompt gets one scalar score \texttt{$s_i = \hat y_i$}
+\item binary \texttt{score}: each held-out prompt gets one scalar positive score \texttt{$s_i = \hat s_i$}
+\item \texttt{top\_10p\_capture} / \texttt{top\_20p\_capture}: sort held-out prompts by descending regression score, keep the top \texttt{$\lceil 0.1n \rceil$} or \texttt{$\lceil 0.2n \rceil$}, and compute \texttt{$\sum_{i \in kept} y_i / \sum_i y_i$}
+\item Here \texttt{$y_i$} is the realized \texttt{mean\_relative\_length} for that same held-out prompt.
+\item ``mass'' means total realized relative-length weight across prompts, not a prompt count and not a binary positive count.
+\item Concrete example: \texttt{GPQA} test has \texttt{40} prompts, so \texttt{top\_20p\_capture} keeps the top \texttt{8} prompts. Ensemble \texttt{0.247} means those \texttt{8} prompts contain \texttt{24.7\%} of the total realized relative-length mass on that test split.
+\end{itemize}
+
+\subsection*{Metadata Baseline}
+\begin{itemize}[leftmargin=1.5em]
+\item Allowed inputs: \texttt{prompt\_token\_count} and \texttt{effective\_max\_tokens}
+\item Excluded inputs: no activations, no prompt text, no dataset identity, no architecture features, no generated output features
+\item Regression baseline: train-fit standardized linear regression, evaluated once on held-out test
+\item Binary baseline: train-fit 1D score rule, with direction chosen by train \texttt{PR-AUC} and threshold chosen by train macro-F1 / positive-F1 / accuracy, evaluated once on held-out test
+\item Fixed-run nuance: \texttt{effective\_max\_tokens=30000} is constant here, so prompt length is the only nontrivial metadata feature on this run
+\end{itemize}
+
+\section*{Split And Balancing Contract}
+\subsection*{Regression \texttt{mean\_relative\_length}}
+\begin{itemize}[leftmargin=1.5em]
+\item train: natural
+\item test: natural
+\item prompt-disjoint split stays fixed
+\end{itemize}
+
+\subsection*{Binary \texttt{majority\_s\_0.5}}
+\begin{itemize}[leftmargin=1.5em]
+\item relabel from the same prompts with \texttt{--balance-train downsample --balance-test none}
+\item train prevalence is therefore exactly \texttt{0.5} on every dataset
+\item test prevalence stays natural:
+  \begin{itemize}[leftmargin=1.5em]
+  \item \texttt{GPQA 0.0500}
+  \item \texttt{AIME 0.5833}
+  \item \texttt{MATH-500 0.0400}
+  \item \texttt{MMLU-Pro 0.0125}
+  \item \texttt{LiveCodeBench 0.3375}
+  \end{itemize}
+\end{itemize}
+
+\section*{Regression Results: Locked Full-Train \texttt{mean\_relative\_length}}
+This lane comes only from the locked full-train run. The binary reruns did not change it.
+
+\subsection*{Screening Table: \texttt{top\_10p\_capture}}
+\begin{center}
+\small
+\setlength{\tabcolsep}{4pt}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Dataset & Ensemble & Last-layer & Prompt-length baseline \\
+\midrule
+GPQA & 0.132 $\pm$ 0.019 & 0.089 $\pm$ 0.006 & 0.070 \\
+AIME & 0.204 $\pm$ 0.015 & 0.221 $\pm$ 0.004 & 0.223 \\
+MATH-500 & 0.129 $\pm$ 0.033 & 0.117 $\pm$ 0.061 & 0.151 \\
+MMLU-Pro & 0.209 $\pm$ 0.022 & 0.094 $\pm$ 0.062 & 0.169 \\
+LiveCodeBench & 0.170 $\pm$ 0.004 & 0.156 $\pm$ 0.000 & 0.137 \\
+\bottomrule
+\end{tabular}
+}
+\end{center}
+
+\subsection*{Screening Table: \texttt{top\_20p\_capture}}
+\begin{center}
+\small
+\setlength{\tabcolsep}{4pt}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Dataset & Ensemble & Last-layer & Prompt-length baseline \\
+\midrule
+GPQA & 0.247 $\pm$ 0.018 & 0.216 $\pm$ 0.039 & 0.168 \\
+AIME & 0.305 $\pm$ 0.017 & 0.321 $\pm$ 0.020 & 0.306 \\
+MATH-500 & 0.262 $\pm$ 0.058 & 0.243 $\pm$ 0.094 & 0.290 \\
+MMLU-Pro & 0.355 $\pm$ 0.025 & 0.185 $\pm$ 0.098 & 0.292 \\
+LiveCodeBench & 0.340 $\pm$ 0.005 & 0.317 $\pm$ 0.010 & 0.248 \\
+\bottomrule
+\end{tabular}
+}
+\end{center}
+
+\subsection*{Calibration And Diagnostic Table}
+\begin{center}
+\small
+\setlength{\tabcolsep}{4pt}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+Dataset & Ensemble RMSE & Last-layer RMSE & Prompt-length RMSE & Ensemble Spearman & Last-layer Spearman & Prompt-length Spearman \\
+\midrule
+GPQA & 0.160 $\pm$ 0.002 & 0.164 $\pm$ 0.003 & 0.165 & 0.419 $\pm$ 0.045 & 0.175 $\pm$ 0.225 & 0.116 \\
+AIME & 0.183 $\pm$ 0.006 & 0.189 $\pm$ 0.004 & 0.176 & 0.639 $\pm$ 0.090 & 0.483 $\pm$ 0.138 & 0.676 \\
+MATH-500 & 0.162 $\pm$ 0.002 & 0.169 $\pm$ 0.018 & 0.154 & 0.351 $\pm$ 0.199 & 0.158 $\pm$ 0.426 & 0.461 \\
+MMLU-Pro & 0.133 $\pm$ 0.000 & 0.138 $\pm$ 0.005 & 0.126 & 0.348 $\pm$ 0.034 & -0.019 $\pm$ 0.293 & 0.393 \\
+LiveCodeBench & 0.248 $\pm$ 0.018 & 0.242 $\pm$ 0.011 & 0.279 & 0.805 $\pm$ 0.002 & 0.784 $\pm$ 0.006 & 0.405 \\
+\bottomrule
+\end{tabular}
+}
+\end{center}
+
+\subsection*{Regression Interpretation}
+\begin{itemize}[leftmargin=1.5em]
+\item Screening read, ensemble versus prompt length:
+  \begin{itemize}[leftmargin=1.5em]
+  \item wins: \texttt{GPQA}, \texttt{MMLU-Pro}, \texttt{LiveCodeBench}
+  \item losses: \texttt{AIME}, \texttt{MATH-500}
+  \end{itemize}
+\item Calibration read, ensemble versus prompt length:
+  \begin{itemize}[leftmargin=1.5em]
+  \item wins: \texttt{GPQA}, \texttt{LiveCodeBench}
+  \item losses: \texttt{AIME}, \texttt{MATH-500}, \texttt{MMLU-Pro}
+  \end{itemize}
+\item Ensemble versus \texttt{last\_layer}:
+  \begin{itemize}[leftmargin=1.5em]
+  \item on \texttt{top\_20p\_capture}, ensemble wins \texttt{4 / 5}
+  \item on \texttt{RMSE}, ensemble also wins \texttt{4 / 5}
+  \item the exception flips by object on \texttt{LiveCodeBench}
+  \end{itemize}
+\item Practical read:
+  \begin{itemize}[leftmargin=1.5em]
+  \item \texttt{mean\_relative\_length} is usable as a screening score
+  \item it is not a uniform activation-lift win over prompt length
+  \item \texttt{Spearman} should stay diagnostic only
+  \end{itemize}
+\end{itemize}
+
+\section*{Binary Results: Locked Full-Train \texttt{majority\_s\_0.5}}
+This is the default April binary head before the capacity controls.
+
+\subsection*{Ranking Table: Locked Run}
+\begin{center}
+\small
+\setlength{\tabcolsep}{4pt}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Dataset & Ensemble PR-AUC & Last-layer PR-AUC & Prompt-length baseline PR-AUC & Test prevalence \\
+\midrule
+GPQA & 0.420 $\pm$ 0.029 & 0.230 $\pm$ 0.278 & 0.066 & 0.050 \\
+AIME & 0.922 $\pm$ 0.024 & 0.904 $\pm$ 0.028 & 0.898 & 0.583 \\
+MATH-500 & 0.135 $\pm$ 0.005 & 0.151 $\pm$ 0.071 & 0.100 & 0.040 \\
+MMLU-Pro & 0.184 $\pm$ 0.037 & 0.056 $\pm$ 0.012 & 0.110 & 0.013 \\
+LiveCodeBench & 0.711 $\pm$ 0.036 & 0.712 $\pm$ 0.023 & 0.576 & 0.338 \\
+\bottomrule
+\end{tabular}
+}
+\end{center}
+
+\subsection*{Threshold Table: Locked Ensemble Versus Prompt-Length Baseline}
+\begin{center}
+\small
+\setlength{\tabcolsep}{4pt}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+Dataset & Ensemble precision & Ensemble recall & Ensemble macro-F1 & Prompt precision & Prompt recall & Prompt macro-F1 \\
+\midrule
+GPQA & 0.110 $\pm$ 0.050 & 1.000 $\pm$ 0.000 & 0.382 $\pm$ 0.244 & 0.038 & 0.500 & 0.286 \\
+AIME & 0.926 $\pm$ 0.128 & 0.762 $\pm$ 0.218 & 0.798 $\pm$ 0.044 & 0.800 & 0.571 & 0.667 \\
+MATH-500 & 0.091 $\pm$ 0.020 & 1.000 $\pm$ 0.000 & 0.444 $\pm$ 0.060 & 0.079 & 0.750 & 0.458 \\
+MMLU-Pro & 0.117 $\pm$ 0.073 & 0.833 $\pm$ 0.289 & 0.562 $\pm$ 0.067 & 0.029 & 1.000 & 0.397 \\
+LiveCodeBench & 0.609 $\pm$ 0.046 & 0.827 $\pm$ 0.091 & 0.747 $\pm$ 0.014 & 0.494 & 0.722 & 0.646 \\
+\bottomrule
+\end{tabular}
+}
+\end{center}
+
+\subsection*{Locked Binary Interpretation}
+\begin{itemize}[leftmargin=1.5em]
+\item Ensemble \texttt{PR-AUC} beats the prompt-length baseline on all five datasets.
+\item The cleanest wins are \texttt{AIME}, \texttt{MMLU-Pro}, and \texttt{LiveCodeBench}.
+\item The rare-positive datasets still have unstable threshold metrics, so \texttt{PR-AUC} remains the main ranking object.
+\end{itemize}
+
+\section*{Balanced Binary Capacity Controls On The Same April Binary Data}
+This section is the follow-up rerun surface requested after the train-balanced / test-natural contract was made explicit.
+
+\subsection*{Probe Families Compared}
+\begin{center}
+\small
+\begin{tabular}{@{}lrrl@{}}
+\toprule
+Surface & Hidden dim & Depth & View definition \\
+\midrule
+Default \texttt{h128 d1} & 128 & 1 & same April default \\
+Width-only \texttt{h256 d1} & 256 & 1 & same data, wider MLP \\
+Width+depth \texttt{h256 d2} & 256 & 2 & same data, wider and deeper MLP \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection*{Ranking Table: Test \texttt{PR-AUC}}
+\begin{center}
+\small
+\setlength{\tabcolsep}{4pt}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{@{}lrrrrrrrr@{}}
+\toprule
+Dataset & Test prevalence & Prompt length & Ensemble \texttt{h128 d1} & Ensemble \texttt{h256 d1} & Ensemble \texttt{h256 d2} & Last-layer \texttt{h128 d1} & Last-layer \texttt{h256 d1} & Last-layer \texttt{h256 d2} \\
+\midrule
+GPQA & 0.0500 & 0.0657 & 0.4198 & 0.5833 & 0.5025 & 0.2298 & 0.3071 & 0.3176 \\
+AIME & 0.5833 & 0.8976 & 0.9218 & 0.9120 & 0.9090 & 0.9043 & 0.8436 & 0.8479 \\
+MATH-500 & 0.0400 & 0.1002 & 0.1354 & 0.1663 & 0.1596 & 0.1506 & 0.1315 & 0.1322 \\
+MMLU-Pro & 0.0125 & 0.1104 & 0.1837 & 0.2116 & 0.2023 & 0.0559 & 0.0701 & 0.0959 \\
+LiveCodeBench & 0.3375 & 0.5760 & 0.7111 & 0.7143 & 0.6865 & 0.7116 & 0.7452 & 0.7575 \\
+\bottomrule
+\end{tabular}
+}
+\end{center}
+
+\subsection*{Cross-Dataset Mean \texttt{PR-AUC}}
+\begin{center}
+\small
+\begin{tabular}{@{}lr@{}}
+\toprule
+Surface & Mean test \texttt{PR-AUC} \\
+\midrule
+Prompt length baseline & 0.3500 \\
+Ensemble \texttt{h128 d1} & 0.4744 \\
+Ensemble \texttt{h256 d1} & 0.5175 \\
+Ensemble \texttt{h256 d2} & 0.4920 \\
+Last-layer \texttt{h128 d1} & 0.4104 \\
+Last-layer \texttt{h256 d1} & 0.4195 \\
+Last-layer \texttt{h256 d2} & 0.4302 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection*{Secondary Check: Mean Test \texttt{PR-AUC} At \texttt{best\_rank}}
+\begin{center}
+\small
+\begin{tabular}{@{}lr@{}}
+\toprule
+Surface & Mean test \texttt{PR-AUC} \\
+\midrule
+Prompt length baseline & 0.3500 \\
+Ensemble \texttt{h128 d1} & 0.4744 \\
+Ensemble \texttt{h256 d1} & 0.5385 \\
+Ensemble \texttt{h256 d2} & 0.5215 \\
+Last-layer \texttt{h128 d1} & 0.4104 \\
+Last-layer \texttt{h256 d1} & 0.4552 \\
+Last-layer \texttt{h256 d2} & 0.4359 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+This secondary checkpoint rule keeps the global ensemble recommendation intact: \texttt{h256 d1} still stays ahead of \texttt{h256 d2}. The \texttt{last\_layer} ranking does move, which is another reason not to treat that control view as the main tuning conclusion.
+
+\subsection*{Threshold Behavior On Natural Test For The Recommended Surface}
+Held fixed to \texttt{ensemble h256 d1} at the frozen \texttt{best\_loss} checkpoint.
+
+\begin{center}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+Dataset & Test prevalence & Positive precision & Positive recall & Positive \texttt{F1} & Macro \texttt{F1} \\
+\midrule
+GPQA & 0.0500 & 0.2143 & 1.0000 & 0.3452 & 0.6069 \\
+AIME & 0.5833 & 0.9048 & 0.4762 & 0.5639 & 0.6143 \\
+MATH-500 & 0.0400 & 0.0539 & 0.6667 & 0.0996 & 0.4391 \\
+MMLU-Pro & 0.0125 & 0.1249 & 1.0000 & 0.2176 & 0.5746 \\
+LiveCodeBench & 0.3375 & 0.6143 & 0.6543 & 0.5138 & 0.5809 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Because training is balanced but evaluation is natural, these threshold metrics stay recall-heavy on rare-positive datasets. That is expected behavior on this object, not evidence that the operating point is suddenly well-calibrated. Use them as a threshold-shape check, not as the headline comparison.
+
+\subsection*{Capacity-Control Interpretation}
+\begin{itemize}[leftmargin=1.5em]
+\item For \texttt{ensemble}:
+  \begin{itemize}[leftmargin=1.5em]
+  \item width helps relative to the default
+  \item added depth hurts relative to width-only on all five datasets
+  \item best global ensemble surface is \texttt{h256 d1}
+  \end{itemize}
+\item For \texttt{last\_layer}:
+  \begin{itemize}[leftmargin=1.5em]
+  \item width is mixed
+  \item added depth helps modestly on top of width on all five datasets
+  \item best global last-layer surface is \texttt{h256 d2}
+  \end{itemize}
+\item Important nuance:
+  \begin{itemize}[leftmargin=1.5em]
+  \item the \texttt{last\_layer} ordering is not stable across checkpoint rules
+  \item \texttt{h256 d2} wins at \texttt{best\_loss}, but \texttt{h256 d1} wins at \texttt{best\_rank}
+  \item the robust tuning conclusion is therefore about the ensemble, not about promoting a separate last-layer champion
+  \end{itemize}
+\item So the earlier \texttt{h256 d2} result mixed one good change with one bad one:
+  \begin{itemize}[leftmargin=1.5em]
+  \item good change for ensemble: width
+  \item bad change for ensemble: extra depth
+  \end{itemize}
+\end{itemize}
+
+\section*{Relation To The Earlier March Probe Surface}
+\begin{itemize}[leftmargin=1.5em]
+\item The March target-choice bundle did not use this exact April reporting contract.
+\item Continuous target-choice runs were usually reported from \texttt{best\_rank}, not the frozen \texttt{best\_loss} checkpoint used here.
+\item The older March \texttt{majority\_s\_0.5} probe/control bundle was not explicitly train-balanced in the way the April binary relabel is.
+\item Saved train prevalences in that older March bundle were \texttt{GPQA 0.0569}, \texttt{AIME 0.5000}, \texttt{MATH-500 0.0550}, \texttt{MMLU-Pro 0.0109}, and \texttt{LiveCodeBench 0.2734}.
+\item The inherited default probe family was the same \texttt{h128 d1} MLP family.
+\item So the April balanced binary reruns are a fresh object, not a report rewrite on the March target-choice bundle.
+\end{itemize}
+
+\section*{Combined Recommendation}
+\begin{itemize}[leftmargin=1.5em]
+\item If the project needs one deployment-facing prompt-risk screen today, lead with binary \texttt{majority\_s\_0.5}. Use \texttt{ensemble h256 d1} as the current single global ensemble default.
+\item If the project keeps a cheap comparison control, keep \texttt{last\_layer h256 d2} only as the frozen-\texttt{best\_loss} control, and do not present it as a stable tuning winner across checkpoint rules.
+\item If the regression lane is reported, use \texttt{top\_20p\_capture} first, \texttt{RMSE} as calibration context, and keep \texttt{Spearman} diagnostic only.
+\item The next honest tuning step is not another vague size increase. The open question now is layer subset, not whether to keep making every per-layer MLP deeper.
+\end{itemize}
+
+\section*{Artifact Bundle}
+\begin{itemize}[leftmargin=1.5em]
+\item Combined note: \texttt{docs/prompt-profile-full-surface-update-2026-04-04.md}
+\item Combined PDF: \path{outputs/prompt_profile_full_surface_update_20260404/prompt_profile_full_surface_update_20260404.pdf}
+\item Combined TeX: \path{outputs/prompt_profile_full_surface_update_20260404/prompt_profile_full_surface_update_20260404.tex}
+\item Underlying locked full-train bundle: \path{outputs/prompt_profile_full_train_locked_pair_20260404/}
+\item Underlying binary capacity bundle: \path{outputs/prompt_profile_binary_capacity_controls_20260404/}
+\end{itemize}
+
+\end{document}

@@ -1,17 +1,24 @@
-# Prompt-Profile Full Train Results
+# Prompt-Profile Full Train Results And Binary Capacity Follow-Up
 
-Last updated: 2026-04-04 05:33 UTC
+Last updated: 2026-04-04 06:39 UTC
 
 ## Executive Summary
 
-- This report covers the first locked prompt-profile full-train run on the fixed five-dataset saved surface. It is not a new target-choice experiment.
+- This report now keeps the whole current object in one place:
+  - the first locked prompt-profile full-train run on the fixed five-dataset saved surface;
+  - the later balanced-binary capacity follow-up on the same saved April `majority_s_0.5` data.
 - Runtime object: Slurm job `2043` on `2` GPUs, completed at `2026-04-04 00:10 UTC`.
 - Model/policy object: `Qwen/Qwen3-1.7B`, `temperature=0.2`, `num_generations=4`, `max_tokens=30000`, prompt-prefill activations only, loop detector `n=30`, `k=20`.
 - Split contract: regression keeps the natural prompt-disjoint train/test split; binary relabel keeps test natural but downsample-balances the train split to `50/50`.
 - Continuous head (`mean_relative_length`): if the use is screening degenerate prompts, the right headline metric is held-out top-k capture on the frozen `best_loss` checkpoint, not `Spearman`. On `top_20p_capture`, ensemble beats the train-fit prompt-length baseline on `GPQA`, `MMLU-Pro`, and `LiveCodeBench`, but not on `AIME` or `MATH-500`. On `RMSE`, the win shrinks to `GPQA` and `LiveCodeBench` only.
 - Binary head (`majority_s_0.5`): this is still the cleaner finished surface. Ensemble `PR-AUC` beats the prompt-length baseline on all five datasets.
-- Recommendation from this run:
-  - if the goal is deployment-facing degenerate-prompt screening, lead with `majority_s_0.5`;
+- Balanced-binary capacity follow-up:
+  - the locked run above used the default `h128 d1` binary probes;
+  - the later `2106` / `2107` / `2108` follow-up reran only the balanced binary head with `h128 d1`, `h256 d1`, and `h256 d2` on the same saved April relabeled data;
+  - on that follow-up, the best single global binary ensemble surface is `h256 d1`, not default `h128 d1` and not deeper `h256 d2`;
+  - this changes the recommended binary probe family only; it does not change the regression lane above.
+- Recommendation from the combined surface:
+  - if the goal is deployment-facing degenerate-prompt screening, lead with `majority_s_0.5` using ensemble `h256 d1`;
   - if `mean_relative_length` is still reported, use `top_20p_capture` first, `RMSE` second, and `Spearman` only as a tertiary diagnostic.
 
 ## Exact Question
@@ -201,6 +208,78 @@ This is the cleaner finished head from the locked pair.
   - `MATH-500`
     - ranking lift over prompt length exists, but the absolute threshold-quality story is still weak
 
+## Follow-Up: Balanced-Binary Capacity Controls
+
+This section is separate from the frozen locked `2043` tables above.
+
+- Why it exists:
+  - Wangzhi explicitly asked for the newer train-balanced / test-natural binary surface, with probe size called out literally rather than inherited from the old default.
+- What stayed fixed:
+  - same saved April relabeled binary data under `outputs/prompt_profile_full_train_locked_pair_20260404/`
+  - same binary target `majority_s_0.5`
+  - same train-balanced / test-natural split contract
+  - same prompt-prefill feature surface with sample shape `[28, 2048]`
+  - same seeds `0,1,2`
+  - same optimizer settings `epochs=15`, `batch_size=256`, `lr=1e-4`, `weight_decay=0.05`, `dropout=0.1`
+- What changed:
+  - default binary probes `h128 d1`
+  - width-only control `h256 d1`
+  - width+depth control `h256 d2`
+- Follow-up jobs:
+  - `2106`: `LiveCodeBench`-only pilot caused by the first dataset-list bug
+  - `2107`: corrected five-dataset `h256 d2` rerun
+  - `2108`: width-only `h256 d1` control
+
+### Balanced-Binary Ranking Table: Test `PR-AUC`
+
+| Dataset | Test prevalence | Prompt length | Ensemble `h128 d1` | Ensemble `h256 d1` | Ensemble `h256 d2` | Last-layer `h128 d1` | Last-layer `h256 d1` | Last-layer `h256 d2` |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `GPQA` | `0.0500` | `0.0657` | `0.4198` | `0.5833` | `0.5025` | `0.2298` | `0.3071` | `0.3176` |
+| `AIME` | `0.5833` | `0.8976` | `0.9218` | `0.9120` | `0.9090` | `0.9043` | `0.8436` | `0.8479` |
+| `MATH-500` | `0.0400` | `0.1002` | `0.1354` | `0.1663` | `0.1596` | `0.1506` | `0.1315` | `0.1322` |
+| `MMLU-Pro` | `0.0125` | `0.1104` | `0.1837` | `0.2116` | `0.2023` | `0.0559` | `0.0701` | `0.0959` |
+| `LiveCodeBench` | `0.3375` | `0.5760` | `0.7111` | `0.7143` | `0.6865` | `0.7116` | `0.7452` | `0.7575` |
+
+### Balanced-Binary Mean `PR-AUC`
+
+| Surface | `best_loss` mean test `PR-AUC` | `best_rank` mean test `PR-AUC` |
+| --- | ---: | ---: |
+| Prompt length baseline | `0.3500` | `0.3500` |
+| Ensemble `h128 d1` | `0.4744` | `0.4744` |
+| Ensemble `h256 d1` | `0.5175` | `0.5385` |
+| Ensemble `h256 d2` | `0.4920` | `0.5215` |
+| Last-layer `h128 d1` | `0.4104` | `0.4104` |
+| Last-layer `h256 d1` | `0.4195` | `0.4552` |
+| Last-layer `h256 d2` | `0.4302` | `0.4359` |
+
+### Balanced-Binary Threshold Behavior For The Recommended Surface
+
+Held fixed to ensemble `h256 d1` at the frozen `best_loss` checkpoint.
+
+| Dataset | Test prevalence | Positive precision | Positive recall | Positive `F1` | Macro `F1` |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `GPQA` | `0.0500` | `0.2143` | `1.0000` | `0.3452` | `0.6069` |
+| `AIME` | `0.5833` | `0.9048` | `0.4762` | `0.5639` | `0.6143` |
+| `MATH-500` | `0.0400` | `0.0539` | `0.6667` | `0.0996` | `0.4391` |
+| `MMLU-Pro` | `0.0125` | `0.1249` | `1.0000` | `0.2176` | `0.5746` |
+| `LiveCodeBench` | `0.3375` | `0.6143` | `0.6543` | `0.5138` | `0.5809` |
+
+### Balanced-Binary Follow-Up Interpretation
+
+- What is now proved:
+  - for the per-layer `ensemble`, width is the useful change and added depth hurts
+  - `ensemble h256 d1` is the best single global binary surface under the frozen `best_loss` rule
+  - `ensemble h256 d1` also stays ahead of `h256 d2` under `best_rank`, so the main ensemble choice is not just a checkpoint-selection accident
+  - `ensemble h256 d1` still beats the prompt-length baseline on all five datasets by `PR-AUC`
+- What did not stay stable:
+  - the `last_layer` ranking is not robust in the same way
+  - under `best_loss`, `last_layer h256 d2` is slightly ahead of `h256 d1`
+  - under `best_rank`, `last_layer h256 d1` is ahead of `h256 d2`
+- Practical consequence:
+  - the robust tuning conclusion is about the ensemble, not about promoting a separate last-layer champion
+  - threshold metrics on the natural test split remain recall-heavy on rare-positive datasets, so `PR-AUC` should stay primary and threshold metrics should stay diagnostic
+  - the next honest tuning step is layer subset / view selection on the same balanced binary data, not another vague capacity increase
+
 ## What This Run Does And Does Not Show
 
 - This run does show
@@ -228,10 +307,13 @@ This is the cleaner finished head from the locked pair.
 
 - Default finished surface from this run
   - `majority_s_0.5`
+- Default binary probe family after the balanced follow-up
+  - ensemble `h256 d1`
 - How to report the continuous head
   - if the use is screening high-risk prompts, report `top_20p_capture` first, `top_10p_capture` second if tighter budget matters, `RMSE` as calibration context, and `Spearman` only as a tertiary diagnostic
 - Most honest one-line summary
   - on the frozen locked run, the binary head is a `5 / 5` prompt-length-baseline win by `PR-AUC`, while the continuous head is a `3 / 5` win by screening capture and only a `2 / 5` win by calibration error
+  - on the balanced-binary probe follow-up, the better global ensemble default is `h256 d1`, not deeper `h256 d2`
 
 ## Artifact Bundle
 
@@ -239,3 +321,6 @@ Copied ledger for this run:
 - `outputs/prompt_profile_full_train_locked_pair_20260404/remote_summary/`
 - `outputs/prompt_profile_full_train_locked_pair_20260404/regression_summary.csv`
 - `outputs/prompt_profile_full_train_locked_pair_20260404/binary_summary.csv`
+- `outputs/prompt_profile_binary_capacity_controls_20260404/capacity_comparison_summary.json`
+- `outputs/prompt_profile_binary_capacity_controls_20260404/capacity_comparison_metrics.csv`
+- `outputs/prompt_profile_binary_capacity_controls_20260404/prompt_profile_binary_capacity_controls_20260404.pdf`

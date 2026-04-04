@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-04-04 06:31 UTC
+Last updated: 2026-04-04 06:33 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -15,6 +15,7 @@ Core docs:
 - Prompt-profile risk-screen decision: prompt-profile-risk-screen-2026-03-30.md
 - Prompt-profile plain-language note: prompt-profile-plain-language-2026-03-30.md
 - Prompt-profile full-train plan: prompt-profile-full-train-plan-2026-04-02.md
+- Prompt-profile combined April surface report: prompt-profile-full-surface-update-2026-04-04.md
 - Prompt-profile full-train result note: prompt-profile-full-train-results-2026-04-04.md
 - Prompt-profile binary retrain note: prompt-profile-binary-retrain-h256d2-2026-04-04.md
 - Prompt-profile binary capacity-controls note: prompt-profile-binary-capacity-controls-2026-04-04.md
@@ -34,6 +35,8 @@ Key outputs:
 - Full-train plan PDF: ../outputs/prompt_profile_full_train_plan_20260402/prompt_profile_full_train_plan_20260402.pdf
 - Full-train result bundle: ../outputs/prompt_profile_full_train_locked_pair_20260404/
 - Full-train result PDF: ../outputs/prompt_profile_full_train_locked_pair_20260404/prompt_profile_full_train_locked_pair_20260404.pdf
+- Combined April surface bundle: ../outputs/prompt_profile_full_surface_update_20260404/
+- Combined April surface PDF: ../outputs/prompt_profile_full_surface_update_20260404/prompt_profile_full_surface_update_20260404.pdf
 - Binary retrain result bundle: ../outputs/prompt_profile_binary_retrain_h256d2_20260404/
 - Binary retrain result PDF: ../outputs/prompt_profile_binary_retrain_h256d2_20260404/prompt_profile_binary_retrain_h256d2_20260404.pdf
 - Binary capacity-controls bundle: ../outputs/prompt_profile_binary_capacity_controls_20260404/
@@ -55,6 +58,10 @@ Current live status:
 - The older `h256 d2` binary retrain note is still on disk, but it is now intermediate only:
   - it preserves the exact `2106` / `2107` depth-rerun record and raw remote metrics
   - it should not be paraphrased as the current best-surface recommendation anymore
+- The combined April surface note is now the collaborator-facing handoff:
+  - it puts the locked full-train regression/binary result and the balanced binary capacity rerun back into one report
+  - it makes the object split explicit: regression stays on the locked full-train surface, while the train-balanced reruns change only the binary head
+  - it keeps the current binary recommendation aligned with the capacity sweep: `ensemble h256 d1` as the global ensemble default
 - The follow-up capacity-control note is now the current binary tuning surface:
   - same balanced binary data, now compared across `h128 d1`, `h256 d1`, and `h256 d2`
   - the clean current read is that width helps the ensemble, extra depth hurts the ensemble, and extra depth only helps the `last_layer` view modestly
