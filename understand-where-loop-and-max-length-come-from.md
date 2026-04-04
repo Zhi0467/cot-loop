@@ -146,7 +146,7 @@ Current interpretation:
 - this is now enough to reject the earlier all-raw comparison, but it is still not the final multi-dataset answer to the full note hypothesis;
 - the next expansion should keep the corrected prompt-surface split fixed and scale the same rollout-stat object outward, rather than revisiting the invalid shared-raw contract.
 
-## Fairness Correction (2026-04-04 05:09 UTC)
+## Fairness Correction (2026-04-04 05:11 UTC)
 
 Wangzhi's follow-up exposed one more confound in the first bounded pilots.
 
@@ -169,7 +169,7 @@ So the collector now supports explicit sampling overrides, and the corrected fol
 - same sampling contract across checkpoints:
   - `temperature=0.2`
   - `top_p=0.95`
-  - `top_k=20`
+  - `top_k=-1`
   - `num_generations=10`
   - `max_model_len=40960`
 - still the same native prompt-surface split:
@@ -177,23 +177,29 @@ So the collector now supports explicit sampling overrides, and the corrected fol
   - SFT `chat_template`
   - RLVR `chat_template`
 
-The first Qwen3-like bounded rerun on that tighter contract is now under:
+The first Qwen3-like bounded rerun with `top_k=20` was only a short diagnostic. Wangzhi then clarified that `top_k` should stay at its default `-1`, so the live canonical rerun is now under:
 
-- `/data/scratch/murphy/outputs/cot-loop-detection/olmo3_degeneration_origin_progression/math8_qwen3like_gen10_ctx40960/`
+- `/data/scratch/murphy/outputs/cot-loop-detection/olmo3_degeneration_origin_progression/math8_qwen3like_gen10_ctx40960_topkneg1/`
 
 Current state of that rerun:
 
-- SFT finished cleanly in `00:01:12` with:
-  - `42 / 80` correct
+- `2089` SFT finished in `00:01:12` with:
+  - `41 / 80` correct
   - `0 / 80` looped
   - `0 / 80` max-length hits
-  - `avg_generation_length = 376.8625`
-- RLVR finished cleanly in `00:01:55` with:
+  - `avg_generation_length = 379.8625`
+- `2090` RLVR finished in `00:01:46` with:
   - `50 / 80` correct
   - `0 / 80` looped
   - `0 / 80` max-length hits
-  - `avg_generation_length = 562.7`
-- base is still running and is again the only long pole under the shared decode contract.
+  - `avg_generation_length = 538.4125`
+- `2088` base is still running and is again the only long pole
+
+The superseded `top_k=20` diagnostic is still useful as a short runtime sanity check:
+
+- SFT finished in `00:01:12` with `42 / 80` correct, `0 / 80` loops, `0 / 80` max-length hits, `avg_generation_length = 376.8625`
+- RLVR finished in `00:01:55` with `50 / 80` correct, `0 / 80` loops, `0 / 80` max-length hits, `avg_generation_length = 562.7`
+- base had to be canceled when the `top_k=-1` clarification arrived
 
 So the current fairness rule is:
 
