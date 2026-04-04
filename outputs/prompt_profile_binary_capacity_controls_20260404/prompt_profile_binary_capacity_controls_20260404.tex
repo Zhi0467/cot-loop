@@ -1,0 +1,150 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+
+\title{Prompt-Profile Binary Capacity Controls On Balanced \texttt{majority\_s\_0.5}}
+\author{}
+\date{2026-04-04 06:27 UTC}
+
+\begin{document}
+\maketitle
+
+\section*{Executive Summary}
+\begin{itemize}[leftmargin=1.5em]
+\item This note compares three probe families on the same saved April binary data: default \texttt{h128 d1}, width-only control \texttt{h256 d1}, and width+depth control \texttt{h256 d2}.
+\item Exact runtime:
+  \begin{itemize}[leftmargin=1.5em]
+  \item \texttt{2106}: \texttt{LiveCodeBench}-only pilot caused by the first dataset-list bug
+  \item \texttt{2107}: corrected five-dataset \texttt{h256 d2} rerun, \texttt{2026-04-04 05:57:19 UTC} to \texttt{2026-04-04 06:04:55 UTC}
+  \item \texttt{2108}: width-only \texttt{h256 d1} control, \texttt{2026-04-04 06:13:02 UTC} to \texttt{2026-04-04 06:22:07 UTC}
+  \end{itemize}
+\item Fixed object: same saved prompt-prefill activations, same binary target \texttt{majority\_s\_0.5}, same train-balanced / test-natural split contract, same seeds \texttt{0,1,2}, same \texttt{epochs=15}, \texttt{lr=1e-4}, \texttt{weight\_decay=0.05}, \texttt{dropout=0.1}.
+\item Main read on held-out \texttt{PR-AUC}: for the per-layer \texttt{ensemble}, width is the useful change and added depth hurts. For \texttt{last\_layer}, added depth helps modestly on top of width.
+\item Cross-dataset mean test \texttt{PR-AUC}: prompt length baseline \texttt{0.350}; ensemble \texttt{h128 d1} \texttt{0.474}; ensemble \texttt{h256 d1} \texttt{0.518}; ensemble \texttt{h256 d2} \texttt{0.492}; last-layer \texttt{h128 d1} \texttt{0.410}; last-layer \texttt{h256 d1} \texttt{0.420}; last-layer \texttt{h256 d2} \texttt{0.430}.
+\item Best single global surface from this control sweep: \texttt{ensemble h256 d1}.
+\item Limitation: this still does not answer which layers to keep. It only separates width from depth while keeping the same two view definitions: \texttt{ensemble} over all \texttt{28} layers, or final \texttt{last\_layer}.
+\end{itemize}
+
+\section*{Exact Question}
+On the saved balanced binary object, did the earlier \texttt{h256 d2} shifts come from width, depth, or only the combination?
+
+\section*{Run Contract}
+\begin{itemize}[leftmargin=1.5em]
+\item Source data root: \texttt{/data/scratch/murphy/outputs/cot-loop-detection/full\_train\_locked\_pair\_20260404}
+\item Binary target: \texttt{majority\_s\_0.5}
+\item Train balance: downsample to \texttt{50/50}
+\item Test balance: natural
+\item Views:
+  \begin{itemize}[leftmargin=1.5em]
+  \item \texttt{ensemble}: one MLP per layer across all \texttt{28} saved layers, aggregated by \texttt{vote\_fraction}
+  \item \texttt{last\_layer}: final-layer-only MLP
+  \end{itemize}
+\item Probe families:
+  \begin{itemize}[leftmargin=1.5em]
+  \item \texttt{h128 d1}: \texttt{hidden\_dim=128}, \texttt{depth=1}
+  \item \texttt{h256 d1}: \texttt{hidden\_dim=256}, \texttt{depth=1}
+  \item \texttt{h256 d2}: \texttt{hidden\_dim=256}, \texttt{depth=2}
+  \end{itemize}
+\end{itemize}
+
+\section*{Ranking Results: Test \texttt{PR-AUC}}
+\begin{center}
+\small
+\setlength{\tabcolsep}{4pt}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{@{}lrrrrrrrr@{}}
+\toprule
+Dataset & Test prevalence & Prompt length & Ensemble \texttt{h128 d1} & Ensemble \texttt{h256 d1} & Ensemble \texttt{h256 d2} & Last-layer \texttt{h128 d1} & Last-layer \texttt{h256 d1} & Last-layer \texttt{h256 d2} \\
+\midrule
+GPQA & 0.0500 & 0.0657 & 0.4198 & 0.5833 & 0.5025 & 0.2298 & 0.3071 & 0.3176 \\
+AIME & 0.5833 & 0.8976 & 0.9218 & 0.9120 & 0.9090 & 0.9043 & 0.8436 & 0.8479 \\
+MATH-500 & 0.0400 & 0.1002 & 0.1354 & 0.1663 & 0.1596 & 0.1506 & 0.1315 & 0.1322 \\
+MMLU-Pro & 0.0125 & 0.1104 & 0.1837 & 0.2116 & 0.2023 & 0.0559 & 0.0701 & 0.0959 \\
+LiveCodeBench & 0.3375 & 0.5760 & 0.7111 & 0.7143 & 0.6865 & 0.7116 & 0.7452 & 0.7575 \\
+\bottomrule
+\end{tabular}
+}
+\end{center}
+
+\section*{Cross-Dataset Mean \texttt{PR-AUC}}
+\begin{center}
+\small
+\begin{tabular}{@{}lr@{}}
+\toprule
+Surface & Mean test \texttt{PR-AUC} \\
+\midrule
+Prompt length baseline & 0.3500 \\
+Ensemble \texttt{h128 d1} & 0.4744 \\
+Ensemble \texttt{h256 d1} & 0.5175 \\
+Ensemble \texttt{h256 d2} & 0.4920 \\
+Last-layer \texttt{h128 d1} & 0.4104 \\
+Last-layer \texttt{h256 d1} & 0.4195 \\
+Last-layer \texttt{h256 d2} & 0.4302 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section*{What Width And Depth Actually Did}
+\begin{itemize}[leftmargin=1.5em]
+\item Ensemble:
+  \begin{itemize}[leftmargin=1.5em]
+  \item width helps relative to the default on \texttt{GPQA}, \texttt{MATH-500}, \texttt{MMLU-Pro}, and \texttt{LiveCodeBench}, with only a small drop on \texttt{AIME}
+  \item added depth hurts relative to width-only on all five ensemble slices
+  \item so the best global ensemble surface is \texttt{h256 d1}, not \texttt{h256 d2}
+  \end{itemize}
+\item Last-layer:
+  \begin{itemize}[leftmargin=1.5em]
+  \item width helps on \texttt{GPQA}, \texttt{MMLU-Pro}, and \texttt{LiveCodeBench}, but hurts on \texttt{AIME} and \texttt{MATH-500}
+  \item added depth then improves on top of width on all five last-layer slices, though sometimes only slightly
+  \item so the best global last-layer surface is \texttt{h256 d2}
+  \end{itemize}
+\end{itemize}
+
+\section*{Interpretation}
+\begin{itemize}[leftmargin=1.5em]
+\item Proven now:
+  \begin{itemize}[leftmargin=1.5em]
+  \item \texttt{ensemble h256 d1} is the strongest single global surface in this capacity sweep
+  \item \texttt{ensemble h256 d1} still beats the prompt-length baseline on all five datasets by \texttt{PR-AUC}
+  \item \texttt{last\_layer h256 d2} is better than \texttt{last\_layer h256 d1} on every dataset, but it is still weaker than \texttt{ensemble h256 d1} as a global choice
+  \end{itemize}
+\item Also proven:
+  \begin{itemize}[leftmargin=1.5em]
+  \item the earlier \texttt{h256 d2} ensemble result was mixing one good change with one bad one
+  \item the good change was width
+  \item the bad change, for ensemble, was the extra depth
+  \end{itemize}
+\item Important caveat:
+  \begin{itemize}[leftmargin=1.5em]
+  \item this still says nothing about whether we should keep all \texttt{28} layers in the ensemble
+  \item the next honest tuning step is a small layer-subset / view sweep on the same balanced binary data, not another vague capacity increase
+  \end{itemize}
+\end{itemize}
+
+\section*{Recommendation}
+\begin{itemize}[leftmargin=1.5em]
+\item If one single global binary surface is needed today, use \texttt{ensemble h256 d1}.
+\item If the project wants separate best-by-view surfaces:
+  \begin{itemize}[leftmargin=1.5em]
+  \item \texttt{ensemble}: \texttt{h256 d1}
+  \item \texttt{last\_layer}: \texttt{h256 d2}
+  \end{itemize}
+\item Keep \texttt{PR-AUC} as the main comparison object for this balanced-train / natural-test binary surface.
+\end{itemize}
+
+\section*{Artifact Bundle}
+\begin{itemize}[leftmargin=1.5em]
+\item PDF: \texttt{outputs/prompt\_profile\_binary\_capacity\_controls\_20260404/prompt\_profile\_binary\_capacity\_controls\_20260404.pdf}
+\item TeX: \texttt{outputs/prompt\_profile\_binary\_capacity\_controls\_20260404/prompt\_profile\_binary\_capacity\_controls\_20260404.tex}
+\item Intermediate \texttt{h256 d2} note:
+  \begin{itemize}[leftmargin=1.5em]
+  \item \texttt{docs/prompt-profile-binary-retrain-h256d2-2026-04-04.md}
+  \end{itemize}
+\end{itemize}
+
+\end{document}

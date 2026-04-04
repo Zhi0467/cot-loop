@@ -1,9 +1,18 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-04 06:18 UTC
+Last updated: 2026-04-04 06:27 UTC
 
 ## Immediate Next Experiments
 
+- The binary capacity-control sweep now exists as the latest result surface.
+  - Result note: `docs/prompt-profile-binary-capacity-controls-2026-04-04.md`
+  - Result PDF: `outputs/prompt_profile_binary_capacity_controls_20260404/prompt_profile_binary_capacity_controls_20260404.pdf`
+  - This is the same saved April balanced binary data with three probe families: `h128 d1`, `h256 d1`, `h256 d2`.
+  - Main read: if one single global ensemble surface is needed today, it should be `h256 d1`, not `h256 d2`.
+  - The width-vs-depth split is now explicit:
+    - for `ensemble`, width helps and added depth hurts;
+    - for `last_layer`, added depth helps modestly on top of width.
+  - Proven limitation: this still does not answer which layers to keep. The next honest tuning step is a small layer-subset / view sweep on the same balanced binary data.
 - The balanced binary capacity rerun now exists as a separate result surface.
   - Result note: `docs/prompt-profile-binary-retrain-h256d2-2026-04-04.md`
   - Result PDF: `outputs/prompt_profile_binary_retrain_h256d2_20260404/prompt_profile_binary_retrain_h256d2_20260404.pdf`
