@@ -38,6 +38,7 @@ from loop_probe.collector import (
 )
 from loop_probe.configs import RolloutConfig
 from loop_probe.labeling import first_ngram_loop_prefix_length
+from loop_probe.prompt_format import VALID_PROMPT_FORMATS, resolve_prompt_format
 from loop_probe.prompt_builder import build_math_prompt
 from loop_probe.rollout import resolve_sampling_defaults
 from loop_probe.types import DatasetSpec
@@ -92,6 +93,16 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--livecodebench-repo", default="")
     parser.add_argument("--release-version", default="release_v6")
     parser.add_argument("--lm-style-override", default=None)
+    parser.add_argument(
+        "--prompt-format",
+        default="auto",
+        choices=VALID_PROMPT_FORMATS,
+        help=(
+            "How to serialize non-LiveCodeBench prompts before generation. "
+            "'auto' uses the tokenizer chat template when available and falls "
+            "back to raw plain text otherwise."
+        ),
+    )
     parser.add_argument(
         "--resume-lcb-records-checkpoint",
         default="",
@@ -314,6 +325,23 @@ def _load_prompt_items(
     args: argparse.Namespace,
     tokenizer: Any | None,
 ) -> tuple[list[PromptWorkItem], dict[str, object], Any]:
+    if args.task_kind == "livecodebench_codegen":
+        if args.prompt_format == "chat_template":
+            raise SystemExit(
+                "livecodebench_codegen uses raw prompt strings and does not support "
+                "--prompt-format chat_template."
+            )
+        resolved_prompt_format = "raw"
+    else:
+        if tokenizer is None:
+            raise SystemExit(
+                "Tokenizer is required to resolve prompt formatting for this task."
+            )
+        try:
+            resolved_prompt_format = resolve_prompt_format(tokenizer, args.prompt_format)
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from exc
+
     spec = DatasetSpec(
         dataset=args.dataset,
         config=args.dataset_config,
@@ -332,12 +360,19 @@ def _load_prompt_items(
         items = [
             PromptWorkItem(
                 sample_id=record.sample_id,
-                prompt=build_math_prompt(tokenizer, record.prompt),
+                prompt=build_math_prompt(
+                    tokenizer,
+                    record.prompt,
+                    prompt_format=resolved_prompt_format,
+                ),
                 gold_answer=gold_answer,
             )
             for record, gold_answer in samples
         ]
-        return items, {}, None
+        return items, {
+            "prompt_format_requested": args.prompt_format,
+            "prompt_format_resolved": resolved_prompt_format,
+        }, None
 
     if args.task_kind == "multiple_choice_gpqa":
         if tokenizer is None:
@@ -352,12 +387,15 @@ def _load_prompt_items(
                     tokenizer,
                     record.prompt,
                     options,
+                    prompt_format=resolved_prompt_format,
                 ),
                 gold_answer=gold_letter,
             )
             for record, options, gold_letter in samples
         ]
         metadata = {
+            "prompt_format_requested": args.prompt_format,
+            "prompt_format_resolved": resolved_prompt_format,
             "shuffle_policy": {
                 "kind": "seed_xor_sample_id",
                 "base_seed": args.seed,
@@ -378,13 +416,17 @@ def _load_prompt_items(
                     tokenizer,
                     record.prompt,
                     options,
+                    prompt_format=resolved_prompt_format,
                 ),
                 gold_answer=gold_answer,
                 gold_index=gold_index,
             )
             for record, options, gold_answer, gold_index in samples
         ]
-        return items, {}, None
+        return items, {
+            "prompt_format_requested": args.prompt_format,
+            "prompt_format_resolved": resolved_prompt_format,
+        }, None
 
     benchmark, format_prompt = livecodebench_codegen.load_benchmark(
         args.livecodebench_repo,
@@ -407,7 +449,11 @@ def _load_prompt_items(
         )
         for idx, (question_id, prompt) in enumerate(prompt_records)
     ]
-    return items, {"lm_style": lm_style}, selected_benchmark
+    return items, {
+        "lm_style": lm_style,
+        "prompt_format_requested": args.prompt_format,
+        "prompt_format_resolved": resolved_prompt_format,
+    }, selected_benchmark
 
 
 def _update_qa_stats(
@@ -441,6 +487,8 @@ def _update_qa_stats(
             agg.num_correct_and_looped += 1
         if max_length_hit:
             agg.num_correct_and_max_length_hit += 1
+        if loop_flag and max_length_hit:
+            agg.num_correct_and_looped_and_max_length_hit += 1
     else:
         agg.num_wrong += 1
         agg.wrong_length_sum += token_count
@@ -967,6 +1015,7 @@ def _apply_lcb_grades(
     agg.wrong_length_sum = 0
     agg.num_correct_and_looped = 0
     agg.num_correct_and_max_length_hit = 0
+    agg.num_correct_and_looped_and_max_length_hit = 0
 
     for record_key, passed in grading_by_record_key.items():
         record = records_by_key[record_key]
@@ -978,6 +1027,8 @@ def _apply_lcb_grades(
                 agg.num_correct_and_looped += 1
             if record.max_length_hit:
                 agg.num_correct_and_max_length_hit += 1
+            if record.loop_flag and record.max_length_hit:
+                agg.num_correct_and_looped_and_max_length_hit += 1
         else:
             agg.num_wrong += 1
             agg.wrong_length_sum += record.token_count
@@ -1130,6 +1181,9 @@ def main() -> None:
             "num_looped_and_max_length_hit": agg.num_looped_and_max_length_hit,
             "num_correct_and_looped": agg.num_correct_and_looped,
             "num_correct_and_max_length_hit": agg.num_correct_and_max_length_hit,
+            "num_correct_and_looped_and_max_length_hit": (
+                agg.num_correct_and_looped_and_max_length_hit
+            ),
         },
         "metrics": metrics,
     }
