@@ -1,22 +1,29 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-04 07:15 UTC
+Last updated: 2026-04-04 21:43 UTC
 
 ## Immediate Next Experiments
 
-- The missing prompt-profile rerun is now balanced regression, not another binary-only rewrite.
-  - The runnable code path now exists:
-    - `scripts/run_prompt_profile_full_train.py --regression-data-mode reuse_binary_subset`
-    - `slurm/run_prompt_profile_balanced_regression_retrain.sbatch`
-  - Default rerun surface:
-    - read shared `mean_relative_length` archives from `/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/`
-    - reuse the balanced `majority_s_0.5` train/test sample IDs from that same saved root
-    - write the regression-only balanced rerun under `/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced/`
-    - keep the collaborator-correct contract on the GPU node: `2` GPUs
-  - Current blocker is infrastructure, not the launch surface:
-    - `tianhaowang-gpu0.ucsd.edu:22` accepts TCP
-    - SSH still times out during banner exchange, so Slurm submission is not reachable yet
-  - Do not treat the combined April note as satisfying the balanced-only request until this rerun exists.
+- The balanced-only prompt-profile regression rerun now exists and should be cited directly.
+  - Result note: `docs/prompt-profile-balanced-regression-2026-04-04.md`
+  - Result PDF: `outputs/prompt_profile_balanced_regression_20260404/prompt_profile_balanced_regression_20260404.pdf`
+  - Copied summary ledger: `outputs/prompt_profile_balanced_regression_20260404/remote_summary/`
+  - Exact split contract:
+    - reuse the saved balanced `majority_s_0.5` train/test prompt IDs from `/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/`
+    - relabel those same prompts with `mean_relative_length`
+    - keep train balanced on the binary split and test natural
+    - keep the default regression probe family (`hidden_dim=128`, `depth=1`, `dropout=0.1`)
+  - Main screening read at frozen `best_loss`:
+    - cross-dataset mean `top_20p_capture`: ensemble `0.344`, prompt length `0.262`, last-layer `0.257`
+    - ensemble beats prompt length on `GPQA`, `MATH-500`, `MMLU-Pro`, and `LiveCodeBench`
+    - `AIME` is the only non-win against the prompt-length baseline on that metric
+  - Calibration caveat:
+    - cross-dataset mean `RMSE`: last-layer `0.191`, ensemble `0.205`, prompt length `0.265`
+    - this keeps `mean_relative_length` as a screening-first surface rather than a clean calibrated regressor
+  - Two code-path fixes landed during the rerun and should be treated as part of the durable execution surface:
+    - Slurm wrappers now honor explicit `CONDA_ENV` before any stale repo-local `.venv`
+    - `scripts/summarize_prompt_profile_full_train.py` now summarizes regression-only reruns instead of marking them `missing_shared_archive`
+  - If prompt-profile regression is pushed further, the next honest follow-up is not "rerun balanced regression again." It is a small layer-subset or capacity sweep on this same balanced regression split, while keeping `top_20p_capture` primary and `RMSE` secondary.
 - Audit the weird bounded OLMo instruct bundle before scaling it or swapping model families.
   - The current bundle is under `/data/scratch/murphy/outputs/cot-loop-detection/olmo3_degeneration_origin_progression/bound8_temp0p1_gen10_ctx40960_topkneg1/`.
   - `RLVR / MMLU-Pro = 0 / 80` with mean length `6.15` is too suspicious to treat as a clean capability read.
@@ -27,14 +34,15 @@ Last updated: 2026-04-04 07:15 UTC
     - only after that decide whether the current OLMo 3 surface is scientifically usable.
   - If a smaller progression is still needed after the audit, the smallest public fallback is the April 2025 OLMo 2 `1B` chain (`OLMo-2-0425-1B -> OLMo-2-0425-1B-SFT -> OLMo-2-0425-1B-RLVR1 -> OLMo-2-0425-1B-Instruct`).
   - Do not describe that as a smaller OLMo 3 run: the public OLMo 3 instruct ladder is only `7B` and `32B`.
-- The combined April prompt-profile report now exists as the main collaborator-facing surface.
+- The combined April prompt-profile report is now background context, not the current balanced-regression deliverable.
   - Result note: `docs/prompt-profile-full-surface-update-2026-04-04.md`
   - Result PDF: `outputs/prompt_profile_full_surface_update_20260404/prompt_profile_full_surface_update_20260404.pdf`
   - It puts the locked full-train report and the balanced binary capacity rerun back into one self-contained artifact.
   - It makes the object split explicit:
     - regression `mean_relative_length` stays on the locked full-train surface
     - the balanced rerun section in that report changes only the binary `majority_s_0.5` head
-    - the collaborator-requested balanced regression rerun is still a separate missing object
+    - the collaborator-requested balanced regression rerun is now answered by `docs/prompt-profile-balanced-regression-2026-04-04.md`
+  - For the collaborator-correct balanced-only regression question, cite the balanced regression note above instead of this combined note.
   - Main combined read:
     - regression is still mixed and should be reported screening-first with `top_20p_capture`
     - binary remains the cleaner deployment-facing head
