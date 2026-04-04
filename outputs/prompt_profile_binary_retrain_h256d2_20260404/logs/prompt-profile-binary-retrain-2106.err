@@ -1,0 +1,251 @@
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from WANDB_API_KEY.
+wandb: Currently logged in as: wangzhi0467 (wth_ucsd) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: setting up run t8go5zeb
+wandb: Tracking run with wandb version 0.25.0
+wandb: Run data is saved locally in /data/scratch/murphy/projects/worktrees/cot-loop-binary-retrain-20260404/wandb/run-20260404_055448-t8go5zeb
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run livecodebench-majority_s_0.5-ensemble-seed0
+wandb: ⭐️ View project at https://wandb.ai/wth_ucsd/cot-loop-probe
+wandb: 🚀 View run at https://wandb.ai/wth_ucsd/cot-loop-probe/runs/t8go5zeb
+wandb: updating run metadata
+wandb: uploading history steps 13-14, summary, console lines 14-14
+wandb: 
+wandb: Run history:
+wandb:                   epoch ▁▁▂▃▃▃▄▅▅▅▆▇▇▇█
+wandb:           eval/accuracy ▄▇▇▅▁▃█▇▅▅▅▆▇▇█
+wandb:           eval/macro_f1 ▁▇▇▆▅▅██▇▆▇▇███
+wandb:        eval/positive_f1 ▁▆▆▇▇▇██▇▇▇████
+wandb: eval/positive_precision ▁▇█▆▅▆▇▇▆▆▆▇▇▇▇
+wandb:    eval/positive_recall ▁▅▄▇██▇▇▇██████
+wandb:             eval/pr_auc ▁▅█▃▆▅▆▇▇▇▇▆▇▇▇
+wandb:         eval/prevalence ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:            eval/roc_auc ▁██▁▅▆▆▆▆▆▆▆▇▇▇
+wandb:                    step ▁▁▂▃▃▃▄▅▅▅▆▇▇▇█
+wandb:                     +10 ...
+wandb: 
+wandb: Run summary:
+wandb:                   epoch 15
+wandb:           eval/accuracy 0.7625
+wandb:           eval/macro_f1 0.75606
+wandb:        eval/positive_f1 0.71642
+wandb: eval/positive_precision 0.6
+wandb:    eval/positive_recall 0.88889
+wandb:             eval/pr_auc 0.65478
+wandb:         eval/prevalence 0.3375
+wandb:            eval/roc_auc 0.82818
+wandb:                    step 30
+wandb:                     +10 ...
+wandb: 
+wandb: 🚀 View run livecodebench-majority_s_0.5-ensemble-seed0 at: https://wandb.ai/wth_ucsd/cot-loop-probe/runs/t8go5zeb
+wandb: ⭐️ View project at: https://wandb.ai/wth_ucsd/cot-loop-probe
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./wandb/run-20260404_055448-t8go5zeb/logs
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from WANDB_API_KEY.
+wandb: Currently logged in as: wangzhi0467 (wth_ucsd) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: setting up run ji4n5b16
+wandb: Tracking run with wandb version 0.25.0
+wandb: Run data is saved locally in /data/scratch/murphy/projects/worktrees/cot-loop-binary-retrain-20260404/wandb/run-20260404_055512-ji4n5b16
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run livecodebench-majority_s_0.5-ensemble-seed1
+wandb: ⭐️ View project at https://wandb.ai/wth_ucsd/cot-loop-probe
+wandb: 🚀 View run at https://wandb.ai/wth_ucsd/cot-loop-probe/runs/ji4n5b16
+wandb: updating run metadata
+wandb: uploading output.log; uploading wandb-summary.json; uploading config.yaml
+wandb: 
+wandb: Run history:
+wandb:                   epoch ▁▁▂▃▃▃▄▅▅▅▆▇▇▇█
+wandb:           eval/accuracy ▁█▄▄▇▁▅▆▇▆▆▆▇▇▇
+wandb:           eval/macro_f1 ▁█▆▆▇▆▇▇██▇████
+wandb:        eval/positive_f1 ▁█▆▆▇▇█▇███████
+wandb: eval/positive_precision █▄▄▃▃▁▂▃▃▂▂▃▃▃▃
+wandb:    eval/positive_recall ▁▆▄▅▆█▇▆▆▇▇▇▇▇▇
+wandb:             eval/pr_auc ▃█▇▄▁▅▁▂▅▄▅▃▄▃▅
+wandb:         eval/prevalence ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:            eval/roc_auc ▁██▅▄▅▁▃▆▆▇▇▇▇▇
+wandb:                    step ▁▁▂▃▃▃▄▅▅▅▆▇▇▇█
+wandb:                     +10 ...
+wandb: 
+wandb: Run summary:
+wandb:                   epoch 15
+wandb:           eval/accuracy 0.7875
+wandb:           eval/macro_f1 0.77177
+wandb:        eval/positive_f1 0.71186
+wandb: eval/positive_precision 0.65625
+wandb:    eval/positive_recall 0.77778
+wandb:             eval/pr_auc 0.67883
+wandb:         eval/prevalence 0.3375
+wandb:            eval/roc_auc 0.8467
+wandb:                    step 30
+wandb:                     +10 ...
+wandb: 
+wandb: 🚀 View run livecodebench-majority_s_0.5-ensemble-seed1 at: https://wandb.ai/wth_ucsd/cot-loop-probe/runs/ji4n5b16
+wandb: ⭐️ View project at: https://wandb.ai/wth_ucsd/cot-loop-probe
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./wandb/run-20260404_055512-ji4n5b16/logs
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from WANDB_API_KEY.
+wandb: Currently logged in as: wangzhi0467 (wth_ucsd) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: setting up run 0rghspdn
+wandb: Tracking run with wandb version 0.25.0
+wandb: Run data is saved locally in /data/scratch/murphy/projects/worktrees/cot-loop-binary-retrain-20260404/wandb/run-20260404_055539-0rghspdn
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run livecodebench-majority_s_0.5-ensemble-seed2
+wandb: ⭐️ View project at https://wandb.ai/wth_ucsd/cot-loop-probe
+wandb: 🚀 View run at https://wandb.ai/wth_ucsd/cot-loop-probe/runs/0rghspdn
+wandb: updating run metadata
+wandb: uploading output.log; uploading wandb-summary.json; uploading config.yaml
+wandb: 
+wandb: Run history:
+wandb:                   epoch ▁▁▂▃▃▃▄▅▅▅▆▇▇▇█
+wandb:           eval/accuracy ▄▁▁▆▃▁▆▇▆█▇██▆▇
+wandb:           eval/macro_f1 ▄▁▁▇▇▆▇▇▇████▇█
+wandb:        eval/positive_f1 ▄▁▁▇█▇█▇▇██████
+wandb: eval/positive_precision █▁▁▆▅▅▆▆▆▇▆▇▆▆▆
+wandb:    eval/positive_recall ▃▁▁▆██▇▆▆▇▇▇▇▇▇
+wandb:             eval/pr_auc ▄▅█▂▅▁▃▄▂▇▆██▆▅
+wandb:         eval/prevalence ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:            eval/roc_auc ▁▄▇▅▆▃▄▄▂▆▇███▇
+wandb:                    step ▁▁▂▃▃▃▄▅▅▅▆▇▇▇█
+wandb:                     +10 ...
+wandb: 
+wandb: Run summary:
+wandb:                   epoch 15
+wandb:           eval/accuracy 0.775
+wandb:           eval/macro_f1 0.76155
+wandb:        eval/positive_f1 0.70492
+wandb: eval/positive_precision 0.63235
+wandb:    eval/positive_recall 0.7963
+wandb:             eval/pr_auc 0.6825
+wandb:         eval/prevalence 0.3375
+wandb:            eval/roc_auc 0.85342
+wandb:                    step 30
+wandb:                     +10 ...
+wandb: 
+wandb: 🚀 View run livecodebench-majority_s_0.5-ensemble-seed2 at: https://wandb.ai/wth_ucsd/cot-loop-probe/runs/0rghspdn
+wandb: ⭐️ View project at: https://wandb.ai/wth_ucsd/cot-loop-probe
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./wandb/run-20260404_055539-0rghspdn/logs
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from WANDB_API_KEY.
+wandb: Currently logged in as: wangzhi0467 (wth_ucsd) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: setting up run 1xwwq3a7
+wandb: Tracking run with wandb version 0.25.0
+wandb: Run data is saved locally in /data/scratch/murphy/projects/worktrees/cot-loop-binary-retrain-20260404/wandb/run-20260404_055606-1xwwq3a7
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run livecodebench-majority_s_0.5-last_layer-seed0
+wandb: ⭐️ View project at https://wandb.ai/wth_ucsd/cot-loop-probe
+wandb: 🚀 View run at https://wandb.ai/wth_ucsd/cot-loop-probe/runs/1xwwq3a7
+wandb: updating run metadata
+wandb: uploading history steps 0-14, summary, console lines 0-14
+wandb: 
+wandb: Run history:
+wandb:                   epoch ▁▁▂▃▃▃▄▅▅▅▆▇▇▇█
+wandb:           eval/accuracy ▆▁█▅▄▇▇▇▇▇▇▇▇█▆
+wandb:           eval/macro_f1 ▄▁█▅▄▇▇▆▇▇▇▆▇▇▆
+wandb:        eval/positive_f1 ▁▅█▆▆▇▇▇▇▆▇▆▇▇▆
+wandb: eval/positive_precision █▁▇▄▃▇▆▆▆▇▇▆▇▇▆
+wandb:    eval/positive_recall ▁█▆▆▇▅▆▆▆▅▅▅▅▅▅
+wandb:             eval/pr_auc ▁▅▅▅▆▇▇▇▇▇▇████
+wandb:         eval/prevalence ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:            eval/roc_auc ▁▅▆▆▆▇▇▇▇██████
+wandb:                    step ▁▁▂▃▃▃▄▅▅▅▆▇▇▇█
+wandb:                     +10 ...
+wandb: 
+wandb: Run summary:
+wandb:                   epoch 15
+wandb:           eval/accuracy 0.7375
+wandb:           eval/macro_f1 0.72656
+wandb:        eval/positive_f1 0.67188
+wandb: eval/positive_precision 0.58108
+wandb:    eval/positive_recall 0.7963
+wandb:             eval/pr_auc 0.75796
+wandb:         eval/prevalence 0.3375
+wandb:            eval/roc_auc 0.86618
+wandb:                    step 30
+wandb:                     +10 ...
+wandb: 
+wandb: 🚀 View run livecodebench-majority_s_0.5-last_layer-seed0 at: https://wandb.ai/wth_ucsd/cot-loop-probe/runs/1xwwq3a7
+wandb: ⭐️ View project at: https://wandb.ai/wth_ucsd/cot-loop-probe
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./wandb/run-20260404_055606-1xwwq3a7/logs
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from WANDB_API_KEY.
+wandb: Currently logged in as: wangzhi0467 (wth_ucsd) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.25.0
+wandb: Run data is saved locally in /data/scratch/murphy/projects/worktrees/cot-loop-binary-retrain-20260404/wandb/run-20260404_055624-9yewwyqb
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run livecodebench-majority_s_0.5-last_layer-seed1
+wandb: ⭐️ View project at https://wandb.ai/wth_ucsd/cot-loop-probe
+wandb: 🚀 View run at https://wandb.ai/wth_ucsd/cot-loop-probe/runs/9yewwyqb
+wandb: updating run metadata
+wandb: uploading history steps 0-14, summary, console lines 0-14
+wandb: 
+wandb: Run history:
+wandb:                   epoch ▁▁▂▃▃▃▄▅▅▅▆▇▇▇█
+wandb:           eval/accuracy ▆▇▁▆█▇▇██▇▇▇▇▇▇
+wandb:           eval/macro_f1 ▃▇▁▇▇██████▇█▇█
+wandb:        eval/positive_f1 ▁█▆▇▇██████████
+wandb: eval/positive_precision ▁▇▄▆█▇▇██▇▇▇▇▇▇
+wandb:    eval/positive_recall ▁▇█▇▆▇▇▆▆▇▇▇▇▆▇
+wandb:             eval/pr_auc ▂▁▁▃▄▅▅▆▇▇▇▇███
+wandb:         eval/prevalence ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:            eval/roc_auc ▁▃▃▄▅▅▆▇▇▇▇████
+wandb:                    step ▁▁▂▃▃▃▄▅▅▅▆▇▇▇█
+wandb:                     +10 ...
+wandb: 
+wandb: Run summary:
+wandb:                   epoch 15
+wandb:           eval/accuracy 0.7625
+wandb:           eval/macro_f1 0.74984
+wandb:        eval/positive_f1 0.69355
+wandb: eval/positive_precision 0.61429
+wandb:    eval/positive_recall 0.7963
+wandb:             eval/pr_auc 0.76159
+wandb:         eval/prevalence 0.3375
+wandb:            eval/roc_auc 0.8681
+wandb:                    step 30
+wandb:                     +10 ...
+wandb: 
+wandb: 🚀 View run livecodebench-majority_s_0.5-last_layer-seed1 at: https://wandb.ai/wth_ucsd/cot-loop-probe/runs/9yewwyqb
+wandb: ⭐️ View project at: https://wandb.ai/wth_ucsd/cot-loop-probe
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./wandb/run-20260404_055624-9yewwyqb/logs
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from WANDB_API_KEY.
+wandb: Currently logged in as: wangzhi0467 (wth_ucsd) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: setting up run hdswfbzu
+wandb: Tracking run with wandb version 0.25.0
+wandb: Run data is saved locally in /data/scratch/murphy/projects/worktrees/cot-loop-binary-retrain-20260404/wandb/run-20260404_055641-hdswfbzu
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run livecodebench-majority_s_0.5-last_layer-seed2
+wandb: ⭐️ View project at https://wandb.ai/wth_ucsd/cot-loop-probe
+wandb: 🚀 View run at https://wandb.ai/wth_ucsd/cot-loop-probe/runs/hdswfbzu
+wandb: updating run metadata
+wandb: uploading history steps 0-14, summary, console lines 0-14
+wandb: 
+wandb: Run history:
+wandb:                   epoch ▁▁▂▃▃▃▄▅▅▅▆▇▇▇█
+wandb:           eval/accuracy ▁▇█▇██▇█▇██▇▇▇▇
+wandb:           eval/macro_f1 ▁▇█▇██▇█▇██▇▇▇█
+wandb:        eval/positive_f1 ▁▆▇▇▇▇▆▇▆██▆▆▆▆
+wandb: eval/positive_precision ▁▅▇▆██▆▇▆▇▇▆▆▆▇
+wandb:    eval/positive_recall █▆▂▇▁▂▃▂▂▆▆▂▂▂▂
+wandb:             eval/pr_auc ▁▆▇▇███████████
+wandb:         eval/prevalence ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:            eval/roc_auc ▁▇▇▇███████████
+wandb:                    step ▁▁▂▃▃▃▄▅▅▅▆▇▇▇█
+wandb:                     +10 ...
+wandb: 
+wandb: Run summary:
+wandb:                   epoch 15
+wandb:           eval/accuracy 0.75625
+wandb:           eval/macro_f1 0.74248
+wandb:        eval/positive_f1 0.68293
+wandb: eval/positive_precision 0.6087
+wandb:    eval/positive_recall 0.77778
+wandb:             eval/pr_auc 0.7529
+wandb:         eval/prevalence 0.3375
+wandb:            eval/roc_auc 0.86513
+wandb:                    step 30
+wandb:                     +10 ...
+wandb: 
+wandb: 🚀 View run livecodebench-majority_s_0.5-last_layer-seed2 at: https://wandb.ai/wth_ucsd/cot-loop-probe/runs/hdswfbzu
+wandb: ⭐️ View project at: https://wandb.ai/wth_ucsd/cot-loop-probe
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./wandb/run-20260404_055641-hdswfbzu/logs

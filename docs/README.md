@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-04-04 00:17 UTC
+Last updated: 2026-04-04 06:18 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -16,6 +16,7 @@ Core docs:
 - Prompt-profile plain-language note: prompt-profile-plain-language-2026-03-30.md
 - Prompt-profile full-train plan: prompt-profile-full-train-plan-2026-04-02.md
 - Prompt-profile full-train result note: prompt-profile-full-train-results-2026-04-04.md
+- Prompt-profile binary retrain note: prompt-profile-binary-retrain-h256d2-2026-04-04.md
 - Thread reset / new-thread handoff: thread-reset-2026-03-25.md
 - Prompt-profile projection/export path: prompt-profile-projection.md
 - Prefill-activation visualization note: prefill-activation-visualization.md
@@ -32,6 +33,8 @@ Key outputs:
 - Full-train plan PDF: ../outputs/prompt_profile_full_train_plan_20260402/prompt_profile_full_train_plan_20260402.pdf
 - Full-train result bundle: ../outputs/prompt_profile_full_train_locked_pair_20260404/
 - Full-train result PDF: ../outputs/prompt_profile_full_train_locked_pair_20260404/prompt_profile_full_train_locked_pair_20260404.pdf
+- Binary retrain result bundle: ../outputs/prompt_profile_binary_retrain_h256d2_20260404/
+- Binary retrain result PDF: ../outputs/prompt_profile_binary_retrain_h256d2_20260404/prompt_profile_binary_retrain_h256d2_20260404.pdf
 - Consolidated earlier findings PDF: ../outputs/pr2_experiment_findings_consolidated_pdf/pr2_experiment_findings_consolidated.pdf
 - Rollout-statistics module audit PDF: ../outputs/rollout_stats_module_audit/rollout_stats_module_audit.pdf
 - Detailed reopened-round summary PDF: ../outputs/prefill_rounds_1_to_12_detailed_summary/prefill_rounds_1_to_12_detailed_summary.pdf
@@ -46,10 +49,15 @@ Current live status:
 - The repo-root note `../understand-where-loop-and-max-length-come-from.md` is the actual OLMo progression plan on the older rollout-statistics module: reuse the Qwen3 collector/report bundle, collect the same metric family, and test where degenerate rollouts enter along base -> SFT -> RLVR.
 - The docs note `understand-where-loop-and-max-length-come-from.md` is only the background definitions appendix for saved `loop`, prompt-profile `cap_hit` / `p_cap`, rollout-stat `max_length_hit`, and `majority_s_0.5`.
 - The locked pair now has both the execution note and the finished first-run result note on disk.
+- The balanced binary probe-capacity rerun is now on disk too. It keeps the April binary data fixed and only changes the probe family from `h128 d1` to `h256 d2`.
 - The run surface is now executable rather than purely documentary: `scripts/run_prompt_profile_full_train.py` is the canonical launcher, and `scripts/summarize_prompt_profile_full_train.py` is the canonical post-run ledger for the locked pair plus metadata controls.
 - The first locked full-train pass is now complete. The repo-facing result is split cleanly:
   - regression `mean_relative_length`: ensemble beats `last_layer`, but the train-fit prompt-length baseline still wins on `AIME`, `MATH-500`, and `MMLU-Pro`;
   - binary `majority_s_0.5`: ensemble `PR-AUC` beats the prompt-length baseline on all five datasets, with the clearest finished wins on `AIME`, `LiveCodeBench`, and `MMLU-Pro`.
+- The newer binary retrain result answers a different question:
+  - same balanced binary data, larger probe family;
+  - `ensemble h256 d2` is the best single global ranking surface by mean test `PR-AUC`;
+  - the effect is mixed by dataset and by view, so this should not be paraphrased as a blanket “bigger probe wins” result.
 - The reset note `thread-reset-2026-03-25.md` is now the correct restart surface for Slack follow-up. It captures the collaborator's recent corrections, the proved-vs-unproved ledger, and the exact next work order.
 - `roadmap.md` is the chronological experiment log; `backlog.md` now carries the post-run interpretation object under the corrected selection rule.
 - `LiveCodeBench` is no longer pending, but its recovered projection artifact still lacks prompt-level accuracy.

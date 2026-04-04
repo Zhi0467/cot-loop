@@ -1,9 +1,17 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-04 04:25 UTC
+Last updated: 2026-04-04 06:18 UTC
 
 ## Immediate Next Experiments
 
+- The balanced binary capacity rerun now exists as a separate result surface.
+  - Result note: `docs/prompt-profile-binary-retrain-h256d2-2026-04-04.md`
+  - Result PDF: `outputs/prompt_profile_binary_retrain_h256d2_20260404/prompt_profile_binary_retrain_h256d2_20260404.pdf`
+  - Raw metrics: `outputs/prompt_profile_binary_retrain_h256d2_20260404/binary_retrain_metrics.csv`
+  - This is the same saved April `majority_s_0.5` data with a different probe family, not a new target-choice run.
+  - What changed: default `h128 d1` probes became `h256 d2`; train/test split, seeds, optimizer settings, and layer/view definitions stayed fixed.
+  - Main read on test `PR-AUC`: `ensemble h256 d2` is the best single global surface by cross-dataset mean (`0.492`), but the gain is mixed by dataset and by view rather than monotone.
+  - Proven limitation: this rerun changed probe capacity only. It did not sweep which layers to keep, so the next honest tuning step is a small layer-subset / view sweep on the same balanced binary data if more tuning is needed.
 - Interpret the finished locked full-train pass before reopening targets.
   - Result note: `docs/prompt-profile-full-train-results-2026-04-04.md`
   - Result PDF: `outputs/prompt_profile_full_train_locked_pair_20260404/prompt_profile_full_train_locked_pair_20260404.pdf`
