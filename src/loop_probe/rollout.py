@@ -17,18 +17,29 @@ class GeneratedRollout:
     finish_reason: str | None
 
 
-def resolve_sampling_defaults(model_id: str) -> tuple[float, int]:
+def resolve_sampling_defaults(
+    model_id: str,
+    *,
+    top_p: float | None = None,
+    top_k: int | None = None,
+) -> tuple[float, int]:
     try:
         gen_config = GenerationConfig.from_pretrained(model_id)
     except OSError as exc:
         if "generation_config.json" not in str(exc):
             raise
-        return 1.0, -1
-    top_p = gen_config.top_p if gen_config.top_p is not None else 1.0
-    top_k = gen_config.top_k if gen_config.top_k is not None else -1
-    if top_k == 0:
-        top_k = -1
-    return top_p, top_k
+        resolved_top_p = 1.0
+        resolved_top_k = -1
+    else:
+        resolved_top_p = gen_config.top_p if gen_config.top_p is not None else 1.0
+        resolved_top_k = gen_config.top_k if gen_config.top_k is not None else -1
+    if top_p is not None:
+        resolved_top_p = top_p
+    if top_k is not None:
+        resolved_top_k = top_k
+    if resolved_top_k == 0:
+        resolved_top_k = -1
+    return resolved_top_p, resolved_top_k
 
 
 def _normalize_finish_reason(reason: object) -> str:
@@ -129,7 +140,11 @@ def _generate_grouped_rollouts_single_process(
             "are enabled."
         )
 
-    top_p, top_k = resolve_sampling_defaults(cfg.model_id)
+    top_p, top_k = resolve_sampling_defaults(
+        cfg.model_id,
+        top_p=cfg.top_p,
+        top_k=cfg.top_k,
+    )
 
     tokenizer = AutoTokenizer.from_pretrained(
         cfg.model_id,

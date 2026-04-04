@@ -73,6 +73,8 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--answer-field", default="answer")
     parser.add_argument("--model-id", default="Qwen/Qwen3-1.7B")
     parser.add_argument("--temperature", type=float, default=0.2)
+    parser.add_argument("--top-p", type=float, default=None)
+    parser.add_argument("--top-k", type=int, default=None)
     parser.add_argument("--num-generations", type=int, default=10)
     parser.add_argument("--max-tokens", type=int, default=81920)
     parser.add_argument("--max-model-len", type=int, default=40960)
@@ -305,10 +307,16 @@ def _build_rollout_config(args: argparse.Namespace) -> RolloutConfig:
         raise SystemExit("--loop-k must be >= 2.")
     if args.num_generations < 1:
         raise SystemExit("--num-generations must be >= 1.")
+    if args.top_p is not None and not (0.0 < args.top_p <= 1.0):
+        raise SystemExit("--top-p must be in (0, 1] when provided.")
+    if args.top_k is not None and args.top_k < -1:
+        raise SystemExit("--top-k must be >= -1 when provided.")
 
     return RolloutConfig(
         model_id=args.model_id,
         temperature=args.temperature,
+        top_p=args.top_p,
+        top_k=args.top_k,
         num_generations=args.num_generations,
         max_tokens=args.max_tokens,
         tp=args.tp,
@@ -525,7 +533,11 @@ def _collect_worker_stats(
             "generations per prompt."
         )
 
-    top_p, top_k = resolve_sampling_defaults(rollout_cfg.model_id)
+    top_p, top_k = resolve_sampling_defaults(
+        rollout_cfg.model_id,
+        top_p=rollout_cfg.top_p,
+        top_k=rollout_cfg.top_k,
+    )
     tokenizer = AutoTokenizer.from_pretrained(
         rollout_cfg.model_id,
         trust_remote_code=rollout_cfg.trust_remote_code,
