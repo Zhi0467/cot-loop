@@ -14,10 +14,8 @@ set -euo pipefail
 
 mkdir -p logs outputs
 
-if [[ -f ".venv/bin/activate" ]]; then
-  source .venv/bin/activate
-else
-  CONDA_ENV="${CONDA_ENV:-swe311}"
+# Prefer an explicit conda env when requested; otherwise fall back to local venv.
+if [[ -n "${CONDA_ENV:-}" ]]; then
   CONDA_SH="${CONDA_SH:-${HOME}/miniforge3/etc/profile.d/conda.sh}"
   if [[ ! -f "${CONDA_SH}" ]]; then
     echo "[prompt-profile-binary-retrain] conda activation script not found: ${CONDA_SH}" >&2
@@ -26,6 +24,11 @@ else
   # shellcheck disable=SC1090
   source "${CONDA_SH}"
   conda activate "${CONDA_ENV}"
+elif [[ -f ".venv/bin/activate" ]]; then
+  source .venv/bin/activate
+else
+  echo "[prompt-profile-binary-retrain] no runtime env found (.venv missing and CONDA_ENV not set)" >&2
+  exit 1
 fi
 
 if [[ -f "${HOME}/.env" ]]; then
