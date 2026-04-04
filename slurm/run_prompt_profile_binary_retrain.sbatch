@@ -126,8 +126,18 @@ for seed in "${SEED_ARRAY[@]}"; do
 done
 
 for dataset in "${DATASETS[@]}"; do
-  CMD+=(--dataset "${dataset}")
+  if [[ "${dataset}" == "all" ]]; then
+    CMD+=(--dataset all)
+    break
+  fi
 done
+
+if [[ "${DATASETS[0]}" != "all" ]]; then
+  CMD+=(--dataset)
+  for dataset in "${DATASETS[@]}"; do
+    CMD+=("${dataset}")
+  done
+fi
 
 printf '$'
 for arg in "${CMD[@]}"; do
