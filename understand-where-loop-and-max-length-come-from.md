@@ -207,6 +207,64 @@ So the current fairness rule is:
 - do keep the collector, dataset slice, loop detector, and sampling contract fixed;
 - treat prompt surface as a separate interface choice that must stay native unless a direct probe shows otherwise.
 
+## Temperature-0.1 Collection Queue (2026-04-04 05:39 UTC)
+
+Wangzhi then made one more execution correction:
+
+- stop arguing from `MATH-500` alone;
+- keep collecting across datasets;
+- use `temperature=0.1` instead of `0.2`.
+
+So the stale `0.2` base rerun (`2088`) was canceled and replaced with one bounded cross-dataset queue under:
+
+- output root:
+  - `/data/scratch/murphy/outputs/cot-loop-detection/olmo3_degeneration_origin_progression/bound8_temp0p1_gen10_ctx40960_topkneg1/`
+- shared decode contract:
+  - `temperature=0.1`
+  - `top_p=0.95`
+  - `top_k=-1`
+  - `num_generations=10`
+  - `max_tokens=40960`
+  - `max_model_len=40960`
+  - `max_samples=8` per dataset for this bounded collection pass
+- prompt surfaces:
+  - `base/raw`
+  - `SFT/chat_template`
+  - `RLVR/chat_template`
+  - `LiveCodeBench` stays raw-string prompt generation for every stage because the benchmark prompt builder itself is raw and the collector disallows chat-template wrapping there
+
+The live queue is now:
+
+- base chain:
+  - `2091` `MATH-500`
+  - `2092` `AIME`
+  - `2093` `GPQA`
+  - `2094` `MMLU-Pro`
+  - `2095` `LiveCodeBench`
+- SFT chain:
+  - `2096` `MATH-500`
+  - `2097` `AIME`
+  - `2098` `GPQA`
+  - `2099` `MMLU-Pro`
+  - `2100` `LiveCodeBench`
+- RLVR chain:
+  - `2101` `MATH-500`
+  - `2102` `AIME`
+  - `2103` `GPQA`
+  - `2104` `MMLU-Pro`
+  - `2105` `LiveCodeBench`
+
+State at queue launch checkpoint:
+
+- `2096` already finished `MATH-500` cleanly and advanced the SFT chain to `2097` (`AIME`);
+- `2101` RLVR is still on the `MATH-500` leg;
+- `2091` base is still on the `MATH-500` leg and remains the runtime long pole.
+
+The runtime estimate from the canceled `0.2` base log is still useful operationally:
+
+- the base `MATH-500` leg is roughly an `85`-`95` minute job on this bounded `8`-prompt contract;
+- the instruct-stage legs are minute-scale and should clear the later dataset queue much sooner.
+
 ## Deliverables
 
 We want three layers of output:
