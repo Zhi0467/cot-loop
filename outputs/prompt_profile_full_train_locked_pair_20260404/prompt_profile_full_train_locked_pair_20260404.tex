@@ -9,7 +9,7 @@
 
 \title{Prompt-Profile Full Train: Locked Pair Results}
 \author{}
-\date{2026-04-04 04:36 UTC}
+\date{2026-04-04 05:33 UTC}
 
 \begin{document}
 \maketitle
@@ -19,6 +19,7 @@
 \item This report covers the first locked prompt-profile full-train run on the fixed five-dataset saved surface. It is not a new target-choice experiment.
 \item Runtime object: Slurm job \texttt{2043} on \texttt{2} GPUs, completed at \texttt{2026-04-04 00:10 UTC}.
 \item Model/policy object: \texttt{Qwen/Qwen3-1.7B}, \texttt{temperature=0.2}, \texttt{num\_generations=4}, \texttt{max\_tokens=30000}, prompt-prefill activations only, loop detector \texttt{n=30}, \texttt{k=20}.
+\item Split contract: regression keeps the natural prompt-disjoint train/test split; binary relabel keeps test natural but downsample-balances the train split to \texttt{50/50}.
 \item Continuous head (\texttt{mean\_relative\_length}): if the use is screening degenerate prompts, the right headline metric is held-out top-k capture on the frozen \texttt{best\_loss} checkpoint, not \texttt{Spearman}. On \texttt{top\_20p\_capture}, ensemble beats the train-fit prompt-length baseline on \texttt{GPQA}, \texttt{MMLU-Pro}, and \texttt{LiveCodeBench}, but not on \texttt{AIME} or \texttt{MATH-500}. On \texttt{RMSE}, the win shrinks to \texttt{GPQA} and \texttt{LiveCodeBench} only.
 \item Binary head (\texttt{majority\_s\_0.5}): this is still the cleaner finished surface. Ensemble \texttt{PR-AUC} beats the prompt-length baseline on all five datasets.
 \item Recommendation from this run:
@@ -64,6 +65,14 @@ LiveCodeBench & 640 & 160 & \texttt{livecodebench\_codegen} & saved prompt field
 }
 \end{center}
 
+\subsection*{Split And Balancing Contract}
+\begin{itemize}[leftmargin=1.5em]
+\item Regression \texttt{mean\_relative\_length}: no balancing on train or test; the shared archive keeps the natural prompt-disjoint split shown above.
+\item Binary \texttt{majority\_s\_0.5}: relabeled from the same prompts with \texttt{--balance-train downsample --balance-test none}.
+\item Train prevalence is therefore exactly \texttt{0.5} on every dataset.
+\item Test prevalence stays natural: \texttt{GPQA 0.050}, \texttt{AIME 0.583}, \texttt{MATH-500 0.040}, \texttt{MMLU-Pro 0.0125}, \texttt{LiveCodeBench 0.3375}.
+\end{itemize}
+
 \section*{Definitions}
 \subsection*{Targets}
 \begin{itemize}[leftmargin=1.5em]
@@ -86,7 +95,11 @@ LiveCodeBench & 640 & 160 & \texttt{livecodebench\_codegen} & saved prompt field
 
 \subsection*{Metrics}
 \begin{itemize}[leftmargin=1.5em]
-\item \texttt{top\_10p\_capture} / \texttt{top\_20p\_capture}: sort held-out prompts by predicted score, keep the top \texttt{10\%} or \texttt{20\%}, and ask what fraction of total target mass falls inside that bucket. For \texttt{mean\_relative\_length}, target mass means summed realized relative-length mass over held-out prompts.
+\item \texttt{score}: in the regression lane, each held-out prompt gets one scalar score \texttt{$s_i = \hat y_i$}. For regression \texttt{ensemble}, \texttt{$s_i$} is the mean of the per-layer MLP predictions; for regression \texttt{last\_layer}, it is the final-layer MLP prediction; for the prompt-length baseline, it is the linear-model prediction from prompt length, with the budget term constant on this run. In the binary lane, each held-out prompt gets one scalar positive score \texttt{$s_i = \hat s_i$}; \texttt{PR-AUC} ranks these scores, and the threshold table applies one train-chosen threshold to them.
+\item \texttt{top\_10p\_capture} / \texttt{top\_20p\_capture}: for held-out prompts \texttt{$i=1,\dots,n$}, sort by descending regression score \texttt{$s_i$}, keep the top \texttt{$\lceil 0.1n \rceil$} or \texttt{$\lceil 0.2n \rceil$}, and compute \texttt{$\sum_{i \in kept} y_i / \sum_{i=1}^n y_i$}.
+\item Here \texttt{$y_i$} is the realized \texttt{mean\_relative\_length} for that same held-out prompt.
+\item ``mass'' means total realized relative-length weight across prompts, not a prompt count and not a binary positive count.
+\item Concrete example: on \texttt{GPQA}, test has \texttt{40} prompts, so \texttt{top\_20p\_capture} keeps the top \texttt{8} prompts by predicted \texttt{mean\_relative\_length}; ensemble \texttt{0.247} means those \texttt{8} prompts contain \texttt{24.7\%} of the total realized relative-length mass on the \texttt{40}-prompt test split.
 \item \texttt{RMSE}: pointwise error on the aligned held-out prompt pairs.
 \item \texttt{Spearman}: monotone ordering agreement on those same aligned held-out prompt pairs. It is not the task definition.
 \item \texttt{PR-AUC}: ranking metric for the binary head across thresholds.
@@ -254,6 +267,22 @@ LiveCodeBench & 0.609 $\pm$ 0.046 & 0.827 $\pm$ 0.091 & 0.747 $\pm$ 0.014 & 0.49
   \item that \texttt{majority\_s\_0.5} is a pure loop label
   \item that \texttt{p\_loop} should be reopened as the default train target after the fact
   \end{itemize}
+\end{itemize}
+
+\section*{Relation To The Earlier Probe Surface}
+\begin{itemize}[leftmargin=1.5em]
+\item The March target-choice bundle was not using this exact contract.
+\item Continuous target-choice runs (\texttt{mean\_relative\_length} and \texttt{p\_loop}):
+  \begin{itemize}[leftmargin=1.5em]
+  \item used prompt-disjoint natural train/test splits with no balancing
+  \item were typically reported from \texttt{best\_rank}, not the frozen \texttt{best\_loss} contract used here
+  \end{itemize}
+\item Older March \texttt{majority\_s\_0.5} pilot/control runs:
+  \begin{itemize}[leftmargin=1.5em]
+  \item were also mostly natural-train rather than explicitly balanced
+  \item saved train prevalences in the cross-dataset bundle were \texttt{GPQA 0.0569}, \texttt{AIME 0.5000}, \texttt{MATH-500 0.0550}, \texttt{MMLU-Pro 0.0109}, and \texttt{LiveCodeBench 0.2734}
+  \end{itemize}
+\item So if the question is ``did we at least balance the train split before target switching?'', the answer is: not on the old March probe/control bundle except where the underlying split happened to land near balanced. The explicit balanced-train contract starts with the locked April binary relabel path used in this report.
 \end{itemize}
 
 \section*{Recommendation}

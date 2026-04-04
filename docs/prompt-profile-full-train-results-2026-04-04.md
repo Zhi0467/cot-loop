@@ -1,12 +1,13 @@
 # Prompt-Profile Full Train Results
 
-Last updated: 2026-04-04 04:36 UTC
+Last updated: 2026-04-04 05:33 UTC
 
 ## Executive Summary
 
 - This report covers the first locked prompt-profile full-train run on the fixed five-dataset saved surface. It is not a new target-choice experiment.
 - Runtime object: Slurm job `2043` on `2` GPUs, completed at `2026-04-04 00:10 UTC`.
 - Model/policy object: `Qwen/Qwen3-1.7B`, `temperature=0.2`, `num_generations=4`, `max_tokens=30000`, prompt-prefill activations only, loop detector `n=30`, `k=20`.
+- Split contract: regression keeps the natural prompt-disjoint train/test split; binary relabel keeps test natural but downsample-balances the train split to `50/50`.
 - Continuous head (`mean_relative_length`): if the use is screening degenerate prompts, the right headline metric is held-out top-k capture on the frozen `best_loss` checkpoint, not `Spearman`. On `top_20p_capture`, ensemble beats the train-fit prompt-length baseline on `GPQA`, `MMLU-Pro`, and `LiveCodeBench`, but not on `AIME` or `MATH-500`. On `RMSE`, the win shrinks to `GPQA` and `LiveCodeBench` only.
 - Binary head (`majority_s_0.5`): this is still the cleaner finished surface. Ensemble `PR-AUC` beats the prompt-length baseline on all five datasets.
 - Recommendation from this run:
@@ -37,6 +38,15 @@ What does the first locked full-train pass say about the current two-head prompt
 | `MMLU-Pro` | `multiple_choice_mmlupro` | `640` | `160` | saved prompt field `problem` |
 | `LiveCodeBench` | `livecodebench_codegen` | `640` | `160` | saved prompt field `problem` |
 
+### Split And Balancing Contract
+
+- Regression `mean_relative_length`
+  - no balancing on train or test; the shared archive keeps the natural prompt-disjoint split shown above.
+- Binary `majority_s_0.5`
+  - relabeled from the same prompts with `--balance-train downsample --balance-test none`.
+  - train prevalence is therefore exactly `0.5` on every dataset.
+  - test prevalence stays natural: `GPQA 0.050`, `AIME 0.583`, `MATH-500 0.040`, `MMLU-Pro 0.0125`, `LiveCodeBench 0.3375`.
+
 ## Definitions
 
 ### Targets
@@ -64,9 +74,15 @@ What does the first locked full-train pass say about the current two-head prompt
 
 ### Metrics
 
+- `score`
+  - regression lane: each held-out prompt gets one scalar score `s_i = \hat y_i`.
+  - for regression `ensemble`, `s_i` is the mean of the per-layer MLP predictions; for regression `last_layer`, it is the final-layer MLP prediction; for the prompt-length baseline, it is the linear-model prediction from prompt length, with the budget term constant on this run.
+  - binary lane: each held-out prompt gets one scalar positive score `s_i = \hat s_i`; `PR-AUC` ranks these scores, and the threshold table applies one train-chosen threshold to them.
 - `top_10p_capture` / `top_20p_capture`
-  - sort held-out prompts by predicted score, keep the top `10%` or `20%`, and ask what fraction of the total target mass falls inside that bucket.
-  - for `mean_relative_length`, target mass means summed realized relative-length mass over held-out prompts.
+  - for held-out prompts `i=1,...,n`, sort by descending regression score `s_i`, keep the top `ceil(0.1 n)` or `ceil(0.2 n)`, and compute `sum_{i in kept} y_i / sum_{i=1}^n y_i`.
+  - here `y_i` is the realized `mean_relative_length` for that same held-out prompt.
+  - "mass" means total realized relative-length weight across prompts, not a prompt count and not a binary positive count.
+  - concrete example: on `GPQA`, test has `40` prompts, so `top_20p_capture` keeps the top `8` prompts by predicted `mean_relative_length`; ensemble `0.247` means those `8` prompts contain `24.7%` of the total realized relative-length mass on the `40`-prompt test split.
 - `RMSE`
   - pointwise error on those aligned held-out prompt pairs.
 - `Spearman`
@@ -196,6 +212,17 @@ This is the cleaner finished head from the locked pair.
   - that `mean_relative_length` beats prompt length uniformly
   - that `majority_s_0.5` is a pure loop label
   - that `p_loop` should be reopened as the default train target after the fact
+
+## Relation To The Earlier Probe Surface
+
+- The March target-choice bundle was not using this exact contract.
+- Continuous target-choice runs (`mean_relative_length` and `p_loop`)
+  - used prompt-disjoint natural train/test splits with no balancing.
+  - were typically reported from `best_rank`, not the frozen `best_loss` contract used here.
+- Older March `majority_s_0.5` pilot/control runs
+  - were also mostly natural-train rather than explicitly balanced.
+  - saved train prevalences in the cross-dataset bundle were `GPQA 0.0569`, `AIME 0.5000`, `MATH-500 0.0550`, `MMLU-Pro 0.0109`, and `LiveCodeBench 0.2734`.
+- So if the question is "did we at least balance the train split before target switching?", the answer is: not on the old March probe/control bundle except where the underlying split happened to land near balanced. The explicit balanced-train contract starts with the locked April binary relabel path used in this report.
 
 ## Recommendation
 
