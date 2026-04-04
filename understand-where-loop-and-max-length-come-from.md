@@ -265,6 +265,26 @@ The runtime estimate from the canceled `0.2` base log is still useful operationa
 - the base `MATH-500` leg is roughly an `85`-`95` minute job on this bounded `8`-prompt contract;
 - the instruct-stage legs are minute-scale and should clear the later dataset queue much sooner.
 
+Wangzhi then narrowed the thread objective again:
+
+- if base is the long pole, skip it for now;
+- in this thread, finish collecting only the SFT and RLVR stats.
+
+So the base chain (`2091`-`2095`) has now been canceled, and the live collection object for this thread is just:
+
+- SFT:
+  - `2097` `AIME`
+  - `2098` `GPQA`
+  - `2099` `MMLU-Pro`
+  - `2100` `LiveCodeBench`
+- RLVR:
+  - `2102` `AIME`
+  - `2103` `GPQA`
+  - `2104` `MMLU-Pro`
+  - `2105` `LiveCodeBench`
+
+So the immediate deliverable for this thread is no longer a three-stage progression table. It is the instruct-stage rollout-stat bundle across the remaining datasets, with base deferred because it is currently the runtime bottleneck rather than the most decision-relevant object.
+
 ## Deliverables
 
 We want three layers of output:
