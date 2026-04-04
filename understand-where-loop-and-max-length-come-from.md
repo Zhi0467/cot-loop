@@ -146,6 +146,61 @@ Current interpretation:
 - this is now enough to reject the earlier all-raw comparison, but it is still not the final multi-dataset answer to the full note hypothesis;
 - the next expansion should keep the corrected prompt-surface split fixed and scale the same rollout-stat object outward, rather than revisiting the invalid shared-raw contract.
 
+## Fairness Correction (2026-04-04 05:09 UTC)
+
+Wangzhi's follow-up exposed one more confound in the first bounded pilots.
+
+- The prompt surface had been corrected, but the sampling contract was still too loose relative to the older Qwen3 rollout-stat bundle.
+- Those earlier bounded pilots used:
+  - `temperature=0.2`
+  - `num_generations=1`
+  - `max_tokens=4096`
+  - `max_model_len=65536`
+  - implicit `top_p` / `top_k` inherited from each checkpoint's `generation_config`
+- That meant the comparison was no longer close to the Qwen3 common-policy bundle we were supposed to reuse.
+- Worse, the inherited sampling defaults were not even shared across the OLMo stages:
+  - base OLMo effectively ran with `top_p=1.0`, `top_k=-1`
+  - instruct SFT / RLVR ran with `top_p=0.95`, `top_k=-1`
+
+So the collector now supports explicit sampling overrides, and the corrected follow-up object is:
+
+- same dataset slice and same collector;
+- same loop detector;
+- same sampling contract across checkpoints:
+  - `temperature=0.2`
+  - `top_p=0.95`
+  - `top_k=20`
+  - `num_generations=10`
+  - `max_model_len=40960`
+- still the same native prompt-surface split:
+  - base `raw`
+  - SFT `chat_template`
+  - RLVR `chat_template`
+
+The first Qwen3-like bounded rerun on that tighter contract is now under:
+
+- `/data/scratch/murphy/outputs/cot-loop-detection/olmo3_degeneration_origin_progression/math8_qwen3like_gen10_ctx40960/`
+
+Current state of that rerun:
+
+- SFT finished cleanly in `00:01:12` with:
+  - `42 / 80` correct
+  - `0 / 80` looped
+  - `0 / 80` max-length hits
+  - `avg_generation_length = 376.8625`
+- RLVR finished cleanly in `00:01:55` with:
+  - `50 / 80` correct
+  - `0 / 80` looped
+  - `0 / 80` max-length hits
+  - `avg_generation_length = 562.7`
+- base is still running and is again the only long pole under the shared decode contract.
+
+So the current fairness rule is:
+
+- do **not** force an identical wrapper when that wrapper is broken for one stage;
+- do keep the collector, dataset slice, loop detector, and sampling contract fixed;
+- treat prompt surface as a separate interface choice that must stay native unless a direct probe shows otherwise.
+
 ## Deliverables
 
 We want three layers of output:
