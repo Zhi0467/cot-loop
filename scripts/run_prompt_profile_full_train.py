@@ -139,6 +139,24 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--python-bin", default=sys.executable)
     parser.add_argument("--wandb-project", default="cot-loop-probe")
     parser.add_argument("--probe-preset", default="mlp")
+    parser.add_argument(
+        "--mlp-hidden-dim",
+        type=int,
+        default=None,
+        help="Optional hidden width override when --probe-preset=mlp.",
+    )
+    parser.add_argument(
+        "--mlp-depth",
+        type=int,
+        default=None,
+        help="Optional hidden-layer count override when --probe-preset=mlp.",
+    )
+    parser.add_argument(
+        "--mlp-dropout",
+        type=float,
+        default=None,
+        help="Optional dropout override when --probe-preset=mlp.",
+    )
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--batch-size", type=int, default=256)
     parser.add_argument("--lr", type=float, default=1e-4)
@@ -415,7 +433,7 @@ def train_probe_cmd(
     wandb_run_name: str,
 ) -> list[str]:
     view_args = BINARY_VIEW_ARGS if target_kind == "binary" else REGRESSION_VIEW_ARGS
-    return [
+    cmd = [
         args.python_bin,
         str(SCRIPTS_DIR / "train_probe.py"),
         "--data-dir",
@@ -446,8 +464,15 @@ def train_probe_cmd(
         args.wandb_project,
         "--wandb-run-name",
         wandb_run_name,
-        *view_args[view_name],
     ]
+    if args.mlp_hidden_dim is not None:
+        cmd.extend(["--mlp-hidden-dim", str(args.mlp_hidden_dim)])
+    if args.mlp_depth is not None:
+        cmd.extend(["--mlp-depth", str(args.mlp_depth)])
+    if args.mlp_dropout is not None:
+        cmd.extend(["--mlp-dropout", str(args.mlp_dropout)])
+    cmd.extend(view_args[view_name])
+    return cmd
 
 
 def relabel_cmd(

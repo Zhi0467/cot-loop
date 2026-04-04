@@ -8,6 +8,7 @@ This directory contains SLURM workflows for the CoT loop detector project.
 - `analyze_prefill_stability.sbatch`: Prefill-loop sanity check and stability checks with greedy rollouts.
 - `run_probe_train_e2e.sbatch`: End-to-end probe pipeline for the canonical stacked prefill dataset (build + probe training, including optional multi-seed runs).
 - `run_prompt_profile_full_train.sbatch`: 2-GPU wrapper for the locked `mean_relative_length` + `majority_s_0.5` full-train path, reusing the saved March prompt-profile archives and writing the standardized `outputs/full_train/` ledger.
+- `run_prompt_profile_binary_retrain.sbatch`: 1-GPU wrapper for rerunning only the balanced `majority_s_0.5` binary probes from an existing locked full-train output root, with explicit MLP-width/depth overrides.
 - `run_prompt_profile_projection.sbatch`: One-GPU prompt-profile visualization path (build + prompt-level projection export, with optional render when `matplotlib` is available).
 - `run_k5_threeview_dataset.sbatch`: Historical multi-view dataset build for the k=5 / max_tokens=15000 ablation study.
 - `run_k5_threeview_ablation.sbatch`: Historical MLP sweep over the k=5 three-view ablation dataset.
@@ -141,6 +142,28 @@ Submit with defaults:
 ```bash
 CONDA_ENV=swe311 \
 sbatch slurm/run_prompt_profile_full_train.sbatch
+```
+
+## Locked Binary Retrain Wrapper
+
+`run_prompt_profile_binary_retrain.sbatch` defaults to:
+
+- `#SBATCH --gres=gpu:1`
+- `SOURCE_ROOT=/data/scratch/${USER}/outputs/cot-loop-detection/full_train_locked_pair_20260404`
+- `OUT_ROOT=/data/scratch/${USER}/outputs/cot-loop-detection/full_train_locked_pair_20260404_binary_h256d2`
+- reuse of the saved balanced `majority_s_0.5` data under the source root
+- MLP overrides aligned with the earlier loop-label ablation family:
+  - `MLP_HIDDEN_DIM=256`
+  - `MLP_DEPTH=2`
+  - `MLP_DROPOUT=0.1`
+  - `EPOCHS=15`
+  - `LR=1e-4`
+  - `WEIGHT_DECAY=0.05`
+
+Submit with defaults:
+```bash
+CONDA_ENV=swe311 \
+sbatch slurm/run_prompt_profile_binary_retrain.sbatch
 ```
 
 ## Prompt-Level Projection Defaults
