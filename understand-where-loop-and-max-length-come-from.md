@@ -304,7 +304,15 @@ So on this bounded instruct-only pass:
 
 - RLVR stayed loop-free and max-length-hit-free on every collected dataset;
 - the only observed degeneracy mass was on SFT, and even there it was light (`1 / 80` on `AIME`, `1 / 80` on `MMLU-Pro`);
-- that means the current live question is no longer "what do SFT and RLVR look like?" but "what do we do next about the deferred base stage?"
+- that does **not** yet make the instruct-side read scientifically clean across datasets.
+
+Two follow-up cautions matter before treating this bundle as directly comparable to the earlier Qwen3 surface:
+
+- `RLVR / MMLU-Pro` came back at `0 / 80` correct with `avg_generation_length = 6.15` under the same `chat_template` surface that was otherwise working on the other MCQ tasks. That shape looks more like a terminal-answer or grading mismatch than a stable capability read.
+- `LiveCodeBench` is on a different interface from the MCQ tasks by construction: it stays on the benchmark's raw-string prompt builder for every stage, so its numbers should not be read as one more ordinary MCQ point.
+- `LiveCodeBench` is also not obviously a total generation failure. The saved RLVR JSON includes native codegen metrics of `pass@1 = 0.10` and `pass@10 = 0.375` on this `8`-problem slice, and the paired `livecodebench__lcb_records.json` file contains substantive code outputs rather than blanks.
+
+So the current live question is no longer only "what do we do next about the deferred base stage?" It is also "do we need a terminal-format / grading sanity pass on the weird instruct-side datasets, especially `MMLU-Pro`, before making a stronger SFT-versus-RLVR claim?"
 
 ## Why The New Lengths Are Much Shorter Than Qwen3
 
@@ -325,7 +333,7 @@ Concrete examples:
 - `GPQA`: Qwen3 v2 has `avg_generation_length = 9687.16`, `loop_fraction = 0.1641`, `max_length_hit_fraction = 0.0692`; current OLMo gives SFT `7.0` and RLVR `291.06`, both with `0 / 80` loops and `0 / 80` max-length hits.
 - `MMLU-Pro`: Qwen3 v2 has `avg_generation_length = 3702.36`, `loop_fraction = 0.0456`, `max_length_hit_fraction = 0.0095`; current OLMo gives SFT `590.55` with `1 / 80` loop and RLVR `6.15` with `0 / 80`.
 
-So the short lengths are not mainly coming from a silent prompt-contract change. The current GPQA / MMLU-Pro adapters still use the same JSON-answer surface as the saved Qwen3 v2 bundle. The best current explanation is behavioral: far less loop / cap mass on this bounded OLMo instruct slice, plus some prompts where the model simply emits the requested short JSON answer and stops.
+So the short lengths are not mainly coming from a silent prompt-contract change. The current GPQA / MMLU-Pro adapters still use the same JSON-answer surface as the saved Qwen3 v2 bundle. Much of the gap is plausibly behavioral: far less loop / cap mass on this bounded OLMo instruct slice, plus some prompts where the model simply emits the requested short JSON answer and stops. But `RLVR / MMLU-Pro = 0 / 80` with `avg_generation_length = 6.15` is still suspicious enough that the dataset-by-dataset semantic read should stay provisional until the terminal-answer surface is audited.
 
 One automation footnote:
 

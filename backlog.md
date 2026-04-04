@@ -1,6 +1,6 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-04 06:27 UTC
+Last updated: 2026-04-04 06:31 UTC
 
 ## Immediate Next Experiments
 
@@ -12,15 +12,17 @@ Last updated: 2026-04-04 06:27 UTC
   - The width-vs-depth split is now explicit:
     - for `ensemble`, width helps and added depth hurts;
     - for `last_layer`, added depth helps modestly on top of width.
+  - The global ensemble recommendation is stable across checkpoint rules:
+    - frozen `best_loss`: mean test `PR-AUC 0.518` for `ensemble h256 d1` versus `0.492` for `ensemble h256 d2`;
+    - secondary `best_rank`: mean test `PR-AUC 0.539` for `ensemble h256 d1` versus `0.522` for `ensemble h256 d2`.
+  - Threshold metrics on the natural test split remain recall-heavy on rare-positive datasets, so keep `PR-AUC` primary and treat threshold metrics as diagnostic only.
   - Proven limitation: this still does not answer which layers to keep. The next honest tuning step is a small layer-subset / view sweep on the same balanced binary data.
-- The balanced binary capacity rerun now exists as a separate result surface.
+- The older `h256 d2` balanced binary rerun note is now intermediate evidence rather than the recommendation surface.
   - Result note: `docs/prompt-profile-binary-retrain-h256d2-2026-04-04.md`
-  - Result PDF: `outputs/prompt_profile_binary_retrain_h256d2_20260404/prompt_profile_binary_retrain_h256d2_20260404.pdf`
-  - Raw metrics: `outputs/prompt_profile_binary_retrain_h256d2_20260404/binary_retrain_metrics.csv`
-  - This is the same saved April `majority_s_0.5` data with a different probe family, not a new target-choice run.
-  - What changed: default `h128 d1` probes became `h256 d2`; train/test split, seeds, optimizer settings, and layer/view definitions stayed fixed.
-  - Main read on test `PR-AUC`: `ensemble h256 d2` is the best single global surface by cross-dataset mean (`0.492`), but the gain is mixed by dataset and by view rather than monotone.
-  - Proven limitation: this rerun changed probe capacity only. It did not sweep which layers to keep, so the next honest tuning step is a small layer-subset / view sweep on the same balanced binary data if more tuning is needed.
+  - Result bundle: `outputs/prompt_profile_binary_retrain_h256d2_20260404/`
+  - This is still useful because it preserves the exact `2106` / `2107` depth-rerun metrics and logs.
+  - But it should now be read only as the depth-only control that motivated the width-only `2108` follow-up, not as the current best-surface note.
+  - The superseding recommendation surface is the capacity-controls note above.
 - Interpret the finished locked full-train pass before reopening targets.
   - Result note: `docs/prompt-profile-full-train-results-2026-04-04.md`
   - Result PDF: `outputs/prompt_profile_full_train_locked_pair_20260404/prompt_profile_full_train_locked_pair_20260404.pdf`

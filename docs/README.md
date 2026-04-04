@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-04-04 06:27 UTC
+Last updated: 2026-04-04 06:31 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -36,6 +36,7 @@ Key outputs:
 - Full-train result PDF: ../outputs/prompt_profile_full_train_locked_pair_20260404/prompt_profile_full_train_locked_pair_20260404.pdf
 - Binary retrain result bundle: ../outputs/prompt_profile_binary_retrain_h256d2_20260404/
 - Binary retrain result PDF: ../outputs/prompt_profile_binary_retrain_h256d2_20260404/prompt_profile_binary_retrain_h256d2_20260404.pdf
+- Binary capacity-controls bundle: ../outputs/prompt_profile_binary_capacity_controls_20260404/
 - Binary capacity-controls PDF: ../outputs/prompt_profile_binary_capacity_controls_20260404/prompt_profile_binary_capacity_controls_20260404.pdf
 - Consolidated earlier findings PDF: ../outputs/pr2_experiment_findings_consolidated_pdf/pr2_experiment_findings_consolidated.pdf
 - Rollout-statistics module audit PDF: ../outputs/rollout_stats_module_audit/rollout_stats_module_audit.pdf
@@ -51,19 +52,20 @@ Current live status:
 - The repo-root note `../understand-where-loop-and-max-length-come-from.md` is the actual OLMo progression plan on the older rollout-statistics module: reuse the Qwen3 collector/report bundle, collect the same metric family, and test where degenerate rollouts enter along base -> SFT -> RLVR.
 - The docs note `understand-where-loop-and-max-length-come-from.md` is only the background definitions appendix for saved `loop`, prompt-profile `cap_hit` / `p_cap`, rollout-stat `max_length_hit`, and `majority_s_0.5`.
 - The locked pair now has both the execution note and the finished first-run result note on disk.
-- The balanced binary probe-capacity rerun is now on disk too. It keeps the April binary data fixed and only changes the probe family from `h128 d1` to `h256 d2`.
+- The older `h256 d2` binary retrain note is still on disk, but it is now intermediate only:
+  - it preserves the exact `2106` / `2107` depth-rerun record and raw remote metrics
+  - it should not be paraphrased as the current best-surface recommendation anymore
 - The follow-up capacity-control note is now the current binary tuning surface:
   - same balanced binary data, now compared across `h128 d1`, `h256 d1`, and `h256 d2`
   - the clean current read is that width helps the ensemble, extra depth hurts the ensemble, and extra depth only helps the `last_layer` view modestly
+  - under the frozen `best_loss` rule, `ensemble h256 d1` is the best single global surface (`0.518` mean test `PR-AUC`)
+  - under the secondary `best_rank` rule, the ensemble ordering stays the same (`0.539 > 0.522 > 0.474`), so the global ensemble choice is stable
+  - threshold metrics on the natural test split remain recall-heavy on rare-positive datasets, so `PR-AUC` stays primary and threshold metrics stay diagnostic
   - if one single global binary surface is needed today, it should be `ensemble h256 d1`
 - The run surface is now executable rather than purely documentary: `scripts/run_prompt_profile_full_train.py` is the canonical launcher, and `scripts/summarize_prompt_profile_full_train.py` is the canonical post-run ledger for the locked pair plus metadata controls.
 - The first locked full-train pass is now complete. The repo-facing result is split cleanly:
   - regression `mean_relative_length`: ensemble beats `last_layer`, but the train-fit prompt-length baseline still wins on `AIME`, `MATH-500`, and `MMLU-Pro`;
   - binary `majority_s_0.5`: ensemble `PR-AUC` beats the prompt-length baseline on all five datasets, with the clearest finished wins on `AIME`, `LiveCodeBench`, and `MMLU-Pro`.
-- The newer binary retrain result answers a different question:
-  - same balanced binary data, larger probe family;
-  - `ensemble h256 d2` is the best single global ranking surface by mean test `PR-AUC`;
-  - the effect is mixed by dataset and by view, so this should not be paraphrased as a blanket “bigger probe wins” result.
 - The reset note `thread-reset-2026-03-25.md` is now the correct restart surface for Slack follow-up. It captures the collaborator's recent corrections, the proved-vs-unproved ledger, and the exact next work order.
 - `roadmap.md` is the chronological experiment log; `backlog.md` now carries the post-run interpretation object under the corrected selection rule.
 - `LiveCodeBench` is no longer pending, but its recovered projection artifact still lacks prompt-level accuracy.
