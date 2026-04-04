@@ -392,6 +392,8 @@ def summarize_generation_config(rows: list[dict[str, Any]]) -> dict[str, Any]:
 def validate_bundle_contract(rows: list[dict[str, Any]]) -> None:
     required_generation_keys = (
         "temperature",
+        "top_p",
+        "top_k",
         "num_generations",
         "max_tokens",
         "max_model_len",

@@ -306,7 +306,7 @@ def build_prompts(
     model_id: str,
     lm_style_override: str | None = None,
     max_samples: int | None = None,
-) -> tuple[list[tuple[str, str]], str]:
+) -> tuple[list[tuple[str, str]], str, str]:
     lm_style = _get_lm_style(
         model_id,
         override=lm_style_override,
@@ -314,6 +314,9 @@ def build_prompts(
     )
     symbols = _import_lcb_symbols(repo_path)
     tokenizer = _load_tokenizer(model_id) if lm_style == _HF_CHAT_TEMPLATE_STYLE else None
+    resolved_prompt_format = (
+        "chat_template" if lm_style == _HF_CHAT_TEMPLATE_STYLE else "raw"
+    )
     prompt_records: list[tuple[str, str]] = []
     selected = benchmark if max_samples is None else benchmark[:max_samples]
     with _repo_cwd(repo_path):
@@ -334,7 +337,7 @@ def build_prompts(
             prompt_records.append((str(instance.question_id), prompt))
     return prompt_records, (
         lm_style if isinstance(lm_style, str) else lm_style.value
-    )
+    ), resolved_prompt_format
 
 
 def extract_code_output(

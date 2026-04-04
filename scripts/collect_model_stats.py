@@ -440,7 +440,7 @@ def _load_prompt_items(
         args.livecodebench_repo,
         args.release_version,
     )
-    prompt_records, lm_style = livecodebench_codegen.build_prompts(
+    prompt_records, lm_style, resolved_prompt_format = livecodebench_codegen.build_prompts(
         benchmark,
         format_prompt,
         repo_path=args.livecodebench_repo,

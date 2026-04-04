@@ -73,8 +73,23 @@ WEIGHT_DECAY="${WEIGHT_DECAY:-0.05}"
 NUM_WORKERS="${NUM_WORKERS:-8}"
 DEVICE="${DEVICE:-auto}"
 
-read -r -a DATASETS <<< "${DATASET_LIST}"
+DEFAULT_DATASETS=(gpqa aime math500 mmlu_pro livecodebench)
+read -r -a REQUESTED_DATASETS <<< "${DATASET_LIST}"
 read -r -a SEED_ARRAY <<< "${SEEDS}"
+
+USE_ALL_DATASETS=0
+for dataset in "${REQUESTED_DATASETS[@]}"; do
+  if [[ "${dataset}" == "all" ]]; then
+    USE_ALL_DATASETS=1
+    break
+  fi
+done
+
+if (( USE_ALL_DATASETS )); then
+  DATASETS=("${DEFAULT_DATASETS[@]}")
+else
+  DATASETS=("${REQUESTED_DATASETS[@]}")
+fi
 
 mkdir -p "${OUT_ROOT}"
 
@@ -128,14 +143,9 @@ for seed in "${SEED_ARRAY[@]}"; do
   CMD+=("${seed}")
 done
 
-for dataset in "${DATASETS[@]}"; do
-  if [[ "${dataset}" == "all" ]]; then
-    CMD+=(--dataset all)
-    break
-  fi
-done
-
-if [[ "${DATASETS[0]}" != "all" ]]; then
+if (( USE_ALL_DATASETS )); then
+  CMD+=(--dataset all)
+else
   CMD+=(--dataset)
   for dataset in "${DATASETS[@]}"; do
     CMD+=("${dataset}")
