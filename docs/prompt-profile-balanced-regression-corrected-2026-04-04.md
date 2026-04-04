@@ -1,5 +1,12 @@
 # Balanced Prompt-Profile Regression Rerun (Corrected Full-Train Sampler Surface)
 
+Status: non-canonical after 2026-04-04 23:45 UTC.
+
+Wangzhi later corrected the training object itself: `mean_relative_length` should stay on the natural distribution and natural sampler because it is a continuous target, not a binary-label problem. Keep this note only as a side analysis of what changed when the full regression train/test splits were preserved but train-time sampling was still balanced using natural `majority_s_0.5` labels.
+
+Use `docs/prompt-profile-full-train-results-2026-04-04.md` or
+`docs/prompt-profile-full-surface-update-2026-04-04.md` for the canonical regression lane.
+
 Generated: 2026-04-04 UTC
 
 ## Correction
@@ -136,12 +143,11 @@ Cross-dataset mean `top_10p_capture`: ensemble `0.197`, last-layer `0.164`, prom
 
 ## Recommendation
 
-- If `mean_relative_length` stays in the project as a screening score for catching degenerate or long rollouts, keep the ensemble view and report `top_20p_capture` first.
-- Do not sell this corrected regression lane as a clean calibrated regressor. On the full-train corrected object, the prompt-length baseline is still the best `RMSE` surface on `4 / 5` datasets.
-- Future balanced-regression follow-up should now be tuning, not another contract fix:
-  - small layer-subset sweep for the ensemble
-  - small capacity sweep on this same full-train sampler surface
-  - keep `top_20p_capture` primary, `RMSE` secondary
+- Treat this note as sensitivity analysis only, not as the default regression contract.
+- If `mean_relative_length` stays in the project as a screening score for catching degenerate or long rollouts, use the natural-split / natural-sampler regression lane instead of this balanced-sampler variant.
+- The substantive lesson from this side analysis is narrower:
+  - restoring the full train counts matters;
+  - even after that fix, prompt length remains the stronger calibration baseline on most datasets.
 
 ## Artifacts
 

@@ -7,6 +7,8 @@ Use `docs/prompt-profile-balanced-regression-corrected-2026-04-04.md` and
 `outputs/prompt_profile_balanced_regression_corrected_20260404/` for the corrected
 full-train sampler rerun.
 
+Later collaborator correction at 2026-04-04 23:45 UTC: neither balanced-regression note is the canonical regression lane anymore. The default regression object is again the natural-split / natural-sampler April run in `docs/prompt-profile-full-train-results-2026-04-04.md`.
+
 Generated: 2026-04-04 UTC
 
 ## Object
