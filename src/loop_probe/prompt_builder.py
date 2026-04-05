@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from .prompt_format import format_user_prompt
 
-def build_math_prompt(tokenizer, question: str) -> str:
+
+def build_math_prompt(
+    tokenizer,
+    question: str,
+    *,
+    prompt_format: str = "auto",
+) -> str:
     user_msg = f"{question}\n\nYou must put your final answer within \\boxed{{}}."
-    return tokenizer.apply_chat_template(
-        [{"role": "user", "content": user_msg}],
-        tokenize=False,
-        add_generation_prompt=True,
-    )
+    return format_user_prompt(tokenizer, user_msg, prompt_format=prompt_format)

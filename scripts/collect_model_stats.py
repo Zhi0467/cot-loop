@@ -38,6 +38,7 @@ from loop_probe.collector import (
 )
 from loop_probe.configs import RolloutConfig
 from loop_probe.labeling import first_ngram_loop_prefix_length
+from loop_probe.prompt_format import VALID_PROMPT_FORMATS, resolve_prompt_format
 from loop_probe.prompt_builder import build_math_prompt
 from loop_probe.rollout import resolve_sampling_defaults
 from loop_probe.types import DatasetSpec
@@ -72,6 +73,8 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--answer-field", default="answer")
     parser.add_argument("--model-id", default="Qwen/Qwen3-1.7B")
     parser.add_argument("--temperature", type=float, default=0.2)
+    parser.add_argument("--top-p", type=float, default=None)
+    parser.add_argument("--top-k", type=int, default=None)
     parser.add_argument("--num-generations", type=int, default=10)
     parser.add_argument("--max-tokens", type=int, default=81920)
     parser.add_argument("--max-model-len", type=int, default=40960)
@@ -92,6 +95,16 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--livecodebench-repo", default="")
     parser.add_argument("--release-version", default="release_v6")
     parser.add_argument("--lm-style-override", default=None)
+    parser.add_argument(
+        "--prompt-format",
+        default="auto",
+        choices=VALID_PROMPT_FORMATS,
+        help=(
+            "How to serialize non-LiveCodeBench prompts before generation. "
+            "'auto' uses the tokenizer chat template when available and falls "
+            "back to raw plain text otherwise."
+        ),
+    )
     parser.add_argument(
         "--resume-lcb-records-checkpoint",
         default="",
@@ -294,10 +307,16 @@ def _build_rollout_config(args: argparse.Namespace) -> RolloutConfig:
         raise SystemExit("--loop-k must be >= 2.")
     if args.num_generations < 1:
         raise SystemExit("--num-generations must be >= 1.")
+    if args.top_p is not None and not (0.0 < args.top_p <= 1.0):
+        raise SystemExit("--top-p must be in (0, 1] when provided.")
+    if args.top_k is not None and args.top_k < -1:
+        raise SystemExit("--top-k must be >= -1 when provided.")
 
     return RolloutConfig(
         model_id=args.model_id,
         temperature=args.temperature,
+        top_p=args.top_p,
+        top_k=args.top_k,
         num_generations=args.num_generations,
         max_tokens=args.max_tokens,
         tp=args.tp,
@@ -314,6 +333,23 @@ def _load_prompt_items(
     args: argparse.Namespace,
     tokenizer: Any | None,
 ) -> tuple[list[PromptWorkItem], dict[str, object], Any]:
+    if args.task_kind == "livecodebench_codegen":
+        if args.prompt_format == "chat_template":
+            raise SystemExit(
+                "livecodebench_codegen uses raw prompt strings and does not support "
+                "--prompt-format chat_template."
+            )
+        resolved_prompt_format = "raw"
+    else:
+        if tokenizer is None:
+            raise SystemExit(
+                "Tokenizer is required to resolve prompt formatting for this task."
+            )
+        try:
+            resolved_prompt_format = resolve_prompt_format(tokenizer, args.prompt_format)
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from exc
+
     spec = DatasetSpec(
         dataset=args.dataset,
         config=args.dataset_config,
@@ -332,12 +368,19 @@ def _load_prompt_items(
         items = [
             PromptWorkItem(
                 sample_id=record.sample_id,
-                prompt=build_math_prompt(tokenizer, record.prompt),
+                prompt=build_math_prompt(
+                    tokenizer,
+                    record.prompt,
+                    prompt_format=resolved_prompt_format,
+                ),
                 gold_answer=gold_answer,
             )
             for record, gold_answer in samples
         ]
-        return items, {}, None
+        return items, {
+            "prompt_format_requested": args.prompt_format,
+            "prompt_format_resolved": resolved_prompt_format,
+        }, None
 
     if args.task_kind == "multiple_choice_gpqa":
         if tokenizer is None:
@@ -352,12 +395,15 @@ def _load_prompt_items(
                     tokenizer,
                     record.prompt,
                     options,
+                    prompt_format=resolved_prompt_format,
                 ),
                 gold_answer=gold_letter,
             )
             for record, options, gold_letter in samples
         ]
         metadata = {
+            "prompt_format_requested": args.prompt_format,
+            "prompt_format_resolved": resolved_prompt_format,
             "shuffle_policy": {
                 "kind": "seed_xor_sample_id",
                 "base_seed": args.seed,
@@ -378,13 +424,17 @@ def _load_prompt_items(
                     tokenizer,
                     record.prompt,
                     options,
+                    prompt_format=resolved_prompt_format,
                 ),
                 gold_answer=gold_answer,
                 gold_index=gold_index,
             )
             for record, options, gold_answer, gold_index in samples
         ]
-        return items, {}, None
+        return items, {
+            "prompt_format_requested": args.prompt_format,
+            "prompt_format_resolved": resolved_prompt_format,
+        }, None
 
     benchmark, format_prompt = livecodebench_codegen.load_benchmark(
         args.livecodebench_repo,
@@ -398,6 +448,7 @@ def _load_prompt_items(
         lm_style_override=args.lm_style_override,
         max_samples=args.max_samples,
     )
+    resolved_prompt_format = livecodebench_codegen.prompt_format_for_lm_style(lm_style)
     selected_benchmark = benchmark if args.max_samples is None else benchmark[: args.max_samples]
     items = [
         PromptWorkItem(
@@ -407,7 +458,11 @@ def _load_prompt_items(
         )
         for idx, (question_id, prompt) in enumerate(prompt_records)
     ]
-    return items, {"lm_style": lm_style}, selected_benchmark
+    return items, {
+        "lm_style": lm_style,
+        "prompt_format_requested": args.prompt_format,
+        "prompt_format_resolved": resolved_prompt_format,
+    }, selected_benchmark
 
 
 def _update_qa_stats(
@@ -441,6 +496,8 @@ def _update_qa_stats(
             agg.num_correct_and_looped += 1
         if max_length_hit:
             agg.num_correct_and_max_length_hit += 1
+        if loop_flag and max_length_hit:
+            agg.num_correct_and_looped_and_max_length_hit += 1
     else:
         agg.num_wrong += 1
         agg.wrong_length_sum += token_count
@@ -477,7 +534,11 @@ def _collect_worker_stats(
             "generations per prompt."
         )
 
-    top_p, top_k = resolve_sampling_defaults(rollout_cfg.model_id)
+    top_p, top_k = resolve_sampling_defaults(
+        rollout_cfg.model_id,
+        top_p=rollout_cfg.top_p,
+        top_k=rollout_cfg.top_k,
+    )
     tokenizer = AutoTokenizer.from_pretrained(
         rollout_cfg.model_id,
         trust_remote_code=rollout_cfg.trust_remote_code,
@@ -967,6 +1028,7 @@ def _apply_lcb_grades(
     agg.wrong_length_sum = 0
     agg.num_correct_and_looped = 0
     agg.num_correct_and_max_length_hit = 0
+    agg.num_correct_and_looped_and_max_length_hit = 0
 
     for record_key, passed in grading_by_record_key.items():
         record = records_by_key[record_key]
@@ -978,6 +1040,8 @@ def _apply_lcb_grades(
                 agg.num_correct_and_looped += 1
             if record.max_length_hit:
                 agg.num_correct_and_max_length_hit += 1
+            if record.loop_flag and record.max_length_hit:
+                agg.num_correct_and_looped_and_max_length_hit += 1
         else:
             agg.num_wrong += 1
             agg.wrong_length_sum += record.token_count
@@ -1095,6 +1159,14 @@ def main() -> None:
         )
 
     metrics = compute_metrics(agg, statistics)
+    resolved_generation_config = rollout_cfg.to_dict()
+    resolved_top_p, resolved_top_k = resolve_sampling_defaults(
+        rollout_cfg.model_id,
+        top_p=rollout_cfg.top_p,
+        top_k=rollout_cfg.top_k,
+    )
+    resolved_generation_config["top_p"] = resolved_top_p
+    resolved_generation_config["top_k"] = resolved_top_k
 
     payload = {
         "metadata": {
@@ -1103,7 +1175,7 @@ def main() -> None:
             "split": args.split,
             "task_kind": args.task_kind,
             "model_id": rollout_cfg.model_id,
-            "generation_config": rollout_cfg.to_dict(),
+            "generation_config": resolved_generation_config,
             "stats_contract_version": STATS_CONTRACT_VERSION,
             "seed": args.seed,
             "statistics": statistics,
@@ -1130,6 +1202,9 @@ def main() -> None:
             "num_looped_and_max_length_hit": agg.num_looped_and_max_length_hit,
             "num_correct_and_looped": agg.num_correct_and_looped,
             "num_correct_and_max_length_hit": agg.num_correct_and_max_length_hit,
+            "num_correct_and_looped_and_max_length_hit": (
+                agg.num_correct_and_looped_and_max_length_hit
+            ),
         },
         "metrics": metrics,
     }

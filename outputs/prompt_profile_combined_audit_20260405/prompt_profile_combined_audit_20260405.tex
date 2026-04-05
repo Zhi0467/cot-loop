@@ -1,0 +1,302 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{longtable}
+\usepackage{array}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+
+\title{Prompt-Profile Combined Audit:\\Natural Regression, Balanced Binary, and Metadata Controls}
+\author{}
+\date{2026-04-05 02:10 UTC}
+
+\begin{document}
+\maketitle
+
+\section*{Executive Summary}
+\begin{itemize}[leftmargin=1.5em]
+\item This report bundles the current prompt-profile surface into one note:
+  \begin{itemize}[leftmargin=1.5em]
+  \item canonical regression on \texttt{mean\_relative\_length}
+  \item current binary recommendation on \texttt{majority\_s\_0.5}
+  \item a new metadata-baseline audit over the saved prompt archives
+  \item an Athena code audit over the prompt-profile build / label / train / summarize path
+  \end{itemize}
+\item Regression is now pinned cleanly.
+  \begin{itemize}[leftmargin=1.5em]
+  \item Slurm \texttt{2215} reran the canonical natural regression object from the current PR head.
+  \item It reproduced the original locked \texttt{2043} regression ledger exactly.
+  \item Max absolute difference was \texttt{0.0} across the prompt-length baselines plus \texttt{ensemble} and \texttt{last\_layer} at both frozen checkpoints.
+  \end{itemize}
+\item Binary is still the cleaner deployment-facing head.
+  \begin{itemize}[leftmargin=1.5em]
+  \item The current best single global activation surface remains \texttt{ensemble h256 d1}.
+  \item Cross-dataset mean test \texttt{PR-AUC}: prompt length \texttt{0.350}, \texttt{ensemble h256 d1} \texttt{0.518}, \texttt{last\_layer h256 d2} \texttt{0.430}.
+  \end{itemize}
+\item The metadata story is narrower than the older April PDFs.
+  \begin{itemize}[leftmargin=1.5em]
+  \item The current reported ``metadata baseline'' is really a train-fit 1D prompt-length baseline, because \texttt{effective\_max\_tokens=30000} is fixed.
+  \item Cheap prompt-shape features often match or beat prompt length, and in a few cases rival or beat the activation probes too.
+  \item So the current results establish lift over prompt length on some surfaces, not yet lift over strong prompt-only controls in general.
+  \end{itemize}
+\end{itemize}
+
+\section*{Current Objects}
+\subsection*{Regression}
+\begin{itemize}[leftmargin=1.5em]
+\item target: \texttt{mean\_relative\_length}
+\item split: natural prompt-disjoint train/test
+\item sampler: natural
+\item views: \texttt{ensemble}, \texttt{last\_layer}
+\item canonical artifact:
+  \begin{itemize}[leftmargin=1.5em]
+  \item \texttt{docs/prompt-profile-natural-regression-rerun-2026-04-05.md}
+  \item \texttt{outputs/prompt\_profile\_natural\_regression\_rerun\_20260405/prompt\_profile\_natural\_regression\_rerun\_20260405.pdf}
+  \end{itemize}
+\end{itemize}
+
+\subsection*{Binary}
+\begin{itemize}[leftmargin=1.5em]
+\item target: \texttt{majority\_s\_0.5}
+\item split: train balanced by downsampling, test natural
+\item current recommended activation surface: \texttt{ensemble h256 d1}
+\item capacity-control artifact:
+  \begin{itemize}[leftmargin=1.5em]
+  \item \texttt{docs/prompt-profile-binary-capacity-controls-2026-04-04.md}
+  \item \texttt{outputs/prompt\_profile\_binary\_capacity\_controls\_20260404/prompt\_profile\_binary\_capacity\_controls\_20260404.pdf}
+  \end{itemize}
+\end{itemize}
+
+\section*{Regression Read}
+Primary metric here is screening, not calibration.
+
+\begin{center}
+\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Dataset & Prompt length \texttt{top\_20p\_capture} & Ensemble \texttt{top\_20p\_capture} & Prompt length \texttt{RMSE} & Ensemble \texttt{RMSE} \\
+\midrule
+\texttt{GPQA} & 0.168 & 0.247 $\pm$ 0.018 & 0.165 & 0.160 $\pm$ 0.002 \\
+\texttt{AIME} & 0.306 & 0.305 $\pm$ 0.017 & 0.176 & 0.183 $\pm$ 0.006 \\
+\texttt{MATH-500} & 0.290 & 0.262 $\pm$ 0.058 & 0.154 & 0.162 $\pm$ 0.002 \\
+\texttt{MMLU-Pro} & 0.292 & 0.355 $\pm$ 0.025 & 0.126 & 0.133 $\pm$ 0.000 \\
+\texttt{LiveCodeBench} & 0.248 & 0.340 $\pm$ 0.005 & 0.279 & 0.248 $\pm$ 0.018 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Cross-dataset means:
+\begin{itemize}[leftmargin=1.5em]
+\item \texttt{top\_20p\_capture}: prompt length \texttt{0.261}, ensemble \texttt{0.302}
+\item \texttt{RMSE}: prompt length \texttt{0.180}, ensemble \texttt{0.177}
+\end{itemize}
+
+Interpretation:
+\begin{itemize}[leftmargin=1.5em]
+\item On the operational screening read, ensemble beats prompt length on \texttt{GPQA}, \texttt{MMLU-Pro}, and \texttt{LiveCodeBench}.
+\item On calibration, prompt length still wins on \texttt{AIME}, \texttt{MATH-500}, and \texttt{MMLU-Pro}.
+\item So this lane is still useful as a prompt-conditioned long-completion risk score.
+\item It is still not a clean calibrated regressor, and it is not yet evidence of a loop-specific hidden-state signal by itself.
+\end{itemize}
+
+\section*{Binary Read}
+\begin{center}
+\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Dataset & Test prevalence & Prompt length \texttt{PR-AUC} & Ensemble \texttt{h256 d1} & Last-layer \texttt{h256 d2} \\
+\midrule
+\texttt{GPQA} & 0.0500 & 0.0657 & 0.5833 & 0.3176 \\
+\texttt{AIME} & 0.5833 & 0.8976 & 0.9120 & 0.8479 \\
+\texttt{MATH-500} & 0.0400 & 0.1002 & 0.1663 & 0.1322 \\
+\texttt{MMLU-Pro} & 0.0125 & 0.1104 & 0.2116 & 0.0959 \\
+\texttt{LiveCodeBench} & 0.3375 & 0.5760 & 0.7143 & 0.7575 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Cross-dataset mean test \texttt{PR-AUC}:
+\begin{itemize}[leftmargin=1.5em]
+\item prompt length \texttt{0.350}
+\item \texttt{ensemble h256 d1} \texttt{0.518}
+\item \texttt{last\_layer h256 d2} \texttt{0.430}
+\end{itemize}
+
+Interpretation:
+\begin{itemize}[leftmargin=1.5em]
+\item \texttt{majority\_s\_0.5} is still the cleaner finished head.
+\item \texttt{ensemble h256 d1} remains the best single global activation surface.
+\item But the prompt-length baseline is too strong on \texttt{AIME} to support a broad ``activation-only lift'' story there.
+\item \texttt{LiveCodeBench} and \texttt{GPQA} remain the cleanest current binary activation wins.
+\end{itemize}
+
+\section*{Metadata Audit}
+\subsection*{What the Current Reported Baseline Really Is}
+\begin{itemize}[leftmargin=1.5em]
+\item The main report baseline is intentionally narrow: a train-fit prompt-only scorer on \texttt{prompt\_token\_count} and \texttt{effective\_max\_tokens}.
+\item On this fixed-budget surface, \texttt{effective\_max\_tokens=30000} is constant.
+\item So the effective control is just prompt length.
+\item That means the current report does not yet compare activations against a strong prompt-only metadata ceiling.
+\end{itemize}
+
+\subsection*{Cheap Prompt-Stat Audit}
+The new audit used the saved prompt archives directly:
+\begin{itemize}[leftmargin=1.5em]
+\item regression source root: the reused shared archives behind
+  \texttt{outputs/prompt\_profile\_natural\_regression\_rerun\_20260405/}
+\item binary source root:
+  \texttt{outputs/prompt\_profile\_full\_train\_locked\_pair\_20260404/}
+\item saved audit bundle:
+  \texttt{outputs/prompt\_profile\_metadata\_audit\_20260405/}
+\end{itemize}
+
+\begin{center}
+\small
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{1.6in}>{\raggedright\arraybackslash}p{2.1in}>{\raggedright\arraybackslash}p{2.1in}@{}}
+\toprule
+Dataset & Regression best raw feature by \texttt{top\_20p\_capture} & Binary best raw feature by \texttt{PR-AUC} \\
+\midrule
+\texttt{GPQA} & \texttt{newline\_count 0.242} & \texttt{newline\_count 0.167} \\
+\texttt{AIME} & \texttt{char\_length 0.332} & \texttt{dollar\_count 0.937} \\
+\texttt{MATH-500} & \texttt{prompt\_token\_count 0.290} & \texttt{dollar\_count 0.117} \\
+\texttt{MMLU-Pro} & \texttt{dollar\_count 0.300} & \texttt{newline\_count 0.506} \\
+\texttt{LiveCodeBench} & \texttt{prompt\_token\_count 0.248} & \texttt{char\_length 0.590} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Important comparisons against raw prompt length:
+\begin{itemize}[leftmargin=1.5em]
+\item \texttt{AIME} binary:
+  \begin{itemize}[leftmargin=1.5em]
+  \item prompt length \texttt{PR-AUC 0.898}
+  \item dollar count \texttt{PR-AUC 0.937}
+  \item current recommended activation surface \texttt{ensemble h256 d1 0.912}
+  \end{itemize}
+\item \texttt{MMLU-Pro} binary:
+  \begin{itemize}[leftmargin=1.5em]
+  \item prompt length \texttt{PR-AUC 0.110}
+  \item newline count \texttt{PR-AUC 0.506}
+  \item current recommended activation surface \texttt{ensemble h256 d1 0.212}
+  \end{itemize}
+\item \texttt{GPQA} regression:
+  \begin{itemize}[leftmargin=1.5em]
+  \item prompt length \texttt{top\_20p\_capture 0.168}
+  \item newline count \texttt{0.242}
+  \item current ensemble \texttt{0.247}
+  \end{itemize}
+\end{itemize}
+
+So the cheap-feature audit already shows that the current 1D prompt-length control is missing real prompt-shape structure.
+
+\subsection*{Prompt-Length Quartiles}
+The quartile picture is also informative:
+\begin{itemize}[leftmargin=1.5em]
+\item \texttt{AIME}:
+  \begin{itemize}[leftmargin=1.5em]
+  \item prompt-length quartiles rise almost monotonically in both \texttt{mean\_relative\_length} and \texttt{majority\_s\_0.5}
+  \item the longest quartile reaches mean relative length \texttt{0.765} and binary positive rate \texttt{1.000}
+  \end{itemize}
+\item \texttt{MMLU-Pro}:
+  \begin{itemize}[leftmargin=1.5em]
+  \item the longest quartile moves from mean relative length \texttt{0.075} to \texttt{0.183}
+  \item binary positive rate moves from \texttt{0.000} to \texttt{0.050}
+  \end{itemize}
+\item \texttt{LiveCodeBench}:
+  \begin{itemize}[leftmargin=1.5em]
+  \item the middle-to-long quartiles are the riskiest
+  \item binary positive rate rises from \texttt{0.100} in the shortest quartile to \texttt{0.538} in the third quartile
+  \end{itemize}
+\item \texttt{GPQA}:
+  \begin{itemize}[leftmargin=1.5em]
+  \item the effect is non-monotone
+  \item the third quartile is riskiest, and the very longest prompts get safer again
+  \item this argues for prompt-family structure, not a simple linear length effect
+  \end{itemize}
+\end{itemize}
+
+\section*{Athena Audit}
+Athena reviewed the current prompt-profile code path and the cheap prompt-stat audit in deep mode.
+
+Files reviewed included:
+\begin{itemize}[leftmargin=1.5em]
+\item \texttt{docs/prompt-profile-natural-regression-rerun-2026-04-05.md}
+\item \texttt{docs/prompt-profile-full-train-results-2026-04-04.md}
+\item \texttt{scripts/run\_prompt\_profile\_full\_train.py}
+\item \texttt{scripts/summarize\_prompt\_profile\_full\_train.py}
+\item \texttt{scripts/train\_probe.py}
+\item \texttt{scripts/train\_metadata\_residual\_probe.py}
+\item \texttt{src/loop\_probe/labeling.py}
+\item \texttt{scripts/audit\_prompt\_metadata\_correlations.py}
+\item \texttt{outputs/prompt\_profile\_metadata\_audit\_20260405/metadata\_correlation\_summary.json}
+\end{itemize}
+
+Main Athena conclusions:
+\begin{itemize}[leftmargin=1.5em]
+\item The strongest explanation is conceptual, not a hidden implementation bug.
+\item The present targets are close to fixed-budget long-completion risk:
+  \begin{itemize}[leftmargin=1.5em]
+  \item \texttt{mean\_relative\_length} is output length scaled by a constant budget.
+  \item \texttt{majority\_s\_0.5} is effectively ``does this prompt usually cross about half the budget?''
+  \end{itemize}
+\item So prompt-only structure can be strong even before activations enter.
+\item The missing control is a stronger prompt-shape baseline, not another prompt-length row:
+  \begin{itemize}[leftmargin=1.5em]
+  \item token length, log token length, char length
+  \item newline, digit, dollar counts
+  \item prompt-template / subject / family identity where available
+  \item nonlinearities or interactions, because \texttt{GPQA} is already visibly non-monotone
+  \end{itemize}
+\item The current results still support narrower claims:
+  \begin{itemize}[leftmargin=1.5em]
+  \item ensemble remains better than \texttt{last\_layer} on most current surfaces
+  \item \texttt{ensemble h256 d1} is still the right current binary default
+  \item \texttt{LiveCodeBench} remains the clearest regression and binary activation win
+  \end{itemize}
+\item What they do not yet support is a general claim of hidden-state lift over strong prompt-only controls, or a clean loop-specific early-warning claim.
+\end{itemize}
+
+\section*{Recommended Next Checks}
+Priority order from the combined local audit plus Athena:
+\begin{enumerate}[leftmargin=1.5em]
+\item Replace the current 1D prompt-length control with a strong train-fit prompt-shape baseline on the same frozen splits.
+\item Evaluate activation probes as residuals over that metadata model, not only as stand-alone predictors.
+\item Re-evaluate inside matched strata of prompt shape:
+  prompt-length quantile, newline / dollar / digit bins, and subject or template family where available.
+\item Use family-held-out splits where possible, not only prompt-disjoint random splits.
+\item Decompose ``long completion risk'' from ``loop-specific risk'' more explicitly before making stronger mechanistic claims.
+\end{enumerate}
+
+\section*{Current Honest Claim}
+The combined current claim should be:
+\begin{itemize}[leftmargin=1.5em]
+\item Regression:
+  \begin{itemize}[leftmargin=1.5em]
+  \item useful as a screening score for prompt-conditioned long-completion risk
+  \item still mixed against even the narrow prompt-length baseline
+  \end{itemize}
+\item Binary:
+  \begin{itemize}[leftmargin=1.5em]
+  \item \texttt{majority\_s\_0.5} is the cleaner finished head
+  \item \texttt{ensemble h256 d1} is the best current global activation surface
+  \end{itemize}
+\item Metadata:
+  \begin{itemize}[leftmargin=1.5em]
+  \item the current report establishes lift over 1D prompt length on some surfaces
+  \item it does not yet establish lift over strong prompt-only controls in general
+  \end{itemize}
+\end{itemize}
+
+\section*{Artifacts}
+\begin{itemize}[leftmargin=1.5em]
+\item combined audit PDF:
+  \texttt{outputs/prompt\_profile\_combined\_audit\_20260405/prompt\_profile\_combined\_audit\_20260405.pdf}
+\item combined audit TeX:
+  \texttt{outputs/prompt\_profile\_combined\_audit\_20260405/prompt\_profile\_combined\_audit\_20260405.tex}
+\item metadata audit bundle:
+  \texttt{outputs/prompt\_profile\_metadata\_audit\_20260405/}
+\end{itemize}
+
+\end{document}

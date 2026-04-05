@@ -97,6 +97,8 @@ QUESTION_FIELD="${QUESTION_FIELD:-}"
 ANSWER_FIELD="${ANSWER_FIELD:-}"
 MODEL_ID="${MODEL_ID:-Qwen/Qwen3-1.7B}"
 TEMPERATURE="${TEMPERATURE:-0.2}"
+TOP_P="${TOP_P:-}"
+TOP_K="${TOP_K:-}"
 NUM_GENERATIONS="${NUM_GENERATIONS:-10}"
 STATISTICS="${STATISTICS:-success_fraction,loop_fraction,avg_generation_length,avg_loop_generation_length,avg_first_loop_prefix_length,max_length_hit_fraction,loop_max_length_hit_fraction,max_length_hit_loop_fraction,generation_length_variance,max_length_hit_success_fraction,loop_success_fraction,avg_correct_generation_length,avg_wrong_generation_length}"
 MAX_SAMPLES="${MAX_SAMPLES:-}"
@@ -175,6 +177,14 @@ fi
 
 if [[ -n "${MAX_SAMPLES}" ]]; then
   ARGS+=(--max-samples "$MAX_SAMPLES")
+fi
+
+if [[ -n "${TOP_P}" ]]; then
+  ARGS+=(--top-p "$TOP_P")
+fi
+
+if [[ -n "${TOP_K}" ]]; then
+  ARGS+=(--top-k "$TOP_K")
 fi
 
 if [[ -n "${MAX_NUM_SEQS}" ]]; then

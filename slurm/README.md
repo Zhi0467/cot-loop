@@ -7,6 +7,9 @@ This directory contains SLURM workflows for the CoT loop detector project.
 - `run_vllm_generate.sbatch`: Generate trajectories used for loop-label collection and detector analysis.
 - `analyze_prefill_stability.sbatch`: Prefill-loop sanity check and stability checks with greedy rollouts.
 - `run_probe_train_e2e.sbatch`: End-to-end probe pipeline for the canonical stacked prefill dataset (build + probe training, including optional multi-seed runs).
+- `run_prompt_profile_full_train.sbatch`: 2-GPU wrapper for the locked `mean_relative_length` + `majority_s_0.5` full-train path, reusing the saved March prompt-profile archives and writing the standardized `outputs/full_train/` ledger.
+- `run_prompt_profile_balanced_regression_retrain.sbatch`: 2-GPU wrapper for rerunning only the regression head on the balanced-train / natural-test prompt subset already defined by the saved `majority_s_0.5` data.
+- `run_prompt_profile_binary_retrain.sbatch`: 1-GPU wrapper for rerunning only the balanced `majority_s_0.5` binary probes from an existing locked full-train output root, with explicit MLP-width/depth overrides.
 - `run_prompt_profile_projection.sbatch`: One-GPU prompt-profile visualization path (build + prompt-level projection export, with optional render when `matplotlib` is available).
 - `run_k5_threeview_dataset.sbatch`: Historical multi-view dataset build for the k=5 / max_tokens=15000 ablation study.
 - `run_k5_threeview_ablation.sbatch`: Historical MLP sweep over the k=5 three-view ablation dataset.
@@ -124,6 +127,73 @@ PROMPT_FIELD=Question \
 TRAIN_EXTRA_ARGS="--classifier-mode last_layer --classifier-layer -1" \
 SCORE_RULE=mean_prob \
 sbatch slurm/run_probe_train_e2e.sbatch
+```
+
+## Locked Full-Train Wrapper
+
+`run_prompt_profile_full_train.sbatch` defaults to:
+
+- `#SBATCH --gres=gpu:2`
+- `OUT_ROOT=outputs/full_train`
+- `ARCHIVE_SOURCE_ROOT=/data/scratch/${USER}/outputs/cot-loop-detection`
+- reuse of the saved March `mean_relative_length` archives for `GPQA`, `AIME`, `MATH-500`, `MMLU-Pro`, and `LiveCodeBench`
+- sequential execution of the locked regression train, `majority_s_0.5` relabel, binary train, and summary ledger stages
+
+Submit with defaults:
+```bash
+CONDA_ENV=swe311 \
+sbatch slurm/run_prompt_profile_full_train.sbatch
+```
+
+## Balanced Regression Retrain Wrapper
+
+`run_prompt_profile_balanced_regression_retrain.sbatch` defaults to:
+
+- `#SBATCH --gres=gpu:2`
+- `SOURCE_ROOT=/data/scratch/${USER}/outputs/cot-loop-detection/full_train_locked_pair_20260404`
+- `OUT_ROOT=/data/scratch/${USER}/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced_sampler`
+- reuse of the saved shared `mean_relative_length` archives under `SOURCE_ROOT`
+- reuse of the natural `majority_s_0.5` labels only as a train-balance reference
+- full shared regression train/test splits stay intact; train balancing happens through the sampler rather than by downsampling the regression rows
+- the rerun now leaves a local `shared_archive` link under `OUT_ROOT`, so the summary step can still recover the prompt-length baseline cleanly
+- regression-only retraining plus a fresh summary ledger under `OUT_ROOT/summary/`
+- default probe settings stay on the locked family unless you override them with env vars such as `MLP_HIDDEN_DIM`, `MLP_DEPTH`, and `MLP_DROPOUT`
+
+Submit with defaults:
+```bash
+CONDA_ENV=swe311 \
+sbatch slurm/run_prompt_profile_balanced_regression_retrain.sbatch
+```
+
+Example width-only follow-up on the same balanced regression object:
+```bash
+CONDA_ENV=swe311 \
+MLP_HIDDEN_DIM=256 \
+MLP_DEPTH=1 \
+WEIGHT_DECAY=0.05 \
+sbatch slurm/run_prompt_profile_balanced_regression_retrain.sbatch
+```
+
+## Locked Binary Retrain Wrapper
+
+`run_prompt_profile_binary_retrain.sbatch` defaults to:
+
+- `#SBATCH --gres=gpu:1`
+- `SOURCE_ROOT=/data/scratch/${USER}/outputs/cot-loop-detection/full_train_locked_pair_20260404`
+- `OUT_ROOT=/data/scratch/${USER}/outputs/cot-loop-detection/full_train_locked_pair_20260404_binary_h256d2`
+- reuse of the saved balanced `majority_s_0.5` data under the source root
+- MLP overrides aligned with the earlier loop-label ablation family:
+  - `MLP_HIDDEN_DIM=256`
+  - `MLP_DEPTH=2`
+  - `MLP_DROPOUT=0.1`
+  - `EPOCHS=15`
+  - `LR=1e-4`
+  - `WEIGHT_DECAY=0.05`
+
+Submit with defaults:
+```bash
+CONDA_ENV=swe311 \
+sbatch slurm/run_prompt_profile_binary_retrain.sbatch
 ```
 
 ## Prompt-Level Projection Defaults

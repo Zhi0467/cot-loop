@@ -85,6 +85,7 @@ class WorkerAggregator:
     num_looped_and_max_length_hit: int = 0
     num_correct_and_looped: int = 0
     num_correct_and_max_length_hit: int = 0
+    num_correct_and_looped_and_max_length_hit: int = 0
     length_sum: int = 0
     length_sq_sum: int = 0
     loop_length_sum: int = 0
@@ -112,6 +113,9 @@ def merge_aggregators(aggregators: Iterable[WorkerAggregator]) -> WorkerAggregat
         merged.num_looped_and_max_length_hit += int(agg.num_looped_and_max_length_hit)
         merged.num_correct_and_looped += int(agg.num_correct_and_looped)
         merged.num_correct_and_max_length_hit += int(agg.num_correct_and_max_length_hit)
+        merged.num_correct_and_looped_and_max_length_hit += int(
+            agg.num_correct_and_looped_and_max_length_hit
+        )
         merged.length_sum += int(agg.length_sum)
         merged.length_sq_sum += int(agg.length_sq_sum)
         merged.loop_length_sum += int(agg.loop_length_sum)

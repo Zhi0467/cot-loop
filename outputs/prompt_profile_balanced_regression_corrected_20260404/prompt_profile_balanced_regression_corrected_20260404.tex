@@ -1,0 +1,226 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{hyperref}
+
+\title{Balanced Prompt-Profile Regression Rerun\\Corrected Full-Train Sampler Surface}
+\author{}
+\date{2026-04-04 UTC}
+
+\begin{document}
+\maketitle
+
+\section{Correction}
+
+The earlier note \texttt{docs/prompt-profile-balanced-regression-2026-04-04.md}
+was not the same train object as the previous Qwen3 run. It relabeled the
+downsampled balanced binary subset and therefore trained regression on much
+smaller train sets (\texttt{18 / 48 / 44 / 14 / 350} prompts across
+\texttt{GPQA / AIME / MATH-500 / MMLU-Pro / LiveCodeBench}).
+
+This corrected rerun keeps the full saved Qwen3 \texttt{mean\_relative\_length}
+train/test splits and uses the binary \texttt{majority\_s\_0.5} labels only to
+balance the train-time sampler. Test stays natural. No regression-label
+downsampling is applied.
+
+\section{Object}
+
+\begin{itemize}
+\item Target: \texttt{mean\_relative\_length}.
+\item Split contract:
+  \begin{itemize}
+  \item train prompts: full saved Qwen3 shared-archive train split
+  \item train balancing: weighted sampler from the natural \texttt{majority\_s\_0.5} labels
+  \item test prompts: full saved Qwen3 shared-archive natural test split
+  \item no regression-label downsampling
+  \end{itemize}
+\item Prompt surface: same locked April prompt-profile setup (\texttt{Qwen/Qwen3-1.7B}, prompt-prefill stacked all-layer last-token activations, \texttt{temperature=0.2}, \texttt{num\_generations=4}, \texttt{max\_tokens=30000}).
+\item Probe family: default \texttt{mlp} preset, so hidden width \texttt{128}, depth \texttt{1}, dropout \texttt{0.1}.
+\item Views:
+  \begin{itemize}
+  \item \texttt{ensemble}: one MLP per layer with \texttt{mean\_prob} aggregation
+  \item \texttt{last\_layer}: one MLP on the final-layer slice
+  \end{itemize}
+\item Seeds: \texttt{0, 1, 2}.
+\item Checkpoint rule: frozen \texttt{best\_loss}.
+\item Primary regression read: \texttt{top\_20p\_capture}.
+\item Secondary calibration read: \texttt{RMSE}.
+\item Diagnostic only: \texttt{Spearman}.
+\end{itemize}
+
+Metadata baseline in this note means a train-fit linear regressor on prompt-only
+features. Because \texttt{effective\_max\_tokens} is fixed at \texttt{30000} on
+this surface, the only nontrivial metadata baseline is prompt length.
+
+\section{Exact Train/Test Contract}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lrrrrrrr}
+\toprule
+Dataset & Correct train & Correct test & Train pos & Train neg & Test pos & Test neg & Withdrawn train \\
+\midrule
+GPQA & 158 & 40 & 9 & 149 & 2 & 38 & 18 \\
+AIME & 48 & 12 & 24 & 24 & 7 & 5 & 48 \\
+MATH-500 & 400 & 100 & 22 & 378 & 4 & 96 & 44 \\
+MMLU-Pro & 640 & 160 & 7 & 633 & 2 & 158 & 14 \\
+LiveCodeBench & 640 & 160 & 175 & 465 & 54 & 106 & 350 \\
+\bottomrule
+\end{tabular}
+\caption{The corrected run keeps the full regression train/test splits and uses the natural binary labels only for train-time sampling weights.}
+\end{table}
+
+The train-balance mechanism is therefore: keep all
+\texttt{158 / 48 / 400 / 640 / 640} regression train prompts, derive binary
+prevalence from the natural \texttt{majority\_s\_0.5} labels on those same train
+prompts, and use those labels only to weight train sampling toward a balanced
+positive/negative mix.
+
+\section{Metric Definitions}
+
+\begin{itemize}
+\item Each held-out prompt $i$ gets a score $s_i = \texttt{predicted mean\_relative\_length}$.
+\item Each held-out prompt also has mass $y_i = \texttt{actual mean\_relative\_length}$ from the saved rollout archive.
+\item \texttt{top\_10p\_capture} / \texttt{top\_20p\_capture}: sort held-out prompts by $s_i$, keep the top 10\% or 20\%, and divide the captured actual mass by total held-out mass: $\sum_{i \in \text{top-k by } s} y_i / \sum_j y_j$.
+\item \texttt{RMSE}: pointwise error on aligned held-out prompts.
+\item \texttt{Spearman}: monotone-order diagnostic on aligned held-out prompts. It is not the headline metric.
+\end{itemize}
+
+\section{Main Read}
+
+\begin{itemize}
+\item Screening (\texttt{top\_20p\_capture}): ensemble is still the best single global regression surface. Cross-dataset mean \texttt{top\_20p\_capture} is \texttt{0.345} for ensemble, \texttt{0.299} for last-layer, and \texttt{0.261} for prompt length.
+\item On \texttt{top\_20p\_capture}, ensemble beats last-layer on all \texttt{5 / 5} datasets and beats prompt length on \texttt{4 / 5}; AIME is still the only non-win against prompt length.
+\item Calibration (\texttt{RMSE}): the full-train correction changes the story materially. Cross-dataset mean \texttt{RMSE} is \texttt{0.180} for prompt length, \texttt{0.192} for ensemble, and \texttt{0.195} for last-layer.
+\item Prompt length is now the best calibrated baseline on \texttt{GPQA}, \texttt{AIME}, \texttt{MATH-500}, and \texttt{MMLU-Pro}. \texttt{LiveCodeBench} is the only dataset where ensemble has the best \texttt{RMSE}.
+\item Diagnostic ordering (\texttt{Spearman}): ensemble is strongest on all \texttt{5 / 5}. Cross-dataset mean \texttt{Spearman} is \texttt{0.680} for ensemble, \texttt{0.472} for last-layer, and \texttt{0.410} for prompt length.
+\end{itemize}
+
+So the corrected full-train object supports the regression lane only as a screening
+score. Restoring the full Qwen3 train counts helps the activation probes on the
+screening read, but it helps the prompt-length calibration baseline even more
+strongly on several datasets.
+
+\section{What Changed Materially From The Withdrawn Note}
+
+\begin{itemize}
+\item The withdrawn note undertrained \texttt{GPQA}, \texttt{MATH-500}, and \texttt{MMLU-Pro} by collapsing them to \texttt{18}, \texttt{44}, and \texttt{14} train prompts.
+\item Once the full train counts are restored, the prompt-length baseline becomes much stronger on \texttt{RMSE}: \texttt{GPQA} \texttt{0.244 -> 0.165}, \texttt{MATH-500} \texttt{0.253 -> 0.154}, \texttt{MMLU-Pro} \texttt{0.359 -> 0.126}.
+\item The activation controls also move on the screening read: \texttt{last\_layer top\_20p\_capture} rises from \texttt{0.234 -> 0.305} on \texttt{MATH-500} and from \texttt{0.200 -> 0.363} on \texttt{MMLU-Pro}.
+\item Ensemble stays the best screening surface overall, but the calibration claim from the withdrawn note does not survive the full-train correction.
+\end{itemize}
+
+\section{Results}
+
+\subsection*{\texttt{top\_10p\_capture} at \texttt{best\_loss}}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+Dataset & Prompt length & Last-layer & Ensemble \\
+\midrule
+GPQA & 0.070 & 0.101 $\pm$ 0.009 & 0.169 $\pm$ 0.009 \\
+AIME & 0.223 & 0.194 $\pm$ 0.032 & 0.195 $\pm$ 0.015 \\
+MATH-500 & 0.151 & 0.157 $\pm$ 0.025 & 0.186 $\pm$ 0.003 \\
+MMLU-Pro & 0.169 & 0.205 $\pm$ 0.092 & 0.263 $\pm$ 0.013 \\
+LiveCodeBench & 0.137 & 0.160 $\pm$ 0.004 & 0.171 $\pm$ 0.000 \\
+\bottomrule
+\end{tabular}
+\caption{Held-out \texttt{top\_10p\_capture}. Cross-dataset means: ensemble \texttt{0.197}, last-layer \texttt{0.164}, prompt length \texttt{0.150}.}
+\end{table}
+
+\subsection*{\texttt{top\_20p\_capture} at \texttt{best\_loss}}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+Dataset & Prompt length & Last-layer & Ensemble \\
+\midrule
+GPQA & 0.168 & 0.246 $\pm$ 0.031 & 0.306 $\pm$ 0.039 \\
+AIME & 0.306 & 0.268 $\pm$ 0.037 & 0.305 $\pm$ 0.017 \\
+MATH-500 & 0.290 & 0.305 $\pm$ 0.046 & 0.337 $\pm$ 0.011 \\
+MMLU-Pro & 0.292 & 0.363 $\pm$ 0.130 & 0.445 $\pm$ 0.005 \\
+LiveCodeBench & 0.248 & 0.312 $\pm$ 0.004 & 0.330 $\pm$ 0.016 \\
+\bottomrule
+\end{tabular}
+\caption{Held-out \texttt{top\_20p\_capture}. This is the main screening metric for the regression lane.}
+\end{table}
+
+\subsection*{\texttt{RMSE} at \texttt{best\_loss}}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+Dataset & Prompt length & Last-layer & Ensemble \\
+\midrule
+GPQA & 0.165 & 0.171 $\pm$ 0.011 & 0.206 $\pm$ 0.023 \\
+AIME & 0.176 & 0.192 $\pm$ 0.002 & 0.187 $\pm$ 0.002 \\
+MATH-500 & 0.154 & 0.192 $\pm$ 0.031 & 0.199 $\pm$ 0.034 \\
+MMLU-Pro & 0.126 & 0.195 $\pm$ 0.026 & 0.149 $\pm$ 0.004 \\
+LiveCodeBench & 0.279 & 0.224 $\pm$ 0.007 & 0.219 $\pm$ 0.004 \\
+\bottomrule
+\end{tabular}
+\caption{Held-out \texttt{RMSE}. The corrected full-train prompt-length baseline is now the best calibrated surface on four datasets.}
+\end{table}
+
+\subsection*{\texttt{Spearman} at \texttt{best\_loss}}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+Dataset & Prompt length & Last-layer & Ensemble \\
+\midrule
+GPQA & 0.116 & 0.246 $\pm$ 0.054 & 0.584 $\pm$ 0.052 \\
+AIME & 0.676 & 0.361 $\pm$ 0.185 & 0.718 $\pm$ 0.077 \\
+MATH-500 & 0.461 & 0.549 $\pm$ 0.260 & 0.760 $\pm$ 0.008 \\
+MMLU-Pro & 0.393 & 0.412 $\pm$ 0.187 & 0.538 $\pm$ 0.003 \\
+LiveCodeBench & 0.405 & 0.790 $\pm$ 0.005 & 0.800 $\pm$ 0.005 \\
+\bottomrule
+\end{tabular}
+\caption{Held-out \texttt{Spearman}. This stays diagnostic only.}
+\end{table}
+
+\section{Interpretation}
+
+\begin{itemize}
+\item GPQA: ensemble is still clearly the best screening surface, but the corrected full-train prompt-length baseline is now the best calibrated predictor.
+\item AIME: this remains the awkward dataset. Screening is essentially a tie between prompt length and ensemble, while prompt length still has the best \texttt{RMSE}.
+\item MATH-500: ensemble is best for screening, but prompt length is best for calibration once the full train split is restored.
+\item MMLU-Pro: ensemble is strongest on both capture metrics and \texttt{Spearman}, but prompt length is still the best calibrated baseline by \texttt{RMSE}.
+\item LiveCodeBench: ensemble is the strongest overall surface here. It wins both screening and \texttt{RMSE}.
+\end{itemize}
+
+\section{Recommendation}
+
+\begin{itemize}
+\item If \texttt{mean\_relative\_length} stays in the project as a screening score for catching degenerate or long rollouts, keep the ensemble view and report \texttt{top\_20p\_capture} first.
+\item Do not sell this corrected regression lane as a clean calibrated regressor. On the full-train corrected object, the prompt-length baseline is still the best \texttt{RMSE} surface on \texttt{4 / 5} datasets.
+\item Future balanced-regression follow-up should now be tuning, not another contract fix:
+  \begin{itemize}
+  \item small layer-subset sweep for the ensemble
+  \item small capacity sweep on this same full-train sampler surface
+  \item keep \texttt{top\_20p\_capture} primary and \texttt{RMSE} secondary
+  \end{itemize}
+\end{itemize}
+
+\section{Artifacts}
+
+\begin{itemize}
+\item Corrected copied summary ledger: \texttt{outputs/prompt\_profile\_balanced\_regression\_corrected\_20260404/remote\_summary/}
+\item Slurm log: \texttt{outputs/prompt\_profile\_balanced\_regression\_corrected\_20260404/logs/prompt-profile-regression-balanced-2214.out}
+\item Superseded note for provenance only: \texttt{docs/prompt-profile-balanced-regression-2026-04-04.md}
+\end{itemize}
+
+\end{document}
