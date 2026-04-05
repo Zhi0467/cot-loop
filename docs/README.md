@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-04-05 00:54 UTC
+Last updated: 2026-04-05 01:22 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -19,6 +19,7 @@ Core docs:
 - Prompt-profile corrected balanced-regression note: prompt-profile-balanced-regression-corrected-2026-04-04.md
 - Prompt-profile combined April surface report: prompt-profile-full-surface-update-2026-04-04.md
 - OLMo degeneration-origin audit report: olmo-degeneration-origin-audit-2026-04-04.md
+- OLMo2 1B fifty-prompt rerun report: olmo2-1b-fifty-prompt-rerun-2026-04-05.md
 - Prompt-profile full-train result note: prompt-profile-full-train-results-2026-04-04.md
 - Prompt-profile binary retrain note: prompt-profile-binary-retrain-h256d2-2026-04-04.md
 - Prompt-profile binary capacity-controls note: prompt-profile-binary-capacity-controls-2026-04-04.md
@@ -46,6 +47,8 @@ Key outputs:
 - Combined April surface PDF: ../outputs/prompt_profile_full_surface_update_20260404/prompt_profile_full_surface_update_20260404.pdf
 - OLMo degeneration-origin audit bundle: ../outputs/olmo_degeneration_origin_audit_20260404/
 - OLMo degeneration-origin audit PDF: ../outputs/olmo_degeneration_origin_audit_20260404/olmo_degeneration_origin_audit_20260404.pdf
+- OLMo2 1B fifty-prompt rerun bundle: ../outputs/olmo2_1b_fifty_prompt_rerun_20260405/
+- OLMo2 1B fifty-prompt rerun PDF: ../outputs/olmo2_1b_fifty_prompt_rerun_20260405/olmo2_1b_fifty_prompt_rerun_20260405.pdf
 - Binary retrain result bundle: ../outputs/prompt_profile_binary_retrain_h256d2_20260404/
 - Binary retrain result PDF: ../outputs/prompt_profile_binary_retrain_h256d2_20260404/prompt_profile_binary_retrain_h256d2_20260404.pdf
 - Binary capacity-controls bundle: ../outputs/prompt_profile_binary_capacity_controls_20260404/
@@ -61,11 +64,16 @@ Current live status:
 - `p_loop` still wins the old bucket diagnostic for concentrating looping prompts, but that is no longer treated as proof that it should be the main training objective.
 - The note `prompt-profile-risk-screen-2026-03-30.md` is now the technical decision surface for this predictability-first correction.
 - The note `prompt-profile-plain-language-2026-03-30.md` is the collaborator-facing explanation of the same correction in plain words.
-- The repo-root note `../understand-where-loop-and-max-length-come-from.md` is still the working OLMo progression note on the older rollout-statistics module: it now includes the corrected OLMo3 audit rows plus the bounded OLMo2 `1B` fallback.
+- The repo-root note `../understand-where-loop-and-max-length-come-from.md` is still the working OLMo progression note on the older rollout-statistics module: it now includes the corrected OLMo3 audit rows plus the larger OLMo2 `1B` follow-up.
 - The docs note `understand-where-loop-and-max-length-come-from.md` is only the background definitions appendix for saved `loop`, prompt-profile `cap_hit` / `p_cap`, rollout-stat `max_length_hit`, and `majority_s_0.5`.
 - The new note `olmo-degeneration-origin-audit-2026-04-04.md` is the collaborator-facing summary surface for that thread:
   - it consolidates the repaired OLMo3 `MMLU-Pro` / `LiveCodeBench` rows plus the bounded OLMo2 `1B` ladder;
   - it is the right artifact to cite when the question is "what survived the audit?" rather than "what commands were run?"
+- The newer note `olmo2-1b-fifty-prompt-rerun-2026-04-05.md` is the larger OLMo2 follow-up:
+  - it scales the OLMo2 ladder from `8` to `50` prompts per dataset under the same corrected contract;
+  - it replaces the older `8`-prompt fallback as the right stage-conclusion surface for this ladder;
+  - it keeps the main base-versus-later split, but it also shows the later-stage story is not uniformly clean or monotone;
+  - it is now the right artifact to cite when the question is "what survived once the slice stopped being a pilot?"
 - The locked pair now has both the execution note and the finished first-run result note on disk.
 - The older `h256 d2` binary retrain note is still on disk, but it is now intermediate only:
   - it preserves the exact `2106` / `2107` depth-rerun record and raw remote metrics

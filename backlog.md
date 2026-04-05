@@ -1,6 +1,6 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-05 00:54 UTC
+Last updated: 2026-04-05 01:22 UTC
 
 ## Immediate Next Experiments
 
@@ -38,6 +38,8 @@ Last updated: 2026-04-05 00:54 UTC
 - The corrected OLMo degeneration-origin package now exists and should be cited directly.
   - Result note: `docs/olmo-degeneration-origin-audit-2026-04-04.md`
   - Result PDF: `outputs/olmo_degeneration_origin_audit_20260404/olmo_degeneration_origin_audit_20260404.pdf`
+  - Larger follow-up note: `docs/olmo2-1b-fifty-prompt-rerun-2026-04-05.md`
+  - Larger follow-up PDF: `outputs/olmo2_1b_fifty_prompt_rerun_20260405/olmo2_1b_fifty_prompt_rerun_20260405.pdf`
   - Main repairs:
     - `RLVR / MMLU-Pro = 0 / 80` was a grader bug on relaxed terminal forms such as `{"answer": I}`;
     - OLMo now has a model-native `LiveCodeBench` path instead of the old silent Qwen-wrapper fallback.
@@ -45,12 +47,14 @@ Last updated: 2026-04-05 00:54 UTC
     - bounded OLMo3 SFT now lands at `34 / 80` on `MMLU-Pro` with `1 / 80` loop and `1 / 80` max hit;
     - bounded OLMo3 RLVR now lands at `27 / 80` on `MMLU-Pro` with `0 / 80` loops and `0 / 80` max hits;
     - bounded OLMo3 `LiveCodeBench` is now `6 / 80` for SFT with `1 / 80` loop and `22 / 80` for RLVR with `0 / 80` loops.
-  - Main OLMo2 fallback read:
-    - heavy loop / cap mass in base;
-    - reduced but still present mass in SFT;
-    - much smaller mass in `RLVR1` / instruct.
+  - Main OLMo2 read after scaling past the pilot:
+    - the 50-prompt rerun is now the right stage-conclusion surface, not the older `8`-prompt fallback;
+    - base remains the dominant source of degeneration mass on the completed rows;
+    - SFT sharply reduces that mass but still leaves substantial residual degeneration on several datasets;
+    - `RLVR1` is usually the cleanest point in the ladder;
+    - final instruct is mixed rather than monotone and can re-accumulate loop / max-length mass on harder datasets.
   - What is still open:
-    - decide whether the next honest follow-up is a larger bounded OLMo2 slice or a smaller targeted OLMo3 base comparison;
+    - decide whether the next honest follow-up is a smaller targeted OLMo3 base comparison or a broader same-surface OLMo3 rerun, not another OLMo2 scale-up;
     - do not reopen interface debugging unless a new row breaks the corrected surface again.
 - The combined April prompt-profile report is now background context, not the current regression deliverable.
   - Result note: `docs/prompt-profile-full-surface-update-2026-04-04.md`

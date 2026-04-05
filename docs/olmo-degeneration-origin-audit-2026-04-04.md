@@ -1,5 +1,10 @@
 # OLMo Degeneration-Origin Audit - 2026-04-04
 
+Update:
+- the larger OLMo2 fallback follow-up now lives at `docs/olmo2-1b-fifty-prompt-rerun-2026-04-05.md`;
+- use that newer note for stage conclusions on the OLMo2 ladder;
+- keep this older note as the smaller `8`-prompt audit that motivated the rerun.
+
 ## Scope
 
 This note closes the bounded OLMo audit that started from `understand-where-loop-and-max-length-come-from.md`.

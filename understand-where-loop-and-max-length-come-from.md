@@ -513,3 +513,48 @@ The collaborator-facing summary surface for this whole arc now lives at:
 
 - `docs/olmo-degeneration-origin-audit-2026-04-04.md`
 - `outputs/olmo_degeneration_origin_audit_20260404/olmo_degeneration_origin_audit_20260404.pdf`
+
+## Fifty-Prompt OLMo2 Follow-up (2026-04-05)
+
+Wangzhi rejected the bounded `8`-prompt OLMo2 ladder as too small to carry a stage conclusion, so I reran the same corrected OLMo2 `1B -> SFT -> RLVR1 -> Instruct` ladder at `50` prompts per dataset under the same rollout-stat contract:
+
+- output root:
+  - `/data/scratch/murphy/outputs/cot-loop-detection/olmo2_1b_degeneration_origin_progression/bound50_temp0p1_gen10_ctx4096_topkneg1/`
+- decode contract:
+  - `temperature=0.1`
+  - `top_p=0.95`
+  - `top_k=-1`
+  - `num_generations=10`
+  - `max_tokens=max_model_len=4096`
+- prompt surfaces:
+  - base math / MCQ on native `raw`
+  - SFT / `RLVR1` / instruct math / MCQ on native `chat_template`
+  - `LiveCodeBench` on raw benchmark strings, with instruct checkpoints using the explicit `HFChatTemplate` LM style internally
+
+This larger rerun is now the right OLMo2 stage-conclusion surface, not the earlier pilot.
+
+The qualitative read survives the scale-up, but it gets sharper:
+
+- the large loop / max-length mass is already present in base, so this is not a clean base model that only becomes degenerate after SFT or RLVR;
+- SFT sharply reduces that base degeneration regime, but it still leaves substantial residual mass on several datasets rather than cleaning it away;
+- `RLVR1` is usually the cleanest point in the ladder on the larger rerun;
+- final instruct is mixed rather than monotone:
+  - much cleaner than base;
+  - often cleaner than SFT;
+  - but not uniformly cleaner than `RLVR1`, and on some harder datasets it re-accumulates meaningful loop / max-length mass.
+- `LiveCodeBench` makes the same split especially stark:
+  - base finishes at `0 / 500` correct, `117 / 500` looped, and `475 / 500` max-length hits;
+  - SFT drops that to `37 / 500` loops and `48 / 500` max-length hits;
+  - `RLVR1` drops it further to `4 / 500` and `4 / 500`;
+  - final instruct stays similarly clean on degeneration (`3 / 500` loops, `2 / 500` max-length hits), even though native `pass@10` remains near zero across the whole `1B` ladder.
+
+So the main question in this note now has a clearer answer on the cheap fallback family:
+
+- the degenerate-rollout regime is already present before SFT;
+- SFT and RLVR change how much of that mass survives, but they do not look like the place where the regime is created from nearly zero;
+- the progression question should therefore be phrased as "how do later stages reduce or reshape an existing degeneration regime?" rather than "which later stage first introduces it?"
+
+For the full row-by-row table, use:
+
+- `docs/olmo2-1b-fifty-prompt-rerun-2026-04-05.md`
+- `outputs/olmo2_1b_fifty_prompt_rerun_20260405/olmo2_1b_fifty_prompt_rerun_20260405.pdf`

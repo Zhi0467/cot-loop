@@ -1160,8 +1160,13 @@ def main() -> None:
 
     metrics = compute_metrics(agg, statistics)
     resolved_generation_config = rollout_cfg.to_dict()
-    resolved_generation_config["top_p"] = top_p
-    resolved_generation_config["top_k"] = top_k
+    resolved_top_p, resolved_top_k = resolve_sampling_defaults(
+        rollout_cfg.model_id,
+        top_p=rollout_cfg.top_p,
+        top_k=rollout_cfg.top_k,
+    )
+    resolved_generation_config["top_p"] = resolved_top_p
+    resolved_generation_config["top_k"] = resolved_top_k
 
     payload = {
         "metadata": {
