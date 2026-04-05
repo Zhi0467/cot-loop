@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-04-05 01:22 UTC
+Last updated: 2026-04-05 02:14 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -16,6 +16,7 @@ Core docs:
 - Prompt-profile plain-language note: prompt-profile-plain-language-2026-03-30.md
 - Prompt-profile full-train plan: prompt-profile-full-train-plan-2026-04-02.md
 - Prompt-profile natural-regression rerun note: prompt-profile-natural-regression-rerun-2026-04-05.md
+- Prompt-profile combined audit note: prompt-profile-combined-audit-2026-04-05.md
 - Prompt-profile corrected balanced-regression note: prompt-profile-balanced-regression-corrected-2026-04-04.md
 - Prompt-profile combined April surface report: prompt-profile-full-surface-update-2026-04-04.md
 - OLMo degeneration-origin audit report: olmo-degeneration-origin-audit-2026-04-04.md
@@ -39,6 +40,9 @@ Key outputs:
 - Full-train plan PDF: ../outputs/prompt_profile_full_train_plan_20260402/prompt_profile_full_train_plan_20260402.pdf
 - Natural-regression rerun bundle: ../outputs/prompt_profile_natural_regression_rerun_20260405/
 - Natural-regression rerun PDF: ../outputs/prompt_profile_natural_regression_rerun_20260405/prompt_profile_natural_regression_rerun_20260405.pdf
+- Prompt-profile combined audit bundle: ../outputs/prompt_profile_combined_audit_20260405/
+- Prompt-profile combined audit PDF: ../outputs/prompt_profile_combined_audit_20260405/prompt_profile_combined_audit_20260405.pdf
+- Prompt-profile metadata audit bundle: ../outputs/prompt_profile_metadata_audit_20260405/
 - Corrected balanced-regression bundle: ../outputs/prompt_profile_balanced_regression_corrected_20260404/
 - Corrected balanced-regression PDF: ../outputs/prompt_profile_balanced_regression_corrected_20260404/prompt_profile_balanced_regression_corrected_20260404.pdf
 - Full-train result bundle: ../outputs/prompt_profile_full_train_locked_pair_20260404/
@@ -58,6 +62,12 @@ Key outputs:
 - Detailed reopened-round summary PDF: ../outputs/prefill_rounds_1_to_12_detailed_summary/prefill_rounds_1_to_12_detailed_summary.pdf
 
 Current live status:
+- The new note `prompt-profile-combined-audit-2026-04-05.md` is now the collaborator-facing prompt-profile bundle:
+  - it keeps the canonical natural regression rerun, the current balanced-binary default, the cheap prompt-stat audit, and the Athena code audit in one surface;
+  - it narrows the honest claim: the current reports establish lift over a 1D prompt-length baseline on some surfaces, not yet lift over strong prompt-only controls in general.
+- The next honest prompt-profile step is now a stronger prompt-shape baseline rather than another natural-regression rerun:
+  - fit a real prompt-only baseline on the frozen splits using shape features such as length, character count, newline count, and symbol counts;
+  - then measure whether the activation probes still add lift as residuals or within matched prompt-shape strata.
 - The current prompt-level predictor task is "predict terminal rollout statistics from prompt-prefill activations under one fixed model and decode policy," not "force everything into one binary loop label."
 - The objective selector is now fixed explicitly: choose the target by held-out predictability on the target itself, not by the downstream `top 20%` loop-enrichment slice.
 - Under that criterion, `mean_relative_length` is the strongest current regression target and `majority_s_0.5` is the strongest finished binary label surface, and Wangzhi locked that pair for the first full-train pass.
@@ -93,6 +103,10 @@ Current live status:
   - it retrains `mean_relative_length` on the natural train/test split with natural sampling from the current PR head
   - it reproduces the original locked `2043` regression ledger exactly, with max absolute metric difference `0.0`
   - it is the right note to cite when the question is "did the natural regression object still hold after rerunning it on the updated branch?"
+- The combined audit note is now the right top-level prompt-profile citation when the question is "what is the current whole surface and what still looks suspicious?":
+  - it bundles natural regression, balanced binary, the cheap prompt-stat audit, and Athena's codebase-level reasoning in one place;
+  - it makes the baseline caveat explicit: the old "metadata baseline" is only prompt length on this fixed-budget surface;
+  - it points to the next honest follow-up as a stronger prompt-shape baseline and residualized evaluation rather than another same-object rerun.
 - The corrected balanced-regression note is now side-analysis provenance only:
   - it still explains the earlier count drop and the balanced-sampler detour
   - it should not be cited as the default regression training object anymore

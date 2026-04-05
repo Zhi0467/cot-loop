@@ -1,9 +1,26 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-05 01:22 UTC
+Last updated: 2026-04-05 02:14 UTC
 
 ## Immediate Next Experiments
 
+- The current collaborator-facing prompt-profile surface is now one combined audit bundle rather than separate regression and binary notes.
+  - Primary citation:
+    - `docs/prompt-profile-combined-audit-2026-04-05.md`
+    - `outputs/prompt_profile_combined_audit_20260405/prompt_profile_combined_audit_20260405.pdf`
+  - Supporting audit bundle:
+    - `outputs/prompt_profile_metadata_audit_20260405/`
+  - What this bundle fixes:
+    - it keeps the canonical natural-split / natural-sampler regression rerun and the current balanced-binary recommendation in one surface again;
+    - it adds a cheap prompt-stat audit from the saved prompt archives;
+    - it adds Athena's codebase-level audit of the current build / label / train / summarize path.
+  - Main correction from that audit:
+    - the reported "metadata baseline" on the April full-train notes is only a train-fit 1D prompt-length scorer, because `effective_max_tokens=30000` is fixed on this surface;
+    - cheap prompt-shape features such as `newline_count`, `dollar_count`, and `char_length` already match or beat raw prompt length on several datasets, and in a few places they rival or beat the current activation probes too.
+  - Next honest prompt-profile step:
+    - replace the 1D prompt-length control with a stronger prompt-shape baseline on the same frozen splits;
+    - evaluate whether activations still add lift as residuals or inside matched prompt-shape strata;
+    - do not spend another cycle rerunning the same natural regression object unless that stronger baseline changes the read.
 - The canonical prompt-profile regression lane is now backed by both the original locked run and a fresh rerun on the current branch.
   - First citation for the current regression object:
     - `docs/prompt-profile-natural-regression-rerun-2026-04-05.md`
@@ -122,6 +139,8 @@ This should be similar to our previous experiments on training probes on loop la
 
 - The explicit cross-dataset `majority_s_0.5` table now exists under `outputs/prompt_majority05_cross_dataset_rebuild_20260325/`; future replies should cite that table directly instead of falling back to `AIME`-only anecdotes.
 - The metadata-only continuous-baseline pass plus the held-out top-risk bucket comparison now exist under `outputs/prompt_profile_risk_controls_20260330/`; future replies should cite that bundle rather than paraphrasing the result.
+- The current whole-surface prompt-profile bundle now exists under `outputs/prompt_profile_combined_audit_20260405/`; future replies should cite that PDF when the question is about regression plus binary together rather than only one head.
+- The cheap prompt-stat audit now exists under `outputs/prompt_profile_metadata_audit_20260405/`; future replies should say plainly that the old "metadata baseline" is only prompt length on this fixed-budget run and that stronger prompt-shape controls remain open.
 - The full-train execution object is now pinned in `docs/prompt-profile-full-train-plan-2026-04-02.md`; future handoffs should cite that file instead of restating the run contract from thread memory.
 - The locked pair now has executable command surfaces too: `scripts/run_prompt_profile_full_train.py` for the run itself and `scripts/summarize_prompt_profile_full_train.py` for the cross-dataset ledger. Future handoffs should point to those scripts instead of recopying the manual command sequence.
 - The first locked full-train result bundle now exists under `outputs/prompt_profile_full_train_locked_pair_20260404/`; future replies should cite that ledger directly instead of falling back to the early GPQA/AIME-only Slack checkpoints.
