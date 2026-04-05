@@ -1,12 +1,16 @@
 # Prompt-Profile Full Train Results And Binary Capacity Follow-Up
 
-Last updated: 2026-04-04 06:39 UTC
+Last updated: 2026-04-05 00:54 UTC
 
 ## Executive Summary
 
 - This report now keeps the whole current object in one place:
   - the first locked prompt-profile full-train run on the fixed five-dataset saved surface;
   - the later balanced-binary capacity follow-up on the same saved April `majority_s_0.5` data.
+- Fresh regression verification:
+  - Slurm `2215` reran the regression lane only on the current branch with the natural train/test split and natural sampler.
+  - That rerun reproduced the original regression ledger exactly.
+  - Use `docs/prompt-profile-natural-regression-rerun-2026-04-05.md` for the explicit reproducibility check and the fresh regression-only artifact bundle.
 - Runtime object: Slurm job `2043` on `2` GPUs, completed at `2026-04-04 00:10 UTC`.
 - Model/policy object: `Qwen/Qwen3-1.7B`, `temperature=0.2`, `num_generations=4`, `max_tokens=30000`, prompt-prefill activations only, loop detector `n=30`, `k=20`.
 - Split contract: regression keeps the natural prompt-disjoint train/test split; binary relabel keeps test natural but downsample-balances the train split to `50/50`.

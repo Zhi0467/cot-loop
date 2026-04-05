@@ -410,23 +410,14 @@ def validate_bundle_contract(rows: list[dict[str, Any]]) -> None:
     )
     mismatches = []
     baseline = rows[0]
-    baseline_contract_version = baseline.get("stats_contract_version")
-    if baseline_contract_version not in (None, EXPECTED_STATS_CONTRACT_VERSION):
-        raise ValueError(
-            "Cross-dataset rollout report requires stats_contract_version to be "
-            f"either legacy None or {EXPECTED_STATS_CONTRACT_VERSION!r}, got "
-            f"{baseline_contract_version!r} for {baseline['display_name']}."
-        )
-    for row in rows[1:]:
-        if row.get("stats_contract_version") != baseline_contract_version:
-            mismatches.append(
-                (
-                    "stats_contract_version",
-                    baseline["display_name"],
-                    baseline_contract_version,
-                    row["display_name"],
-                    row.get("stats_contract_version"),
-                )
+    allowed_contract_versions = {None, EXPECTED_STATS_CONTRACT_VERSION}
+    for row in rows:
+        contract_version = row.get("stats_contract_version")
+        if contract_version not in allowed_contract_versions:
+            raise ValueError(
+                "Cross-dataset rollout report requires stats_contract_version to be "
+                f"either legacy None or {EXPECTED_STATS_CONTRACT_VERSION!r}, got "
+                f"{contract_version!r} for {row['display_name']}."
             )
 
     for key in required_generation_keys:

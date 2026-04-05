@@ -1,12 +1,16 @@
 # Prompt-Profile Full Surface Update: Locked Pair Plus Balanced Binary Capacity Controls
 
-Last updated: 2026-04-04 06:33 UTC
+Last updated: 2026-04-05 00:54 UTC
 
 ## Executive Summary
 
 - This report puts the whole April surface back in one place.
   - locked full-train run: Slurm `2043`
   - balanced binary capacity reruns: Slurm `2107` and `2108`
+- Fresh regression verification:
+  - Slurm `2215` reran the regression lane only on the current branch with the natural train/test split and natural sampler.
+  - That rerun reproduced the original regression ledger exactly, so the regression section below is now both the original April result and a verified current-branch reproduction.
+  - Use `docs/prompt-profile-natural-regression-rerun-2026-04-05.md` for the regression-only rerun note and artifact bundle.
 - The regression lane and the balanced binary rerun are different objects.
   - `mean_relative_length` comes from the locked full-train run and keeps the natural prompt-disjoint train/test split.
   - `majority_s_0.5` keeps test natural but downsample-balances train to `50/50`.

@@ -54,6 +54,16 @@ def parse_args() -> argparse.Namespace:
         choices=DATASET_ORDER,
         help="Dataset key(s) to summarize. Defaults to all known datasets.",
     )
+    parser.add_argument(
+        "--expected-targets",
+        nargs="+",
+        choices=("regression", "binary"),
+        default=["regression", "binary"],
+        help=(
+            "Which targets this run was expected to materialize. "
+            "Regression-only reruns should pass --expected-targets regression."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -558,7 +568,12 @@ def component_status(payload: dict[str, Any] | None) -> str:
     return status if isinstance(status, str) else "missing"
 
 
-def dataset_summary(dataset_key: str, out_root: Path) -> dict[str, Any]:
+def dataset_summary(
+    dataset_key: str,
+    out_root: Path,
+    *,
+    expected_targets: set[str],
+) -> dict[str, Any]:
     dataset_root = out_root / dataset_key
     shared_archive = dataset_root / "shared_archive"
     binary_data = dataset_root / "majority_s_0.5" / "data"
@@ -570,6 +585,7 @@ def dataset_summary(dataset_key: str, out_root: Path) -> dict[str, Any]:
         "shared_archive": str(shared_archive),
         "binary_data_dir": str(binary_data),
         "regression_data_dir": str(resolved_regression_data),
+        "expected_targets": sorted(expected_targets),
         "status": "missing",
     }
 
@@ -661,10 +677,16 @@ def dataset_summary(dataset_key: str, out_root: Path) -> dict[str, Any]:
         "metadata_baselines": binary_baselines,
         "views": binary_views,
     }
-    if binary_status == "missing":
-        summary["status"] = "missing_binary"
-    elif regression_status != "complete" or binary_status != "complete":
+    expects_regression = "regression" in expected_targets
+    expects_binary = "binary" in expected_targets
+
+    if expects_regression and regression_status != "complete":
         summary["status"] = "partial"
+    elif expects_binary and binary_status != "complete":
+        if binary_status == "missing":
+            summary["status"] = "missing_binary"
+        else:
+            summary["status"] = "partial"
     else:
         summary["status"] = "complete"
     return summary
@@ -691,13 +713,19 @@ def main() -> None:
     selected = args.dataset or list(DATASET_ORDER)
 
     all_payload: dict[str, Any] = {
+        "expected_targets": sorted(set(args.expected_targets)),
         "out_root": str(out_root),
         "datasets": {},
     }
     flat_rows: list[dict[str, Any]] = []
+    expected_targets = set(args.expected_targets)
 
     for dataset_key in selected:
-        payload = dataset_summary(dataset_key, out_root)
+        payload = dataset_summary(
+            dataset_key,
+            out_root,
+            expected_targets=expected_targets,
+        )
         all_payload["datasets"][dataset_key] = payload
         write_json(summary_dir / f"{dataset_key}.json", payload)
 

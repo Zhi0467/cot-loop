@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-04-04 23:12 UTC
+Last updated: 2026-04-05 00:54 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -15,6 +15,7 @@ Core docs:
 - Prompt-profile risk-screen decision: prompt-profile-risk-screen-2026-03-30.md
 - Prompt-profile plain-language note: prompt-profile-plain-language-2026-03-30.md
 - Prompt-profile full-train plan: prompt-profile-full-train-plan-2026-04-02.md
+- Prompt-profile natural-regression rerun note: prompt-profile-natural-regression-rerun-2026-04-05.md
 - Prompt-profile corrected balanced-regression note: prompt-profile-balanced-regression-corrected-2026-04-04.md
 - Prompt-profile combined April surface report: prompt-profile-full-surface-update-2026-04-04.md
 - OLMo degeneration-origin audit report: olmo-degeneration-origin-audit-2026-04-04.md
@@ -35,6 +36,8 @@ Key outputs:
 - Prompt-profile risk-control bundle: ../outputs/prompt_profile_risk_controls_20260330/
 - Plain-language objective PDF: ../outputs/prompt_profile_plain_language_20260330/prompt_profile_plain_language_20260330.pdf
 - Full-train plan PDF: ../outputs/prompt_profile_full_train_plan_20260402/prompt_profile_full_train_plan_20260402.pdf
+- Natural-regression rerun bundle: ../outputs/prompt_profile_natural_regression_rerun_20260405/
+- Natural-regression rerun PDF: ../outputs/prompt_profile_natural_regression_rerun_20260405/prompt_profile_natural_regression_rerun_20260405.pdf
 - Corrected balanced-regression bundle: ../outputs/prompt_profile_balanced_regression_corrected_20260404/
 - Corrected balanced-regression PDF: ../outputs/prompt_profile_balanced_regression_corrected_20260404/prompt_profile_balanced_regression_corrected_20260404.pdf
 - Full-train result bundle: ../outputs/prompt_profile_full_train_locked_pair_20260404/
@@ -78,11 +81,13 @@ Current live status:
   - under the secondary `best_rank` rule, the ensemble ordering stays the same (`0.539 > 0.522 > 0.474`), so the global ensemble choice is stable
   - threshold metrics on the natural test split remain recall-heavy on rare-positive datasets, so `PR-AUC` stays primary and threshold metrics stay diagnostic
   - if one single global binary surface is needed today, it should be `ensemble h256 d1`
-- The corrected balanced-regression note is now the current regression rerun surface:
-  - it fixes the mistaken downsampled-subset train contract from the earlier same-day note
-  - the real train counts are `158 / 48 / 400 / 640 / 640`, with sampler balance taken from the natural `majority_s_0.5` labels
-  - on the collaborator-chosen screening metric (`top_20p_capture`), ensemble still wins globally (`0.345 > 0.299 > 0.261`)
-  - on calibration (`RMSE`), prompt length is now the best baseline on `4 / 5` datasets, so the regression lane should still be described as screening-first rather than calibrated
+- The natural-regression rerun note is now the canonical regression rerun surface:
+  - it retrains `mean_relative_length` on the natural train/test split with natural sampling from the current PR head
+  - it reproduces the original locked `2043` regression ledger exactly, with max absolute metric difference `0.0`
+  - it is the right note to cite when the question is "did the natural regression object still hold after rerunning it on the updated branch?"
+- The corrected balanced-regression note is now side-analysis provenance only:
+  - it still explains the earlier count drop and the balanced-sampler detour
+  - it should not be cited as the default regression training object anymore
 - The run surface is now executable rather than purely documentary: `scripts/run_prompt_profile_full_train.py` is the canonical launcher, and `scripts/summarize_prompt_profile_full_train.py` is the canonical post-run ledger for the locked pair plus metadata controls.
 - The first locked full-train pass is now complete. The repo-facing result is split cleanly:
   - regression `mean_relative_length`: ensemble beats `last_layer`, but the train-fit prompt-length baseline still wins on `AIME`, `MATH-500`, and `MMLU-Pro`;

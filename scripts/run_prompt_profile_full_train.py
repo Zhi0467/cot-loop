@@ -180,6 +180,16 @@ def parse_args() -> argparse.Namespace:
             "Defaults to --out-root."
         ),
     )
+    parser.add_argument(
+        "--expected-targets",
+        nargs="+",
+        choices=("regression", "binary"),
+        default=["regression", "binary"],
+        help=(
+            "Which targets this run is expected to summarize. "
+            "Regression-only reruns should pass --expected-targets regression."
+        ),
+    )
     parser.add_argument("--python-bin", default=sys.executable)
     parser.add_argument("--wandb-project", default="cot-loop-probe")
     parser.add_argument("--probe-preset", default="mlp")
@@ -784,6 +794,8 @@ def summary_cmd(
         "--summary-dir",
         str(summary_dir),
     ]
+    if args.expected_targets:
+        cmd.extend(["--expected-targets", *args.expected_targets])
     for spec in datasets:
         cmd.extend(["--dataset", spec.key])
     return cmd

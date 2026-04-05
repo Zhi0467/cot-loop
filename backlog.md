@@ -1,16 +1,26 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-04 23:48 UTC
+Last updated: 2026-04-05 00:54 UTC
 
 ## Immediate Next Experiments
 
-- The canonical prompt-profile regression lane is the locked natural-split / natural-sampler run, not the later balanced-regression reruns.
-  - Canonical regression notes:
+- The canonical prompt-profile regression lane is now backed by both the original locked run and a fresh rerun on the current branch.
+  - First citation for the current regression object:
+    - `docs/prompt-profile-natural-regression-rerun-2026-04-05.md`
+    - `outputs/prompt_profile_natural_regression_rerun_20260405/prompt_profile_natural_regression_rerun_20260405.pdf`
+  - Earlier background notes that the rerun verifies rather than replaces:
     - `docs/prompt-profile-full-train-results-2026-04-04.md`
     - `docs/prompt-profile-full-surface-update-2026-04-04.md`
+  - What the rerun proved:
+    - Slurm `2215` retrained the regression lane only, on the natural prompt-disjoint train/test split with natural sampling, from the current PR branch.
+    - Its copied summary matched the original locked `2043` regression ledger exactly:
+      - max absolute difference `0.0`
+      - no movement in prompt-only metadata baselines
+      - no movement in `ensemble` or `last_layer`
+      - no movement at either `best_loss` or `best_rank`
   - Why this is the canonical object now:
     - Wangzhi later rejected train balancing for `mean_relative_length`, since it is a continuous target and does not concern a binary label.
-    - So the correct regression contract is the original natural prompt-disjoint train/test split with natural sampling.
+    - The natural-split / natural-sampler regression lane is therefore not just preferred in principle; it is now re-run and verified on the current branch.
   - Main natural regression read at frozen `best_loss`:
     - screening (`top_20p_capture`): ensemble beats prompt length on `GPQA`, `MMLU-Pro`, and `LiveCodeBench`
     - calibration (`RMSE`): ensemble beats prompt length only on `GPQA` and `LiveCodeBench`

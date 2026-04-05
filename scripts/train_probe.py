@@ -855,7 +855,16 @@ def main() -> None:
 
     num_pos = int(train_info.get("num_positive", 0))
     num_neg = int(train_info.get("num_negative", 0))
-    if target_kind == "binary" and num_pos > 0 and num_neg > 0:
+    balanced_binary_sampler_active = (
+        target_kind == "binary" and train_sampler is not None
+    )
+    if balanced_binary_sampler_active:
+        pos_weight = torch.tensor(1.0, dtype=torch.float32, device=device)
+        print(
+            "binary train sampler is already balanced; disabling BCE class weighting",
+            flush=True,
+        )
+    elif target_kind == "binary" and num_pos > 0 and num_neg > 0:
         pos_weight = torch.tensor(
             float(num_neg / num_pos),
             dtype=torch.float32,

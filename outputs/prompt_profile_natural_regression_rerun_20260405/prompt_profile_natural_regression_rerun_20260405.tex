@@ -1,0 +1,289 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{hyperref}
+
+\title{Natural Prompt-Profile Regression Rerun\\Natural Split / Natural Sampler}
+\author{}
+\date{2026-04-05 UTC}
+
+\begin{document}
+\maketitle
+
+\section{Executive Summary}
+
+This note is the fresh regression-only rerun for the final collaborator-approved
+object:
+\begin{itemize}
+\item target: \texttt{mean\_relative\_length}
+\item split: natural prompt-disjoint train/test
+\item sampler: natural
+\item views: \texttt{ensemble} and \texttt{last\_layer}
+\end{itemize}
+
+Runtime object:
+\begin{itemize}
+\item Slurm job \texttt{2215}
+\item branch head at launch: \texttt{b9247a1} (\texttt{slurm: add natural regression rerun wrapper})
+\item node: \texttt{tianhaowang-gpu0}
+\item GPUs: \texttt{2}
+\end{itemize}
+
+The rerun reused the saved April shared archives from the locked full-train run,
+retrained the regression probes from scratch on the current branch, and did not
+rerun the binary head. The main result is stronger than ``the natural object is
+conceptually right'': the fresh rerun reproduced the original locked
+\texttt{2043} regression ledger exactly. The maximum absolute difference was
+\texttt{0.0} across all five datasets for the prompt-only regression metadata
+baselines and for the \texttt{ensemble} and \texttt{last\_layer} aggregate
+metrics under both \texttt{best\_loss} and \texttt{best\_rank}.
+
+\section{Why This Rerun Exists}
+
+The thread corrected the regression contract twice. First, the downsampled
+balanced binary subset was the wrong regression dataset. Second, even the
+full-count balanced-sampler rerun was still the wrong default object. Wangzhi's
+final correction was that \texttt{mean\_relative\_length} should stay on the
+natural train/test split with natural sampling because it is a continuous
+target, not a binary-label problem.
+
+This rerun therefore answers one narrow question: if we retrain the regression
+lane today on the current branch under the natural split and natural sampler, do
+the April regression conclusions still hold? The answer is yes, exactly.
+
+\section{Rerun Contract}
+
+\begin{itemize}
+\item Source shared-archive root:
+  \texttt{/data/scratch/murphy/outputs/cot-loop-detection/full\_train\_locked\_pair\_20260404}
+\item Fresh rerun bundle:
+  \texttt{outputs/prompt\_profile\_natural\_regression\_rerun\_20260405/}
+\item Model and rollout object:
+  \begin{itemize}
+  \item \texttt{Qwen/Qwen3-1.7B}
+  \item \texttt{temperature=0.2}
+  \item \texttt{num\_generations=4}
+  \item \texttt{max\_tokens=30000}
+  \item prompt-prefill stacked all-layer last-token activations only
+  \end{itemize}
+\item Probe family:
+  \begin{itemize}
+  \item default \texttt{mlp}
+  \item hidden width \texttt{128}
+  \item depth \texttt{1}
+  \item dropout \texttt{0.1}
+  \end{itemize}
+\item Optimizer and seeds:
+  \begin{itemize}
+  \item seeds \texttt{0,1,2}
+  \item epochs \texttt{10}
+  \item batch size \texttt{256}
+  \item learning rate \texttt{1e-4}
+  \item weight decay \texttt{0.1}
+  \end{itemize}
+\item Reporting rule:
+  \begin{itemize}
+  \item keep \texttt{best\_loss} as the main checkpoint
+  \item keep \texttt{best\_rank} diagnostic only
+  \end{itemize}
+\end{itemize}
+
+\section{Exact Reproduction Check}
+
+The fresh summary bundle was compared directly against the original locked
+full-train regression summary.
+
+\begin{itemize}
+\item Original ledger:
+  \texttt{outputs/prompt\_profile\_full\_train\_locked\_pair\_20260404/remote\_summary/cross\_dataset\_summary.json}
+\item Fresh rerun ledger:
+  \texttt{outputs/prompt\_profile\_natural\_regression\_rerun\_20260405/remote\_summary/cross\_dataset\_summary.json}
+\end{itemize}
+
+Compared objects:
+\begin{itemize}
+\item all regression metadata-baseline test metrics for
+  \texttt{prompt\_length}, \texttt{effective\_budget}, and
+  \texttt{prompt\_length\_plus\_effective\_budget}
+\item all aggregated regression probe metrics for \texttt{ensemble} and
+  \texttt{last\_layer} under both \texttt{best\_loss} and \texttt{best\_rank}
+\item all five datasets
+\end{itemize}
+
+Result:
+\begin{itemize}
+\item max absolute difference = \texttt{0.0}
+\item no dataset, view, metric, or baseline moved
+\end{itemize}
+
+\section{Fixed Dataset Surface}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lrrl}
+\toprule
+Dataset & Train prompts & Test prompts & Task kind \\
+\midrule
+\texttt{GPQA} & 158 & 40 & \texttt{multiple\_choice\_gpqa} \\
+\texttt{AIME} & 48 & 12 & \texttt{math\_freeform} \\
+\texttt{MATH-500} & 400 & 100 & \texttt{math\_freeform} \\
+\texttt{MMLU-Pro} & 640 & 160 & \texttt{multiple\_choice\_mmlupro} \\
+\texttt{LiveCodeBench} & 640 & 160 & \texttt{livecodebench\_codegen} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Metric Definitions}
+
+\begin{itemize}
+\item Regression score:
+  each held-out prompt gets one scalar score
+  $s_i = \texttt{predicted mean\_relative\_length}$.
+\item Actual mass:
+  each held-out prompt contributes
+  $y_i = \texttt{actual mean\_relative\_length}$.
+\item \texttt{top\_10p\_capture} / \texttt{top\_20p\_capture}:
+  sort held-out prompts by descending $s_i$, keep the top 10\% or 20\%, and
+  report $\sum_{i \in \mathrm{kept}} y_i / \sum_j y_j$.
+\item ``Mass'' means total realized relative-length weight across held-out
+  prompts, not a prompt count and not a binary positive count.
+\item \texttt{RMSE}:
+  pointwise error on aligned held-out prompt pairs.
+\item \texttt{Spearman}:
+  monotone-order diagnostic on those same aligned held-out prompt pairs. It is
+  not the task definition.
+\item Metadata baseline:
+  train-fit prompt-only linear regression on \texttt{prompt\_token\_count} and
+  \texttt{effective\_max\_tokens}. Because \texttt{effective\_max\_tokens} is
+  fixed at \texttt{30000}, prompt length is the only nontrivial feature here.
+\end{itemize}
+
+\section{Results}
+
+\subsection*{\texttt{top\_10p\_capture} at \texttt{best\_loss}}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+Dataset & Prompt length & Last-layer & Ensemble \\
+\midrule
+\texttt{GPQA} & 0.070 & 0.089 $\pm$ 0.006 & 0.132 $\pm$ 0.019 \\
+\texttt{AIME} & 0.223 & 0.221 $\pm$ 0.004 & 0.204 $\pm$ 0.015 \\
+\texttt{MATH-500} & 0.151 & 0.117 $\pm$ 0.061 & 0.129 $\pm$ 0.033 \\
+\texttt{MMLU-Pro} & 0.169 & 0.094 $\pm$ 0.062 & 0.209 $\pm$ 0.022 \\
+\texttt{LiveCodeBench} & 0.137 & 0.156 $\pm$ 0.000 & 0.170 $\pm$ 0.004 \\
+\bottomrule
+\end{tabular}
+\caption{Cross-dataset means: prompt length \texttt{0.150}, last-layer \texttt{0.135}, ensemble \texttt{0.169}.}
+\end{table}
+
+\subsection*{\texttt{top\_20p\_capture} at \texttt{best\_loss}}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+Dataset & Prompt length & Last-layer & Ensemble \\
+\midrule
+\texttt{GPQA} & 0.168 & 0.216 $\pm$ 0.039 & 0.247 $\pm$ 0.018 \\
+\texttt{AIME} & 0.306 & 0.321 $\pm$ 0.020 & 0.305 $\pm$ 0.017 \\
+\texttt{MATH-500} & 0.290 & 0.243 $\pm$ 0.094 & 0.262 $\pm$ 0.058 \\
+\texttt{MMLU-Pro} & 0.292 & 0.185 $\pm$ 0.098 & 0.355 $\pm$ 0.025 \\
+\texttt{LiveCodeBench} & 0.248 & 0.317 $\pm$ 0.010 & 0.340 $\pm$ 0.005 \\
+\bottomrule
+\end{tabular}
+\caption{Cross-dataset means: prompt length \texttt{0.261}, last-layer \texttt{0.256}, ensemble \texttt{0.302}.}
+\end{table}
+
+\subsection*{\texttt{RMSE} at \texttt{best\_loss}}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+Dataset & Prompt length & Last-layer & Ensemble \\
+\midrule
+\texttt{GPQA} & 0.165 & 0.164 $\pm$ 0.003 & 0.160 $\pm$ 0.002 \\
+\texttt{AIME} & 0.176 & 0.189 $\pm$ 0.004 & 0.183 $\pm$ 0.006 \\
+\texttt{MATH-500} & 0.154 & 0.169 $\pm$ 0.018 & 0.162 $\pm$ 0.002 \\
+\texttt{MMLU-Pro} & 0.126 & 0.138 $\pm$ 0.005 & 0.133 $\pm$ 0.000 \\
+\texttt{LiveCodeBench} & 0.279 & 0.242 $\pm$ 0.011 & 0.248 $\pm$ 0.018 \\
+\bottomrule
+\end{tabular}
+\caption{Cross-dataset means: prompt length \texttt{0.180}, last-layer \texttt{0.180}, ensemble \texttt{0.177}.}
+\end{table}
+
+\subsection*{\texttt{Spearman} at \texttt{best\_loss}}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+Dataset & Prompt length & Last-layer & Ensemble \\
+\midrule
+\texttt{GPQA} & 0.116 & 0.175 $\pm$ 0.225 & 0.419 $\pm$ 0.045 \\
+\texttt{AIME} & 0.676 & 0.483 $\pm$ 0.138 & 0.639 $\pm$ 0.090 \\
+\texttt{MATH-500} & 0.461 & 0.158 $\pm$ 0.426 & 0.351 $\pm$ 0.199 \\
+\texttt{MMLU-Pro} & 0.393 & -0.019 $\pm$ 0.293 & 0.348 $\pm$ 0.034 \\
+\texttt{LiveCodeBench} & 0.405 & 0.784 $\pm$ 0.006 & 0.805 $\pm$ 0.002 \\
+\bottomrule
+\end{tabular}
+\caption{Cross-dataset means: prompt length \texttt{0.410}, last-layer \texttt{0.316}, ensemble \texttt{0.512}.}
+\end{table}
+
+\section{Interpretation}
+
+\begin{itemize}
+\item Operational screening read:
+  on \texttt{top\_20p\_capture}, ensemble beats prompt length on
+  \texttt{GPQA}, \texttt{MMLU-Pro}, and \texttt{LiveCodeBench}; it loses on
+  \texttt{AIME} and \texttt{MATH-500}. It beats \texttt{last\_layer} on
+  \texttt{4 / 5}, with only \texttt{AIME} favoring \texttt{last\_layer}.
+\item Calibration read:
+  on \texttt{RMSE}, ensemble beats prompt length only on \texttt{GPQA} and
+  \texttt{LiveCodeBench}. Prompt length still wins on \texttt{AIME},
+  \texttt{MATH-500}, and \texttt{MMLU-Pro}.
+\item Diagnostic ordering:
+  \texttt{Spearman} still looks strongest for ensemble on
+  \texttt{GPQA} and \texttt{LiveCodeBench}, but it remains tertiary and should
+  not drive the headline claim.
+\item Most important rerun result:
+  the mixed regression story did not wash out, sharpen, or drift on the current
+  branch. It reproduced exactly.
+\end{itemize}
+
+\section{Recommendation}
+
+\begin{itemize}
+\item Keep the regression lane on the natural split and natural sampler.
+\item Keep \texttt{top\_20p\_capture} as the primary regression metric.
+\item Keep \texttt{RMSE} as calibration context.
+\item Keep \texttt{Spearman} diagnostic only.
+\item Do not cite the balanced-regression notes as the canonical regression answer.
+\item If this lane is tuned further, do it on this exact natural surface:
+  small layer-subset sweep, small capacity sweep, and no more balancing detours.
+\end{itemize}
+
+\section{Artifacts}
+
+\begin{itemize}
+\item Fresh report bundle:
+  \texttt{outputs/prompt\_profile\_natural\_regression\_rerun\_20260405/}
+\item Fresh copied summary ledger:
+  \texttt{outputs/prompt\_profile\_natural\_regression\_rerun\_20260405/remote\_summary/}
+\item Fresh Slurm log:
+  \texttt{outputs/prompt\_profile\_natural\_regression\_rerun\_20260405/logs/prompt-profile-regression-natural-2215.out}
+\item Original locked two-head note:
+  \texttt{docs/prompt-profile-full-train-results-2026-04-04.md}
+\item Combined April surface note:
+  \texttt{docs/prompt-profile-full-surface-update-2026-04-04.md}
+\end{itemize}
+
+\end{document}

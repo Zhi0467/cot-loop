@@ -167,6 +167,7 @@ SUMMARY_CMD=(
   --stage summary
   --out-root "${OUT_ROOT}"
   --summary-dir "${SUMMARY_DIR}"
+  --expected-targets regression
 )
 
 for dataset in "${DATASETS[@]}"; do

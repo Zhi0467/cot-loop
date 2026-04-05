@@ -2,6 +2,9 @@
   "binary_data_dir": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced_sampler/aime/majority_s_0.5/data",
   "dataset": "aime",
   "dataset_root": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced_sampler/aime",
+  "expected_targets": [
+    "regression"
+  ],
   "majority_s_0.5": {
     "metadata_baselines": null,
     "status": "missing",
@@ -458,5 +461,5 @@
   },
   "regression_data_dir": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced_sampler/aime/mean_relative_length/data",
   "shared_archive": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced_sampler/aime/shared_archive",
-  "status": "missing_binary"
+  "status": "complete"
 }

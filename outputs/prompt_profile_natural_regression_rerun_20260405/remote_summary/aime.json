@@ -1,7 +1,7 @@
 {
-  "binary_data_dir": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced/aime/majority_s_0.5/data",
+  "binary_data_dir": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/aime/majority_s_0.5/data",
   "dataset": "aime",
-  "dataset_root": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced/aime",
+  "dataset_root": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/aime",
   "expected_targets": [
     "regression"
   ],
@@ -11,7 +11,7 @@
     "views": null
   },
   "mean_relative_length": {
-    "data_dir": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced/aime/mean_relative_length/data",
+    "data_dir": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/aime/shared_archive",
     "metadata_baselines": {
       "effective_budget": {
         "feature_names": [
@@ -241,7 +241,7 @@
               "top_10p_capture": 0.21263390014139646,
               "top_20p_capture": 0.32440749093641247
             },
-            "seed_dir": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced/aime/mean_relative_length/ensemble/seed_0"
+            "seed_dir": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/aime/mean_relative_length/ensemble/seed_0"
           },
           {
             "best_loss": {
@@ -264,7 +264,7 @@
               "top_10p_capture": 0.1861782987741919,
               "top_20p_capture": 0.2951000690284554
             },
-            "seed_dir": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced/aime/mean_relative_length/ensemble/seed_1"
+            "seed_dir": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/aime/mean_relative_length/ensemble/seed_1"
           },
           {
             "best_loss": {
@@ -287,10 +287,10 @@
               "top_10p_capture": 0.22069536104927953,
               "top_20p_capture": 0.3031615299363385
             },
-            "seed_dir": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced/aime/mean_relative_length/ensemble/seed_2"
+            "seed_dir": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/aime/mean_relative_length/ensemble/seed_2"
           }
         ],
-        "run_dir": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced/aime/mean_relative_length/ensemble",
+        "run_dir": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/aime/mean_relative_length/ensemble",
         "seed_count": 3,
         "status": "complete"
       },
@@ -404,7 +404,7 @@
               "top_10p_capture": 0.22305651566036336,
               "top_20p_capture": 0.33197828591462686
             },
-            "seed_dir": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced/aime/mean_relative_length/last_layer/seed_0"
+            "seed_dir": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/aime/mean_relative_length/last_layer/seed_0"
           },
           {
             "best_loss": {
@@ -427,7 +427,7 @@
               "top_10p_capture": 0.22305651566036336,
               "top_20p_capture": 0.33197828591462686
             },
-            "seed_dir": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced/aime/mean_relative_length/last_layer/seed_1"
+            "seed_dir": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/aime/mean_relative_length/last_layer/seed_1"
           },
           {
             "best_loss": {
@@ -450,16 +450,16 @@
               "top_10p_capture": 0.21548572068214894,
               "top_20p_capture": 0.29795188956920793
             },
-            "seed_dir": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced/aime/mean_relative_length/last_layer/seed_2"
+            "seed_dir": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/aime/mean_relative_length/last_layer/seed_2"
           }
         ],
-        "run_dir": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced/aime/mean_relative_length/last_layer",
+        "run_dir": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/aime/mean_relative_length/last_layer",
         "seed_count": 3,
         "status": "complete"
       }
     }
   },
-  "regression_data_dir": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced/aime/mean_relative_length/data",
-  "shared_archive": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced/aime/shared_archive",
+  "regression_data_dir": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/aime/mean_relative_length/data",
+  "shared_archive": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/aime/shared_archive",
   "status": "complete"
 }
