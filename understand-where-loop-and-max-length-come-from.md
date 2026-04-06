@@ -13,6 +13,25 @@ Clarification:
   - looped and max-length-hit rollouts are much less accurate on the harder datasets;
 - mean rollout length plus binary length-threshold labels are still useful prompt-level proxies, but this note is not about choosing among those proxies. This note is about where the degenerate-rollout regime enters the model family.
 
+## Status Snapshot (2026-04-06)
+
+This file is now a chronological working note, not just the original plan. The current read is:
+
+- the original "base should barely have any degenerate rollouts" hypothesis is no longer the leading explanation;
+- on the scaled OLMo2 `1B` `50`-prompt ladder, heavy loop / max-length mass is already present in base, drops sharply in SFT, and is smallest at `RLVR1` on most datasets;
+- the corrected OLMo3 `7B` bounded rows do **not** support "RLVR introduces the degeneration";
+- the same-family Qwen control now shows that raw base prompting can also raise loop / max-length mass on Qwen-style models, so the phenomenon is not OLMo-only;
+- the textual failure mode is not identical across families:
+  - OLMo2 base repeats derivation content or falls into synthetic-junk tails;
+  - Qwen base raw often loops on the MCQ answer-format instruction tail itself.
+
+Two practical notes for reading the rest of this file:
+
+- sections explicitly marked `Historical` preserve the earlier pilot/debug sequence and are intentionally not the current conclusion surface;
+- the durable stage-conclusion companions are:
+  - `docs/olmo2-1b-fifty-prompt-rerun-2026-04-05.md`
+  - `docs/olmo-degeneration-origin-audit-2026-04-04.md`
+
 ## Existing Reference Surface
 
 Use the older rollout-statistics bundle as the reference object, not thread memory.
@@ -53,9 +72,9 @@ Keep the raw counts too:
 - max-length-hit count
 - overlap counts between loop, max-length hit, and correctness
 
-## Plan
+## Original Plan (Before Execution)
 
-The hypothesis is the base model should barely have any degenerate rollouts. The key question is whether this behavior is introduced during SFT, amplified during RLVR, or already present in the base model.
+The original hypothesis was that the base model might have little degenerate-rollout mass, with SFT or RLVR introducing the regime later. The later sections of this note no longer support that as the main read, but the starting plan is preserved here so the execution history is legible.
 
 So we do this:
 
@@ -73,10 +92,10 @@ So we do this:
    - for the progression question, do not use Sankey;
    - use line plots for each metric across base -> SFT -> RLVR, broken out by dataset.
 6. Draw conclusions on the hypothesis.
-   - supported if the base checkpoint has little degenerate-rollout mass and SFT or RLVR shows a clear rise in loop rate, max-length-hit rate, or both across multiple datasets;
-   - weakened if the base model already shows substantial degeneracy under the same contract, or if the progression is flat and noisy rather than stage-linked.
+   - the original expected support case was: base low, then SFT or RLVR clearly higher across multiple datasets;
+   - the now-observed alternative is: base already carries substantial degeneration, and later stages mostly reduce or reshape it instead of creating it from near zero.
 
-## Execution Update (2026-04-04)
+## Historical: Early OLMo3 Pilot Update (2026-04-04)
 
 The first execution pass changed one important assumption in this plan.
 
@@ -146,7 +165,7 @@ Current interpretation:
 - this is now enough to reject the earlier all-raw comparison, but it is still not the final multi-dataset answer to the full note hypothesis;
 - the next expansion should keep the corrected prompt-surface split fixed and scale the same rollout-stat object outward, rather than revisiting the invalid shared-raw contract.
 
-## Fairness Correction (2026-04-04 05:11 UTC)
+## Historical: OLMo3 Fairness Correction (2026-04-04 05:11 UTC)
 
 Wangzhi's follow-up exposed one more confound in the first bounded pilots.
 
@@ -207,7 +226,7 @@ So the current fairness rule is:
 - do keep the collector, dataset slice, loop detector, and sampling contract fixed;
 - treat prompt surface as a separate interface choice that must stay native unless a direct probe shows otherwise.
 
-## Temperature-0.1 Collection Queue (2026-04-04 05:39 UTC)
+## Historical: Temperature-0.1 Collection Queue (2026-04-04 05:39 UTC)
 
 Wangzhi then made one more execution correction:
 
@@ -325,7 +344,7 @@ There is also a real smaller-model fallback, but it is not within the same OLMo 
   - `OLMo-2-0425-1B-Instruct`
 - that would still change families and training details, so it should be treated as a fallback debug object after auditing the current OLMo 3 bounded outputs, not as a silent replacement for them.
 
-## Local Audit Before The OLMo 2 Pivot (2026-04-04 07:25 UTC)
+## Historical: Local Audit Before The OLMo 2 Pivot (2026-04-04 07:25 UTC)
 
 I checked the weird rows against the local collector / adapter code before trying to trust or rerun them blindly.
 
@@ -400,7 +419,7 @@ The final conclusion should stay on this object:
 - where degenerate rollouts enter the model family;
 - whether the progression points to base, SFT, RLVR, or no clean stage break.
 
-## Remote Audit Correction And OLMo 2 Follow-Through (2026-04-04 22:07 UTC)
+## Corrected OLMo3 Audit + OLMo2 Follow-Through (2026-04-04 22:07 UTC)
 
 This supersedes the earlier "SSH blocked / drop LiveCodeBench" state.
 
@@ -685,7 +704,7 @@ Those figures are built directly from the saved `50`-prompt stage JSONs, not fro
 - `RLVR1` is the cleanest point on most datasets;
 - final instruct is mixed and re-accumulates visible degeneration on `MMLU-Pro`.
 
-The live Qwen base control has now crossed from progress receipts into finished rows:
+The live Qwen base control has now crossed from progress receipts into finished rows, but this section is still live until the remaining four datasets finish:
 
 - completed `MATH-500` row (`50` prompts, `500` rollouts):
   - `243 / 500` correct
@@ -697,11 +716,11 @@ The live Qwen base control has now crossed from progress receipts into finished 
   - old instruct row: `3628 / 5000` correct, `147 / 5000` looped, `73 / 5000` max-length-hit, `avg_generation_length = 6227.6302`
   - base raw is already worse on loop rate (`0.038` vs `0.0294`) and much worse on max-length-hit rate (`0.044` vs `0.0146`), even though the base row is much shorter on average (`1893.592` vs `6227.6302`)
 - remaining dedicated base jobs still live:
-  - latest log checkpoint (`2026-04-06 08:16 UTC`):
-    - `AIME`: `13 / 50` prompts processed
-    - `GPQA`: `7 / 50`
-    - `MMLU-Pro`: `8 / 50`
-    - `LiveCodeBench release_v6`: `4 / 50`
-  - `GPQA` and `LiveCodeBench` are the slowest decode legs so far on the base control; neither has emitted a finished JSON yet
+  - latest log checkpoint (`2026-04-06 08:31 UTC`):
+    - `AIME`: `16 / 50` prompts processed
+    - `GPQA`: `11 / 50`
+    - `MMLU-Pro`: `11 / 50`
+    - `LiveCodeBench release_v6`: `6 / 50`
+  - `GPQA` and `LiveCodeBench` are still the slowest decode legs so far on the base control; neither has emitted a finished JSON yet
 
 After `math500.json` was written, I killed the old serialized follow-on under GPU `3` because it had automatically rolled into a duplicate `AIME` run. So the active Qwen control is now cleanly one finished `MATH-500` row plus one live collector per remaining dataset, not two copies of `AIME`.

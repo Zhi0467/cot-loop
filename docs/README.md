@@ -79,7 +79,10 @@ Current live status:
 - `p_loop` still wins the old bucket diagnostic for concentrating looping prompts, but that is no longer treated as proof that it should be the main training objective.
 - The note `prompt-profile-risk-screen-2026-03-30.md` is now the technical decision surface for this predictability-first correction.
 - The note `prompt-profile-plain-language-2026-03-30.md` is the collaborator-facing explanation of the same correction in plain words.
-- The repo-root note `../understand-where-loop-and-max-length-come-from.md` is still the working OLMo progression note on the older rollout-statistics module: it now includes the corrected OLMo3 audit rows plus the larger OLMo2 `1B` follow-up.
+- The repo-root note `../understand-where-loop-and-max-length-come-from.md` is still the working OLMo progression note on the older rollout-statistics module:
+  - it now opens with a current status snapshot;
+  - older April 4 pilot/debug sections are preserved in-place but explicitly marked `Historical`;
+  - use it when you want the full chronological path, not just the cleaned stage conclusion.
 - The docs note `understand-where-loop-and-max-length-come-from.md` is only the background definitions appendix for saved `loop`, prompt-profile `cap_hit` / `p_cap`, rollout-stat `max_length_hit`, and `majority_s_0.5`.
 - The new note `olmo-degeneration-origin-audit-2026-04-04.md` is the collaborator-facing summary surface for that thread:
   - it consolidates the repaired OLMo3 `MMLU-Pro` / `LiveCodeBench` rows plus the bounded OLMo2 `1B` ladder;

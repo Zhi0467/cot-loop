@@ -124,7 +124,7 @@ Read:
 
 That means the cheap full-ladder control already shows the stage shape the original note was trying to isolate: degeneration is heaviest in base, reduced but still present in SFT, and much smaller after RL-style post-training.
 
-## Current Conclusion
+## April 4 Conclusion Before The 50-Prompt Rerun
 
 What is now proved:
 - the fishy OLMo3 rows were not just "weird but maybe real"; two of them were genuine evaluation-surface bugs, and the corrected rows are now on disk;
@@ -135,7 +135,7 @@ What is still not proved:
 - a full OLMo3 `7B` base -> SFT -> RLVR five-dataset progression under one bounded contract, because the `7B` base checkpoint is still too slow to finish that object honestly;
 - any stronger claim that low accuracy itself disappears after RL-style post-training. Some `1B` rows remain low-accuracy while already being non-degenerate.
 
-If this thread is continued, the next honest step is not another interface audit. It is either:
+At that stage, before the later `50`-prompt OLMo2 rerun and the Qwen base raw control, the next honest step was:
 - scale the bounded OLMo2 ladder to a larger prompt slice; or
 - revive the OLMo3 base stage only on a smaller / more targeted object where the runtime is actually tractable.
 
@@ -150,6 +150,8 @@ If this thread is continued, the next honest step is not another interface audit
   - `/data/scratch/murphy/outputs/cot-loop-detection/olmo2_1b_degeneration_origin_progression/bound8_temp0p1_gen10_ctx4096_topkneg1/`
 
 ## April 6 Follow-up
+
+These bullets supersede the April 4 "next step" framing above. They are the reason this note is now historical rather than the main stage-conclusion surface.
 
 Two later clarifications matter if this audit note is cited on its own:
 
