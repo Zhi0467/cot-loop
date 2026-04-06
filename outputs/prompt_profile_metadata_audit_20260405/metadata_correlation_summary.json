@@ -1,0 +1,719 @@
+{
+  "datasets": {
+    "aime": {
+      "binary_archive": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/aime/majority_s_0.5/data/diagnostics/prompt_rollout_archive.jsonl",
+      "binary_feature_metrics": [
+        {
+          "feature": "prompt_token_count",
+          "positive_rate_top_10p": 1.0,
+          "positive_rate_top_20p": 1.0,
+          "pr_auc": 0.8976190476190475,
+          "prevalence": 0.5833333333333334,
+          "roc_auc": 0.8428571428571429
+        },
+        {
+          "feature": "char_length",
+          "positive_rate_top_10p": 1.0,
+          "positive_rate_top_20p": 1.0,
+          "pr_auc": 0.8917233560090703,
+          "prevalence": 0.5833333333333334,
+          "roc_auc": 0.8285714285714286
+        },
+        {
+          "feature": "newline_count",
+          "positive_rate_top_10p": 0.0,
+          "positive_rate_top_20p": 0.0,
+          "pr_auc": 0.5833333333333334,
+          "prevalence": 0.5833333333333334,
+          "roc_auc": 0.4
+        },
+        {
+          "feature": "digit_count",
+          "positive_rate_top_10p": 1.0,
+          "positive_rate_top_20p": 0.6666666666666666,
+          "pr_auc": 0.7268707482993196,
+          "prevalence": 0.5833333333333334,
+          "roc_auc": 0.5571428571428572
+        },
+        {
+          "feature": "dollar_count",
+          "positive_rate_top_10p": 1.0,
+          "positive_rate_top_20p": 1.0,
+          "pr_auc": 0.9367346938775509,
+          "prevalence": 0.5833333333333334,
+          "roc_auc": 0.9142857142857143
+        },
+        {
+          "feature": "choice_count",
+          "positive_rate_top_10p": 0.0,
+          "positive_rate_top_20p": 0.0,
+          "pr_auc": 0.5833333333333334,
+          "prevalence": 0.5833333333333334,
+          "roc_auc": 0.5
+        }
+      ],
+      "binary_prompt_length_bins": [
+        {
+          "bucket": 1,
+          "bucket_prompt_token_max": 74.0,
+          "bucket_prompt_token_min": 66.0,
+          "char_length_mean": 245.25,
+          "majority_s_0.5_rate": 0.25,
+          "mean_relative_length_mean": 0.42156666666666665,
+          "num_rows": 4,
+          "p_cap_mean": 0.0,
+          "p_loop_mean": 0.0,
+          "prompt_token_count_mean": 70.5
+        },
+        {
+          "bucket": 2,
+          "bucket_prompt_token_max": 97.0,
+          "bucket_prompt_token_min": 94.0,
+          "char_length_mean": 396.5,
+          "majority_s_0.5_rate": 0.5,
+          "mean_relative_length_mean": 0.6741583333333334,
+          "num_rows": 2,
+          "p_cap_mean": 0.0,
+          "p_loop_mean": 0.0,
+          "prompt_token_count_mean": 95.5
+        },
+        {
+          "bucket": 3,
+          "bucket_prompt_token_max": 161.0,
+          "bucket_prompt_token_min": 109.0,
+          "char_length_mean": 496.3333333333333,
+          "majority_s_0.5_rate": 0.6666666666666666,
+          "mean_relative_length_mean": 0.7262666666666666,
+          "num_rows": 3,
+          "p_cap_mean": 0.3333333333333333,
+          "p_loop_mean": 0.3333333333333333,
+          "prompt_token_count_mean": 129.66666666666666
+        },
+        {
+          "bucket": 4,
+          "bucket_prompt_token_max": 597.0,
+          "bucket_prompt_token_min": 170.0,
+          "char_length_mean": 926.3333333333334,
+          "majority_s_0.5_rate": 1.0,
+          "mean_relative_length_mean": 0.7645111111111111,
+          "num_rows": 3,
+          "p_cap_mean": 0.3333333333333333,
+          "p_loop_mean": 0.08333333333333333,
+          "prompt_token_count_mean": 336.3333333333333
+        }
+      ],
+      "display_name": "AIME",
+      "regression_archive": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/aime/shared_archive/diagnostics/prompt_rollout_archive.jsonl",
+      "regression_feature_metrics": [
+        {
+          "feature": "prompt_token_count",
+          "spearman": 0.6760080419465041,
+          "top_10p_capture": 0.2230565145476949,
+          "top_20p_capture": 0.3055226846352808
+        },
+        {
+          "feature": "char_length",
+          "spearman": 0.6713286713286714,
+          "top_10p_capture": 0.2230565145476949,
+          "top_20p_capture": 0.3319782866911626
+        },
+        {
+          "feature": "newline_count",
+          "spearman": -0.21835657337057335,
+          "top_10p_capture": 0.12471165480723333,
+          "top_20p_capture": 0.1685523350687699
+        },
+        {
+          "feature": "digit_count",
+          "spearman": 0.09138967094979739,
+          "top_10p_capture": 0.2230565145476949,
+          "top_20p_capture": 0.26689719480923146
+        },
+        {
+          "feature": "dollar_count",
+          "spearman": 0.47268151829098154,
+          "top_10p_capture": 0.2126339042882675,
+          "top_20p_capture": 0.29510007437585334
+        },
+        {
+          "feature": "choice_count",
+          "spearman": null,
+          "top_10p_capture": 0.09900869198405915,
+          "top_20p_capture": 0.1685523350687699
+        }
+      ]
+    },
+    "gpqa": {
+      "binary_archive": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/gpqa/majority_s_0.5/data/diagnostics/prompt_rollout_archive.jsonl",
+      "binary_feature_metrics": [
+        {
+          "feature": "prompt_token_count",
+          "positive_rate_top_10p": 0.0,
+          "positive_rate_top_20p": 0.0,
+          "pr_auc": 0.06573275862068965,
+          "prevalence": 0.05,
+          "roc_auc": 0.4473684210526316
+        },
+        {
+          "feature": "char_length",
+          "positive_rate_top_10p": 0.0,
+          "positive_rate_top_20p": 0.0,
+          "pr_auc": 0.055303030303030305,
+          "prevalence": 0.05,
+          "roc_auc": 0.35526315789473684
+        },
+        {
+          "feature": "newline_count",
+          "positive_rate_top_10p": 0.0,
+          "positive_rate_top_20p": 0.125,
+          "pr_auc": 0.16666666666666669,
+          "prevalence": 0.05,
+          "roc_auc": 0.7960526315789473
+        },
+        {
+          "feature": "digit_count",
+          "positive_rate_top_10p": 0.0,
+          "positive_rate_top_20p": 0.125,
+          "pr_auc": 0.09953703703703703,
+          "prevalence": 0.05,
+          "roc_auc": 0.5921052631578947
+        },
+        {
+          "feature": "dollar_count",
+          "positive_rate_top_10p": 0.0,
+          "positive_rate_top_20p": 0.0,
+          "pr_auc": 0.05,
+          "prevalence": 0.05,
+          "roc_auc": 0.4473684210526316
+        },
+        {
+          "feature": "choice_count",
+          "positive_rate_top_10p": 0.0,
+          "positive_rate_top_20p": 0.125,
+          "pr_auc": 0.05,
+          "prevalence": 0.05,
+          "roc_auc": 0.5
+        }
+      ],
+      "binary_prompt_length_bins": [
+        {
+          "bucket": 1,
+          "bucket_prompt_token_max": 180.0,
+          "bucket_prompt_token_min": 109.0,
+          "char_length_mean": 562.6,
+          "majority_s_0.5_rate": 0.0,
+          "mean_relative_length_mean": 0.19746000000000002,
+          "num_rows": 10,
+          "p_cap_mean": 0.025,
+          "p_loop_mean": 0.1,
+          "prompt_token_count_mean": 153.4
+        },
+        {
+          "bucket": 2,
+          "bucket_prompt_token_max": 230.0,
+          "bucket_prompt_token_min": 181.0,
+          "char_length_mean": 712.3,
+          "majority_s_0.5_rate": 0.1,
+          "mean_relative_length_mean": 0.25932416666666663,
+          "num_rows": 10,
+          "p_cap_mean": 0.025,
+          "p_loop_mean": 0.175,
+          "prompt_token_count_mean": 207.1
+        },
+        {
+          "bucket": 3,
+          "bucket_prompt_token_max": 264.0,
+          "bucket_prompt_token_min": 234.0,
+          "char_length_mean": 878.4,
+          "majority_s_0.5_rate": 0.1,
+          "mean_relative_length_mean": 0.37718083333333335,
+          "num_rows": 10,
+          "p_cap_mean": 0.1,
+          "p_loop_mean": 0.2,
+          "prompt_token_count_mean": 247.5
+        },
+        {
+          "bucket": 4,
+          "bucket_prompt_token_max": 916.0,
+          "bucket_prompt_token_min": 283.0,
+          "char_length_mean": 1328.9,
+          "majority_s_0.5_rate": 0.0,
+          "mean_relative_length_mean": 0.21848833333333334,
+          "num_rows": 10,
+          "p_cap_mean": 0.025,
+          "p_loop_mean": 0.075,
+          "prompt_token_count_mean": 406.7
+        }
+      ],
+      "display_name": "GPQA",
+      "regression_archive": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/gpqa/shared_archive/diagnostics/prompt_rollout_archive.jsonl",
+      "regression_feature_metrics": [
+        {
+          "feature": "prompt_token_count",
+          "spearman": 0.11643289508743641,
+          "top_10p_capture": 0.07008307573415763,
+          "top_20p_capture": 0.1679274773861707
+        },
+        {
+          "feature": "char_length",
+          "spearman": -0.04587887646878034,
+          "top_10p_capture": 0.057762656143106876,
+          "top_20p_capture": 0.17741245850964094
+        },
+        {
+          "feature": "newline_count",
+          "spearman": 0.22818948332682923,
+          "top_10p_capture": 0.11302163833075732,
+          "top_20p_capture": 0.2417779410646869
+        },
+        {
+          "feature": "digit_count",
+          "spearman": 0.38898372333699643,
+          "top_10p_capture": 0.07338488484049964,
+          "top_20p_capture": 0.2261929270023057
+        },
+        {
+          "feature": "dollar_count",
+          "spearman": 0.15226648966782177,
+          "top_10p_capture": 0.11403197608128306,
+          "top_20p_capture": 0.18068022018395108
+        },
+        {
+          "feature": "choice_count",
+          "spearman": null,
+          "top_10p_capture": 0.06664824410266802,
+          "top_20p_capture": 0.21515601641878018
+        }
+      ]
+    },
+    "livecodebench": {
+      "binary_archive": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/livecodebench/majority_s_0.5/data/diagnostics/prompt_rollout_archive.jsonl",
+      "binary_feature_metrics": [
+        {
+          "feature": "prompt_token_count",
+          "positive_rate_top_10p": 0.625,
+          "positive_rate_top_20p": 0.53125,
+          "pr_auc": 0.5770827207719685,
+          "prevalence": 0.3375,
+          "roc_auc": 0.720125786163522
+        },
+        {
+          "feature": "char_length",
+          "positive_rate_top_10p": 0.75,
+          "positive_rate_top_20p": 0.53125,
+          "pr_auc": 0.5897928546171382,
+          "prevalence": 0.3375,
+          "roc_auc": 0.7177672955974843
+        },
+        {
+          "feature": "newline_count",
+          "positive_rate_top_10p": 0.5,
+          "positive_rate_top_20p": 0.46875,
+          "pr_auc": 0.4783111252537108,
+          "prevalence": 0.3375,
+          "roc_auc": 0.631114605171209
+        },
+        {
+          "feature": "digit_count",
+          "positive_rate_top_10p": 0.4375,
+          "positive_rate_top_20p": 0.375,
+          "pr_auc": 0.423142394021066,
+          "prevalence": 0.3375,
+          "roc_auc": 0.6033368273934312
+        },
+        {
+          "feature": "dollar_count",
+          "positive_rate_top_10p": 0.375,
+          "positive_rate_top_20p": 0.34375,
+          "pr_auc": 0.3375,
+          "prevalence": 0.3375,
+          "roc_auc": 0.5
+        },
+        {
+          "feature": "choice_count",
+          "positive_rate_top_10p": 0.375,
+          "positive_rate_top_20p": 0.34375,
+          "pr_auc": 0.3375,
+          "prevalence": 0.3375,
+          "roc_auc": 0.5
+        }
+      ],
+      "binary_prompt_length_bins": [
+        {
+          "bucket": 1,
+          "bucket_prompt_token_max": 418.0,
+          "bucket_prompt_token_min": 250.0,
+          "char_length_mean": 1378.275,
+          "majority_s_0.5_rate": 0.1,
+          "mean_relative_length_mean": 0.2355875,
+          "num_rows": 40,
+          "p_cap_mean": 0.05625,
+          "p_loop_mean": 0.05625,
+          "prompt_token_count_mean": 351.05
+        },
+        {
+          "bucket": 2,
+          "bucket_prompt_token_max": 529.0,
+          "bucket_prompt_token_min": 422.0,
+          "char_length_mean": 1709.6341463414635,
+          "majority_s_0.5_rate": 0.2682926829268293,
+          "mean_relative_length_mean": 0.39024634146341464,
+          "num_rows": 41,
+          "p_cap_mean": 0.10365853658536585,
+          "p_loop_mean": 0.1524390243902439,
+          "prompt_token_count_mean": 466.5853658536585
+        },
+        {
+          "bucket": 3,
+          "bucket_prompt_token_max": 662.0,
+          "bucket_prompt_token_min": 543.0,
+          "char_length_mean": 2083.4358974358975,
+          "majority_s_0.5_rate": 0.5384615384615384,
+          "mean_relative_length_mean": 0.5470463675213677,
+          "num_rows": 39,
+          "p_cap_mean": 0.21153846153846154,
+          "p_loop_mean": 0.23717948717948717,
+          "prompt_token_count_mean": 591.3589743589744
+        },
+        {
+          "bucket": 4,
+          "bucket_prompt_token_max": 1678.0,
+          "bucket_prompt_token_min": 671.0,
+          "char_length_mean": 2701.1,
+          "majority_s_0.5_rate": 0.45,
+          "mean_relative_length_mean": 0.4620987499999999,
+          "num_rows": 40,
+          "p_cap_mean": 0.1,
+          "p_loop_mean": 0.15,
+          "prompt_token_count_mean": 852.975
+        }
+      ],
+      "display_name": "LiveCodeBench",
+      "regression_archive": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/livecodebench/shared_archive/diagnostics/prompt_rollout_archive.jsonl",
+      "regression_feature_metrics": [
+        {
+          "feature": "prompt_token_count",
+          "spearman": 0.4049523277144553,
+          "top_10p_capture": 0.1369146297210031,
+          "top_20p_capture": 0.2477733343738979
+        },
+        {
+          "feature": "char_length",
+          "spearman": 0.3864118118451641,
+          "top_10p_capture": 0.14707418480555132,
+          "top_20p_capture": 0.2454043468436853
+        },
+        {
+          "feature": "newline_count",
+          "spearman": 0.19995311767936125,
+          "top_10p_capture": 0.12301364029478297,
+          "top_20p_capture": 0.23481907140338146
+        },
+        {
+          "feature": "digit_count",
+          "spearman": 0.23421058346838353,
+          "top_10p_capture": 0.11136821515367765,
+          "top_20p_capture": 0.20762239971143492
+        },
+        {
+          "feature": "dollar_count",
+          "spearman": null,
+          "top_10p_capture": 0.09068712133975333,
+          "top_20p_capture": 0.18782825523755464
+        },
+        {
+          "feature": "choice_count",
+          "spearman": null,
+          "top_10p_capture": 0.09068712133975333,
+          "top_20p_capture": 0.18782825523755464
+        }
+      ]
+    },
+    "math500": {
+      "binary_archive": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/math500/majority_s_0.5/data/diagnostics/prompt_rollout_archive.jsonl",
+      "binary_feature_metrics": [
+        {
+          "feature": "prompt_token_count",
+          "positive_rate_top_10p": 0.1,
+          "positive_rate_top_20p": 0.1,
+          "pr_auc": 0.09927476737821564,
+          "prevalence": 0.04,
+          "roc_auc": 0.73828125
+        },
+        {
+          "feature": "char_length",
+          "positive_rate_top_10p": 0.0,
+          "positive_rate_top_20p": 0.05,
+          "pr_auc": 0.0900155081189564,
+          "prevalence": 0.04,
+          "roc_auc": 0.7513020833333334
+        },
+        {
+          "feature": "newline_count",
+          "positive_rate_top_10p": 0.1,
+          "positive_rate_top_20p": 0.05,
+          "pr_auc": 0.06999999999999999,
+          "prevalence": 0.04,
+          "roc_auc": 0.58203125
+        },
+        {
+          "feature": "digit_count",
+          "positive_rate_top_10p": 0.1,
+          "positive_rate_top_20p": 0.05,
+          "pr_auc": 0.07409983633387889,
+          "prevalence": 0.04,
+          "roc_auc": 0.6080729166666666
+        },
+        {
+          "feature": "dollar_count",
+          "positive_rate_top_10p": 0.1,
+          "positive_rate_top_20p": 0.1,
+          "pr_auc": 0.11693693693693694,
+          "prevalence": 0.04,
+          "roc_auc": 0.7252604166666666
+        },
+        {
+          "feature": "choice_count",
+          "positive_rate_top_10p": 0.2,
+          "positive_rate_top_20p": 0.1,
+          "pr_auc": 0.04,
+          "prevalence": 0.04,
+          "roc_auc": 0.5
+        }
+      ],
+      "binary_prompt_length_bins": [
+        {
+          "bucket": 1,
+          "bucket_prompt_token_max": 53.0,
+          "bucket_prompt_token_min": 31.0,
+          "char_length_mean": 167.96153846153845,
+          "majority_s_0.5_rate": 0.0,
+          "mean_relative_length_mean": 0.12514743589743593,
+          "num_rows": 26,
+          "p_cap_mean": 0.009615384615384616,
+          "p_loop_mean": 0.019230769230769232,
+          "prompt_token_count_mean": 42.80769230769231
+        },
+        {
+          "bucket": 2,
+          "bucket_prompt_token_max": 76.0,
+          "bucket_prompt_token_min": 54.0,
+          "char_length_mean": 229.91666666666666,
+          "majority_s_0.5_rate": 0.041666666666666664,
+          "mean_relative_length_mean": 0.2136010416666666,
+          "num_rows": 24,
+          "p_cap_mean": 0.010416666666666666,
+          "p_loop_mean": 0.020833333333333332,
+          "prompt_token_count_mean": 64.41666666666667
+        },
+        {
+          "bucket": 3,
+          "bucket_prompt_token_max": 105.0,
+          "bucket_prompt_token_min": 78.0,
+          "char_length_mean": 315.16,
+          "majority_s_0.5_rate": 0.04,
+          "mean_relative_length_mean": 0.19493699999999997,
+          "num_rows": 25,
+          "p_cap_mean": 0.0,
+          "p_loop_mean": 0.01,
+          "prompt_token_count_mean": 90.92
+        },
+        {
+          "bucket": 4,
+          "bucket_prompt_token_max": 685.0,
+          "bucket_prompt_token_min": 111.0,
+          "char_length_mean": 530.64,
+          "majority_s_0.5_rate": 0.08,
+          "mean_relative_length_mean": 0.3279973333333333,
+          "num_rows": 25,
+          "p_cap_mean": 0.01,
+          "p_loop_mean": 0.05,
+          "prompt_token_count_mean": 196.32
+        }
+      ],
+      "display_name": "MATH-500",
+      "regression_archive": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/math500/shared_archive/diagnostics/prompt_rollout_archive.jsonl",
+      "regression_feature_metrics": [
+        {
+          "feature": "prompt_token_count",
+          "spearman": 0.4609147657183268,
+          "top_10p_capture": 0.15115167061963916,
+          "top_20p_capture": 0.2898497300765917
+        },
+        {
+          "feature": "char_length",
+          "spearman": 0.3957466345179036,
+          "top_10p_capture": 0.14710107153650087,
+          "top_20p_capture": 0.2784367359971164
+        },
+        {
+          "feature": "newline_count",
+          "spearman": 0.4569862757848403,
+          "top_10p_capture": 0.16421900891613464,
+          "top_20p_capture": 0.26504311238897565
+        },
+        {
+          "feature": "digit_count",
+          "spearman": 0.1384128645496862,
+          "top_10p_capture": 0.13843198155400377,
+          "top_20p_capture": 0.2585585802549222
+        },
+        {
+          "feature": "dollar_count",
+          "spearman": 0.28897100878635557,
+          "top_10p_capture": 0.15422419063763143,
+          "top_20p_capture": 0.26905914076647536
+        },
+        {
+          "feature": "choice_count",
+          "spearman": null,
+          "top_10p_capture": 0.12789451972744303,
+          "top_20p_capture": 0.23149554426332167
+        }
+      ]
+    },
+    "mmlu_pro": {
+      "binary_archive": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/mmlu_pro/majority_s_0.5/data/diagnostics/prompt_rollout_archive.jsonl",
+      "binary_feature_metrics": [
+        {
+          "feature": "prompt_token_count",
+          "positive_rate_top_10p": 0.0625,
+          "positive_rate_top_20p": 0.03125,
+          "pr_auc": 0.11036036036036036,
+          "prevalence": 0.0125,
+          "roc_auc": 0.8734177215189873
+        },
+        {
+          "feature": "char_length",
+          "positive_rate_top_10p": 0.0625,
+          "positive_rate_top_20p": 0.03125,
+          "pr_auc": 0.06719367588932806,
+          "prevalence": 0.0125,
+          "roc_auc": 0.8291139240506329
+        },
+        {
+          "feature": "newline_count",
+          "positive_rate_top_10p": 0.0625,
+          "positive_rate_top_20p": 0.03125,
+          "pr_auc": 0.5064935064935064,
+          "prevalence": 0.0125,
+          "roc_auc": 0.7579113924050633
+        },
+        {
+          "feature": "digit_count",
+          "positive_rate_top_10p": 0.0625,
+          "positive_rate_top_20p": 0.03125,
+          "pr_auc": 0.09142857142857143,
+          "prevalence": 0.0125,
+          "roc_auc": 0.8306962025316456
+        },
+        {
+          "feature": "dollar_count",
+          "positive_rate_top_10p": 0.0625,
+          "positive_rate_top_20p": 0.03125,
+          "pr_auc": 0.25625,
+          "prevalence": 0.0125,
+          "roc_auc": 0.5632911392405063
+        },
+        {
+          "feature": "choice_count",
+          "positive_rate_top_10p": 0.0,
+          "positive_rate_top_20p": 0.0,
+          "pr_auc": 0.0125,
+          "prevalence": 0.0125,
+          "roc_auc": 0.5
+        }
+      ],
+      "binary_prompt_length_bins": [
+        {
+          "bucket": 1,
+          "bucket_prompt_token_max": 189.0,
+          "bucket_prompt_token_min": 121.0,
+          "char_length_mean": 503.1951219512195,
+          "majority_s_0.5_rate": 0.0,
+          "mean_relative_length_mean": 0.0753310975609756,
+          "num_rows": 41,
+          "p_cap_mean": 0.006097560975609756,
+          "p_loop_mean": 0.036585365853658534,
+          "prompt_token_count_mean": 163.0
+        },
+        {
+          "bucket": 2,
+          "bucket_prompt_token_max": 222.0,
+          "bucket_prompt_token_min": 190.0,
+          "char_length_mean": 537.7317073170732,
+          "majority_s_0.5_rate": 0.0,
+          "mean_relative_length_mean": 0.09482052845528455,
+          "num_rows": 41,
+          "p_cap_mean": 0.0,
+          "p_loop_mean": 0.012195121951219513,
+          "prompt_token_count_mean": 207.5609756097561
+        },
+        {
+          "bucket": 3,
+          "bucket_prompt_token_max": 265.0,
+          "bucket_prompt_token_min": 223.0,
+          "char_length_mean": 696.421052631579,
+          "majority_s_0.5_rate": 0.0,
+          "mean_relative_length_mean": 0.13650570175438598,
+          "num_rows": 38,
+          "p_cap_mean": 0.006578947368421052,
+          "p_loop_mean": 0.02631578947368421,
+          "prompt_token_count_mean": 237.42105263157896
+        },
+        {
+          "bucket": 4,
+          "bucket_prompt_token_max": 893.0,
+          "bucket_prompt_token_min": 274.0,
+          "char_length_mean": 1177.1,
+          "majority_s_0.5_rate": 0.05,
+          "mean_relative_length_mean": 0.18285666666666667,
+          "num_rows": 40,
+          "p_cap_mean": 0.03125,
+          "p_loop_mean": 0.06875,
+          "prompt_token_count_mean": 395.4
+        }
+      ],
+      "display_name": "MMLU-Pro",
+      "regression_archive": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/mmlu_pro/shared_archive/diagnostics/prompt_rollout_archive.jsonl",
+      "regression_feature_metrics": [
+        {
+          "feature": "prompt_token_count",
+          "spearman": 0.39305748822881714,
+          "top_10p_capture": 0.1692602309307568,
+          "top_20p_capture": 0.29165105051760065
+        },
+        {
+          "feature": "char_length",
+          "spearman": 0.31241915473884957,
+          "top_10p_capture": 0.16404229794414474,
+          "top_20p_capture": 0.2983279168827259
+        },
+        {
+          "feature": "newline_count",
+          "spearman": 0.12832018143345375,
+          "top_10p_capture": 0.1562731568237866,
+          "top_20p_capture": 0.24638218749304772
+        },
+        {
+          "feature": "digit_count",
+          "spearman": 0.2427560895985152,
+          "top_10p_capture": 0.17907572933833749,
+          "top_20p_capture": 0.27925824575454683
+        },
+        {
+          "feature": "dollar_count",
+          "spearman": 0.16772603594162278,
+          "top_10p_capture": 0.16834636533060893,
+          "top_20p_capture": 0.3002519120156215
+        },
+        {
+          "feature": "choice_count",
+          "spearman": null,
+          "top_10p_capture": 0.1294630098351791,
+          "top_20p_capture": 0.22235856047343042
+        }
+      ]
+    }
+  }
+}

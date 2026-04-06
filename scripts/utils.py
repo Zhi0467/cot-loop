@@ -11,6 +11,7 @@ if SRC not in sys.path:
     sys.path.insert(0, SRC)
 
 from loop_probe.labeling import has_ngram_loop
+from loop_probe.prompt_format import format_user_prompt
 
 _MATH_VERIFY_CONFIGS: Optional[Tuple[List[Any], List[Any]]] = None
 
@@ -95,12 +96,7 @@ def build_prompt(tokenizer, question: str, num_repetition: int) -> str:
     )
     if num_repetition > 1:
         user_msg = user_msg * num_repetition
-    messages = [{"role": "user", "content": user_msg}]
-    return tokenizer.apply_chat_template(
-        messages,
-        tokenize=False,
-        add_generation_prompt=True,
-    )
+    return format_user_prompt(tokenizer, user_msg, prompt_format="auto")
 
 
 def parse_temps(s: str) -> List[float]:

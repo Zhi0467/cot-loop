@@ -15,10 +15,8 @@ set -euo pipefail
 # SLURM starts jobs in the submit directory, so we're already in the right place
 mkdir -p logs outputs
 
-# Prefer local venv if present; otherwise support explicit conda env activation.
-if [[ -f ".venv/bin/activate" ]]; then
-  source .venv/bin/activate
-elif [[ -n "${CONDA_ENV:-}" ]]; then
+# Prefer an explicit conda env when requested; otherwise fall back to local venv.
+if [[ -n "${CONDA_ENV:-}" ]]; then
   CONDA_SH="${CONDA_SH:-${HOME}/miniforge3/etc/profile.d/conda.sh}"
   if [[ ! -f "${CONDA_SH}" ]]; then
     echo "[probe-e2e] conda activation script not found: ${CONDA_SH}" >&2
@@ -27,6 +25,8 @@ elif [[ -n "${CONDA_ENV:-}" ]]; then
   # shellcheck disable=SC1090
   source "${CONDA_SH}"
   conda activate "${CONDA_ENV}"
+elif [[ -f ".venv/bin/activate" ]]; then
+  source .venv/bin/activate
 else
   echo "[probe-e2e] no runtime env found (.venv missing and CONDA_ENV not set)" >&2
   exit 1

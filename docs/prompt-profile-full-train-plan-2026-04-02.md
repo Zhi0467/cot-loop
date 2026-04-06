@@ -1,6 +1,6 @@
 # Prompt-Profile Full Train Plan
 
-Last updated: 2026-04-02 23:04 UTC
+Last updated: 2026-04-03 23:17 UTC
 
 ## Bottom line
 
@@ -114,6 +114,8 @@ The clean path is:
 2. one regression train from that archive
 3. one relabel to `majority_s_0.5`
 4. one binary train from the relabeled archive
+
+The canonical entrypoint for that chain is now `scripts/run_prompt_profile_full_train.py`. It freezes the dataset table below in code and can also hand the finished run roots to `scripts/summarize_prompt_profile_full_train.py` for the locked-pair ledger plus metadata baselines.
 
 Example build-and-train launch for `GPQA` regression:
 

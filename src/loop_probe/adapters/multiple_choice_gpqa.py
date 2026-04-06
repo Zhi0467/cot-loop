@@ -10,6 +10,7 @@ from ._common import (
     load_local_rows,
     resolve_sample_id,
 )
+from ..prompt_format import format_user_prompt
 from ..types import DatasetSpec, SampleRecord
 
 GPQA_LETTERS = ("A", "B", "C", "D")
@@ -86,7 +87,13 @@ def load_and_shuffle(
     return samples
 
 
-def build_mcq_prompt(tokenizer, question: str, options: list[str]) -> str:
+def build_mcq_prompt(
+    tokenizer,
+    question: str,
+    options: list[str],
+    *,
+    prompt_format: str = "auto",
+) -> str:
     if len(options) != 4:
         raise ValueError(f"GPQA expects 4 options, got {len(options)}.")
     option_block = "\n".join(
@@ -99,11 +106,7 @@ def build_mcq_prompt(tokenizer, question: str, options: list[str]) -> str:
         "On the final non-empty line, output only a JSON object of the form "
         '`{"answer": "X"}` where X is one of A, B, C, or D.'
     )
-    return tokenizer.apply_chat_template(
-        [{"role": "user", "content": user_msg}],
-        tokenize=False,
-        add_generation_prompt=True,
-    )
+    return format_user_prompt(tokenizer, user_msg, prompt_format=prompt_format)
 
 
 def grade(response: str, gold_letter: str) -> bool:

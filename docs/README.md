@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-04-02 23:04 UTC
+Last updated: 2026-04-06 09:45 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -9,14 +9,26 @@ Purpose:
 Core docs:
 - Project roadmap: ../roadmap.md
 - Open experiment ledger / next runs: ../backlog.md
+- Degeneracy-origin rollout-stat plan: ../understand-where-loop-and-max-length-come-from.md
 - Prompt-profile implementation path: prompt-profile-probe.md
 - Prompt-profile evaluation contract: prompt-profile-eval-contract.md
 - Prompt-profile risk-screen decision: prompt-profile-risk-screen-2026-03-30.md
 - Prompt-profile plain-language note: prompt-profile-plain-language-2026-03-30.md
 - Prompt-profile full-train plan: prompt-profile-full-train-plan-2026-04-02.md
+- Prompt-profile natural-regression rerun note: prompt-profile-natural-regression-rerun-2026-04-05.md
+- Prompt-profile combined audit note: prompt-profile-combined-audit-2026-04-05.md
+- Prompt-profile metadata-mechanism note: prompt-profile-metadata-mechanism-2026-04-06.md
+- Prompt-profile corrected balanced-regression note: prompt-profile-balanced-regression-corrected-2026-04-04.md
+- Prompt-profile combined April surface report: prompt-profile-full-surface-update-2026-04-04.md
+- OLMo degeneration-origin audit report: olmo-degeneration-origin-audit-2026-04-04.md
+- OLMo2 1B fifty-prompt rerun report: olmo2-1b-fifty-prompt-rerun-2026-04-05.md
+- Prompt-profile full-train result note: prompt-profile-full-train-results-2026-04-04.md
+- Prompt-profile binary retrain note: prompt-profile-binary-retrain-h256d2-2026-04-04.md
+- Prompt-profile binary capacity-controls note: prompt-profile-binary-capacity-controls-2026-04-04.md
 - Thread reset / new-thread handoff: thread-reset-2026-03-25.md
 - Prompt-profile projection/export path: prompt-profile-projection.md
 - Prefill-activation visualization note: prefill-activation-visualization.md
+- Loop / max-length definitions appendix: understand-where-loop-and-max-length-come-from.md
 
 Key outputs:
 - Common-policy rollout report PDF: ../outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/qwen3_1p7b_cross_dataset_rollout_report.pdf
@@ -27,18 +39,106 @@ Key outputs:
 - Prompt-profile risk-control bundle: ../outputs/prompt_profile_risk_controls_20260330/
 - Plain-language objective PDF: ../outputs/prompt_profile_plain_language_20260330/prompt_profile_plain_language_20260330.pdf
 - Full-train plan PDF: ../outputs/prompt_profile_full_train_plan_20260402/prompt_profile_full_train_plan_20260402.pdf
+- Natural-regression rerun bundle: ../outputs/prompt_profile_natural_regression_rerun_20260405/
+- Natural-regression rerun PDF: ../outputs/prompt_profile_natural_regression_rerun_20260405/prompt_profile_natural_regression_rerun_20260405.pdf
+- Prompt-profile combined audit bundle: ../outputs/prompt_profile_combined_audit_20260405/
+- Prompt-profile combined audit PDF: ../outputs/prompt_profile_combined_audit_20260405/prompt_profile_combined_audit_20260405.pdf
+- Prompt-profile metadata audit bundle: ../outputs/prompt_profile_metadata_audit_20260405/
+- Prompt-profile metadata-mechanism bundle: ../outputs/prompt_profile_metadata_mechanism_20260406/
+- Prompt-profile metadata-mechanism PDF: ../outputs/prompt_profile_metadata_mechanism_20260406/prompt_profile_metadata_mechanism_20260406.pdf
+- Corrected balanced-regression bundle: ../outputs/prompt_profile_balanced_regression_corrected_20260404/
+- Corrected balanced-regression PDF: ../outputs/prompt_profile_balanced_regression_corrected_20260404/prompt_profile_balanced_regression_corrected_20260404.pdf
+- Full-train result bundle: ../outputs/prompt_profile_full_train_locked_pair_20260404/
+- Full-train result PDF: ../outputs/prompt_profile_full_train_locked_pair_20260404/prompt_profile_full_train_locked_pair_20260404.pdf
+- Combined April surface bundle: ../outputs/prompt_profile_full_surface_update_20260404/
+- Combined April surface PDF: ../outputs/prompt_profile_full_surface_update_20260404/prompt_profile_full_surface_update_20260404.pdf
+- OLMo degeneration-origin audit bundle: ../outputs/olmo_degeneration_origin_audit_20260404/
+- OLMo degeneration-origin audit PDF: ../outputs/olmo_degeneration_origin_audit_20260404/olmo_degeneration_origin_audit_20260404.pdf
+- OLMo2 1B fifty-prompt rerun bundle: ../outputs/olmo2_1b_fifty_prompt_rerun_20260405/
+- OLMo2 1B fifty-prompt rerun PDF: ../outputs/olmo2_1b_fifty_prompt_rerun_20260405/olmo2_1b_fifty_prompt_rerun_20260405.pdf
+- OLMo2 1B progression figure bundle: ../outputs/olmo2_1b_progression_bound50_20260406/
+- OLMo2 1B progression PDF: ../outputs/olmo2_1b_progression_bound50_20260406/olmo2_1b_progression_bound50.pdf
+- Binary retrain result bundle: ../outputs/prompt_profile_binary_retrain_h256d2_20260404/
+- Binary retrain result PDF: ../outputs/prompt_profile_binary_retrain_h256d2_20260404/prompt_profile_binary_retrain_h256d2_20260404.pdf
+- Binary capacity-controls bundle: ../outputs/prompt_profile_binary_capacity_controls_20260404/
+- Binary capacity-controls PDF: ../outputs/prompt_profile_binary_capacity_controls_20260404/prompt_profile_binary_capacity_controls_20260404.pdf
 - Consolidated earlier findings PDF: ../outputs/pr2_experiment_findings_consolidated_pdf/pr2_experiment_findings_consolidated.pdf
 - Rollout-statistics module audit PDF: ../outputs/rollout_stats_module_audit/rollout_stats_module_audit.pdf
 - Detailed reopened-round summary PDF: ../outputs/prefill_rounds_1_to_12_detailed_summary/prefill_rounds_1_to_12_detailed_summary.pdf
 
 Current live status:
+- The new note `prompt-profile-combined-audit-2026-04-05.md` is now the collaborator-facing prompt-profile bundle:
+  - it keeps the canonical natural regression rerun, the current balanced-binary default, the cheap prompt-stat audit, and the Athena code audit in one surface;
+  - it narrows the honest claim: the current reports establish lift over a 1D prompt-length baseline on some surfaces, not yet lift over strong prompt-only controls in general.
+- The next honest prompt-profile step is now a stronger prompt-shape baseline rather than another natural-regression rerun:
+  - fit a real prompt-only baseline on the frozen splits using shape features such as length, character count, newline count, and symbol counts;
+  - then measure whether the activation probes still add lift as residuals or within matched prompt-shape strata.
 - The current prompt-level predictor task is "predict terminal rollout statistics from prompt-prefill activations under one fixed model and decode policy," not "force everything into one binary loop label."
 - The objective selector is now fixed explicitly: choose the target by held-out predictability on the target itself, not by the downstream `top 20%` loop-enrichment slice.
-- Under that criterion, `mean_relative_length` is the strongest current regression target and `majority_s_0.5` is the strongest finished binary label surface, and Wangzhi has now locked that pair as the next full-train surface.
+- Under that criterion, `mean_relative_length` is the strongest current regression target and `majority_s_0.5` is the strongest finished binary label surface, and Wangzhi locked that pair for the first full-train pass.
 - `p_loop` still wins the old bucket diagnostic for concentrating looping prompts, but that is no longer treated as proof that it should be the main training objective.
 - The note `prompt-profile-risk-screen-2026-03-30.md` is now the technical decision surface for this predictability-first correction.
 - The note `prompt-profile-plain-language-2026-03-30.md` is the collaborator-facing explanation of the same correction in plain words.
-- The locked pair now has a canonical execution note and PDF on disk, so the next step is the run itself rather than another planning pass.
+- The repo-root note `../understand-where-loop-and-max-length-come-from.md` is now the working degeneration-origin note on the older rollout-statistics module:
+  - it now opens with a current status snapshot;
+  - it carries both the OLMo execution history and the active same-family Qwen base control;
+  - older April 4 pilot/debug sections are preserved in-place but explicitly marked `Historical`;
+  - use it when you want the full chronological path, not just the cleaned stage conclusion.
+- The docs note `understand-where-loop-and-max-length-come-from.md` is only the background definitions appendix for saved `loop`, prompt-profile `cap_hit` / `p_cap`, rollout-stat `max_length_hit`, and `majority_s_0.5`.
+- The new note `olmo-degeneration-origin-audit-2026-04-04.md` is the collaborator-facing OLMo audit surface for that thread:
+  - it consolidates the repaired OLMo3 `MMLU-Pro` / `LiveCodeBench` rows plus the bounded OLMo2 `1B` ladder;
+  - it is the right artifact to cite when the question is "what survived the audit?" rather than "what commands were run?"
+- The newer note `olmo2-1b-fifty-prompt-rerun-2026-04-05.md` is the larger OLMo2 follow-up:
+  - it scales the OLMo2 ladder from `8` to `50` prompts per dataset under the same corrected contract;
+  - it replaces the older `8`-prompt fallback as the right stage-conclusion surface for this ladder;
+  - it keeps the main base-versus-later split, but it also shows the later-stage story is not uniformly clean or monotone;
+  - it is now the right artifact to cite when the question is "what survived once the slice stopped being a pilot?"
+- The OLMo2 rerun now has the explicit visualization surface Wangzhi asked for:
+  - the line-chart progression figures plus the within-stage Sankey/alluvial view live in `../outputs/olmo2_1b_progression_bound50_20260406/`
+  - those figures are generated from the saved stage JSONs, not copied by hand from Slack tables.
+- The next same-family control is now the Qwen base raw rerun on the old v2 rollout surface:
+  - the reference object is still `../outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/`
+  - the base checkpoint has to run at `32768`, not `40960`, because `Qwen/Qwen3-1.7B-Base` advertises the shorter limit and vLLM rejects the instruct horizon without an unsafe override
+  - the old Qwen v2 `LiveCodeBench` row used raw strings from LiveCodeBench's `format_prompt_generation` under `CodeQwenInstruct`; the base control uses `GenericBase`, so that row is same dataset / sampler rather than a literal same-LM-style replay
+  - the tiny base `LiveCodeBench` style probe now shows that this wrapper caveat is real but not sufficient to explain the weak base `LiveCodeBench` probe behavior by itself: both `GenericBase` and `CodeQwenInstruct` looped to the cap on the same `2` prompts with `pass@1 = 0`, though `GenericBase` drifts into repeated problem text while `CodeQwenInstruct` collapses into repeated `# YOUR CODE HERE`
+  - the saved text probe already shows that Qwen base raw degenerates on MCQ mainly by repeating the answer-format instruction tail, which is a different failure mode from the OLMo2 base math loops
+  - the first finished base row is now on disk: `MATH-500 243/500 correct`, `19/500` looped, `22/500` max-length-hit, with every looped rollout also hitting max length
+  - that base `MATH-500` row is already worse than the old instruct v2 `MATH-500` reference on both loop rate (`0.038` vs `0.0294`) and max-length-hit rate (`0.044` vs `0.0146`), even though the base row is much shorter on average (`1893.6` vs `6227.6`)
+  - only `MATH-500` is complete so far; the latest Qwen base-control checkpoint lives in `roadmap.md` until this follow-up gets its own finished note
+- The locked pair now has both the execution note and the finished first-run result note on disk.
+- The older `h256 d2` binary retrain note is still on disk, but it is now intermediate only:
+  - it preserves the exact `2106` / `2107` depth-rerun record and raw remote metrics
+  - it should not be paraphrased as the current best-surface recommendation anymore
+- The combined April surface note is now the collaborator-facing handoff:
+  - it puts the locked full-train regression/binary result and the balanced binary capacity rerun back into one report
+  - it makes the object split explicit: regression stays on the locked full-train surface, while the train-balanced reruns change only the binary head
+  - it keeps the current binary recommendation aligned with the capacity sweep: `ensemble h256 d1` as the global ensemble default
+- The follow-up capacity-control note is now the current binary tuning surface:
+  - same balanced binary data, now compared across `h128 d1`, `h256 d1`, and `h256 d2`
+  - the clean current read is that width helps the ensemble, extra depth hurts the ensemble, and extra depth only helps the `last_layer` view modestly
+  - under the frozen `best_loss` rule, `ensemble h256 d1` is the best single global surface (`0.518` mean test `PR-AUC`)
+  - under the secondary `best_rank` rule, the ensemble ordering stays the same (`0.539 > 0.522 > 0.474`), so the global ensemble choice is stable
+  - threshold metrics on the natural test split remain recall-heavy on rare-positive datasets, so `PR-AUC` stays primary and threshold metrics stay diagnostic
+  - if one single global binary surface is needed today, it should be `ensemble h256 d1`
+- The natural-regression rerun note is now the canonical regression rerun surface:
+  - it retrains `mean_relative_length` on the natural train/test split with natural sampling from the current PR head
+  - it reproduces the original locked `2043` regression ledger exactly, with max absolute metric difference `0.0`
+  - it is the right note to cite when the question is "did the natural regression object still hold after rerunning it on the updated branch?"
+- The combined audit note is now the right top-level prompt-profile citation when the question is "what is the current whole surface and what still looks suspicious?":
+  - it bundles natural regression, balanced binary, the cheap prompt-stat audit, and Athena's codebase-level reasoning in one place;
+  - it makes the baseline caveat explicit: the old "metadata baseline" is only prompt length on this fixed-budget surface;
+  - it points to the next honest follow-up as a stronger prompt-shape baseline and residualized evaluation rather than another same-object rerun.
+- The newer note `prompt-profile-metadata-mechanism-2026-04-06.md` is now the right citation when the question is specifically "why are the metadata predictors strong?":
+  - it makes the target geometry explicit: `mean_relative_length` is normalized completion length and `majority_s_0.5` is largely a thresholded version of that same object;
+  - it separates genuine prompt-family structure from tiny-prevalence artifacts, especially the fragile `MMLU-Pro` newline-count row;
+  - it narrows the next decisive follow-up to a residualized conditional-lift audit on the natural regression head, not another binary-only mechanism read.
+- The corrected balanced-regression note is now side-analysis provenance only:
+  - it still explains the earlier count drop and the balanced-sampler detour
+  - it should not be cited as the default regression training object anymore
+- The run surface is now executable rather than purely documentary: `scripts/run_prompt_profile_full_train.py` is the canonical launcher, and `scripts/summarize_prompt_profile_full_train.py` is the canonical post-run ledger for the locked pair plus metadata controls.
+- The first locked full-train pass is now complete. The repo-facing result is split cleanly:
+  - regression `mean_relative_length`: ensemble beats `last_layer`, but the train-fit prompt-length baseline still wins on `AIME`, `MATH-500`, and `MMLU-Pro`;
+  - binary `majority_s_0.5`: ensemble `PR-AUC` beats the prompt-length baseline on all five datasets, with the clearest finished wins on `AIME`, `LiveCodeBench`, and `MMLU-Pro`.
 - The reset note `thread-reset-2026-03-25.md` is now the correct restart surface for Slack follow-up. It captures the collaborator's recent corrections, the proved-vs-unproved ledger, and the exact next work order.
-- `roadmap.md` is the chronological experiment log; `backlog.md` now carries the next objective run under the corrected selection rule.
+- `roadmap.md` is the chronological experiment log; `backlog.md` now carries the post-run interpretation object under the corrected selection rule.
 - `LiveCodeBench` is no longer pending, but its recovered projection artifact still lacks prompt-level accuracy.

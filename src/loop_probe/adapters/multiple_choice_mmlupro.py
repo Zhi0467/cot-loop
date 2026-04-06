@@ -11,6 +11,7 @@ from ._common import (
     load_local_rows,
     resolve_sample_id,
 )
+from ..prompt_format import format_user_prompt
 from ..types import DatasetSpec, SampleRecord
 
 MMLUPRO_LETTERS = tuple(chr(ord("A") + idx) for idx in range(10))
@@ -93,7 +94,13 @@ def load_samples(
     return samples
 
 
-def build_mcq_prompt(tokenizer, question: str, options: list[str]) -> str:
+def build_mcq_prompt(
+    tokenizer,
+    question: str,
+    options: list[str],
+    *,
+    prompt_format: str = "auto",
+) -> str:
     if len(options) > len(MMLUPRO_LETTERS):
         raise ValueError(
             f"MMLU-Pro expects at most {len(MMLUPRO_LETTERS)} options, got {len(options)}."
@@ -110,11 +117,7 @@ def build_mcq_prompt(tokenizer, question: str, options: list[str]) -> str:
         "On the final non-empty line, output only a JSON object of the form "
         f'{{"answer": "X"}} where X is one of {", ".join(valid_letters)}.'
     )
-    return tokenizer.apply_chat_template(
-        [{"role": "user", "content": user_msg}],
-        tokenize=False,
-        add_generation_prompt=True,
-    )
+    return format_user_prompt(tokenizer, user_msg, prompt_format=prompt_format)
 
 
 def grade(

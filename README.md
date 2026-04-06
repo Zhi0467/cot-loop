@@ -9,22 +9,32 @@ The project now has two active evidence streams:
 - the rollout-statistics line measures how often looping and max-length hits actually occur under the repaired v2 collector contract across `MATH-500`, `AIME`, `GPQA`, `MMLU-Pro`, and `LiveCodeBench`.
 
 Latest status:
-- the best prefill-only arm is still the Round 6 all-layer last-token anchor; later metadata-aware prefill rounds did not overturn the completion-view advantage.
-- the common-policy rollout-statistics bundle is now refreshed under one shared decode policy (`temperature=0.2`, `num_generations=10`, and `max prompts <= 800` where applicable) across `MATH-500`, `AIME`, `GPQA`, capped `MMLU-Pro`, and capped `LiveCodeBench release_v6`.
+- the collaborator-facing prompt-profile surface is now the combined audit note `docs/prompt-profile-combined-audit-2026-04-05.md` plus `outputs/prompt_profile_combined_audit_20260405/`, which keeps the canonical natural-regression rerun, the current balanced-binary recommendation, the cheap prompt-stat audit, and Athena's code audit in one surface.
+- the common-policy rollout-statistics bundle remains refreshed under one shared decode policy (`temperature=0.2`, `num_generations=10`, and `max prompts <= 800` where applicable) across `MATH-500`, `AIME`, `GPQA`, capped `MMLU-Pro`, and capped `LiveCodeBench release_v6`.
 - the repaired MC rows are materially different from the stale pre-refresh bundle: `GPQA` now reports `34.5%` rollout success instead of `3.1%`, and `MMLU-Pro` now reports `65.2%` instead of `14.2%`, both under the terminal JSON-answer contract.
-- the readable common-policy artifact is `outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/qwen3_1p7b_cross_dataset_rollout_report.pdf`, while the separate benchmark-style `GPQA` calibration lives in `outputs/gpqa_json_official_temp0p6_gen1/` and should not be conflated with the shared-policy table.
-- one explicit caveat remains on that recovered `LiveCodeBench` block: the original job crashed after grading and before writing the final JSON, and replay-based repair did not reproduce the stored generations exactly enough to recover `avg_first_loop_prefix_length`. That single metric therefore remains `null` for the recovered capped run.
-- the target-choice question is no longer open for the next run: Wangzhi locked `mean_relative_length` as the regression train target and `majority_s_0.5` as the binary train target.
-- the full-train plan is now pinned in both doc and PDF form:
-  - `docs/prompt-profile-full-train-plan-2026-04-02.md`
-  - `outputs/prompt_profile_full_train_plan_20260402/prompt_profile_full_train_plan_20260402.pdf`
-- `p_loop` is still kept in the repo as the loop-specific analysis target, but it is no longer the default training objective for the next full run. The exact target, baseline, and metric definitions now live in `docs/prompt-profile-eval-contract.md` and `docs/prompt-profile-risk-screen-2026-03-30.md`.
-- the current docs now lock one distinction that had kept drifting in-thread:
-  - for binary `majority_s_0.5`, prompt length already means a true one-feature held-out scorer;
-  - for the current continuous-head decision, the raw association table has now been superseded by the trained metadata-control bundle in `outputs/prompt_profile_risk_controls_20260330/`.
-- the current open work is now execution-focused rather than definitional:
-  - run the next full train pass on that locked pair with the architecture/view/checkpoint rule fixed up front;
-  - recover `LiveCodeBench` prompt-level accuracy only if a full `5 / 5` accuracy bucket table becomes necessary.
+- the canonical regression lane is now pinned twice over: the original locked April natural-split / natural-sampler `mean_relative_length` run plus Slurm `2215`, which reproduced that ledger exactly from the current branch.
+- binary `majority_s_0.5` remains the cleaner deployment-facing head, and the current best single global activation surface on that balanced-binary object is still `ensemble h256 d1`.
+- the current target split is explicit and stable:
+  - regression keeps the natural prompt-disjoint train/test split with natural sampling;
+  - balanced training is only for the binary `majority_s_0.5` head.
+- the OLMo degeneration line is now on a corrected result surface rather than an unresolved warning:
+  - `RLVR / MMLU-Pro = 0 / 80` was a grader bug on relaxed terminal JSON-like forms such as `{"answer": I}`;
+  - OLMo now has a model-native `LiveCodeBench` adapter path instead of the old silent Qwen-wrapper fallback;
+- the cheap full-ladder control is now the finished OLMo 2 `1B` 50-prompt progression, which shows heavy loop / cap mass in base, reduced but still present mass in SFT, and much smaller mass in `RLVR1` / instruct.
+- that OLMo2 ladder now has a proper visualization bundle too:
+  - progression figures and Sankey/alluvial overlap views live under `outputs/olmo2_1b_progression_bound50_20260406/`
+  - those figures are built directly from the saved `50`-prompt stage JSONs, not hand-copied tables.
+- the next same-family control is now active rather than only planned:
+  - the old Qwen reference object is the repaired v2 rollout bundle `outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/`
+  - the matching base-control rerun uses `Qwen/Qwen3-1.7B-Base` on the same sampler and dataset family, but at the base checkpoint's real `32768` context limit rather than the instruct checkpoint's `40960`
+  - the `LiveCodeBench` comparison is only same dataset plus same sampler, not a literal same-LM-style replay: the old v2 instruct row used `CodeQwenInstruct`, while the base control uses `GenericBase`
+  - the saved text probe already shows that Qwen base raw does degenerate on MCQ, but mainly by repeating the answer-format instruction tail rather than by OLMo-style math-derivation loops.
+  - the first finished long-horizon base row is already on disk: `MATH-500 = 243/500` correct, `19/500` looped, `22/500` max-length-hit
+  - that base `MATH-500` row is already worse than the old instruct v2 reference on both loop rate (`0.038` vs `0.0294`) and max-length-hit rate (`0.044` vs `0.0146`), even though base is much shorter on average (`1893.6` vs `6227.6`)
+- the current open work is now post-audit rather than pre-audit:
+  - replace the 1D prompt-length control with a stronger prompt-shape baseline on the frozen prompt-profile splits;
+  - test activation lift as residuals or inside matched prompt-shape strata;
+  - finish the Qwen base raw control and fold it back into the same degeneration-origin surface before deciding whether another larger OLMo rerun is warranted.
 
 **Workflow:**
 1. Build model-formatted chat prompts (shared `utils.build_prompt` source)

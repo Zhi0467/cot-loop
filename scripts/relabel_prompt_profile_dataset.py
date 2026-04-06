@@ -59,6 +59,22 @@ def _parse_args() -> argparse.Namespace:
         default="none",
     )
     parser.add_argument("--balance-seed", type=int, default=0)
+    parser.add_argument(
+        "--reuse-train-sample-ids-from",
+        default=None,
+        help=(
+            "Optional dataset dir whose train split sample IDs define the kept "
+            "train prompts for this relabel."
+        ),
+    )
+    parser.add_argument(
+        "--reuse-test-sample-ids-from",
+        default=None,
+        help=(
+            "Optional dataset dir whose test split sample IDs define the kept "
+            "test prompts for this relabel."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -261,6 +277,48 @@ def _subset_rows(rows: list[dict[str, object]], keep_indices: list[int]) -> list
 
 def _subset_labels(values: list[int | float], keep_indices: list[int]) -> list[int | float]:
     return [values[idx] for idx in keep_indices]
+
+
+def _load_split_sample_ids(data_dir: str, split: str) -> list[int]:
+    dataset = ActivationDataset(data_dir, split)
+    return [int(x) for x in dataset.sample_ids.tolist()]
+
+
+def _keep_indices_from_sample_ids(
+    full_sample_ids: list[int],
+    requested_sample_ids: list[int],
+    *,
+    split_name: str,
+) -> list[int]:
+    positions: dict[int, int] = {}
+    for idx, sample_id in enumerate(full_sample_ids):
+        if sample_id in positions:
+            raise SystemExit(
+                f"Split '{split_name}' in the source dataset has duplicate sample_id {sample_id}."
+            )
+        positions[sample_id] = idx
+
+    keep_indices: list[int] = []
+    seen_requested: set[int] = set()
+    missing: list[int] = []
+    for sample_id in requested_sample_ids:
+        if sample_id in seen_requested:
+            raise SystemExit(
+                f"Requested subset for split '{split_name}' repeats sample_id {sample_id}."
+            )
+        seen_requested.add(sample_id)
+        position = positions.get(sample_id)
+        if position is None:
+            missing.append(sample_id)
+            continue
+        keep_indices.append(position)
+
+    if missing:
+        raise SystemExit(
+            f"Requested subset for split '{split_name}' contains sample IDs that are "
+            f"missing from the source dataset: {missing[:10]}"
+        )
+    return keep_indices
 
 
 def _resolve_archive_source(
@@ -554,11 +612,29 @@ def main() -> None:
     args = _parse_args()
     source_dir = os.path.abspath(args.source_dir)
     out_dir = os.path.abspath(args.out_dir)
+    reuse_train_source = (
+        os.path.abspath(args.reuse_train_sample_ids_from)
+        if args.reuse_train_sample_ids_from
+        else None
+    )
+    reuse_test_source = (
+        os.path.abspath(args.reuse_test_sample_ids_from)
+        if args.reuse_test_sample_ids_from
+        else None
+    )
 
     source_manifest = read_manifest(source_dir)
     archive_index, archive_rows_by_split, archive_source_dir, archive_rel_path = (
         _load_archive_index(source_dir, source_manifest)
     )
+
+    if (reuse_train_source is not None or reuse_test_source is not None) and (
+        args.balance_train != "none" or args.balance_test != "none"
+    ):
+        raise SystemExit(
+            "Cannot mix --balance-* with --reuse-*-sample-ids-from. "
+            "Choose either class balancing or explicit sample-id reuse."
+        )
 
     if args.target_kind != "binary" and (
         args.balance_train != "none" or args.balance_test != "none"
@@ -635,13 +711,31 @@ def main() -> None:
         target_spec=target_spec,
     )
 
-    if args.target_kind == "binary":
+    if reuse_train_source is not None:
+        requested_train_ids = _load_split_sample_ids(reuse_train_source, "train")
+        train_keep_idx = _keep_indices_from_sample_ids(
+            train_sample_ids,
+            requested_train_ids,
+            split_name="train",
+        )
+    elif args.target_kind == "binary":
         train_keep_idx = _balanced_indices(
             train_labels,
             split_name="train",
             mode=args.balance_train,
             seed=args.balance_seed,
         )
+    else:
+        train_keep_idx = list(range(len(train_labels)))
+
+    if reuse_test_source is not None:
+        requested_test_ids = _load_split_sample_ids(reuse_test_source, "test")
+        test_keep_idx = _keep_indices_from_sample_ids(
+            test_sample_ids,
+            requested_test_ids,
+            split_name="test",
+        )
+    elif args.target_kind == "binary":
         test_keep_idx = _balanced_indices(
             test_labels,
             split_name="test",
@@ -649,7 +743,6 @@ def main() -> None:
             seed=args.balance_seed + 1,
         )
     else:
-        train_keep_idx = list(range(len(train_labels)))
         test_keep_idx = list(range(len(test_labels)))
 
     train_labels = _subset_labels(train_labels, train_keep_idx)
@@ -764,6 +857,10 @@ def main() -> None:
         "prompt_rollout_archive_file": prompt_rollout_archive_path,
         "prompt_profile_source_dir": archive_source_dir,
         "prompt_profile_source_archive_file": archive_rel_path,
+        "sample_id_subset_source": {
+            "train": reuse_train_source,
+            "test": reuse_test_source,
+        },
         "train_spec": source_manifest.get("train_spec"),
         "test_spec": source_manifest.get("test_spec"),
         "task_loader_config": source_manifest.get("task_loader_config"),

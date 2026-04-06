@@ -1,0 +1,373 @@
+[prompt-profile-regression-natural] SOURCE_ROOT=/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404
+[prompt-profile-regression-natural] OUT_ROOT=/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405
+[prompt-profile-regression-natural] SUMMARY_DIR=/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/summary
+[prompt-profile-regression-natural] DATASETS=gpqa aime math500 mmlu_pro livecodebench
+[prompt-profile-regression-natural] SEEDS=0 1 2
+[prompt-profile-regression-natural] probe=mlp hidden=default depth=default dropout=default
+[prompt-profile-regression-natural] epochs=10 batch_size=256 lr=1e-4 weight_decay=0.1
+[prompt-profile-regression-natural] HF_HOME=/data/scratch/murphy/cache/huggingface
+[prompt-profile-regression-natural] VLLM_CACHE_ROOT=/data/scratch/murphy/cache/vllm
+$ python3 scripts/run_prompt_profile_full_train.py --stage regression --out-root /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405 --summary-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/summary --source-out-root /data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404 --regression-data-mode natural --regression-train-balance-mode none --python-bin python3 --wandb-project cot-loop-probe --probe-preset mlp --epochs 10 --batch-size 256 --lr 1e-4 --weight-decay 0.1 --num-workers 8 --device auto --seeds 0 1 2 --dataset gpqa aime math500 mmlu_pro livecodebench
+$ python3 /home/murphy/projects/worktrees/cot-loop-prompt-profile-natural-rerun/scripts/train_probe.py --data-dir /data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/gpqa/shared_archive --out-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/gpqa/mean_relative_length/ensemble/seed_0 --probe-preset mlp --epochs 10 --batch-size 256 --lr 0.0001 --weight-decay 0.1 --num-workers 8 --device auto --seed 0 --eval-every 1 --log-every 5 --wandb-project cot-loop-probe --wandb-run-name gpqa-mean_relative_length-ensemble-seed0 --classifier-mode ensemble --score-rule mean_prob
+epoch=1 train_loss=0.108377 train_mse=0.0431 train_mae=0.1757 train_spear=0.1089 eval_mse=0.0294 eval_mae=0.1471 eval_spear=0.1998 eval_top10=0.1093
+epoch=2 train_loss=0.086186 train_mse=0.0312 train_mae=0.1395 train_spear=0.1179 eval_mse=0.0255 eval_mae=0.1242 eval_spear=0.4169 eval_top10=0.1094
+epoch=3 train_loss=0.066372 train_mse=0.0321 train_mae=0.1367 train_spear=0.2401 eval_mse=0.0313 eval_mae=0.1298 eval_spear=0.5758 eval_top10=0.1682
+epoch=4 train_loss=0.062857 train_mse=0.0416 train_mae=0.1559 train_spear=0.3224 eval_mse=0.0315 eval_mae=0.1294 eval_spear=0.6186 eval_top10=0.1564
+epoch=5 train_loss=0.063815 train_mse=0.0418 train_mae=0.1561 train_spear=0.4442 eval_mse=0.0310 eval_mae=0.1281 eval_spear=0.6390 eval_top10=0.1567
+epoch=6 train_loss=0.064144 train_mse=0.0419 train_mae=0.1553 train_spear=0.4034 eval_mse=0.0313 eval_mae=0.1287 eval_spear=0.6355 eval_top10=0.1567
+epoch=7 train_loss=0.062335 train_mse=0.0420 train_mae=0.1559 train_spear=0.5044 eval_mse=0.0315 eval_mae=0.1291 eval_spear=0.6355 eval_top10=0.1567
+epoch=8 train_loss=0.061617 train_mse=0.0423 train_mae=0.1562 train_spear=0.4416 eval_mse=0.0314 eval_mae=0.1290 eval_spear=0.6295 eval_top10=0.1567
+epoch=9 train_loss=0.060431 train_mse=0.0421 train_mae=0.1561 train_spear=0.4881 eval_mse=0.0312 eval_mae=0.1285 eval_spear=0.6315 eval_top10=0.1567
+epoch=10 train_loss=0.059333 train_mse=0.0412 train_mae=0.1547 train_spear=0.5745 eval_mse=0.0308 eval_mae=0.1277 eval_spear=0.6447 eval_top10=0.1567
+Saved checkpoints to /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/gpqa/mean_relative_length/ensemble/seed_0
+$ python3 /home/murphy/projects/worktrees/cot-loop-prompt-profile-natural-rerun/scripts/train_probe.py --data-dir /data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/gpqa/shared_archive --out-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/gpqa/mean_relative_length/ensemble/seed_1 --probe-preset mlp --epochs 10 --batch-size 256 --lr 0.0001 --weight-decay 0.1 --num-workers 8 --device auto --seed 1 --eval-every 1 --log-every 5 --wandb-project cot-loop-probe --wandb-run-name gpqa-mean_relative_length-ensemble-seed1 --classifier-mode ensemble --score-rule mean_prob
+epoch=1 train_loss=0.134625 train_mse=0.0651 train_mae=0.2209 train_spear=0.0038 eval_mse=0.0277 eval_mae=0.1418 eval_spear=0.0700 eval_top10=0.1078
+epoch=2 train_loss=0.084079 train_mse=0.0298 train_mae=0.1373 train_spear=0.1923 eval_mse=0.0264 eval_mae=0.1263 eval_spear=0.4649 eval_top10=0.1449
+epoch=3 train_loss=0.075020 train_mse=0.0344 train_mae=0.1416 train_spear=0.2531 eval_mse=0.0326 eval_mae=0.1327 eval_spear=0.4674 eval_top10=0.1449
+epoch=4 train_loss=0.066895 train_mse=0.0426 train_mae=0.1576 train_spear=0.3751 eval_mse=0.0334 eval_mae=0.1338 eval_spear=0.5041 eval_top10=0.1449
+epoch=5 train_loss=0.067211 train_mse=0.0435 train_mae=0.1592 train_spear=0.4834 eval_mse=0.0332 eval_mae=0.1333 eval_spear=0.5163 eval_top10=0.1449
+epoch=6 train_loss=0.066938 train_mse=0.0433 train_mae=0.1589 train_spear=0.5324 eval_mse=0.0330 eval_mae=0.1327 eval_spear=0.5321 eval_top10=0.1449
+epoch=7 train_loss=0.066148 train_mse=0.0431 train_mae=0.1581 train_spear=0.5081 eval_mse=0.0328 eval_mae=0.1322 eval_spear=0.5437 eval_top10=0.1449
+epoch=8 train_loss=0.065449 train_mse=0.0430 train_mae=0.1577 train_spear=0.5034 eval_mse=0.0326 eval_mae=0.1318 eval_spear=0.5428 eval_top10=0.1449
+epoch=9 train_loss=0.064514 train_mse=0.0426 train_mae=0.1570 train_spear=0.5607 eval_mse=0.0324 eval_mae=0.1313 eval_spear=0.5505 eval_top10=0.1449
+epoch=10 train_loss=0.064165 train_mse=0.0427 train_mae=0.1570 train_spear=0.4832 eval_mse=0.0322 eval_mae=0.1308 eval_spear=0.5614 eval_top10=0.1449
+Saved checkpoints to /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/gpqa/mean_relative_length/ensemble/seed_1
+$ python3 /home/murphy/projects/worktrees/cot-loop-prompt-profile-natural-rerun/scripts/train_probe.py --data-dir /data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/gpqa/shared_archive --out-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/gpqa/mean_relative_length/ensemble/seed_2 --probe-preset mlp --epochs 10 --batch-size 256 --lr 0.0001 --weight-decay 0.1 --num-workers 8 --device auto --seed 2 --eval-every 1 --log-every 5 --wandb-project cot-loop-probe --wandb-run-name gpqa-mean_relative_length-ensemble-seed2 --classifier-mode ensemble --score-rule mean_prob
+epoch=1 train_loss=0.143003 train_mse=0.0727 train_mae=0.2354 train_spear=0.1364 eval_mse=0.0424 eval_mae=0.1823 eval_spear=0.2882 eval_top10=0.0949
+epoch=2 train_loss=0.115519 train_mse=0.0402 train_mae=0.1694 train_spear=0.0739 eval_mse=0.0251 eval_mae=0.1251 eval_spear=0.3745 eval_top10=0.1408
+epoch=3 train_loss=0.068462 train_mse=0.0318 train_mae=0.1367 train_spear=0.2302 eval_mse=0.0324 eval_mae=0.1323 eval_spear=0.4009 eval_top10=0.1304
+epoch=4 train_loss=0.066641 train_mse=0.0423 train_mae=0.1572 train_spear=0.3744 eval_mse=0.0344 eval_mae=0.1358 eval_spear=0.5124 eval_top10=0.1372
+epoch=5 train_loss=0.067440 train_mse=0.0451 train_mae=0.1623 train_spear=0.4356 eval_mse=0.0354 eval_mae=0.1378 eval_spear=0.5428 eval_top10=0.1372
+epoch=6 train_loss=0.066903 train_mse=0.0467 train_mae=0.1653 train_spear=0.4521 eval_mse=0.0357 eval_mae=0.1383 eval_spear=0.5514 eval_top10=0.1372
+epoch=7 train_loss=0.065743 train_mse=0.0466 train_mae=0.1655 train_spear=0.5497 eval_mse=0.0354 eval_mae=0.1377 eval_spear=0.5507 eval_top10=0.1372
+epoch=8 train_loss=0.065118 train_mse=0.0465 train_mae=0.1646 train_spear=0.4941 eval_mse=0.0349 eval_mae=0.1367 eval_spear=0.5604 eval_top10=0.1372
+epoch=9 train_loss=0.064306 train_mse=0.0459 train_mae=0.1639 train_spear=0.5464 eval_mse=0.0344 eval_mae=0.1356 eval_spear=0.5687 eval_top10=0.1372
+epoch=10 train_loss=0.064055 train_mse=0.0454 train_mae=0.1630 train_spear=0.5507 eval_mse=0.0338 eval_mae=0.1343 eval_spear=0.5747 eval_top10=0.1372
+Saved checkpoints to /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/gpqa/mean_relative_length/ensemble/seed_2
+$ python3 /home/murphy/projects/worktrees/cot-loop-prompt-profile-natural-rerun/scripts/train_probe.py --data-dir /data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/gpqa/shared_archive --out-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/gpqa/mean_relative_length/last_layer/seed_0 --probe-preset mlp --epochs 10 --batch-size 256 --lr 0.0001 --weight-decay 0.1 --num-workers 8 --device auto --seed 0 --eval-every 1 --log-every 5 --wandb-project cot-loop-probe --wandb-run-name gpqa-mean_relative_length-last_layer-seed0 --classifier-mode last_layer --classifier-layer -1
+epoch=1 train_loss=0.069355 train_mse=0.0694 train_mae=0.2282 train_spear=0.1091 eval_mse=0.0303 eval_mae=0.1329 eval_spear=-0.0242 eval_top10=0.0703
+epoch=2 train_loss=0.041083 train_mse=0.0411 train_mae=0.1587 train_spear=-0.0585 eval_mse=0.0441 eval_mae=0.1567 eval_spear=-0.0460 eval_top10=0.0703
+epoch=3 train_loss=0.056339 train_mse=0.0563 train_mae=0.1849 train_spear=0.0441 eval_mse=0.0457 eval_mae=0.1599 eval_spear=-0.0542 eval_top10=0.0703
+epoch=4 train_loss=0.058549 train_mse=0.0585 train_mae=0.1867 train_spear=-0.0202 eval_mse=0.0411 eval_mae=0.1502 eval_spear=-0.0529 eval_top10=0.0703
+epoch=5 train_loss=0.053877 train_mse=0.0539 train_mae=0.1783 train_spear=0.0547 eval_mse=0.0343 eval_mae=0.1371 eval_spear=-0.0559 eval_top10=0.0823
+epoch=6 train_loss=0.048186 train_mse=0.0482 train_mae=0.1702 train_spear=-0.1735 eval_mse=0.0291 eval_mae=0.1301 eval_spear=-0.0612 eval_top10=0.0823
+epoch=7 train_loss=0.037299 train_mse=0.0373 train_mae=0.1483 train_spear=0.1164 eval_mse=0.0270 eval_mae=0.1304 eval_spear=-0.0811 eval_top10=0.0823
+epoch=8 train_loss=0.032973 train_mse=0.0330 train_mae=0.1414 train_spear=0.0697 eval_mse=0.0274 eval_mae=0.1372 eval_spear=-0.0801 eval_top10=0.0823
+epoch=9 train_loss=0.033658 train_mse=0.0337 train_mae=0.1444 train_spear=0.0449 eval_mse=0.0288 eval_mae=0.1441 eval_spear=-0.0850 eval_top10=0.0823
+epoch=10 train_loss=0.032267 train_mse=0.0323 train_mae=0.1439 train_spear=0.1424 eval_mse=0.0305 eval_mae=0.1500 eval_spear=-0.0820 eval_top10=0.0823
+Saved checkpoints to /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/gpqa/mean_relative_length/last_layer/seed_0
+$ python3 /home/murphy/projects/worktrees/cot-loop-prompt-profile-natural-rerun/scripts/train_probe.py --data-dir /data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/gpqa/shared_archive --out-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/gpqa/mean_relative_length/last_layer/seed_1 --probe-preset mlp --epochs 10 --batch-size 256 --lr 0.0001 --weight-decay 0.1 --num-workers 8 --device auto --seed 1 --eval-every 1 --log-every 5 --wandb-project cot-loop-probe --wandb-run-name gpqa-mean_relative_length-last_layer-seed1 --classifier-mode last_layer --classifier-layer -1
+epoch=1 train_loss=0.125601 train_mse=0.1256 train_mae=0.3175 train_spear=-0.0199 eval_mse=0.0336 eval_mae=0.1602 eval_spear=0.2949 eval_top10=0.1119
+epoch=2 train_loss=0.036696 train_mse=0.0367 train_mae=0.1584 train_spear=0.0158 eval_mse=0.0280 eval_mae=0.1274 eval_spear=0.3422 eval_top10=0.0912
+epoch=3 train_loss=0.038867 train_mse=0.0389 train_mae=0.1545 train_spear=0.0069 eval_mse=0.0369 eval_mae=0.1418 eval_spear=0.3576 eval_top10=0.0912
+epoch=4 train_loss=0.050947 train_mse=0.0509 train_mae=0.1734 train_spear=-0.0847 eval_mse=0.0405 eval_mae=0.1483 eval_spear=0.3518 eval_top10=0.0912
+epoch=5 train_loss=0.052386 train_mse=0.0524 train_mae=0.1774 train_spear=0.0604 eval_mse=0.0400 eval_mae=0.1473 eval_spear=0.3617 eval_top10=0.0912
+epoch=6 train_loss=0.052385 train_mse=0.0524 train_mae=0.1763 train_spear=0.0335 eval_mse=0.0376 eval_mae=0.1427 eval_spear=0.3583 eval_top10=0.0912
+epoch=7 train_loss=0.049827 train_mse=0.0498 train_mae=0.1689 train_spear=0.0416 eval_mse=0.0349 eval_mae=0.1372 eval_spear=0.3484 eval_top10=0.0912
+epoch=8 train_loss=0.046580 train_mse=0.0466 train_mae=0.1648 train_spear=-0.0047 eval_mse=0.0324 eval_mae=0.1329 eval_spear=0.3379 eval_top10=0.0912
+epoch=9 train_loss=0.043938 train_mse=0.0439 train_mae=0.1607 train_spear=-0.0515 eval_mse=0.0305 eval_mae=0.1303 eval_spear=0.3386 eval_top10=0.0912
+epoch=10 train_loss=0.041349 train_mse=0.0413 train_mae=0.1547 train_spear=-0.0206 eval_mse=0.0287 eval_mae=0.1283 eval_spear=0.3336 eval_top10=0.0912
+Saved checkpoints to /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/gpqa/mean_relative_length/last_layer/seed_1
+$ python3 /home/murphy/projects/worktrees/cot-loop-prompt-profile-natural-rerun/scripts/train_probe.py --data-dir /data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/gpqa/shared_archive --out-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/gpqa/mean_relative_length/last_layer/seed_2 --probe-preset mlp --epochs 10 --batch-size 256 --lr 0.0001 --weight-decay 0.1 --num-workers 8 --device auto --seed 2 --eval-every 1 --log-every 5 --wandb-project cot-loop-probe --wandb-run-name gpqa-mean_relative_length-last_layer-seed2 --classifier-mode last_layer --classifier-layer -1
+epoch=1 train_loss=0.058943 train_mse=0.0589 train_mae=0.2081 train_spear=-0.0393 eval_mse=0.0329 eval_mae=0.1343 eval_spear=-0.1705 eval_top10=0.1279
+epoch=2 train_loss=0.044524 train_mse=0.0445 train_mae=0.1616 train_spear=-0.0933 eval_mse=0.0411 eval_mae=0.1496 eval_spear=-0.0392 eval_top10=0.1046
+epoch=3 train_loss=0.053904 train_mse=0.0539 train_mae=0.1797 train_spear=-0.0580 eval_mse=0.0375 eval_mae=0.1420 eval_spear=0.1118 eval_top10=0.1046
+epoch=4 train_loss=0.048580 train_mse=0.0486 train_mae=0.1685 train_spear=0.0102 eval_mse=0.0299 eval_mae=0.1277 eval_spear=0.2144 eval_top10=0.1046
+epoch=5 train_loss=0.042573 train_mse=0.0426 train_mae=0.1598 train_spear=-0.1484 eval_mse=0.0260 eval_mae=0.1310 eval_spear=0.2651 eval_top10=0.0939
+epoch=6 train_loss=0.033340 train_mse=0.0333 train_mae=0.1395 train_spear=0.0615 eval_mse=0.0288 eval_mae=0.1449 eval_spear=0.2914 eval_top10=0.0871
+epoch=7 train_loss=0.034626 train_mse=0.0346 train_mae=0.1493 train_spear=-0.0310 eval_mse=0.0326 eval_mae=0.1586 eval_spear=0.2996 eval_top10=0.0871
+epoch=8 train_loss=0.038006 train_mse=0.0380 train_mae=0.1581 train_spear=-0.0526 eval_mse=0.0331 eval_mae=0.1603 eval_spear=0.3021 eval_top10=0.0871
+epoch=9 train_loss=0.038372 train_mse=0.0384 train_mae=0.1581 train_spear=0.0560 eval_mse=0.0319 eval_mae=0.1567 eval_spear=0.3126 eval_top10=0.0949
+epoch=10 train_loss=0.039345 train_mse=0.0393 train_mae=0.1598 train_spear=-0.0837 eval_mse=0.0300 eval_mae=0.1501 eval_spear=0.3137 eval_top10=0.0949
+Saved checkpoints to /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/gpqa/mean_relative_length/last_layer/seed_2
+$ python3 /home/murphy/projects/worktrees/cot-loop-prompt-profile-natural-rerun/scripts/train_probe.py --data-dir /data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/aime/shared_archive --out-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/aime/mean_relative_length/ensemble/seed_0 --probe-preset mlp --epochs 10 --batch-size 256 --lr 0.0001 --weight-decay 0.1 --num-workers 8 --device auto --seed 0 --eval-every 1 --log-every 5 --wandb-project cot-loop-probe --wandb-run-name aime-mean_relative_length-ensemble-seed0 --classifier-mode ensemble --score-rule mean_prob
+epoch=1 train_loss=0.169456 train_mse=0.1025 train_mae=0.2703 train_spear=-0.1496 eval_mse=0.0371 eval_mae=0.1662 eval_spear=0.8392 eval_top10=0.2126
+epoch=2 train_loss=0.129313 train_mse=0.0636 train_mae=0.2200 train_spear=-0.0017 eval_mse=0.0368 eval_mae=0.1705 eval_spear=0.7483 eval_top10=0.2126
+epoch=3 train_loss=0.125685 train_mse=0.0669 train_mae=0.2176 train_spear=0.3769 eval_mse=0.0342 eval_mae=0.1623 eval_spear=0.7902 eval_top10=0.2126
+epoch=4 train_loss=0.126655 train_mse=0.0637 train_mae=0.2152 train_spear=0.3037 eval_mse=0.0336 eval_mae=0.1617 eval_spear=0.7552 eval_top10=0.2126
+epoch=5 train_loss=0.113652 train_mse=0.0619 train_mae=0.2101 train_spear=0.5394 eval_mse=0.0338 eval_mae=0.1629 eval_spear=0.7552 eval_top10=0.2126
+epoch=6 train_loss=0.111710 train_mse=0.0637 train_mae=0.2125 train_spear=0.3882 eval_mse=0.0333 eval_mae=0.1616 eval_spear=0.7203 eval_top10=0.2126
+epoch=7 train_loss=0.109063 train_mse=0.0622 train_mae=0.2125 train_spear=0.4706 eval_mse=0.0327 eval_mae=0.1599 eval_spear=0.7273 eval_top10=0.2155
+epoch=8 train_loss=0.106116 train_mse=0.0603 train_mae=0.2091 train_spear=0.5537 eval_mse=0.0322 eval_mae=0.1581 eval_spear=0.6713 eval_top10=0.2155
+epoch=9 train_loss=0.102859 train_mse=0.0567 train_mae=0.2017 train_spear=0.7194 eval_mse=0.0318 eval_mae=0.1569 eval_spear=0.6713 eval_top10=0.2155
+epoch=10 train_loss=0.106326 train_mse=0.0607 train_mae=0.2088 train_spear=0.5167 eval_mse=0.0315 eval_mae=0.1554 eval_spear=0.6643 eval_top10=0.2126
+Saved checkpoints to /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/aime/mean_relative_length/ensemble/seed_0
+$ python3 /home/murphy/projects/worktrees/cot-loop-prompt-profile-natural-rerun/scripts/train_probe.py --data-dir /data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/aime/shared_archive --out-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/aime/mean_relative_length/ensemble/seed_1 --probe-preset mlp --epochs 10 --batch-size 256 --lr 0.0001 --weight-decay 0.1 --num-workers 8 --device auto --seed 1 --eval-every 1 --log-every 5 --wandb-project cot-loop-probe --wandb-run-name aime-mean_relative_length-ensemble-seed1 --classifier-mode ensemble --score-rule mean_prob
+epoch=1 train_loss=0.154357 train_mse=0.0800 train_mae=0.2430 train_spear=0.3297 eval_mse=0.0371 eval_mae=0.1723 eval_spear=0.2517 eval_top10=0.1630
+epoch=2 train_loss=0.122414 train_mse=0.0648 train_mae=0.2175 train_spear=0.1376 eval_mse=0.0355 eval_mae=0.1664 eval_spear=0.5385 eval_top10=0.1862
+epoch=3 train_loss=0.131714 train_mse=0.0622 train_mae=0.2147 train_spear=0.5445 eval_mse=0.0360 eval_mae=0.1701 eval_spear=0.4056 eval_top10=0.1550
+epoch=4 train_loss=0.126337 train_mse=0.0650 train_mae=0.2182 train_spear=0.2777 eval_mse=0.0358 eval_mae=0.1701 eval_spear=0.4545 eval_top10=0.1914
+epoch=5 train_loss=0.126040 train_mse=0.0639 train_mae=0.2144 train_spear=0.4316 eval_mse=0.0365 eval_mae=0.1717 eval_spear=0.5455 eval_top10=0.2231
+epoch=6 train_loss=0.121984 train_mse=0.0673 train_mae=0.2192 train_spear=0.2394 eval_mse=0.0387 eval_mae=0.1751 eval_spear=0.6154 eval_top10=0.1862
+epoch=7 train_loss=0.120243 train_mse=0.0704 train_mae=0.2212 train_spear=0.2585 eval_mse=0.0381 eval_mae=0.1739 eval_spear=0.6224 eval_top10=0.1862
+epoch=8 train_loss=0.117918 train_mse=0.0688 train_mae=0.2160 train_spear=0.4985 eval_mse=0.0374 eval_mae=0.1727 eval_spear=0.6573 eval_top10=0.1862
+epoch=9 train_loss=0.115441 train_mse=0.0676 train_mae=0.2151 train_spear=0.6508 eval_mse=0.0367 eval_mae=0.1714 eval_spear=0.6713 eval_top10=0.1862
+epoch=10 train_loss=0.114835 train_mse=0.0671 train_mae=0.2152 train_spear=0.5928 eval_mse=0.0359 eval_mae=0.1700 eval_spear=0.6713 eval_top10=0.1862
+Saved checkpoints to /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/aime/mean_relative_length/ensemble/seed_1
+$ python3 /home/murphy/projects/worktrees/cot-loop-prompt-profile-natural-rerun/scripts/train_probe.py --data-dir /data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/aime/shared_archive --out-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/aime/mean_relative_length/ensemble/seed_2 --probe-preset mlp --epochs 10 --batch-size 256 --lr 0.0001 --weight-decay 0.1 --num-workers 8 --device auto --seed 2 --eval-every 1 --log-every 5 --wandb-project cot-loop-probe --wandb-run-name aime-mean_relative_length-ensemble-seed2 --classifier-mode ensemble --score-rule mean_prob
+epoch=1 train_loss=0.142631 train_mse=0.0726 train_mae=0.2348 train_spear=-0.1607 eval_mse=0.0360 eval_mae=0.1635 eval_spear=0.5315 eval_top10=0.1914
+epoch=2 train_loss=0.129656 train_mse=0.0604 train_mae=0.2137 train_spear=0.4015 eval_mse=0.0356 eval_mae=0.1681 eval_spear=0.6364 eval_top10=0.1942
+epoch=3 train_loss=0.133389 train_mse=0.0660 train_mae=0.2206 train_spear=0.0854 eval_mse=0.0361 eval_mae=0.1697 eval_spear=0.7552 eval_top10=0.2207
+epoch=4 train_loss=0.131790 train_mse=0.0666 train_mae=0.2192 train_spear=0.2749 eval_mse=0.0355 eval_mae=0.1684 eval_spear=0.7343 eval_top10=0.2207
+epoch=5 train_loss=0.124884 train_mse=0.0636 train_mae=0.2141 train_spear=0.5285 eval_mse=0.0343 eval_mae=0.1649 eval_spear=0.7203 eval_top10=0.1914
+epoch=6 train_loss=0.122249 train_mse=0.0632 train_mae=0.2146 train_spear=0.4634 eval_mse=0.0337 eval_mae=0.1607 eval_spear=0.7203 eval_top10=0.1914
+epoch=7 train_loss=0.123166 train_mse=0.0606 train_mae=0.2107 train_spear=0.4405 eval_mse=0.0335 eval_mae=0.1597 eval_spear=0.7483 eval_top10=0.2126
+epoch=8 train_loss=0.121734 train_mse=0.0599 train_mae=0.2111 train_spear=0.5049 eval_mse=0.0333 eval_mae=0.1595 eval_spear=0.7273 eval_top10=0.2126
+epoch=9 train_loss=0.119493 train_mse=0.0597 train_mae=0.2113 train_spear=0.5620 eval_mse=0.0332 eval_mae=0.1596 eval_spear=0.7273 eval_top10=0.2126
+epoch=10 train_loss=0.118539 train_mse=0.0582 train_mae=0.2076 train_spear=0.6361 eval_mse=0.0331 eval_mae=0.1600 eval_spear=0.7133 eval_top10=0.2126
+Saved checkpoints to /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/aime/mean_relative_length/ensemble/seed_2
+$ python3 /home/murphy/projects/worktrees/cot-loop-prompt-profile-natural-rerun/scripts/train_probe.py --data-dir /data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/aime/shared_archive --out-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/aime/mean_relative_length/last_layer/seed_0 --probe-preset mlp --epochs 10 --batch-size 256 --lr 0.0001 --weight-decay 0.1 --num-workers 8 --device auto --seed 0 --eval-every 1 --log-every 5 --wandb-project cot-loop-probe --wandb-run-name aime-mean_relative_length-last_layer-seed0 --classifier-mode last_layer --classifier-layer -1
+epoch=1 train_loss=0.075442 train_mse=0.0754 train_mae=0.2360 train_spear=0.0472 eval_mse=0.0588 eval_mae=0.1912 eval_spear=0.3427 eval_top10=0.2126
+epoch=2 train_loss=0.102400 train_mse=0.1024 train_mae=0.2575 train_spear=-0.0545 eval_mse=0.0462 eval_mae=0.1799 eval_spear=0.5524 eval_top10=0.2126
+epoch=3 train_loss=0.088053 train_mse=0.0881 train_mae=0.2482 train_spear=-0.0682 eval_mse=0.0348 eval_mae=0.1583 eval_spear=0.5804 eval_top10=0.2126
+epoch=4 train_loss=0.061824 train_mse=0.0618 train_mae=0.2081 train_spear=0.2737 eval_mse=0.0536 eval_mae=0.1971 eval_spear=0.6084 eval_top10=0.2231
+epoch=5 train_loss=0.065987 train_mse=0.0660 train_mae=0.2204 train_spear=0.3424 eval_mse=0.0583 eval_mae=0.2047 eval_spear=0.6014 eval_top10=0.2231
+epoch=6 train_loss=0.084100 train_mse=0.0841 train_mae=0.2446 train_spear=-0.0602 eval_mse=0.0491 eval_mae=0.1882 eval_spear=0.5944 eval_top10=0.2231
+epoch=7 train_loss=0.073163 train_mse=0.0732 train_mae=0.2308 train_spear=0.0289 eval_mse=0.0406 eval_mae=0.1694 eval_spear=0.5944 eval_top10=0.2231
+epoch=8 train_loss=0.072239 train_mse=0.0722 train_mae=0.2326 train_spear=-0.1142 eval_mse=0.0362 eval_mae=0.1628 eval_spear=0.6084 eval_top10=0.2231
+epoch=9 train_loss=0.067165 train_mse=0.0672 train_mae=0.2230 train_spear=0.0403 eval_mse=0.0345 eval_mae=0.1588 eval_spear=0.6084 eval_top10=0.2231
+epoch=10 train_loss=0.074116 train_mse=0.0741 train_mae=0.2355 train_spear=-0.2527 eval_mse=0.0340 eval_mae=0.1592 eval_spear=0.6084 eval_top10=0.2231
+Saved checkpoints to /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/aime/mean_relative_length/last_layer/seed_0
+$ python3 /home/murphy/projects/worktrees/cot-loop-prompt-profile-natural-rerun/scripts/train_probe.py --data-dir /data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/aime/shared_archive --out-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/aime/mean_relative_length/last_layer/seed_1 --probe-preset mlp --epochs 10 --batch-size 256 --lr 0.0001 --weight-decay 0.1 --num-workers 8 --device auto --seed 1 --eval-every 1 --log-every 5 --wandb-project cot-loop-probe --wandb-run-name aime-mean_relative_length-last_layer-seed1 --classifier-mode last_layer --classifier-layer -1
+epoch=1 train_loss=0.063351 train_mse=0.0634 train_mae=0.2141 train_spear=0.1012 eval_mse=0.0458 eval_mae=0.1824 eval_spear=0.0979 eval_top10=0.1528
+epoch=2 train_loss=0.085609 train_mse=0.0856 train_mae=0.2336 train_spear=-0.1079 eval_mse=0.0393 eval_mae=0.1707 eval_spear=0.3706 eval_top10=0.2126
+epoch=3 train_loss=0.068571 train_mse=0.0686 train_mae=0.2275 train_spear=-0.0123 eval_mse=0.0485 eval_mae=0.1869 eval_spear=0.3986 eval_top10=0.2126
+epoch=4 train_loss=0.066613 train_mse=0.0666 train_mae=0.2197 train_spear=0.2399 eval_mse=0.0415 eval_mae=0.1735 eval_spear=0.4476 eval_top10=0.2126
+epoch=5 train_loss=0.064066 train_mse=0.0641 train_mae=0.2182 train_spear=0.0891 eval_mse=0.0365 eval_mae=0.1652 eval_spear=0.4476 eval_top10=0.2126
+epoch=6 train_loss=0.062996 train_mse=0.0630 train_mae=0.2194 train_spear=0.1043 eval_mse=0.0359 eval_mae=0.1656 eval_spear=0.4406 eval_top10=0.2126
+epoch=7 train_loss=0.062521 train_mse=0.0625 train_mae=0.2167 train_spear=0.1651 eval_mse=0.0359 eval_mae=0.1664 eval_spear=0.4965 eval_top10=0.2231
+epoch=8 train_loss=0.068499 train_mse=0.0685 train_mae=0.2218 train_spear=-0.0492 eval_mse=0.0357 eval_mae=0.1650 eval_spear=0.5035 eval_top10=0.2231
+epoch=9 train_loss=0.058333 train_mse=0.0583 train_mae=0.2060 train_spear=0.3679 eval_mse=0.0356 eval_mae=0.1629 eval_spear=0.5035 eval_top10=0.2231
+epoch=10 train_loss=0.062702 train_mse=0.0627 train_mae=0.2182 train_spear=0.1532 eval_mse=0.0359 eval_mae=0.1637 eval_spear=0.5035 eval_top10=0.2231
+Saved checkpoints to /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/aime/mean_relative_length/last_layer/seed_1
+$ python3 /home/murphy/projects/worktrees/cot-loop-prompt-profile-natural-rerun/scripts/train_probe.py --data-dir /data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/aime/shared_archive --out-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/aime/mean_relative_length/last_layer/seed_2 --probe-preset mlp --epochs 10 --batch-size 256 --lr 0.0001 --weight-decay 0.1 --num-workers 8 --device auto --seed 2 --eval-every 1 --log-every 5 --wandb-project cot-loop-probe --wandb-run-name aime-mean_relative_length-last_layer-seed2 --classifier-mode last_layer --classifier-layer -1
+epoch=1 train_loss=0.088668 train_mse=0.0887 train_mae=0.2539 train_spear=-0.0623 eval_mse=0.0516 eval_mae=0.1904 eval_spear=-0.3287 eval_top10=0.1146
+epoch=2 train_loss=0.086517 train_mse=0.0865 train_mae=0.2338 train_spear=0.1223 eval_mse=0.0491 eval_mae=0.1877 eval_spear=-0.1888 eval_top10=0.1146
+epoch=3 train_loss=0.082437 train_mse=0.0824 train_mae=0.2276 train_spear=0.0276 eval_mse=0.0375 eval_mae=0.1721 eval_spear=0.0909 eval_top10=0.1568
+epoch=4 train_loss=0.066492 train_mse=0.0665 train_mae=0.2186 train_spear=0.1125 eval_mse=0.0428 eval_mae=0.1754 eval_spear=0.1888 eval_top10=0.1568
+epoch=5 train_loss=0.068979 train_mse=0.0690 train_mae=0.2236 train_spear=0.0211 eval_mse=0.0517 eval_mae=0.1920 eval_spear=0.2238 eval_top10=0.2155
+epoch=6 train_loss=0.074964 train_mse=0.0750 train_mae=0.2316 train_spear=-0.1017 eval_mse=0.0504 eval_mae=0.1895 eval_spear=0.2448 eval_top10=0.2155
+epoch=7 train_loss=0.074419 train_mse=0.0744 train_mae=0.2355 train_spear=-0.0651 eval_mse=0.0457 eval_mae=0.1803 eval_spear=0.2448 eval_top10=0.2155
+epoch=8 train_loss=0.059764 train_mse=0.0598 train_mae=0.2119 train_spear=0.3316 eval_mse=0.0415 eval_mae=0.1722 eval_spear=0.2797 eval_top10=0.2155
+epoch=9 train_loss=0.067291 train_mse=0.0673 train_mae=0.2220 train_spear=0.0792 eval_mse=0.0387 eval_mae=0.1677 eval_spear=0.3357 eval_top10=0.2155
+epoch=10 train_loss=0.057692 train_mse=0.0577 train_mae=0.2077 train_spear=0.2344 eval_mse=0.0371 eval_mae=0.1647 eval_spear=0.3357 eval_top10=0.2155
+Saved checkpoints to /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/aime/mean_relative_length/last_layer/seed_2
+$ python3 /home/murphy/projects/worktrees/cot-loop-prompt-profile-natural-rerun/scripts/train_probe.py --data-dir /data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/math500/shared_archive --out-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/math500/mean_relative_length/ensemble/seed_0 --probe-preset mlp --epochs 10 --batch-size 256 --lr 0.0001 --weight-decay 0.1 --num-workers 8 --device auto --seed 0 --eval-every 1 --log-every 5 --wandb-project cot-loop-probe --wandb-run-name math500-mean_relative_length-ensemble-seed0 --classifier-mode ensemble --score-rule mean_prob
+epoch=1 train_loss=0.114082 train_mse=0.0573 train_mae=0.2171 train_spear=0.0445 eval_mse=0.0256 eval_mae=0.1272 eval_spear=0.5753 eval_top10=0.1650
+epoch=2 train_loss=0.063533 train_mse=0.0319 train_mae=0.1389 train_spear=0.1879 eval_mse=0.0291 eval_mae=0.1152 eval_spear=0.7076 eval_top10=0.1944
+epoch=3 train_loss=0.052032 train_mse=0.0333 train_mae=0.1179 train_spear=0.5667 eval_mse=0.0309 eval_mae=0.1139 eval_spear=0.7468 eval_top10=0.1793
+epoch=4 train_loss=0.051704 train_mse=0.0349 train_mae=0.1132 train_spear=0.6591 eval_mse=0.0348 eval_mae=0.1203 eval_spear=0.7559 eval_top10=0.1793
+epoch=5 train_loss=0.050720 train_mse=0.0374 train_mae=0.1144 train_spear=0.7403 eval_mse=0.0368 eval_mae=0.1242 eval_spear=0.7549 eval_top10=0.1793
+epoch=6 train_loss=0.050340 train_mse=0.0390 train_mae=0.1162 train_spear=0.7718 eval_mse=0.0375 eval_mae=0.1256 eval_spear=0.7571 eval_top10=0.1793
+epoch=7 train_loss=0.049616 train_mse=0.0393 train_mae=0.1165 train_spear=0.7831 eval_mse=0.0371 eval_mae=0.1247 eval_spear=0.7571 eval_top10=0.1793
+epoch=8 train_loss=0.049004 train_mse=0.0390 train_mae=0.1160 train_spear=0.7662 eval_mse=0.0362 eval_mae=0.1228 eval_spear=0.7575 eval_top10=0.1793
+epoch=9 train_loss=0.048031 train_mse=0.0381 train_mae=0.1145 train_spear=0.7638 eval_mse=0.0354 eval_mae=0.1210 eval_spear=0.7568 eval_top10=0.1793
+epoch=10 train_loss=0.047212 train_mse=0.0373 train_mae=0.1134 train_spear=0.7582 eval_mse=0.0346 eval_mae=0.1193 eval_spear=0.7556 eval_top10=0.1796
+Saved checkpoints to /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/math500/mean_relative_length/ensemble/seed_0
+$ python3 /home/murphy/projects/worktrees/cot-loop-prompt-profile-natural-rerun/scripts/train_probe.py --data-dir /data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/math500/shared_archive --out-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/math500/mean_relative_length/ensemble/seed_1 --probe-preset mlp --epochs 10 --batch-size 256 --lr 0.0001 --weight-decay 0.1 --num-workers 8 --device auto --seed 1 --eval-every 1 --log-every 5 --wandb-project cot-loop-probe --wandb-run-name math500-mean_relative_length-ensemble-seed1 --classifier-mode ensemble --score-rule mean_prob
+epoch=1 train_loss=0.153694 train_mse=0.0837 train_mae=0.2656 train_spear=-0.0890 eval_mse=0.0263 eval_mae=0.1283 eval_spear=0.1979 eval_top10=0.1012
+epoch=2 train_loss=0.064893 train_mse=0.0324 train_mae=0.1382 train_spear=0.1589 eval_mse=0.0297 eval_mae=0.1176 eval_spear=0.5311 eval_top10=0.1403
+epoch=3 train_loss=0.055926 train_mse=0.0346 train_mae=0.1200 train_spear=0.3710 eval_mse=0.0335 eval_mae=0.1196 eval_spear=0.6525 eval_top10=0.1861
+epoch=4 train_loss=0.054331 train_mse=0.0376 train_mae=0.1171 train_spear=0.5880 eval_mse=0.0364 eval_mae=0.1243 eval_spear=0.6771 eval_top10=0.1710
+epoch=5 train_loss=0.053252 train_mse=0.0395 train_mae=0.1179 train_spear=0.7089 eval_mse=0.0370 eval_mae=0.1249 eval_spear=0.7055 eval_top10=0.1873
+epoch=6 train_loss=0.052284 train_mse=0.0397 train_mae=0.1176 train_spear=0.7501 eval_mse=0.0367 eval_mae=0.1242 eval_spear=0.7132 eval_top10=0.1873
+epoch=7 train_loss=0.051365 train_mse=0.0394 train_mae=0.1170 train_spear=0.7377 eval_mse=0.0362 eval_mae=0.1231 eval_spear=0.7140 eval_top10=0.1878
+epoch=8 train_loss=0.050190 train_mse=0.0390 train_mae=0.1160 train_spear=0.7740 eval_mse=0.0356 eval_mae=0.1217 eval_spear=0.7174 eval_top10=0.1878
+epoch=9 train_loss=0.049161 train_mse=0.0382 train_mae=0.1150 train_spear=0.7469 eval_mse=0.0348 eval_mae=0.1201 eval_spear=0.7220 eval_top10=0.1878
+epoch=10 train_loss=0.048261 train_mse=0.0374 train_mae=0.1138 train_spear=0.7648 eval_mse=0.0338 eval_mae=0.1180 eval_spear=0.7218 eval_top10=0.1995
+Saved checkpoints to /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/math500/mean_relative_length/ensemble/seed_1
+$ python3 /home/murphy/projects/worktrees/cot-loop-prompt-profile-natural-rerun/scripts/train_probe.py --data-dir /data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/math500/shared_archive --out-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/math500/mean_relative_length/ensemble/seed_2 --probe-preset mlp --epochs 10 --batch-size 256 --lr 0.0001 --weight-decay 0.1 --num-workers 8 --device auto --seed 2 --eval-every 1 --log-every 5 --wandb-project cot-loop-probe --wandb-run-name math500-mean_relative_length-ensemble-seed2 --classifier-mode ensemble --score-rule mean_prob
+epoch=1 train_loss=0.170028 train_mse=0.1035 train_mae=0.2963 train_spear=0.0426 eval_mse=0.0267 eval_mae=0.1330 eval_spear=0.2794 eval_top10=0.1204
+epoch=2 train_loss=0.067666 train_mse=0.0333 train_mae=0.1428 train_spear=0.1356 eval_mse=0.0301 eval_mae=0.1175 eval_spear=0.6215 eval_top10=0.1856
+epoch=3 train_loss=0.055939 train_mse=0.0345 train_mae=0.1194 train_spear=0.3951 eval_mse=0.0336 eval_mae=0.1190 eval_spear=0.7370 eval_top10=0.1886
+epoch=4 train_loss=0.054760 train_mse=0.0383 train_mae=0.1177 train_spear=0.4613 eval_mse=0.0391 eval_mae=0.1293 eval_spear=0.7365 eval_top10=0.1850
+epoch=5 train_loss=0.054210 train_mse=0.0423 train_mae=0.1219 train_spear=0.6215 eval_mse=0.0410 eval_mae=0.1333 eval_spear=0.7348 eval_top10=0.1899
+epoch=6 train_loss=0.053610 train_mse=0.0434 train_mae=0.1238 train_spear=0.7285 eval_mse=0.0410 eval_mae=0.1332 eval_spear=0.7456 eval_top10=0.1850
+epoch=7 train_loss=0.052583 train_mse=0.0431 train_mae=0.1232 train_spear=0.7460 eval_mse=0.0402 eval_mae=0.1315 eval_spear=0.7538 eval_top10=0.1850
+epoch=8 train_loss=0.051575 train_mse=0.0420 train_mae=0.1213 train_spear=0.7556 eval_mse=0.0394 eval_mae=0.1298 eval_spear=0.7569 eval_top10=0.1850
+epoch=9 train_loss=0.051109 train_mse=0.0417 train_mae=0.1205 train_spear=0.7328 eval_mse=0.0389 eval_mae=0.1288 eval_spear=0.7602 eval_top10=0.1850
+epoch=10 train_loss=0.050384 train_mse=0.0414 train_mae=0.1200 train_spear=0.7364 eval_mse=0.0385 eval_mae=0.1278 eval_spear=0.7582 eval_top10=0.1850
+Saved checkpoints to /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/math500/mean_relative_length/ensemble/seed_2
+$ python3 /home/murphy/projects/worktrees/cot-loop-prompt-profile-natural-rerun/scripts/train_probe.py --data-dir /data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/math500/shared_archive --out-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/math500/mean_relative_length/last_layer/seed_0 --probe-preset mlp --epochs 10 --batch-size 256 --lr 0.0001 --weight-decay 0.1 --num-workers 8 --device auto --seed 0 --eval-every 1 --log-every 5 --wandb-project cot-loop-probe --wandb-run-name math500-mean_relative_length-last_layer-seed0 --classifier-mode last_layer --classifier-layer -1
+epoch=1 train_loss=0.101159 train_mse=0.1012 train_mae=0.2866 train_spear=-0.0415 eval_mse=0.0360 eval_mae=0.1269 eval_spear=-0.3300 eval_top10=0.0477
+epoch=2 train_loss=0.045039 train_mse=0.0450 train_mae=0.1348 train_spear=-0.0451 eval_mse=0.0603 eval_mae=0.1832 eval_spear=-0.2859 eval_top10=0.0801
+epoch=3 train_loss=0.062629 train_mse=0.0626 train_mae=0.1714 train_spear=-0.1224 eval_mse=0.0655 eval_mae=0.1972 eval_spear=-0.2062 eval_top10=0.0916
+epoch=4 train_loss=0.066493 train_mse=0.0665 train_mae=0.1835 train_spear=-0.0037 eval_mse=0.0667 eval_mae=0.2002 eval_spear=-0.1302 eval_top10=0.1022
+epoch=5 train_loss=0.067162 train_mse=0.0672 train_mae=0.1850 train_spear=-0.0432 eval_mse=0.0666 eval_mae=0.2002 eval_spear=-0.0839 eval_top10=0.1082
+epoch=6 train_loss=0.067396 train_mse=0.0674 train_mae=0.1853 train_spear=-0.1134 eval_mse=0.0661 eval_mae=0.1988 eval_spear=-0.0548 eval_top10=0.1082
+epoch=7 train_loss=0.066750 train_mse=0.0667 train_mae=0.1837 train_spear=-0.0809 eval_mse=0.0652 eval_mae=0.1967 eval_spear=-0.0396 eval_top10=0.1083
+epoch=8 train_loss=0.065592 train_mse=0.0656 train_mae=0.1809 train_spear=0.0229 eval_mse=0.0643 eval_mae=0.1942 eval_spear=-0.0254 eval_top10=0.1083
+epoch=9 train_loss=0.064856 train_mse=0.0649 train_mae=0.1787 train_spear=0.0290 eval_mse=0.0632 eval_mae=0.1916 eval_spear=-0.0066 eval_top10=0.1083
+epoch=10 train_loss=0.063772 train_mse=0.0638 train_mae=0.1758 train_spear=-0.0357 eval_mse=0.0621 eval_mae=0.1886 eval_spear=0.0113 eval_top10=0.1160
+Saved checkpoints to /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/math500/mean_relative_length/last_layer/seed_0
+$ python3 /home/murphy/projects/worktrees/cot-loop-prompt-profile-natural-rerun/scripts/train_probe.py --data-dir /data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/math500/shared_archive --out-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/math500/mean_relative_length/last_layer/seed_1 --probe-preset mlp --epochs 10 --batch-size 256 --lr 0.0001 --weight-decay 0.1 --num-workers 8 --device auto --seed 1 --eval-every 1 --log-every 5 --wandb-project cot-loop-probe --wandb-run-name math500-mean_relative_length-last_layer-seed1 --classifier-mode last_layer --classifier-layer -1
+epoch=1 train_loss=0.150486 train_mse=0.1505 train_mae=0.3586 train_spear=-0.0031 eval_mse=0.0274 eval_mae=0.1361 eval_spear=0.0057 eval_top10=0.0992
+epoch=2 train_loss=0.036981 train_mse=0.0370 train_mae=0.1427 train_spear=0.0763 eval_mse=0.0417 eval_mae=0.1350 eval_spear=0.0647 eval_top10=0.0994
+epoch=3 train_loss=0.046932 train_mse=0.0469 train_mae=0.1316 train_spear=-0.0226 eval_mse=0.0498 eval_mae=0.1539 eval_spear=0.1455 eval_top10=0.1078
+epoch=4 train_loss=0.052179 train_mse=0.0522 train_mae=0.1436 train_spear=0.0114 eval_mse=0.0498 eval_mae=0.1541 eval_spear=0.2052 eval_top10=0.1290
+epoch=5 train_loss=0.051774 train_mse=0.0518 train_mae=0.1421 train_spear=-0.0156 eval_mse=0.0458 eval_mae=0.1440 eval_spear=0.2406 eval_top10=0.1349
+epoch=6 train_loss=0.047050 train_mse=0.0470 train_mae=0.1336 train_spear=0.0662 eval_mse=0.0395 eval_mae=0.1308 eval_spear=0.2469 eval_top10=0.1617
+epoch=7 train_loss=0.041454 train_mse=0.0415 train_mae=0.1242 train_spear=0.1142 eval_mse=0.0331 eval_mae=0.1207 eval_spear=0.2591 eval_top10=0.1617
+epoch=8 train_loss=0.037755 train_mse=0.0378 train_mae=0.1243 train_spear=0.0983 eval_mse=0.0286 eval_mae=0.1179 eval_spear=0.2739 eval_top10=0.1617
+epoch=9 train_loss=0.034706 train_mse=0.0347 train_mae=0.1298 train_spear=0.0883 eval_mse=0.0264 eval_mae=0.1193 eval_spear=0.3095 eval_top10=0.1617
+epoch=10 train_loss=0.035132 train_mse=0.0351 train_mae=0.1374 train_spear=0.0309 eval_mse=0.0258 eval_mae=0.1244 eval_spear=0.3499 eval_top10=0.1617
+Saved checkpoints to /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/math500/mean_relative_length/last_layer/seed_1
+$ python3 /home/murphy/projects/worktrees/cot-loop-prompt-profile-natural-rerun/scripts/train_probe.py --data-dir /data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/math500/shared_archive --out-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/math500/mean_relative_length/last_layer/seed_2 --probe-preset mlp --epochs 10 --batch-size 256 --lr 0.0001 --weight-decay 0.1 --num-workers 8 --device auto --seed 2 --eval-every 1 --log-every 5 --wandb-project cot-loop-probe --wandb-run-name math500-mean_relative_length-last_layer-seed2 --classifier-mode last_layer --classifier-layer -1
+epoch=1 train_loss=0.071570 train_mse=0.0716 train_mae=0.2382 train_spear=0.0759 eval_mse=0.0354 eval_mae=0.1243 eval_spear=0.3571 eval_top10=0.1537
+epoch=2 train_loss=0.042490 train_mse=0.0425 train_mae=0.1276 train_spear=0.1131 eval_mse=0.0554 eval_mae=0.1709 eval_spear=0.3909 eval_top10=0.1558
+epoch=3 train_loss=0.057673 train_mse=0.0577 train_mae=0.1590 train_spear=0.0945 eval_mse=0.0586 eval_mae=0.1799 eval_spear=0.4055 eval_top10=0.1413
+epoch=4 train_loss=0.059359 train_mse=0.0594 train_mae=0.1644 train_spear=0.1450 eval_mse=0.0568 eval_mae=0.1751 eval_spear=0.4050 eval_top10=0.1509
+epoch=5 train_loss=0.056722 train_mse=0.0567 train_mae=0.1571 train_spear=0.0946 eval_mse=0.0517 eval_mae=0.1608 eval_spear=0.4126 eval_top10=0.1443
+epoch=6 train_loss=0.051921 train_mse=0.0519 train_mae=0.1441 train_spear=0.1249 eval_mse=0.0441 eval_mae=0.1403 eval_spear=0.4184 eval_top10=0.1428
+epoch=7 train_loss=0.045081 train_mse=0.0451 train_mae=0.1301 train_spear=0.1249 eval_mse=0.0357 eval_mae=0.1240 eval_spear=0.4261 eval_top10=0.1428
+epoch=8 train_loss=0.037267 train_mse=0.0373 train_mae=0.1209 train_spear=0.1892 eval_mse=0.0289 eval_mae=0.1151 eval_spear=0.4392 eval_top10=0.1428
+epoch=9 train_loss=0.032873 train_mse=0.0329 train_mae=0.1226 train_spear=0.2159 eval_mse=0.0254 eval_mae=0.1154 eval_spear=0.4442 eval_top10=0.1413
+epoch=10 train_loss=0.030765 train_mse=0.0308 train_mae=0.1312 train_spear=0.2439 eval_mse=0.0246 eval_mae=0.1219 eval_spear=0.4555 eval_top10=0.1413
+Saved checkpoints to /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/math500/mean_relative_length/last_layer/seed_2
+$ python3 /home/murphy/projects/worktrees/cot-loop-prompt-profile-natural-rerun/scripts/train_probe.py --data-dir /data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/mmlu_pro/shared_archive --out-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/mmlu_pro/mean_relative_length/ensemble/seed_0 --probe-preset mlp --epochs 10 --batch-size 256 --lr 0.0001 --weight-decay 0.1 --num-workers 8 --device auto --seed 0 --eval-every 1 --log-every 5 --wandb-project cot-loop-probe --wandb-run-name mmlu_pro-mean_relative_length-ensemble-seed0 --classifier-mode ensemble --score-rule mean_prob
+epoch=1 train_loss=0.119578 train_mse=0.0664 train_mae=0.2339 train_spear=0.0180 eval_mse=0.0205 eval_mae=0.1226 eval_spear=0.3586 eval_top10=0.1702
+epoch=2 train_loss=0.044487 train_mse=0.0195 train_mae=0.1168 train_spear=0.1103 eval_mse=0.0178 eval_mae=0.0928 eval_spear=0.3877 eval_top10=0.1839
+epoch=3 train_loss=0.033625 train_mse=0.0185 train_mae=0.0940 train_spear=0.1168 eval_mse=0.0198 eval_mae=0.0894 eval_spear=0.3854 eval_top10=0.1886
+epoch=4 train_loss=0.030830 train_mse=0.0201 train_mae=0.0897 train_spear=0.2336 eval_mse=0.0213 eval_mae=0.0903 eval_spear=0.3325 eval_top10=0.1944
+epoch=5 train_loss=0.029373 train_mse=0.0217 train_mae=0.0893 train_spear=0.2416 eval_mse=0.0220 eval_mae=0.0907 eval_spear=0.3603 eval_top10=0.1944
+epoch=6 train_loss=0.028699 train_mse=0.0223 train_mae=0.0894 train_spear=0.2523 eval_mse=0.0228 eval_mae=0.0915 eval_spear=0.3670 eval_top10=0.1944
+epoch=7 train_loss=0.028186 train_mse=0.0231 train_mae=0.0898 train_spear=0.2902 eval_mse=0.0233 eval_mae=0.0920 eval_spear=0.3635 eval_top10=0.1949
+epoch=8 train_loss=0.027916 train_mse=0.0234 train_mae=0.0901 train_spear=0.3596 eval_mse=0.0234 eval_mae=0.0922 eval_spear=0.3771 eval_top10=0.1944
+epoch=9 train_loss=0.027677 train_mse=0.0235 train_mae=0.0902 train_spear=0.3721 eval_mse=0.0234 eval_mae=0.0922 eval_spear=0.3933 eval_top10=0.1944
+epoch=10 train_loss=0.027501 train_mse=0.0235 train_mae=0.0902 train_spear=0.3805 eval_mse=0.0233 eval_mae=0.0921 eval_spear=0.4082 eval_top10=0.2198
+Saved checkpoints to /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/mmlu_pro/mean_relative_length/ensemble/seed_0
+$ python3 /home/murphy/projects/worktrees/cot-loop-prompt-profile-natural-rerun/scripts/train_probe.py --data-dir /data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/mmlu_pro/shared_archive --out-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/mmlu_pro/mean_relative_length/ensemble/seed_1 --probe-preset mlp --epochs 10 --batch-size 256 --lr 0.0001 --weight-decay 0.1 --num-workers 8 --device auto --seed 1 --eval-every 1 --log-every 5 --wandb-project cot-loop-probe --wandb-run-name mmlu_pro-mean_relative_length-ensemble-seed1 --classifier-mode ensemble --score-rule mean_prob
+epoch=1 train_loss=0.164522 train_mse=0.1046 train_mae=0.2966 train_spear=-0.0778 eval_mse=0.0208 eval_mae=0.1238 eval_spear=0.3587 eval_top10=0.2482
+epoch=2 train_loss=0.046024 train_mse=0.0199 train_mae=0.1172 train_spear=0.0915 eval_mse=0.0178 eval_mae=0.0933 eval_spear=0.3240 eval_top10=0.2262
+epoch=3 train_loss=0.035686 train_mse=0.0187 train_mae=0.0946 train_spear=0.0794 eval_mse=0.0197 eval_mae=0.0895 eval_spear=0.3075 eval_top10=0.1760
+epoch=4 train_loss=0.032695 train_mse=0.0204 train_mae=0.0900 train_spear=0.0914 eval_mse=0.0212 eval_mae=0.0902 eval_spear=0.3083 eval_top10=0.1760
+epoch=5 train_loss=0.031083 train_mse=0.0217 train_mae=0.0894 train_spear=0.1785 eval_mse=0.0221 eval_mae=0.0909 eval_spear=0.3202 eval_top10=0.2043
+epoch=6 train_loss=0.030084 train_mse=0.0224 train_mae=0.0894 train_spear=0.3164 eval_mse=0.0226 eval_mae=0.0913 eval_spear=0.3288 eval_top10=0.2194
+epoch=7 train_loss=0.029430 train_mse=0.0228 train_mae=0.0897 train_spear=0.3077 eval_mse=0.0228 eval_mae=0.0916 eval_spear=0.3437 eval_top10=0.2194
+epoch=8 train_loss=0.028942 train_mse=0.0230 train_mae=0.0897 train_spear=0.3647 eval_mse=0.0229 eval_mae=0.0916 eval_spear=0.3538 eval_top10=0.2194
+epoch=9 train_loss=0.028534 train_mse=0.0230 train_mae=0.0896 train_spear=0.4108 eval_mse=0.0228 eval_mae=0.0915 eval_spear=0.3692 eval_top10=0.2450
+epoch=10 train_loss=0.028255 train_mse=0.0229 train_mae=0.0897 train_spear=0.3289 eval_mse=0.0227 eval_mae=0.0913 eval_spear=0.3817 eval_top10=0.2275
+Saved checkpoints to /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/mmlu_pro/mean_relative_length/ensemble/seed_1
+$ python3 /home/murphy/projects/worktrees/cot-loop-prompt-profile-natural-rerun/scripts/train_probe.py --data-dir /data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/mmlu_pro/shared_archive --out-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/mmlu_pro/mean_relative_length/ensemble/seed_2 --probe-preset mlp --epochs 10 --batch-size 256 --lr 0.0001 --weight-decay 0.1 --num-workers 8 --device auto --seed 2 --eval-every 1 --log-every 5 --wandb-project cot-loop-probe --wandb-run-name mmlu_pro-mean_relative_length-ensemble-seed2 --classifier-mode ensemble --score-rule mean_prob
+epoch=1 train_loss=0.177372 train_mse=0.1109 train_mae=0.3076 train_spear=0.0091 eval_mse=0.0223 eval_mae=0.1298 eval_spear=0.2674 eval_top10=0.1173
+epoch=2 train_loss=0.047571 train_mse=0.0207 train_mae=0.1212 train_spear=0.0829 eval_mse=0.0177 eval_mae=0.0935 eval_spear=0.3332 eval_top10=0.2168
+epoch=3 train_loss=0.034569 train_mse=0.0187 train_mae=0.0944 train_spear=0.1100 eval_mse=0.0199 eval_mae=0.0895 eval_spear=0.3073 eval_top10=0.1787
+epoch=4 train_loss=0.031294 train_mse=0.0206 train_mae=0.0897 train_spear=0.1262 eval_mse=0.0215 eval_mae=0.0904 eval_spear=0.3776 eval_top10=0.2046
+epoch=5 train_loss=0.029818 train_mse=0.0220 train_mae=0.0894 train_spear=0.1726 eval_mse=0.0224 eval_mae=0.0910 eval_spear=0.4614 eval_top10=0.2141
+epoch=6 train_loss=0.028780 train_mse=0.0225 train_mae=0.0890 train_spear=0.4869 eval_mse=0.0224 eval_mae=0.0907 eval_spear=0.4933 eval_top10=0.2265
+epoch=7 train_loss=0.028291 train_mse=0.0225 train_mae=0.0887 train_spear=0.5042 eval_mse=0.0225 eval_mae=0.0906 eval_spear=0.5138 eval_top10=0.2296
+epoch=8 train_loss=0.027965 train_mse=0.0227 train_mae=0.0888 train_spear=0.5070 eval_mse=0.0229 eval_mae=0.0911 eval_spear=0.5238 eval_top10=0.2296
+epoch=9 train_loss=0.027692 train_mse=0.0230 train_mae=0.0891 train_spear=0.5100 eval_mse=0.0231 eval_mae=0.0914 eval_spear=0.5292 eval_top10=0.2542
+epoch=10 train_loss=0.027437 train_mse=0.0232 train_mae=0.0893 train_spear=0.5315 eval_mse=0.0232 eval_mae=0.0915 eval_spear=0.5341 eval_top10=0.2525
+Saved checkpoints to /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/mmlu_pro/mean_relative_length/ensemble/seed_2
+$ python3 /home/murphy/projects/worktrees/cot-loop-prompt-profile-natural-rerun/scripts/train_probe.py --data-dir /data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/mmlu_pro/shared_archive --out-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/mmlu_pro/mean_relative_length/last_layer/seed_0 --probe-preset mlp --epochs 10 --batch-size 256 --lr 0.0001 --weight-decay 0.1 --num-workers 8 --device auto --seed 0 --eval-every 1 --log-every 5 --wandb-project cot-loop-probe --wandb-run-name mmlu_pro-mean_relative_length-last_layer-seed0 --classifier-mode last_layer --classifier-layer -1
+epoch=1 train_loss=0.103889 train_mse=0.1039 train_mae=0.2882 train_spear=-0.0329 eval_mse=0.0195 eval_mae=0.0903 eval_spear=-0.1630 eval_top10=0.0549
+epoch=2 train_loss=0.023301 train_mse=0.0233 train_mae=0.0948 train_spear=0.0323 eval_mse=0.0296 eval_mae=0.1100 eval_spear=-0.1705 eval_top10=0.0623
+epoch=3 train_loss=0.030161 train_mse=0.0302 train_mae=0.1097 train_spear=-0.0243 eval_mse=0.0312 eval_mae=0.1169 eval_spear=-0.1398 eval_top10=0.0773
+epoch=4 train_loss=0.031248 train_mse=0.0312 train_mae=0.1145 train_spear=-0.0202 eval_mse=0.0316 eval_mae=0.1186 eval_spear=-0.1337 eval_top10=0.0878
+epoch=5 train_loss=0.031547 train_mse=0.0315 train_mae=0.1159 train_spear=-0.0096 eval_mse=0.0317 eval_mae=0.1192 eval_spear=-0.1266 eval_top10=0.0878
+epoch=6 train_loss=0.031678 train_mse=0.0317 train_mae=0.1164 train_spear=-0.0382 eval_mse=0.0318 eval_mae=0.1194 eval_spear=-0.1235 eval_top10=0.0870
+epoch=7 train_loss=0.031701 train_mse=0.0317 train_mae=0.1165 train_spear=-0.0756 eval_mse=0.0318 eval_mae=0.1195 eval_spear=-0.1200 eval_top10=0.0870
+epoch=8 train_loss=0.031673 train_mse=0.0317 train_mae=0.1164 train_spear=0.0393 eval_mse=0.0318 eval_mae=0.1195 eval_spear=-0.1192 eval_top10=0.0870
+epoch=9 train_loss=0.031684 train_mse=0.0317 train_mae=0.1165 train_spear=-0.0138 eval_mse=0.0318 eval_mae=0.1195 eval_spear=-0.1173 eval_top10=0.0870
+epoch=10 train_loss=0.031671 train_mse=0.0317 train_mae=0.1165 train_spear=0.0153 eval_mse=0.0318 eval_mae=0.1194 eval_spear=-0.1157 eval_top10=0.0870
+Saved checkpoints to /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/mmlu_pro/mean_relative_length/last_layer/seed_0
+$ python3 /home/murphy/projects/worktrees/cot-loop-prompt-profile-natural-rerun/scripts/train_probe.py --data-dir /data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/mmlu_pro/shared_archive --out-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/mmlu_pro/mean_relative_length/last_layer/seed_1 --probe-preset mlp --epochs 10 --batch-size 256 --lr 0.0001 --weight-decay 0.1 --num-workers 8 --device auto --seed 1 --eval-every 1 --log-every 5 --wandb-project cot-loop-probe --wandb-run-name mmlu_pro-mean_relative_length-last_layer-seed1 --classifier-mode last_layer --classifier-layer -1
+epoch=1 train_loss=0.191989 train_mse=0.1920 train_mae=0.4100 train_spear=0.0157 eval_mse=0.0228 eval_mae=0.1312 eval_spear=0.1265 eval_top10=0.0777
+epoch=2 train_loss=0.019954 train_mse=0.0200 train_mae=0.1096 train_spear=0.1383 eval_mse=0.0230 eval_mae=0.0916 eval_spear=0.2251 eval_top10=0.1531
+epoch=3 train_loss=0.024399 train_mse=0.0244 train_mae=0.0934 train_spear=0.0064 eval_mse=0.0263 eval_mae=0.0985 eval_spear=0.2407 eval_top10=0.1423
+epoch=4 train_loss=0.026291 train_mse=0.0263 train_mae=0.0963 train_spear=0.1278 eval_mse=0.0266 eval_mae=0.0993 eval_spear=0.2386 eval_top10=0.1345
+epoch=5 train_loss=0.026351 train_mse=0.0264 train_mae=0.0973 train_spear=0.0115 eval_mse=0.0256 eval_mae=0.0965 eval_spear=0.2510 eval_top10=0.1345
+epoch=6 train_loss=0.025201 train_mse=0.0252 train_mae=0.0940 train_spear=0.0301 eval_mse=0.0239 eval_mae=0.0930 eval_spear=0.2682 eval_top10=0.1501
+epoch=7 train_loss=0.023143 train_mse=0.0231 train_mae=0.0905 train_spear=0.1137 eval_mse=0.0218 eval_mae=0.0905 eval_spear=0.2839 eval_top10=0.1651
+epoch=8 train_loss=0.021821 train_mse=0.0218 train_mae=0.0910 train_spear=0.0668 eval_mse=0.0200 eval_mae=0.0891 eval_spear=0.2947 eval_top10=0.1651
+epoch=9 train_loss=0.020075 train_mse=0.0201 train_mae=0.0926 train_spear=0.0672 eval_mse=0.0186 eval_mae=0.0890 eval_spear=0.3077 eval_top10=0.1651
+epoch=10 train_loss=0.019049 train_mse=0.0190 train_mae=0.0923 train_spear=0.1132 eval_mse=0.0176 eval_mae=0.0907 eval_spear=0.3184 eval_top10=0.1651
+Saved checkpoints to /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/mmlu_pro/mean_relative_length/last_layer/seed_1
+$ python3 /home/murphy/projects/worktrees/cot-loop-prompt-profile-natural-rerun/scripts/train_probe.py --data-dir /data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/mmlu_pro/shared_archive --out-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/mmlu_pro/mean_relative_length/last_layer/seed_2 --probe-preset mlp --epochs 10 --batch-size 256 --lr 0.0001 --weight-decay 0.1 --num-workers 8 --device auto --seed 2 --eval-every 1 --log-every 5 --wandb-project cot-loop-probe --wandb-run-name mmlu_pro-mean_relative_length-last_layer-seed2 --classifier-mode last_layer --classifier-layer -1
+epoch=1 train_loss=0.083198 train_mse=0.0832 train_mae=0.2551 train_spear=-0.0077 eval_mse=0.0201 eval_mae=0.0912 eval_spear=-0.2127 eval_top10=0.0609
+epoch=2 train_loss=0.024067 train_mse=0.0241 train_mae=0.0960 train_spear=-0.0842 eval_mse=0.0294 eval_mae=0.1088 eval_spear=-0.3160 eval_top10=0.0601
+epoch=3 train_loss=0.029742 train_mse=0.0297 train_mae=0.1079 train_spear=-0.0324 eval_mse=0.0308 eval_mae=0.1152 eval_spear=-0.3315 eval_top10=0.0602
+epoch=4 train_loss=0.030759 train_mse=0.0308 train_mae=0.1123 train_spear=-0.0520 eval_mse=0.0311 eval_mae=0.1164 eval_spear=-0.3131 eval_top10=0.0546
+epoch=5 train_loss=0.030977 train_mse=0.0310 train_mae=0.1133 train_spear=-0.0325 eval_mse=0.0310 eval_mae=0.1162 eval_spear=-0.2960 eval_top10=0.0559
+epoch=6 train_loss=0.030810 train_mse=0.0308 train_mae=0.1126 train_spear=-0.0876 eval_mse=0.0308 eval_mae=0.1153 eval_spear=-0.2762 eval_top10=0.0563
+epoch=7 train_loss=0.030608 train_mse=0.0306 train_mae=0.1116 train_spear=-0.0822 eval_mse=0.0306 eval_mae=0.1141 eval_spear=-0.2599 eval_top10=0.0611
+epoch=8 train_loss=0.030173 train_mse=0.0302 train_mae=0.1100 train_spear=0.0149 eval_mse=0.0302 eval_mae=0.1125 eval_spear=-0.2478 eval_top10=0.0760
+epoch=9 train_loss=0.029974 train_mse=0.0300 train_mae=0.1089 train_spear=-0.0884 eval_mse=0.0298 eval_mae=0.1107 eval_spear=-0.2327 eval_top10=0.0760
+epoch=10 train_loss=0.029461 train_mse=0.0295 train_mae=0.1067 train_spear=-0.0423 eval_mse=0.0293 eval_mae=0.1086 eval_spear=-0.2225 eval_top10=0.0760
+Saved checkpoints to /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/mmlu_pro/mean_relative_length/last_layer/seed_2
+$ python3 /home/murphy/projects/worktrees/cot-loop-prompt-profile-natural-rerun/scripts/train_probe.py --data-dir /data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/livecodebench/shared_archive --out-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/livecodebench/mean_relative_length/ensemble/seed_0 --probe-preset mlp --epochs 10 --batch-size 256 --lr 0.0001 --weight-decay 0.1 --num-workers 8 --device auto --seed 0 --eval-every 1 --log-every 5 --wandb-project cot-loop-probe --wandb-run-name livecodebench-mean_relative_length-ensemble-seed0 --classifier-mode ensemble --score-rule mean_prob
+epoch=1 train_loss=0.134972 train_mse=0.0797 train_mae=0.2495 train_spear=0.1100 eval_mse=0.0898 eval_mae=0.2527 eval_spear=0.7822 eval_top10=0.1630
+epoch=2 train_loss=0.120805 train_mse=0.0824 train_mae=0.2335 train_spear=0.5489 eval_mse=0.1005 eval_mae=0.2516 eval_spear=0.8025 eval_top10=0.1688
+epoch=3 train_loss=0.114488 train_mse=0.0859 train_mae=0.2275 train_spear=0.7606 eval_mse=0.0814 eval_mae=0.2327 eval_spear=0.8094 eval_top10=0.1727
+epoch=4 train_loss=0.110314 train_mse=0.0710 train_mae=0.2155 train_spear=0.7597 eval_mse=0.0737 eval_mae=0.2254 eval_spear=0.8083 eval_top10=0.1721
+epoch=5 train_loss=0.110202 train_mse=0.0679 train_mae=0.2136 train_spear=0.7633 eval_mse=0.0754 eval_mae=0.2250 eval_spear=0.8049 eval_top10=0.1721
+epoch=6 train_loss=0.106997 train_mse=0.0686 train_mae=0.2110 train_spear=0.7752 eval_mse=0.0755 eval_mae=0.2228 eval_spear=0.8060 eval_top10=0.1721
+epoch=7 train_loss=0.105888 train_mse=0.0676 train_mae=0.2093 train_spear=0.7560 eval_mse=0.0737 eval_mae=0.2196 eval_spear=0.8010 eval_top10=0.1780
+epoch=8 train_loss=0.104459 train_mse=0.0661 train_mae=0.2067 train_spear=0.7657 eval_mse=0.0759 eval_mae=0.2223 eval_spear=0.8042 eval_top10=0.1721
+epoch=9 train_loss=0.104287 train_mse=0.0689 train_mae=0.2078 train_spear=0.7677 eval_mse=0.0755 eval_mae=0.2220 eval_spear=0.8046 eval_top10=0.1721
+epoch=10 train_loss=0.103166 train_mse=0.0670 train_mae=0.2058 train_spear=0.7669 eval_mse=0.0684 eval_mae=0.2134 eval_spear=0.8032 eval_top10=0.1650
+Saved checkpoints to /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/livecodebench/mean_relative_length/ensemble/seed_0
+$ python3 /home/murphy/projects/worktrees/cot-loop-prompt-profile-natural-rerun/scripts/train_probe.py --data-dir /data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/livecodebench/shared_archive --out-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/livecodebench/mean_relative_length/ensemble/seed_1 --probe-preset mlp --epochs 10 --batch-size 256 --lr 0.0001 --weight-decay 0.1 --num-workers 8 --device auto --seed 1 --eval-every 1 --log-every 5 --wandb-project cot-loop-probe --wandb-run-name livecodebench-mean_relative_length-ensemble-seed1 --classifier-mode ensemble --score-rule mean_prob
+epoch=1 train_loss=0.145394 train_mse=0.0858 train_mae=0.2581 train_spear=-0.0060 eval_mse=0.1138 eval_mae=0.2725 eval_spear=0.7732 eval_top10=0.1642
+epoch=2 train_loss=0.128394 train_mse=0.0965 train_mae=0.2450 train_spear=0.4036 eval_mse=0.0995 eval_mae=0.2552 eval_spear=0.7955 eval_top10=0.1689
+epoch=3 train_loss=0.121405 train_mse=0.0872 train_mae=0.2328 train_spear=0.7003 eval_mse=0.0902 eval_mae=0.2441 eval_spear=0.8040 eval_top10=0.1689
+epoch=4 train_loss=0.111469 train_mse=0.0731 train_mae=0.2197 train_spear=0.6700 eval_mse=0.0691 eval_mae=0.2206 eval_spear=0.8098 eval_top10=0.1709
+epoch=5 train_loss=0.109863 train_mse=0.0680 train_mae=0.2152 train_spear=0.7280 eval_mse=0.0784 eval_mae=0.2293 eval_spear=0.8069 eval_top10=0.1689
+epoch=6 train_loss=0.108416 train_mse=0.0713 train_mae=0.2150 train_spear=0.7532 eval_mse=0.0773 eval_mae=0.2264 eval_spear=0.8082 eval_top10=0.1656
+epoch=7 train_loss=0.106797 train_mse=0.0707 train_mae=0.2121 train_spear=0.7535 eval_mse=0.0754 eval_mae=0.2221 eval_spear=0.8059 eval_top10=0.1717
+epoch=8 train_loss=0.104183 train_mse=0.0672 train_mae=0.2064 train_spear=0.7561 eval_mse=0.0682 eval_mae=0.2129 eval_spear=0.8116 eval_top10=0.1695
+epoch=9 train_loss=0.103448 train_mse=0.0641 train_mae=0.2037 train_spear=0.7561 eval_mse=0.0689 eval_mae=0.2140 eval_spear=0.8071 eval_top10=0.1717
+epoch=10 train_loss=0.101422 train_mse=0.0632 train_mae=0.2026 train_spear=0.7540 eval_mse=0.0647 eval_mae=0.2100 eval_spear=0.8057 eval_top10=0.1721
+Saved checkpoints to /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/livecodebench/mean_relative_length/ensemble/seed_1
+$ python3 /home/murphy/projects/worktrees/cot-loop-prompt-profile-natural-rerun/scripts/train_probe.py --data-dir /data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/livecodebench/shared_archive --out-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/livecodebench/mean_relative_length/ensemble/seed_2 --probe-preset mlp --epochs 10 --batch-size 256 --lr 0.0001 --weight-decay 0.1 --num-workers 8 --device auto --seed 2 --eval-every 1 --log-every 5 --wandb-project cot-loop-probe --wandb-run-name livecodebench-mean_relative_length-ensemble-seed2 --classifier-mode ensemble --score-rule mean_prob
+epoch=1 train_loss=0.148418 train_mse=0.0877 train_mae=0.2628 train_spear=0.0134 eval_mse=0.0956 eval_mae=0.2564 eval_spear=0.7703 eval_top10=0.1666
+epoch=2 train_loss=0.122301 train_mse=0.0818 train_mae=0.2336 train_spear=0.5545 eval_mse=0.1016 eval_mae=0.2541 eval_spear=0.8058 eval_top10=0.1759
+epoch=3 train_loss=0.115191 train_mse=0.0829 train_mae=0.2274 train_spear=0.6539 eval_mse=0.0758 eval_mae=0.2266 eval_spear=0.7994 eval_top10=0.1692
+epoch=4 train_loss=0.103497 train_mse=0.0652 train_mae=0.2108 train_spear=0.7322 eval_mse=0.0597 eval_mae=0.2061 eval_spear=0.8032 eval_top10=0.1741
+epoch=5 train_loss=0.096541 train_mse=0.0580 train_mae=0.2017 train_spear=0.7423 eval_mse=0.0596 eval_mae=0.2042 eval_spear=0.8042 eval_top10=0.1716
+epoch=6 train_loss=0.094331 train_mse=0.0563 train_mae=0.1978 train_spear=0.7613 eval_mse=0.0551 eval_mae=0.1944 eval_spear=0.8071 eval_top10=0.1720
+epoch=7 train_loss=0.092068 train_mse=0.0555 train_mae=0.1937 train_spear=0.7558 eval_mse=0.0601 eval_mae=0.2004 eval_spear=0.8064 eval_top10=0.1716
+epoch=8 train_loss=0.090750 train_mse=0.0572 train_mae=0.1935 train_spear=0.7597 eval_mse=0.0551 eval_mae=0.1931 eval_spear=0.8064 eval_top10=0.1720
+epoch=9 train_loss=0.089177 train_mse=0.0535 train_mae=0.1901 train_spear=0.7651 eval_mse=0.0520 eval_mae=0.1888 eval_spear=0.8062 eval_top10=0.1720
+epoch=10 train_loss=0.088374 train_mse=0.0525 train_mae=0.1890 train_spear=0.7641 eval_mse=0.0534 eval_mae=0.1908 eval_spear=0.8070 eval_top10=0.1716
+Saved checkpoints to /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/livecodebench/mean_relative_length/ensemble/seed_2
+$ python3 /home/murphy/projects/worktrees/cot-loop-prompt-profile-natural-rerun/scripts/train_probe.py --data-dir /data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/livecodebench/shared_archive --out-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/livecodebench/mean_relative_length/last_layer/seed_0 --probe-preset mlp --epochs 10 --batch-size 256 --lr 0.0001 --weight-decay 0.1 --num-workers 8 --device auto --seed 0 --eval-every 1 --log-every 5 --wandb-project cot-loop-probe --wandb-run-name livecodebench-mean_relative_length-last_layer-seed0 --classifier-mode last_layer --classifier-layer -1
+epoch=1 train_loss=0.096030 train_mse=0.0960 train_mae=0.2695 train_spear=-0.0144 eval_mse=0.1168 eval_mae=0.2761 eval_spear=0.3345 eval_top10=0.1572
+epoch=2 train_loss=0.092939 train_mse=0.0929 train_mae=0.2459 train_spear=0.1186 eval_mse=0.0815 eval_mae=0.2554 eval_spear=0.6527 eval_top10=0.1538
+epoch=3 train_loss=0.085064 train_mse=0.0851 train_mae=0.2580 train_spear=0.2824 eval_mse=0.0737 eval_mae=0.2396 eval_spear=0.7247 eval_top10=0.1583
+epoch=4 train_loss=0.076556 train_mse=0.0766 train_mae=0.2352 train_spear=0.3175 eval_mse=0.0787 eval_mae=0.2376 eval_spear=0.7558 eval_top10=0.1583
+epoch=5 train_loss=0.073207 train_mse=0.0732 train_mae=0.2302 train_spear=0.3928 eval_mse=0.0649 eval_mae=0.2281 eval_spear=0.7617 eval_top10=0.1583
+epoch=6 train_loss=0.066773 train_mse=0.0668 train_mae=0.2292 train_spear=0.5569 eval_mse=0.0625 eval_mae=0.2241 eval_spear=0.7660 eval_top10=0.1495
+epoch=7 train_loss=0.064481 train_mse=0.0645 train_mae=0.2239 train_spear=0.5576 eval_mse=0.0618 eval_mae=0.2182 eval_spear=0.7720 eval_top10=0.1572
+epoch=8 train_loss=0.062960 train_mse=0.0630 train_mae=0.2153 train_spear=0.5887 eval_mse=0.0626 eval_mae=0.2160 eval_spear=0.7752 eval_top10=0.1576
+epoch=9 train_loss=0.061917 train_mse=0.0619 train_mae=0.2122 train_spear=0.6011 eval_mse=0.0589 eval_mae=0.2130 eval_spear=0.7787 eval_top10=0.1568
+epoch=10 train_loss=0.060564 train_mse=0.0606 train_mae=0.2122 train_spear=0.6164 eval_mse=0.0566 eval_mae=0.2112 eval_spear=0.7807 eval_top10=0.1568
+Saved checkpoints to /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/livecodebench/mean_relative_length/last_layer/seed_0
+$ python3 /home/murphy/projects/worktrees/cot-loop-prompt-profile-natural-rerun/scripts/train_probe.py --data-dir /data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/livecodebench/shared_archive --out-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/livecodebench/mean_relative_length/last_layer/seed_1 --probe-preset mlp --epochs 10 --batch-size 256 --lr 0.0001 --weight-decay 0.1 --num-workers 8 --device auto --seed 1 --eval-every 1 --log-every 5 --wandb-project cot-loop-probe --wandb-run-name livecodebench-mean_relative_length-last_layer-seed1 --classifier-mode last_layer --classifier-layer -1
+epoch=1 train_loss=0.095114 train_mse=0.0951 train_mae=0.2647 train_spear=0.1184 eval_mse=0.1211 eval_mae=0.2789 eval_spear=0.4919 eval_top10=0.1487
+epoch=2 train_loss=0.104375 train_mse=0.1044 train_mae=0.2538 train_spear=0.1335 eval_mse=0.0891 eval_mae=0.2538 eval_spear=0.7294 eval_top10=0.1612
+epoch=3 train_loss=0.079770 train_mse=0.0798 train_mae=0.2450 train_spear=0.1933 eval_mse=0.0823 eval_mae=0.2550 eval_spear=0.7746 eval_top10=0.1671
+epoch=4 train_loss=0.082406 train_mse=0.0824 train_mae=0.2554 train_spear=0.3602 eval_mse=0.0753 eval_mae=0.2417 eval_spear=0.7856 eval_top10=0.1708
+epoch=5 train_loss=0.077163 train_mse=0.0772 train_mae=0.2361 train_spear=0.3018 eval_mse=0.0847 eval_mae=0.2447 eval_spear=0.7895 eval_top10=0.1708
+epoch=6 train_loss=0.075268 train_mse=0.0753 train_mae=0.2309 train_spear=0.4395 eval_mse=0.0730 eval_mae=0.2356 eval_spear=0.7906 eval_top10=0.1609
+epoch=7 train_loss=0.067296 train_mse=0.0673 train_mae=0.2264 train_spear=0.5436 eval_mse=0.0670 eval_mae=0.2312 eval_spear=0.7915 eval_top10=0.1650
+epoch=8 train_loss=0.070595 train_mse=0.0706 train_mae=0.2358 train_spear=0.4974 eval_mse=0.0663 eval_mae=0.2308 eval_spear=0.7899 eval_top10=0.1563
+epoch=9 train_loss=0.069791 train_mse=0.0698 train_mae=0.2359 train_spear=0.5359 eval_mse=0.0650 eval_mae=0.2274 eval_spear=0.7908 eval_top10=0.1563
+epoch=10 train_loss=0.066541 train_mse=0.0665 train_mae=0.2278 train_spear=0.5648 eval_mse=0.0652 eval_mae=0.2259 eval_spear=0.7925 eval_top10=0.1563
+Saved checkpoints to /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/livecodebench/mean_relative_length/last_layer/seed_1
+$ python3 /home/murphy/projects/worktrees/cot-loop-prompt-profile-natural-rerun/scripts/train_probe.py --data-dir /data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404/livecodebench/shared_archive --out-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/livecodebench/mean_relative_length/last_layer/seed_2 --probe-preset mlp --epochs 10 --batch-size 256 --lr 0.0001 --weight-decay 0.1 --num-workers 8 --device auto --seed 2 --eval-every 1 --log-every 5 --wandb-project cot-loop-probe --wandb-run-name livecodebench-mean_relative_length-last_layer-seed2 --classifier-mode last_layer --classifier-layer -1
+epoch=1 train_loss=0.091501 train_mse=0.0915 train_mae=0.2626 train_spear=0.0167 eval_mse=0.1057 eval_mae=0.2681 eval_spear=0.4598 eval_top10=0.1445
+epoch=2 train_loss=0.084324 train_mse=0.0843 train_mae=0.2468 train_spear=0.1333 eval_mse=0.0813 eval_mae=0.2543 eval_spear=0.7074 eval_top10=0.1449
+epoch=3 train_loss=0.079893 train_mse=0.0799 train_mae=0.2482 train_spear=0.2620 eval_mse=0.0789 eval_mae=0.2409 eval_spear=0.7415 eval_top10=0.1447
+epoch=4 train_loss=0.073355 train_mse=0.0734 train_mae=0.2272 train_spear=0.4168 eval_mse=0.0686 eval_mae=0.2308 eval_spear=0.7615 eval_top10=0.1495
+epoch=5 train_loss=0.068391 train_mse=0.0684 train_mae=0.2298 train_spear=0.4689 eval_mse=0.0640 eval_mae=0.2263 eval_spear=0.7722 eval_top10=0.1515
+epoch=6 train_loss=0.067255 train_mse=0.0673 train_mae=0.2286 train_spear=0.5136 eval_mse=0.0628 eval_mae=0.2195 eval_spear=0.7764 eval_top10=0.1539
+epoch=7 train_loss=0.062107 train_mse=0.0621 train_mae=0.2139 train_spear=0.5831 eval_mse=0.0617 eval_mae=0.2156 eval_spear=0.7790 eval_top10=0.1562
+epoch=8 train_loss=0.062389 train_mse=0.0624 train_mae=0.2148 train_spear=0.5749 eval_mse=0.0577 eval_mae=0.2118 eval_spear=0.7790 eval_top10=0.1562
+epoch=9 train_loss=0.060504 train_mse=0.0605 train_mae=0.2158 train_spear=0.6005 eval_mse=0.0557 eval_mae=0.2095 eval_spear=0.7800 eval_top10=0.1562
+epoch=10 train_loss=0.061338 train_mse=0.0613 train_mae=0.2180 train_spear=0.6036 eval_mse=0.0548 eval_mae=0.2072 eval_spear=0.7808 eval_top10=0.1562
+Saved checkpoints to /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/livecodebench/mean_relative_length/last_layer/seed_2
+$ python3 scripts/run_prompt_profile_full_train.py --stage summary --out-root /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405 --summary-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/summary --dataset gpqa aime math500 mmlu_pro livecodebench
+$ /home/murphy/miniforge3/envs/swe311/bin/python3 /home/murphy/projects/worktrees/cot-loop-prompt-profile-natural-rerun/scripts/summarize_prompt_profile_full_train.py --out-root /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405 --summary-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/summary --dataset gpqa --dataset aime --dataset math500 --dataset mmlu_pro --dataset livecodebench
+/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405/summary/cross_dataset_summary.json

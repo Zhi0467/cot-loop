@@ -6,6 +6,8 @@ from torch import nn
 class RolloutConfig:
     model_id: str
     temperature: float = 0.0
+    top_p: float | None = None
+    top_k: int | None = None
     num_generations: int = 1
     max_tokens: int = 30000
     tp: int = 1
@@ -82,6 +84,8 @@ def get_rollout_config(
     *,
     model_id: str | None = None,
     temperature: float | None = None,
+    top_p: float | None = None,
+    top_k: int | None = None,
     num_generations: int | None = None,
     max_tokens: int | None = None,
     tp: int | None = None,
@@ -107,6 +111,10 @@ def get_rollout_config(
         cfg = replace(cfg, model_id=model_id)
     if temperature is not None:
         cfg = replace(cfg, temperature=temperature)
+    if top_p is not None:
+        cfg = replace(cfg, top_p=top_p)
+    if top_k is not None:
+        cfg = replace(cfg, top_k=top_k)
     if num_generations is not None:
         cfg = replace(cfg, num_generations=num_generations)
     if max_tokens is not None:

@@ -1,0 +1,465 @@
+{
+  "binary_data_dir": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced_sampler/livecodebench/majority_s_0.5/data",
+  "dataset": "livecodebench",
+  "dataset_root": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced_sampler/livecodebench",
+  "expected_targets": [
+    "regression"
+  ],
+  "majority_s_0.5": {
+    "metadata_baselines": null,
+    "status": "missing",
+    "views": null
+  },
+  "mean_relative_length": {
+    "data_dir": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced_sampler/livecodebench/shared_archive",
+    "metadata_baselines": {
+      "effective_budget": {
+        "feature_names": [
+          "effective_max_tokens"
+        ],
+        "model_payload": {
+          "coef": [
+            0.0
+          ],
+          "intercept": 0.3760883723958333,
+          "scaler_mean": [
+            30000.0
+          ],
+          "scaler_scale": [
+            1.0
+          ]
+        },
+        "test": {
+          "mae": 0.2614961979166667,
+          "mse": 0.0869564893599177,
+          "pred_mean": 0.37608837239583337,
+          "rmse": 0.2948838574081628,
+          "spearman": NaN,
+          "target_mean": 0.4077647395833333,
+          "top_10p_capture": 0.09068712133975335,
+          "top_20p_capture": 0.18782825523755464
+        },
+        "train": {
+          "mae": 0.25194432385253906,
+          "mse": 0.08091003991199934,
+          "pred_mean": 0.37608837239583337,
+          "rmse": 0.28444690174441933,
+          "spearman": NaN,
+          "target_mean": 0.37608837239583337,
+          "top_10p_capture": 0.09012609825780987,
+          "top_20p_capture": 0.1852179578665212
+        }
+      },
+      "prompt_length": {
+        "feature_names": [
+          "prompt_token_count"
+        ],
+        "model_payload": {
+          "coef": [
+            0.07007038364426516
+          ],
+          "intercept": 0.3760883723958333,
+          "scaler_mean": [
+            555.171875
+          ],
+          "scaler_scale": [
+            206.6031033987253
+          ]
+        },
+        "test": {
+          "mae": 0.24583152130949965,
+          "mse": 0.07796809785144347,
+          "pred_mean": 0.37932411882441375,
+          "rmse": 0.2792276810265119,
+          "spearman": 0.4049523277144552,
+          "target_mean": 0.4077647395833333,
+          "top_10p_capture": 0.1369146297210031,
+          "top_20p_capture": 0.24777333437389795
+        },
+        "train": {
+          "mae": 0.24145171649051278,
+          "mse": 0.07600018124794483,
+          "pred_mean": 0.3760883723958333,
+          "rmse": 0.27568130376930683,
+          "spearman": 0.2906130386432678,
+          "target_mean": 0.37608837239583337,
+          "top_10p_capture": 0.1306043463369006,
+          "top_20p_capture": 0.2543453484499692
+        }
+      },
+      "prompt_length_plus_effective_budget": {
+        "feature_names": [
+          "prompt_token_count",
+          "effective_max_tokens"
+        ],
+        "model_payload": {
+          "coef": [
+            0.07007038364426513,
+            0.0
+          ],
+          "intercept": 0.37608837239583326,
+          "scaler_mean": [
+            555.171875,
+            30000.0
+          ],
+          "scaler_scale": [
+            206.6031033987253,
+            1.0
+          ]
+        },
+        "test": {
+          "mae": 0.24583152130949965,
+          "mse": 0.07796809785144347,
+          "pred_mean": 0.3793241188244137,
+          "rmse": 0.2792276810265119,
+          "spearman": 0.4049523277144552,
+          "target_mean": 0.4077647395833333,
+          "top_10p_capture": 0.1369146297210031,
+          "top_20p_capture": 0.24777333437389795
+        },
+        "train": {
+          "mae": 0.24145171649051272,
+          "mse": 0.07600018124794483,
+          "pred_mean": 0.37608837239583326,
+          "rmse": 0.27568130376930683,
+          "spearman": 0.2906130386432678,
+          "target_mean": 0.37608837239583337,
+          "top_10p_capture": 0.1306043463369006,
+          "top_20p_capture": 0.2543453484499692
+        }
+      }
+    },
+    "status": "complete",
+    "views": {
+      "ensemble": {
+        "aggregate": {
+          "best_loss": {
+            "mae": {
+              "count": 3,
+              "mean": 0.19457933822801957,
+              "std": 0.005176360216986006
+            },
+            "mse": {
+              "count": 3,
+              "mean": 0.048184437139863125,
+              "std": 0.001563698925568606
+            },
+            "pred_mean": {
+              "count": 3,
+              "mean": 0.4447531040447454,
+              "std": 0.02247499027476372
+            },
+            "rmse": {
+              "count": 3,
+              "mean": 0.21949011208141198,
+              "std": 0.003576556658084723
+            },
+            "spearman": {
+              "count": 3,
+              "mean": 0.8000781280518771,
+              "std": 0.004725749044172127
+            },
+            "target_mean": {
+              "count": 3,
+              "mean": 0.40776473882142455,
+              "std": 0.0
+            },
+            "top_10p_capture": {
+              "count": 3,
+              "mean": 0.17107120786138774,
+              "std": 0.0003277931413403486
+            },
+            "top_20p_capture": {
+              "count": 3,
+              "mean": 0.3301429241035903,
+              "std": 0.016466396706138604
+            }
+          },
+          "best_rank": {
+            "mae": {
+              "count": 3,
+              "mean": 0.19978775606335453,
+              "std": 0.00552517187903117
+            },
+            "mse": {
+              "count": 3,
+              "mean": 0.050288243097233655,
+              "std": 0.002121329876977148
+            },
+            "pred_mean": {
+              "count": 3,
+              "mean": 0.45989798769975704,
+              "std": 0.029039756969377314
+            },
+            "rmse": {
+              "count": 3,
+              "mean": 0.22421727089266189,
+              "std": 0.004720995236229895
+            },
+            "spearman": {
+              "count": 3,
+              "mean": 0.802116293605219,
+              "std": 0.0036890550131554963
+            },
+            "target_mean": {
+              "count": 3,
+              "mean": 0.40776473882142455,
+              "std": 0.0
+            },
+            "top_10p_capture": {
+              "count": 3,
+              "mean": 0.17006547065216518,
+              "std": 0.0019269099736016803
+            },
+            "top_20p_capture": {
+              "count": 3,
+              "mean": 0.33275868363262934,
+              "std": 0.012115659411083187
+            }
+          }
+        },
+        "missing_seed_dirs": [],
+        "per_seed": [
+          {
+            "best_loss": {
+              "mae": 0.19704175849910827,
+              "mse": 0.0487899130572136,
+              "pred_mean": 0.46300904601812365,
+              "rmse": 0.22088438844158634,
+              "spearman": 0.7946443220438298,
+              "target_mean": 0.40776473882142455,
+              "top_10p_capture": 0.17144971077817048,
+              "top_20p_capture": 0.3111472975278492
+            },
+            "best_rank": {
+              "mae": 0.2052219666307792,
+              "mse": 0.05253861175669061,
+              "pred_mean": 0.4891180131584406,
+              "rmse": 0.22921302702222363,
+              "spearman": 0.7978846829954295,
+              "target_mean": 0.40776473882142455,
+              "top_10p_capture": 0.17144971077817048,
+              "top_20p_capture": 0.31878676130686634
+            },
+            "seed_dir": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced_sampler/livecodebench/mean_relative_length/ensemble/seed_0"
+          },
+          {
+            "best_loss": {
+              "mae": 0.18863144812639804,
+              "mse": 0.046408538119064716,
+              "pred_mean": 0.41965122856199744,
+              "rmse": 0.21542640998509147,
+              "spearman": 0.8023614203679832,
+              "target_mean": 0.40776473882142455,
+              "top_10p_capture": 0.1708819564029964,
+              "top_20p_capture": 0.3389218154692879
+            },
+            "best_rank": {
+              "mae": 0.19417590710800142,
+              "mse": 0.04832525143920331,
+              "pred_mean": 0.43104192046448586,
+              "rmse": 0.21983005126507002,
+              "spearman": 0.8046554552912224,
+              "target_mean": 0.40776473882142455,
+              "top_10p_capture": 0.1678647447753287,
+              "top_20p_capture": 0.33912963027738796
+            },
+            "seed_dir": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced_sampler/livecodebench/mean_relative_length/ensemble/seed_1"
+          },
+          {
+            "best_loss": {
+              "mae": 0.19806480805855245,
+              "mse": 0.04935486024331105,
+              "pred_mean": 0.45159903755411507,
+              "rmse": 0.22215953781755815,
+              "spearman": 0.8032286417438181,
+              "target_mean": 0.40776473882142455,
+              "top_10p_capture": 0.1708819564029964,
+              "top_20p_capture": 0.3403596593136338
+            },
+            "best_rank": {
+              "mae": 0.19996539445128292,
+              "mse": 0.05000086609580705,
+              "pred_mean": 0.4595340294763446,
+              "rmse": 0.223608734390692,
+              "spearman": 0.803808742529005,
+              "target_mean": 0.40776473882142455,
+              "top_10p_capture": 0.1708819564029964,
+              "top_20p_capture": 0.3403596593136338
+            },
+            "seed_dir": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced_sampler/livecodebench/mean_relative_length/ensemble/seed_2"
+          }
+        ],
+        "run_dir": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced_sampler/livecodebench/mean_relative_length/ensemble",
+        "seed_count": 3,
+        "status": "complete"
+      },
+      "last_layer": {
+        "aggregate": {
+          "best_loss": {
+            "mae": {
+              "count": 3,
+              "mean": 0.19918143451989936,
+              "std": 0.006591447167912258
+            },
+            "mse": {
+              "count": 3,
+              "mean": 0.05014998504509529,
+              "std": 0.0033339747686085184
+            },
+            "pred_mean": {
+              "count": 3,
+              "mean": 0.4683255790732801,
+              "std": 0.01565225348933604
+            },
+            "rmse": {
+              "count": 3,
+              "mean": 0.22385953716275106,
+              "std": 0.007439018723007668
+            },
+            "spearman": {
+              "count": 3,
+              "mean": 0.7903326301808664,
+              "std": 0.005393892958688994
+            },
+            "target_mean": {
+              "count": 3,
+              "mean": 0.40776473882142455,
+              "std": 0.0
+            },
+            "top_10p_capture": {
+              "count": 3,
+              "mean": 0.15983379127183492,
+              "std": 0.00409062558814437
+            },
+            "top_20p_capture": {
+              "count": 3,
+              "mean": 0.3119105200241871,
+              "std": 0.0043651984805341566
+            }
+          },
+          "best_rank": {
+            "mae": {
+              "count": 3,
+              "mean": 0.19918143451989936,
+              "std": 0.006591447167912258
+            },
+            "mse": {
+              "count": 3,
+              "mean": 0.05014998504509529,
+              "std": 0.0033339747686085184
+            },
+            "pred_mean": {
+              "count": 3,
+              "mean": 0.4683255790732801,
+              "std": 0.01565225348933604
+            },
+            "rmse": {
+              "count": 3,
+              "mean": 0.22385953716275106,
+              "std": 0.007439018723007668
+            },
+            "spearman": {
+              "count": 3,
+              "mean": 0.7903326301808664,
+              "std": 0.005393892958688994
+            },
+            "target_mean": {
+              "count": 3,
+              "mean": 0.40776473882142455,
+              "std": 0.0
+            },
+            "top_10p_capture": {
+              "count": 3,
+              "mean": 0.15983379127183492,
+              "std": 0.00409062558814437
+            },
+            "top_20p_capture": {
+              "count": 3,
+              "mean": 0.3119105200241871,
+              "std": 0.0043651984805341566
+            }
+          }
+        },
+        "missing_seed_dirs": [],
+        "per_seed": [
+          {
+            "best_loss": {
+              "mae": 0.19829588129650802,
+              "mse": 0.04998327314915023,
+              "pred_mean": 0.45611642161384225,
+              "rmse": 0.22356939224578626,
+              "spearman": 0.7946179538263213,
+              "target_mean": 0.40776473882142455,
+              "top_10p_capture": 0.16100800311793836,
+              "top_20p_capture": 0.30692138777665384
+            },
+            "best_rank": {
+              "mae": 0.19829588129650802,
+              "mse": 0.04998327314915023,
+              "pred_mean": 0.45611642161384225,
+              "rmse": 0.22356939224578626,
+              "spearman": 0.7946179538263213,
+              "target_mean": 0.40776473882142455,
+              "top_10p_capture": 0.16100800311793836,
+              "top_20p_capture": 0.30692138777665384
+            },
+            "seed_dir": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced_sampler/livecodebench/mean_relative_length/last_layer/seed_0"
+          },
+          {
+            "best_loss": {
+              "mae": 0.20617089138831943,
+              "mse": 0.053564188199940424,
+              "pred_mean": 0.4859711887314916,
+              "rmse": 0.23143938342455983,
+              "spearman": 0.792104183757178,
+              "target_mean": 0.40776473882142455,
+              "top_10p_capture": 0.15528447162313258,
+              "top_20p_capture": 0.3150266787290914
+            },
+            "best_rank": {
+              "mae": 0.20617089138831943,
+              "mse": 0.053564188199940424,
+              "pred_mean": 0.4859711887314916,
+              "rmse": 0.23143938342455983,
+              "spearman": 0.792104183757178,
+              "target_mean": 0.40776473882142455,
+              "top_10p_capture": 0.15528447162313258,
+              "top_20p_capture": 0.3150266787290914
+            },
+            "seed_dir": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced_sampler/livecodebench/mean_relative_length/last_layer/seed_1"
+          },
+          {
+            "best_loss": {
+              "mae": 0.19307753087487073,
+              "mse": 0.046902493786195217,
+              "pred_mean": 0.46288912687450645,
+              "rmse": 0.21656983581790706,
+              "spearman": 0.7842757529591,
+              "target_mean": 0.40776473882142455,
+              "top_10p_capture": 0.16320889907443384,
+              "top_20p_capture": 0.3137834935668161
+            },
+            "best_rank": {
+              "mae": 0.19307753087487073,
+              "mse": 0.046902493786195217,
+              "pred_mean": 0.46288912687450645,
+              "rmse": 0.21656983581790706,
+              "spearman": 0.7842757529591,
+              "target_mean": 0.40776473882142455,
+              "top_10p_capture": 0.16320889907443384,
+              "top_20p_capture": 0.3137834935668161
+            },
+            "seed_dir": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced_sampler/livecodebench/mean_relative_length/last_layer/seed_2"
+          }
+        ],
+        "run_dir": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced_sampler/livecodebench/mean_relative_length/last_layer",
+        "seed_count": 3,
+        "status": "complete"
+      }
+    }
+  },
+  "regression_data_dir": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced_sampler/livecodebench/mean_relative_length/data",
+  "shared_archive": "/data/scratch/murphy/outputs/cot-loop-detection/full_train_locked_pair_20260404_regression_balanced_sampler/livecodebench/shared_archive",
+  "status": "complete"
+}
