@@ -1,6 +1,6 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-05 02:14 UTC
+Last updated: 2026-04-06 07:02 UTC
 
 ## Immediate Next Experiments
 
@@ -8,18 +8,25 @@ Last updated: 2026-04-05 02:14 UTC
   - Primary citation:
     - `docs/prompt-profile-combined-audit-2026-04-05.md`
     - `outputs/prompt_profile_combined_audit_20260405/prompt_profile_combined_audit_20260405.pdf`
+    - `docs/prompt-profile-metadata-mechanism-2026-04-06.md`
+    - `outputs/prompt_profile_metadata_mechanism_20260406/prompt_profile_metadata_mechanism_20260406.pdf`
   - Supporting audit bundle:
     - `outputs/prompt_profile_metadata_audit_20260405/`
+    - `outputs/prompt_profile_metadata_mechanism_20260406/`
   - What this bundle fixes:
     - it keeps the canonical natural-split / natural-sampler regression rerun and the current balanced-binary recommendation in one surface again;
     - it adds a cheap prompt-stat audit from the saved prompt archives;
-    - it adds Athena's codebase-level audit of the current build / label / train / summarize path.
+    - it adds Athena's codebase-level audit of the current build / label / train / summarize path;
+    - it now also answers the narrower mechanism question directly: why those prompt-only controls are strong.
   - Main correction from that audit:
     - the reported "metadata baseline" on the April full-train notes is only a train-fit 1D prompt-length scorer, because `effective_max_tokens=30000` is fixed on this surface;
-    - cheap prompt-shape features such as `newline_count`, `dollar_count`, and `char_length` already match or beat raw prompt length on several datasets, and in a few places they rival or beat the current activation probes too.
+    - cheap prompt-shape features such as `newline_count`, `dollar_count`, and `char_length` already match or beat raw prompt length on several datasets, and in a few places they rival or beat the current activation probes too;
+    - the new mechanism note sharpens the explanation: the current targets are mostly fixed-budget long-completion objects, and `majority_s_0.5` is largely downstream of `mean_relative_length`, so prompt-family surface cues naturally transfer to both heads.
   - Next honest prompt-profile step:
-    - replace the 1D prompt-length control with a stronger prompt-shape baseline on the same frozen splits;
-    - evaluate whether activations still add lift as residuals or inside matched prompt-shape strata;
+    - fit a stronger prompt-shape baseline for `mean_relative_length` on the frozen natural split;
+    - evaluate activation lift only on residual `mean_relative_length` or inside narrow prompt-shape-risk bins;
+    - then check whether higher activation score still tracks higher `p_loop` after conditioning on prompt shape and true `mean_relative_length`;
+    - do not use `majority_s_0.5` alone to answer the mechanism question, because it is already too downstream of `mean_relative_length`;
     - do not spend another cycle rerunning the same natural regression object unless that stronger baseline changes the read.
 - The canonical prompt-profile regression lane is now backed by both the original locked run and a fresh rerun on the current branch.
   - First citation for the current regression object:

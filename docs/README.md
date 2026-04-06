@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-04-05 02:14 UTC
+Last updated: 2026-04-06 07:02 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -17,6 +17,7 @@ Core docs:
 - Prompt-profile full-train plan: prompt-profile-full-train-plan-2026-04-02.md
 - Prompt-profile natural-regression rerun note: prompt-profile-natural-regression-rerun-2026-04-05.md
 - Prompt-profile combined audit note: prompt-profile-combined-audit-2026-04-05.md
+- Prompt-profile metadata-mechanism note: prompt-profile-metadata-mechanism-2026-04-06.md
 - Prompt-profile corrected balanced-regression note: prompt-profile-balanced-regression-corrected-2026-04-04.md
 - Prompt-profile combined April surface report: prompt-profile-full-surface-update-2026-04-04.md
 - OLMo degeneration-origin audit report: olmo-degeneration-origin-audit-2026-04-04.md
@@ -43,6 +44,8 @@ Key outputs:
 - Prompt-profile combined audit bundle: ../outputs/prompt_profile_combined_audit_20260405/
 - Prompt-profile combined audit PDF: ../outputs/prompt_profile_combined_audit_20260405/prompt_profile_combined_audit_20260405.pdf
 - Prompt-profile metadata audit bundle: ../outputs/prompt_profile_metadata_audit_20260405/
+- Prompt-profile metadata-mechanism bundle: ../outputs/prompt_profile_metadata_mechanism_20260406/
+- Prompt-profile metadata-mechanism PDF: ../outputs/prompt_profile_metadata_mechanism_20260406/prompt_profile_metadata_mechanism_20260406.pdf
 - Corrected balanced-regression bundle: ../outputs/prompt_profile_balanced_regression_corrected_20260404/
 - Corrected balanced-regression PDF: ../outputs/prompt_profile_balanced_regression_corrected_20260404/prompt_profile_balanced_regression_corrected_20260404.pdf
 - Full-train result bundle: ../outputs/prompt_profile_full_train_locked_pair_20260404/
@@ -107,6 +110,10 @@ Current live status:
   - it bundles natural regression, balanced binary, the cheap prompt-stat audit, and Athena's codebase-level reasoning in one place;
   - it makes the baseline caveat explicit: the old "metadata baseline" is only prompt length on this fixed-budget surface;
   - it points to the next honest follow-up as a stronger prompt-shape baseline and residualized evaluation rather than another same-object rerun.
+- The newer note `prompt-profile-metadata-mechanism-2026-04-06.md` is now the right citation when the question is specifically "why are the metadata predictors strong?":
+  - it makes the target geometry explicit: `mean_relative_length` is normalized completion length and `majority_s_0.5` is largely a thresholded version of that same object;
+  - it separates genuine prompt-family structure from tiny-prevalence artifacts, especially the fragile `MMLU-Pro` newline-count row;
+  - it narrows the next decisive follow-up to a residualized conditional-lift audit on the natural regression head, not another binary-only mechanism read.
 - The corrected balanced-regression note is now side-analysis provenance only:
   - it still explains the earlier count drop and the balanced-sampler detour
   - it should not be cited as the default regression training object anymore

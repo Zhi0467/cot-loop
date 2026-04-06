@@ -1,0 +1,166 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{array}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+
+\title{Why The Prompt-Only Metadata Predictors Are Strong:\\Prompt-Profile Mechanism Note}
+\author{}
+\date{2026-04-06 07:02 UTC}
+
+\begin{document}
+\maketitle
+
+\section*{Question}
+Why are the prompt-only metadata predictors so strong on the current prompt-profile surfaces?
+
+\section*{Short Answer}
+They are strong mainly because both current targets are dominated by fixed-budget long-completion risk, and prompt surface structure already encodes much of the latent prompt family / expected derivation verbosity that drives that risk.
+
+The key split is:
+\begin{itemize}[leftmargin=1.5em]
+\item \texttt{mean\_relative\_length} is normalized completion length under a fixed \texttt{effective\_max\_tokens = 30000}
+\item \texttt{majority\_s\_0.5} is a majority-over-rollouts threshold on that same relative-length object
+\end{itemize}
+
+So prompt-only cues that predict long completions naturally look strong on both the regression and binary heads, even before activations enter.
+
+\section*{Current Objects}
+\begin{itemize}[leftmargin=1.5em]
+\item Regression:
+  \begin{itemize}[leftmargin=1.5em]
+  \item target: \texttt{mean\_relative\_length}
+  \item split: natural prompt-disjoint train/test
+  \item sampler: natural
+  \end{itemize}
+\item Binary:
+  \begin{itemize}[leftmargin=1.5em]
+  \item target: \texttt{majority\_s\_0.5}
+  \item split: balanced train / natural test
+  \item current best activation surface: \texttt{ensemble h256 d1}
+  \end{itemize}
+\end{itemize}
+
+\section*{Main Evidence}
+\subsection*{1. The Binary Head Is Mostly Downstream Of The Regression Head}
+On the finished binary test sets, using the ground-truth \texttt{mean\_relative\_length} itself as a scorer for \texttt{majority\_s\_0.5} gives:
+
+\begin{center}
+\small
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Dataset & \texttt{PR-AUC(mean\_relative\_length -> majority\_s\_0.5)} & \texttt{PR-AUC(p\_cap -> majority\_s\_0.5)} & \texttt{PR-AUC(p\_loop -> majority\_s\_0.5)} \\
+\midrule
+\texttt{AIME} & 1.000 & 0.793 & 0.690 \\
+\texttt{GPQA} & 1.000 & 0.286 & 0.333 \\
+\texttt{MATH-500} & 0.917 & 0.353 & 0.145 \\
+\texttt{MMLU-Pro} & 0.833 & 0.506 & 0.506 \\
+\texttt{LiveCodeBench} & 0.972 & 0.658 & 0.663 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+This is the clearest reason the metadata predictors look strong. The binary label is much closer to a thresholded long-completion target than to a loop-probability target.
+
+\subsection*{2. The Useful Prompt-Only Cues Are Dataset-Specific}
+\begin{center}
+\small
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{1.0in}>{\raggedright\arraybackslash}p{1.65in}>{\raggedright\arraybackslash}p{1.55in}>{\raggedright\arraybackslash}p{2.0in}@{}}
+\toprule
+Dataset & Regression cue & Binary cue & Main read \\
+\midrule
+\texttt{AIME} & \texttt{char\_length 0.332} & \texttt{dollar\_count 0.937} & symbolic / TeX density marks long derivations \\
+\texttt{GPQA} & \texttt{newline\_count 0.242} & \texttt{newline\_count 0.167} & prompt structure matters more than raw length \\
+\texttt{MATH-500} & \texttt{prompt\_token\_count 0.290} & \texttt{dollar\_count 0.117} & mostly ordinary problem-length effect \\
+\texttt{MMLU-Pro} & \texttt{dollar\_count 0.300} & \texttt{newline\_count 0.506} & some structure is real, but the binary row is fragile \\
+\texttt{LiveCodeBench} & \texttt{prompt\_token\_count 0.248} & \texttt{char\_length 0.590} & specification length / complexity drives output length \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+There is no single universal metadata feature. Different prompt families hand the target away through different cheap surface cues.
+
+\subsection*{3. Real Structure Versus Rows To Treat Cautiously}
+\textbf{Real structure}
+\begin{itemize}[leftmargin=1.5em]
+\item \texttt{AIME} binary \texttt{dollar\_count}: the high-value examples are dense TeX-heavy olympiad prompts. Example top row: \texttt{dollar\_count = 76}, \texttt{prompt\_token\_count = 597}, \texttt{mean\_relative\_length = 0.779}, \texttt{majority\_s\_0.5 = 1}. This looks like a real derivation-length cue, not a code bug.
+\item \texttt{GPQA} regression \texttt{newline\_count}: the length effect is non-monotone. Prompt-length quartile means are \texttt{0.197, 0.259, 0.377, 0.218}, so the riskiest prompts are medium-long structured scientific prompts, not the absolute longest formal ones.
+\item \texttt{LiveCodeBench} prompt length / char length: this mostly looks like specification length, test-case density, and coding-task complexity.
+\item \texttt{MATH-500} regression prompt length: weaker, but consistent with the ordinary ``longer math statement -> longer derivation'' story.
+\end{itemize}
+
+\textbf{Rows to treat cautiously}
+\begin{itemize}[leftmargin=1.5em]
+\item \texttt{MMLU-Pro} binary \texttt{newline\_count = 0.506}: this is mostly a tiny-prevalence artifact. In the test set, \texttt{newline\_count = 17} covers \texttt{152} rows with positive rate \texttt{0.0066}, while \texttt{newline\_count = 27} is a single positive outlier.
+\item Any universal claim like ``newlines are strong everywhere'' or ``longer prompt always means longer completion.'' Both \texttt{GPQA} and \texttt{LiveCodeBench} already show non-monotone quartile behavior.
+\end{itemize}
+
+\subsection*{4. One Additive Prompt-Shape Model Is Not The Whole Answer}
+A simple seven-feature prompt-shape model using \texttt{prompt\_token\_count}, \texttt{log\_token\_length}, \texttt{char\_length}, \texttt{newline\_count}, \texttt{digit\_count}, \texttt{dollar\_count}, and \texttt{choice\_count} only helps modestly on some slices and gets worse on others. That is useful evidence in itself: the prompt-only signal is benchmark-specific and nonlinear, not one clean universal prompt-length ceiling.
+
+Examples:
+\begin{itemize}[leftmargin=1.5em]
+\item \texttt{GPQA} regression \texttt{top\_20p\_capture}: \texttt{0.168 -> 0.193}
+\item \texttt{MATH-500} regression \texttt{top\_20p\_capture}: \texttt{0.290 -> 0.310}
+\item \texttt{AIME} binary \texttt{PR-AUC}: \texttt{0.898 -> 0.808}
+\item \texttt{MMLU-Pro} binary \texttt{PR-AUC}: \texttt{0.110 -> 0.031}
+\end{itemize}
+
+So the current lesson is not ``one additive prompt-only baseline solves the whole problem.'' The lesson is that the targets let several cheap surface cues become predictive, often in dataset-specific ways.
+
+\section*{Athena Read}
+Athena's deep read agreed with the main local hypothesis, but sharpened two points:
+\begin{enumerate}[leftmargin=1.5em]
+\item the surface features are mostly proxies for latent prompt family / expected derivation verbosity, not direct causes in themselves
+\item the current activation claim is only residual against raw prompt length, not yet against a serious prompt-shape control
+\end{enumerate}
+
+Athena's causal summary is:
+\begin{quote}
+latent task subtype / expected derivation length influences prompt surface cues and also long completion under a fixed budget; that drives \texttt{mean\_relative\_length}, which then almost thresholds into \texttt{majority\_s\_0.5}
+\end{quote}
+
+That is why prompt-only metadata looks strong on both heads.
+
+\section*{Narrowest Honest Claim}
+The current results support only this narrow activation-lift claim:
+\begin{itemize}[leftmargin=1.5em]
+\item activations beat the old 1D prompt-length baseline on some slices of the current targets
+\item so they contain some signal about long-completion propensity beyond raw prompt length alone
+\end{itemize}
+
+The current results do \textbf{not} yet support:
+\begin{itemize}[leftmargin=1.5em]
+\item lift over a strong prompt-shape baseline in general
+\item a loop-specific hidden-state claim
+\item or a claim that binary-head lift is anything more than lift on a thresholded \texttt{mean\_relative\_length} object
+\end{itemize}
+
+\section*{Cheapest Decisive Next Check}
+The cheapest next analysis is a residualized conditional-lift audit on the regression head:
+\begin{enumerate}[leftmargin=1.5em]
+\item fit a stronger prompt-shape model for \texttt{mean\_relative\_length} on the existing frozen splits
+\item score the natural test set
+\item evaluate activation lift only on residual \texttt{mean\_relative\_length}, or inside narrow prompt-shape-risk bins
+\item then check whether higher activation score is associated with higher \texttt{p\_loop} after controlling for prompt shape and true \texttt{mean\_relative\_length}
+\end{enumerate}
+
+This is the right next test because \texttt{majority\_s\_0.5} is already too downstream of \texttt{mean\_relative\_length} to cleanly separate the mechanism. The residualized regression-side check needs no new rollouts and is the cheapest way to distinguish:
+\begin{itemize}[leftmargin=1.5em]
+\item prompt-shape-driven long-completion risk
+\item residual long-completion signal
+\item genuinely loop-specific activation signal
+\end{itemize}
+
+\section*{Artifacts}
+\begin{itemize}[leftmargin=1.5em]
+\item combined surface note: \texttt{docs/prompt-profile-combined-audit-2026-04-05.md}
+\item metadata audit bundle: \texttt{outputs/prompt\_profile\_metadata\_audit\_20260405/}
+\item mechanism summary bundle: \texttt{outputs/prompt\_profile\_metadata\_mechanism\_20260406/}
+\item Athena consult log: \texttt{.agent/runtime/consult\_history/1775257834.444509.jsonl}
+\end{itemize}
+
+\end{document}
