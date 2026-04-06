@@ -693,10 +693,15 @@ The live Qwen base control has now crossed from progress receipts into finished 
   - `22 / 500` max-length hits
   - `avg_generation_length = 1893.592`
   - every looped rollout in that row also hit max length (`19 / 19`)
+- compared with the old instruct-side Qwen v2 `MATH-500` reference under `Qwen/Qwen3-1.7B`:
+  - old instruct row: `3628 / 5000` correct, `147 / 5000` looped, `73 / 5000` max-length-hit, `avg_generation_length = 6227.6302`
+  - base raw is already worse on loop rate (`0.038` vs `0.0294`) and much worse on max-length-hit rate (`0.044` vs `0.0146`), even though the base row is much shorter on average (`1893.592` vs `6227.6302`)
 - remaining dedicated base jobs still live:
-  - `AIME`: `6 / 50` prompts processed
-  - `GPQA`: `4 / 50`
-  - `MMLU-Pro`: `3 / 50`
-  - `LiveCodeBench release_v6`: `2 / 50`
+  - latest log checkpoint (`2026-04-06 08:16 UTC`):
+    - `AIME`: `13 / 50` prompts processed
+    - `GPQA`: `7 / 50`
+    - `MMLU-Pro`: `8 / 50`
+    - `LiveCodeBench release_v6`: `4 / 50`
+  - `GPQA` and `LiveCodeBench` are the slowest decode legs so far on the base control; neither has emitted a finished JSON yet
 
 After `math500.json` was written, I killed the old serialized follow-on under GPU `3` because it had automatically rolled into a duplicate `AIME` run. So the active Qwen control is now cleanly one finished `MATH-500` row plus one live collector per remaining dataset, not two copies of `AIME`.

@@ -27,7 +27,10 @@ Latest status:
 - the next same-family control is now active rather than only planned:
   - the old Qwen reference object is the repaired v2 rollout bundle `outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/`
   - the matching base-control rerun uses `Qwen/Qwen3-1.7B-Base` on the same sampler and dataset family, but at the base checkpoint's real `32768` context limit rather than the instruct checkpoint's `40960`
+  - the `LiveCodeBench` comparison is only same dataset plus same sampler, not a literal same-LM-style replay: the old v2 instruct row used `CodeQwenInstruct`, while the base control uses `GenericBase`
   - the saved text probe already shows that Qwen base raw does degenerate on MCQ, but mainly by repeating the answer-format instruction tail rather than by OLMo-style math-derivation loops.
+  - the first finished long-horizon base row is already on disk: `MATH-500 = 243/500` correct, `19/500` looped, `22/500` max-length-hit
+  - that base `MATH-500` row is already worse than the old instruct v2 reference on both loop rate (`0.038` vs `0.0294`) and max-length-hit rate (`0.044` vs `0.0146`), even though base is much shorter on average (`1893.6` vs `6227.6`)
 - the current open work is now post-audit rather than pre-audit:
   - replace the 1D prompt-length control with a stronger prompt-shape baseline on the frozen prompt-profile splits;
   - test activation lift as residuals or inside matched prompt-shape strata;
