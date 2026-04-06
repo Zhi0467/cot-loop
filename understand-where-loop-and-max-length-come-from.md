@@ -653,15 +653,18 @@ Two launch confounders are already retired:
   - the duplicate serialized continuation was killed after that row landed
   - the still-live surface is now the dedicated per-dataset collector set under `parallel_by_dataset_20260406/`
 
-Fresh runtime checkpoint from the node (`2026-04-06 09:43 UTC`):
+Fresh runtime checkpoint from the node (`2026-04-06 10:10 UTC`):
 
 - completed JSON rows:
   - `bound50_20260406_gpu3/math500.json`
 - still-live direct collectors:
-  - `AIME 37 / 50`
-  - `GPQA 26 / 50`
-  - `MMLU-Pro 33 / 50`
-  - `LiveCodeBench release_v6 18 / 50`
+  - `AIME 43 / 50`
+  - `GPQA 31 / 50`
+  - `MMLU-Pro 39 / 50`
+  - `LiveCodeBench release_v6 26 / 50`
+- liveness check:
+  - all four collectors still have live `collect_model_stats.py` processes
+  - their `run.log` files were freshly updated between `10:04 UTC` and `10:10 UTC`, so this is still slow decode rather than a silent stall
 - so the same-family Qwen control is scientifically useful already, but it is still not a finished five-dataset table
 
 A second tiny `LiveCodeBench` style probe now narrows the wrapper caveat itself.
@@ -762,7 +765,7 @@ Those figures are built directly from the saved `50`-prompt stage JSONs, not fro
 - `RLVR1` is the cleanest point on most datasets;
 - final instruct is mixed and re-accumulates visible degeneration on `MMLU-Pro`.
 
-As of `2026-04-06 09:43 UTC`, the live Qwen base control has crossed from progress receipts into finished rows, but this section is still live until the remaining four datasets finish:
+As of `2026-04-06 10:10 UTC`, the live Qwen base control has crossed from progress receipts into finished rows, but this section is still live until the remaining four datasets finish:
 
 - completed `MATH-500` row (`50` prompts, `500` rollouts):
   - `243 / 500` correct
@@ -774,11 +777,12 @@ As of `2026-04-06 09:43 UTC`, the live Qwen base control has crossed from progre
   - old instruct row: `3628 / 5000` correct, `147 / 5000` looped, `73 / 5000` max-length-hit, `avg_generation_length = 6227.6302`
   - base raw is already worse on loop rate (`0.038` vs `0.0294`) and much worse on max-length-hit rate (`0.044` vs `0.0146`), even though the base row is much shorter on average (`1893.592` vs `6227.6302`)
 - remaining dedicated base jobs still live:
-  - latest log checkpoint (`2026-04-06 09:43 UTC`):
-    - `AIME`: `37 / 50` prompts processed
-    - `GPQA`: `26 / 50`
-    - `MMLU-Pro`: `33 / 50`
-    - `LiveCodeBench release_v6`: `18 / 50`
+  - latest log checkpoint (`2026-04-06 10:10 UTC`):
+    - `AIME`: `43 / 50` prompts processed
+    - `GPQA`: `31 / 50`
+    - `MMLU-Pro`: `39 / 50`
+    - `LiveCodeBench release_v6`: `26 / 50`
+  - all four collectors still have fresh `run.log` mtimes and live worker processes, so the current state is slow but advancing
   - `GPQA` and `LiveCodeBench` are still the slowest decode legs so far on the base control; neither has emitted a finished JSON yet
 
 After `math500.json` was written, I killed the old serialized follow-on under GPU `3` because it had automatically rolled into a duplicate `AIME` run. So the active Qwen control is now cleanly one finished `MATH-500` row plus one live collector per remaining dataset, not two copies of `AIME`.
