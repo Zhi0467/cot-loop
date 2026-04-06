@@ -591,13 +591,32 @@ The old reference object is now pinned more tightly:
 - it is the saved `Qwen/Qwen3-1.7B` cross-dataset rollout bundle under:
   - `outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/`
 - not the OpenThinker sweeps;
-- the relevant shared decode contract there is:
+- the durable files to anchor against are:
+  - `outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/qwen3_1p7b_cross_dataset_rollout_report.pdf`
+  - `outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/cross_dataset_rollout_summary.json`
+  - the five per-dataset JSON rows under `outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/json/`
+- the exact common rollout config persisted in that repaired v2 bundle is:
   - `temperature=0.2`
   - `num_generations=10`
-  - `top_p=0.95`
-  - `top_k=-1`
   - `max_tokens=81920`
+  - `max_model_len=40960`
+  - `max_num_seqs=10`
+  - `max_num_batched_tokens=4096`
+  - `dtype=bfloat16`
+  - `trust_remote_code=True`
   - `LiveCodeBench release_v6`
+- one provenance caveat matters:
+  - this repaired v2 artifact predates the later collector patch that saves explicit `top_p` / `top_k`
+  - so those two knobs are **not** recoverable from the saved JSON/report itself and should not be claimed as exact from disk for the old instruct reference
+- the saved instruct-side reference rows in `cross_dataset_rollout_summary.json` are:
+  - `MATH-500`: `3628 / 5000` correct, `147 / 5000` looped, `73 / 5000` max-length-hit, `avg_generation_length = 6227.6302`
+  - `AIME 2024/2025`: `231 / 600` correct, `90 / 600` looped, `76 / 600` max-length-hit, `avg_generation_length = 20340.2567`
+  - `GPQA Diamond`: `683 / 1980` correct, `325 / 1980` looped, `137 / 1980` max-length-hit, `avg_generation_length = 9687.1586`
+  - `MMLU-Pro`: `5216 / 8000` correct, `365 / 8000` looped, `76 / 8000` max-length-hit, `avg_generation_length = 3702.3581`
+  - `LiveCodeBench release_v6`: `4647 / 8000` rollout-correct, `1198 / 8000` looped, `865 / 8000` max-length-hit, `avg_generation_length = 12591.1644`, native `pass@1 = 0.580875`, `pass@5 = 0.7109573412698412`, `pass@10 = 0.7375`
+- the saved prompt/interface split in that instruct bundle also matters:
+  - `MATH-500`, `AIME`, `GPQA`, and `MMLU-Pro` use tokenizer chat templates
+  - `LiveCodeBench release_v6` uses raw strings from `format_prompt_generation` under `LM_STYLE=CodeQwenInstruct`, not a tokenizer chat wrapper
 
 One clean control does **not** transfer literally from that instruct bundle to the base checkpoint:
 
@@ -609,6 +628,10 @@ I am not using that unsafe override. The active Qwen base control therefore keep
 
 - model:
   - `Qwen/Qwen3-1.7B-Base`
+- explicitly pinned replay-only sampling knobs:
+  - `top_p=0.95`
+  - `top_k=-1`
+  - these are pinned in the new base control itself, but they are not fields that the old instruct-side v2 artifact saved
 - prompt surfaces:
   - math / GPQA / `MMLU-Pro` on explicit `raw`
   - `LiveCodeBench release_v6` on raw benchmark strings with `LM_STYLE=GenericBase`
@@ -617,13 +640,29 @@ I am not using that unsafe override. The active Qwen base control therefore keep
   - so the base `LiveCodeBench` control is same dataset and same sampler, but not a literal same-LM-style replay
 - active `50`-prompt output root:
   - `/data/scratch/murphy/outputs/cot-loop-detection/qwen3_1p7b_base_raw_control_temp0p2_gen10_ctx32768_topkneg1/bound50_20260406_gpu3/`
+  - plus the still-live per-dataset collectors under:
+    - `/data/scratch/murphy/outputs/cot-loop-detection/qwen3_1p7b_base_raw_control_temp0p2_gen10_ctx32768_topkneg1/parallel_by_dataset_20260406/`
 
 Two launch confounders are already retired:
 
 - the first Qwen base attempt at `40960` failed for the real reason above, not because of a bad wrapper;
 - the first `32768` replay on `2` GPUs failed for a mechanical scheduling reason:
   - one supposedly free card only had `37.0 / 94.97 GiB` free at startup, so vLLM refused the engine before generation;
-- the live canonical replay is therefore the single-GPU queue on pinned GPU `3`, which is already processing the `MATH-500` leg cleanly.
+- the old single-GPU launcher on GPU `3` is no longer the whole live state:
+  - `math500.json` already finished there and remains the only completed base row so far
+  - the duplicate serialized continuation was killed after that row landed
+  - the still-live surface is now the dedicated per-dataset collector set under `parallel_by_dataset_20260406/`
+
+Fresh runtime checkpoint from the node (`2026-04-06 09:03 UTC`):
+
+- completed JSON rows:
+  - `bound50_20260406_gpu3/math500.json`
+- still-live direct collectors:
+  - `AIME 24 / 50`
+  - `GPQA 17 / 50`
+  - `MMLU-Pro 22 / 50`
+  - `LiveCodeBench release_v6 11 / 50`
+- so the same-family Qwen control is scientifically useful already, but it is still not a finished five-dataset table
 
 I also started a tiny saved text probe on `Qwen/Qwen3-1.7B-Base` itself:
 
