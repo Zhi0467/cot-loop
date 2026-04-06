@@ -653,16 +653,34 @@ Two launch confounders are already retired:
   - the duplicate serialized continuation was killed after that row landed
   - the still-live surface is now the dedicated per-dataset collector set under `parallel_by_dataset_20260406/`
 
-Fresh runtime checkpoint from the node (`2026-04-06 09:03 UTC`):
+Fresh runtime checkpoint from the node (`2026-04-06 09:25 UTC`):
 
 - completed JSON rows:
   - `bound50_20260406_gpu3/math500.json`
 - still-live direct collectors:
-  - `AIME 24 / 50`
-  - `GPQA 17 / 50`
-  - `MMLU-Pro 22 / 50`
-  - `LiveCodeBench release_v6 11 / 50`
+  - `AIME 29 / 50`
+  - `GPQA 23 / 50`
+  - `MMLU-Pro 28 / 50`
+  - `LiveCodeBench release_v6 15 / 50`
 - so the same-family Qwen control is scientifically useful already, but it is still not a finished five-dataset table
+
+A second tiny `LiveCodeBench` style probe now narrows the wrapper caveat itself.
+
+- object:
+  - `Qwen/Qwen3-1.7B-Base`
+  - `LiveCodeBench release_v6`
+  - first `2` prompts
+  - `1` generation each
+  - same long-horizon sampler as the main Qwen base control
+- compared styles:
+  - `LM_STYLE=GenericBase`
+  - `LM_STYLE=CodeQwenInstruct`
+- result:
+  - both styles came back at `2 / 2` looped, `2 / 2` max-length-hit, `pass@1 = 0.0`
+  - `GenericBase` starts with plausible code and then drifts into repeated problem text / statement fragments until the cap
+  - `CodeQwenInstruct` collapses almost immediately into repeated `# YOUR CODE HERE` until the cap
+
+So the old Qwen-v2-vs-base `LiveCodeBench` wrapper mismatch remains a real provenance caveat, but the wrapper swap alone does **not** rescue the base checkpoint on these first long-horizon `LiveCodeBench` prompts.
 
 I also started a tiny saved text probe on `Qwen/Qwen3-1.7B-Base` itself:
 
@@ -744,7 +762,7 @@ Those figures are built directly from the saved `50`-prompt stage JSONs, not fro
 - `RLVR1` is the cleanest point on most datasets;
 - final instruct is mixed and re-accumulates visible degeneration on `MMLU-Pro`.
 
-As of `2026-04-06 09:10 UTC`, the live Qwen base control has crossed from progress receipts into finished rows, but this section is still live until the remaining four datasets finish:
+As of `2026-04-06 09:25 UTC`, the live Qwen base control has crossed from progress receipts into finished rows, but this section is still live until the remaining four datasets finish:
 
 - completed `MATH-500` row (`50` prompts, `500` rollouts):
   - `243 / 500` correct
@@ -756,11 +774,11 @@ As of `2026-04-06 09:10 UTC`, the live Qwen base control has crossed from progre
   - old instruct row: `3628 / 5000` correct, `147 / 5000` looped, `73 / 5000` max-length-hit, `avg_generation_length = 6227.6302`
   - base raw is already worse on loop rate (`0.038` vs `0.0294`) and much worse on max-length-hit rate (`0.044` vs `0.0146`), even though the base row is much shorter on average (`1893.592` vs `6227.6302`)
 - remaining dedicated base jobs still live:
-  - latest log checkpoint (`2026-04-06 09:10 UTC`):
-    - `AIME`: `25 / 50` prompts processed
-    - `GPQA`: `18 / 50`
-    - `MMLU-Pro`: `22 / 50`
-    - `LiveCodeBench release_v6`: `11 / 50`
+  - latest log checkpoint (`2026-04-06 09:25 UTC`):
+    - `AIME`: `29 / 50` prompts processed
+    - `GPQA`: `23 / 50`
+    - `MMLU-Pro`: `28 / 50`
+    - `LiveCodeBench release_v6`: `15 / 50`
   - `GPQA` and `LiveCodeBench` are still the slowest decode legs so far on the base control; neither has emitted a finished JSON yet
 
 After `math500.json` was written, I killed the old serialized follow-on under GPU `3` because it had automatically rolled into a duplicate `AIME` run. So the active Qwen control is now cleanly one finished `MATH-500` row plus one live collector per remaining dataset, not two copies of `AIME`.

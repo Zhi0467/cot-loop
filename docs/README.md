@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-04-06 09:10 UTC
+Last updated: 2026-04-06 09:28 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -100,6 +100,7 @@ Current live status:
   - the reference object is still `../outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/`
   - the base checkpoint has to run at `32768`, not `40960`, because `Qwen/Qwen3-1.7B-Base` advertises the shorter limit and vLLM rejects the instruct horizon without an unsafe override
   - the old Qwen v2 `LiveCodeBench` row used raw strings from LiveCodeBench's `format_prompt_generation` under `CodeQwenInstruct`; the base control uses `GenericBase`, so that row is same dataset / sampler rather than a literal same-LM-style replay
+  - the tiny base `LiveCodeBench` style probe now shows that this wrapper caveat is real but not sufficient to explain the low base row by itself: both `GenericBase` and `CodeQwenInstruct` looped to the cap on the same `2` prompts with `pass@1 = 0`, though `GenericBase` drifts into repeated problem text while `CodeQwenInstruct` collapses into repeated `# YOUR CODE HERE`
   - the saved text probe already shows that Qwen base raw degenerates on MCQ mainly by repeating the answer-format instruction tail, which is a different failure mode from the OLMo2 base math loops
   - the first finished base row is now on disk: `MATH-500 243/500 correct`, `19/500` looped, `22/500` max-length-hit, with every looped rollout also hitting max length
   - that base `MATH-500` row is already worse than the old instruct v2 `MATH-500` reference on both loop rate (`0.038` vs `0.0294`) and max-length-hit rate (`0.044` vs `0.0146`), even though the base row is much shorter on average (`1893.6` vs `6227.6`)
