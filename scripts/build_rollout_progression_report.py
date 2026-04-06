@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Any
 
 import matplotlib.pyplot as plt
+from matplotlib.patches import PathPatch, Rectangle
+from matplotlib.path import Path as MplPath
 
 
 FIGURES_DIRNAME = "figures"
@@ -44,6 +46,13 @@ OVERLAP_CATEGORIES: tuple[tuple[str, str, str], ...] = (
     ("wrong_no_loop_max", "Wrong / no loop / max", "#277da1"),
     ("wrong_loop_no_max", "Wrong / loop / no max", "#b56576"),
     ("wrong_loop_max", "Wrong / loop / max", "#e76f51"),
+)
+
+SANKEY_BUCKETS: tuple[tuple[str, str, str], ...] = (
+    ("loop_max", "Loop / max", "#e76f51"),
+    ("loop_no_max", "Loop / no max", "#f4a261"),
+    ("no_loop_max", "No loop / max", "#277da1"),
+    ("no_loop_no_max", "No loop / no max", "#2a9d8f"),
 )
 
 
@@ -390,6 +399,334 @@ def _build_overlap_composition_plot(stages: list[dict[str, Any]], out_path: Path
     plt.close(fig)
 
 
+def _bucket_breakdown(breakdown: dict[str, int]) -> dict[str, int]:
+    return {
+        "loop_max": int(breakdown["correct_loop_max"] + breakdown["wrong_loop_max"]),
+        "loop_no_max": int(
+            breakdown["correct_loop_no_max"] + breakdown["wrong_loop_no_max"]
+        ),
+        "no_loop_max": int(
+            breakdown["correct_no_loop_max"] + breakdown["wrong_no_loop_max"]
+        ),
+        "no_loop_no_max": int(
+            breakdown["correct_no_loop_no_max"] + breakdown["wrong_no_loop_no_max"]
+        ),
+    }
+
+
+def _stack_intervals(
+    ordered_items: list[tuple[str, int]],
+    *,
+    top: float,
+    bottom: float,
+) -> dict[str, tuple[float, float]]:
+    total = sum(max(0, int(count)) for _, count in ordered_items)
+    if total <= 0:
+        return {key: (top, top) for key, _ in ordered_items}
+    usable = max(top - bottom, 0.0)
+    scale = usable / float(total)
+    cursor = top
+    intervals: dict[str, tuple[float, float]] = {}
+    for key, count in ordered_items:
+        height = max(0.0, float(count) * scale)
+        intervals[key] = (cursor - height, cursor)
+        cursor -= height
+    return intervals
+
+
+def _draw_ribbon(
+    ax: plt.Axes,
+    *,
+    x0: float,
+    x1: float,
+    y0_low: float,
+    y0_high: float,
+    y1_low: float,
+    y1_high: float,
+    color: str,
+    alpha: float = 0.78,
+    curve: float = 0.25,
+) -> None:
+    verts = [
+        (x0, y0_high),
+        (x0 + curve, y0_high),
+        (x1 - curve, y1_high),
+        (x1, y1_high),
+        (x1, y1_low),
+        (x1 - curve, y1_low),
+        (x0 + curve, y0_low),
+        (x0, y0_low),
+        (x0, y0_high),
+    ]
+    codes = [
+        MplPath.MOVETO,
+        MplPath.CURVE4,
+        MplPath.CURVE4,
+        MplPath.CURVE4,
+        MplPath.LINETO,
+        MplPath.CURVE4,
+        MplPath.CURVE4,
+        MplPath.CURVE4,
+        MplPath.CLOSEPOLY,
+    ]
+    ax.add_patch(
+        PathPatch(
+            MplPath(verts, codes),
+            facecolor=color,
+            edgecolor="none",
+            alpha=alpha,
+        )
+    )
+
+
+def _draw_node(
+    ax: plt.Axes,
+    *,
+    x: float,
+    width: float,
+    y_low: float,
+    y_high: float,
+    label: str,
+    count_text: str,
+    label_mode: str = "above",
+) -> None:
+    height = max(0.0, y_high - y_low)
+    if height <= 0.0:
+        return
+    ax.add_patch(
+        Rectangle(
+            (x, y_low),
+            width,
+            height,
+            facecolor="#f6f6f6",
+            edgecolor="#333333",
+            linewidth=1.0,
+            zorder=3,
+        )
+    )
+    if label_mode == "inside":
+        ax.text(
+            x + width / 2.0,
+            y_low + height / 2.0,
+            label,
+            ha="center",
+            va="center",
+            fontsize=8,
+            fontweight="semibold",
+        )
+    else:
+        ax.text(
+            x + width / 2.0,
+            y_high + 0.02,
+            label,
+            ha="center",
+            va="bottom",
+            fontsize=9,
+            fontweight="semibold",
+        )
+    ax.text(
+        x + width / 2.0,
+        y_low - 0.018,
+        count_text,
+        ha="center",
+        va="top",
+        fontsize=8,
+        color="#444444",
+    )
+
+
+def _draw_stage_sankey(ax: plt.Axes, stage_label: str, breakdown: dict[str, int]) -> None:
+    total = sum(breakdown.values())
+    if total <= 0:
+        ax.set_axis_off()
+        ax.set_title(stage_label)
+        return
+
+    loop_total = breakdown["loop_max"] + breakdown["loop_no_max"]
+    no_loop_total = breakdown["no_loop_max"] + breakdown["no_loop_no_max"]
+    max_total = breakdown["loop_max"] + breakdown["no_loop_max"]
+    no_max_total = breakdown["loop_no_max"] + breakdown["no_loop_no_max"]
+
+    top = 0.92
+    bottom = 0.08
+    x_generated = 0.08
+    x_middle = 0.40
+    x_right = 0.72
+    node_width = 0.075
+    span = top - bottom
+
+    generated_layout = _stack_intervals(
+        [
+            ("loop_max", breakdown["loop_max"]),
+            ("loop_no_max", breakdown["loop_no_max"]),
+            ("no_loop_max", breakdown["no_loop_max"]),
+            ("no_loop_no_max", breakdown["no_loop_no_max"]),
+        ],
+        top=top,
+        bottom=bottom,
+    )
+    looped_layout = _stack_intervals(
+        [
+            ("loop_max", breakdown["loop_max"]),
+            ("loop_no_max", breakdown["loop_no_max"]),
+        ],
+        top=top,
+        bottom=top - span * (loop_total / total),
+    )
+    no_loop_layout = _stack_intervals(
+        [
+            ("no_loop_max", breakdown["no_loop_max"]),
+            ("no_loop_no_max", breakdown["no_loop_no_max"]),
+        ],
+        top=top - span * (loop_total / total),
+        bottom=bottom,
+    )
+    max_layout = _stack_intervals(
+        [
+            ("loop_max", breakdown["loop_max"]),
+            ("no_loop_max", breakdown["no_loop_max"]),
+        ],
+        top=top,
+        bottom=top - span * (max_total / total),
+    )
+    no_max_layout = _stack_intervals(
+        [
+            ("loop_no_max", breakdown["loop_no_max"]),
+            ("no_loop_no_max", breakdown["no_loop_no_max"]),
+        ],
+        top=top - span * (max_total / total),
+        bottom=bottom,
+    )
+
+    for bucket, _, color in SANKEY_BUCKETS:
+        if bucket.startswith("loop_"):
+            src_layout = generated_layout[bucket]
+            mid_layout = looped_layout[bucket]
+        else:
+            src_layout = generated_layout[bucket]
+            mid_layout = no_loop_layout[bucket]
+        _draw_ribbon(
+            ax,
+            x0=x_generated + node_width,
+            x1=x_middle,
+            y0_low=src_layout[0],
+            y0_high=src_layout[1],
+            y1_low=mid_layout[0],
+            y1_high=mid_layout[1],
+            color=color,
+        )
+
+    for bucket, _, color in SANKEY_BUCKETS:
+        if bucket.startswith("loop_"):
+            src_layout = looped_layout[bucket]
+        else:
+            src_layout = no_loop_layout[bucket]
+        if bucket in {"loop_max", "no_loop_max"}:
+            dst_layout = max_layout[bucket]
+        else:
+            dst_layout = no_max_layout[bucket]
+        _draw_ribbon(
+            ax,
+            x0=x_middle + node_width,
+            x1=x_right,
+            y0_low=src_layout[0],
+            y0_high=src_layout[1],
+            y1_low=dst_layout[0],
+            y1_high=dst_layout[1],
+            color=color,
+        )
+
+    _draw_node(
+        ax,
+        x=x_generated,
+        width=node_width,
+        y_low=bottom,
+        y_high=top,
+        label="generated",
+        count_text=f"{total}",
+    )
+    _draw_node(
+        ax,
+        x=x_middle,
+        width=node_width,
+        y_low=top - span * (loop_total / total),
+        y_high=top,
+        label="looped",
+        count_text=f"{loop_total}",
+    )
+    _draw_node(
+        ax,
+        x=x_middle,
+        width=node_width,
+        y_low=bottom,
+        y_high=top - span * (loop_total / total),
+        label="not looped",
+        count_text=f"{no_loop_total}",
+        label_mode="inside" if (loop_total / total) < 0.12 else "above",
+    )
+    _draw_node(
+        ax,
+        x=x_right,
+        width=node_width,
+        y_low=top - span * (max_total / total),
+        y_high=top,
+        label="max-hit",
+        count_text=f"{max_total}",
+    )
+    _draw_node(
+        ax,
+        x=x_right,
+        width=node_width,
+        y_low=bottom,
+        y_high=top - span * (max_total / total),
+        label="no max-hit",
+        count_text=f"{no_max_total}",
+        label_mode="inside" if (max_total / total) < 0.12 else "above",
+    )
+
+    ax.set_xlim(0.0, 0.96)
+    ax.set_ylim(0.0, 1.0)
+    ax.set_axis_off()
+    ax.set_title(stage_label, fontsize=10, pad=10)
+    legend_handles = [
+        Rectangle((0, 0), 1, 1, facecolor=color, edgecolor="none", alpha=0.78)
+        for _, _, color in SANKEY_BUCKETS
+    ]
+    ax.legend(
+        legend_handles,
+        [label for _, label, _ in SANKEY_BUCKETS],
+        frameon=False,
+        loc="lower center",
+        bbox_to_anchor=(0.5, -0.08),
+        ncol=2,
+        fontsize=8,
+    )
+
+
+def _build_stage_sankey_plot(stages: list[dict[str, Any]], out_path: Path) -> None:
+    stage_breakdowns = [
+        _bucket_breakdown(_derive_overlap_breakdown(stage["payload"]["datasets"]))
+        for stage in stages
+    ]
+    cols = min(3, max(1, len(stages)))
+    rows = math.ceil(len(stages) / cols)
+    fig, axes = plt.subplots(
+        rows,
+        cols,
+        figsize=(5.2 * cols, 3.8 * rows),
+        squeeze=False,
+    )
+    flat_axes = [ax for row in axes for ax in row]
+    for ax, stage, breakdown in zip(flat_axes, stages, stage_breakdowns):
+        _draw_stage_sankey(ax, stage["label"], breakdown)
+    for ax in flat_axes[len(stages):]:
+        ax.set_axis_off()
+    fig.suptitle("Within-stage overlap alluvial view", fontsize=13)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+
+
 def _figure_paths(out_dir: Path) -> dict[str, Path]:
     figures_dir = out_dir / FIGURES_DIRNAME
     figures_dir.mkdir(parents=True, exist_ok=True)
@@ -398,6 +735,7 @@ def _figure_paths(out_dir: Path) -> dict[str, Path]:
         "overlap": figures_dir / "progression_overlap.png",
         "lengths": figures_dir / "progression_lengths.png",
         "composition": figures_dir / "stage_overlap_composition.png",
+        "sankey": figures_dir / "stage_overlap_sankey.png",
     }
 
 
@@ -533,6 +871,12 @@ This progression bundle compares multiple checkpoints under one rollout-statisti
 \caption{{Within-stage overlap composition aggregated across all datasets. This uses the saved raw counts to decompose generated rollouts by correctness, loop status, and max-length-hit status.}}
 \end{{figure}}
 
+\begin{{figure}}[H]
+\centering
+\includegraphics[width=\textwidth]{{{FIGURES_DIRNAME}/stage_overlap_sankey.png}}
+\caption{{Within-stage alluvial view of the overlap structure. Each stage shows how generated rollouts split into looped versus non-looped branches and then into max-length-hit versus non-max-length-hit branches.}}
+\end{{figure}}
+
 \section*{{Interpretation}}
 The progression figures answer the exact object of the note: where the degenerate-rollout regime enters the model family under a fixed rollout contract. The line plots are the stage comparison surface; the overlap-composition panel makes the within-stage structure visible without collapsing everything to one scalar rate. If the loop and max-length-hit curves are near-zero in the base stage and then rise sharply after SFT or RLVR, that is direct evidence for a stage-linked introduction of degenerate rollouts. If they are already substantial in the base model, the hypothesis weakens.
 
@@ -571,6 +915,7 @@ def main() -> None:
     _plot_metric_group(stages, OVERLAP_GROUPS, figures["overlap"], "Stage progression: overlap conditionals")
     _plot_metric_group(stages, LENGTH_GROUPS, figures["lengths"], "Stage progression: generation lengths")
     _build_overlap_composition_plot(stages, figures["composition"])
+    _build_stage_sankey_plot(stages, figures["sankey"])
 
     tex_path = _build_tex(stages, out_dir, args.report_stem, args.title)
     if not args.skip_pdf:

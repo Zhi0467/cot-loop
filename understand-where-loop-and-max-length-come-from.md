@@ -558,3 +558,88 @@ For the full row-by-row table, use:
 
 - `docs/olmo2-1b-fifty-prompt-rerun-2026-04-05.md`
 - `outputs/olmo2_1b_fifty_prompt_rerun_20260405/olmo2_1b_fifty_prompt_rerun_20260405.pdf`
+
+## Qwen Base Control + OLMo2 Visuals (2026-04-06)
+
+Wangzhi asked for two follow-ups beyond the finished OLMo2 `50`-prompt ladder:
+
+1. explain whether the heavy base looping is just a raw-prompt artifact or a real degeneration regime;
+2. run the old Qwen-style rollout surface on a base checkpoint, not just on the instruct checkpoint from the original report, to see whether a similar base pathology appears there too.
+
+The old reference object is now pinned more tightly:
+
+- it is the saved `Qwen/Qwen3-1.7B` cross-dataset rollout bundle under:
+  - `outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/`
+- not the OpenThinker sweeps;
+- the relevant shared decode contract there is:
+  - `temperature=0.2`
+  - `num_generations=10`
+  - `top_p=0.95`
+  - `top_k=-1`
+  - `max_tokens=81920`
+  - `LiveCodeBench release_v6`
+
+One clean control does **not** transfer literally from that instruct bundle to the base checkpoint:
+
+- `Qwen/Qwen3-1.7B` advertises `max_position_embeddings=40960`;
+- `Qwen/Qwen3-1.7B-Base` advertises `max_position_embeddings=32768`;
+- vLLM rejects `max_model_len=40960` on the base checkpoint unless `VLLM_ALLOW_LONG_MAX_MODEL_LEN=1` is forced.
+
+I am not using that unsafe override. The active Qwen base control therefore keeps the old sampler and dataset surface, but uses the base checkpoint's real `32768` context limit:
+
+- model:
+  - `Qwen/Qwen3-1.7B-Base`
+- prompt surfaces:
+  - math / GPQA / `MMLU-Pro` on explicit `raw`
+  - `LiveCodeBench release_v6` on raw benchmark strings with `LM_STYLE=GenericBase`
+- active `50`-prompt output root:
+  - `/data/scratch/murphy/outputs/cot-loop-detection/qwen3_1p7b_base_raw_control_temp0p2_gen10_ctx32768_topkneg1/bound50_20260406_gpu3/`
+
+Two launch confounders are already retired:
+
+- the first Qwen base attempt at `40960` failed for the real reason above, not because of a bad wrapper;
+- the first `32768` replay on `2` GPUs failed for a mechanical scheduling reason:
+  - one supposedly free card only had `37.0 / 94.97 GiB` free at startup, so vLLM refused the engine before generation;
+- the live canonical replay is therefore the single-GPU queue on pinned GPU `3`, which is already processing the `MATH-500` leg cleanly.
+
+I also started a tiny saved text probe on `Qwen/Qwen3-1.7B-Base` itself:
+
+- datasets:
+  - first `2` prompts each from `MATH-500`, `GPQA`, and `MMLU-Pro`
+- decode:
+  - same `temperature=0.2`, `top_p=0.95`, `top_k=-1`
+  - `4` generations per prompt
+  - `max_model_len=32768`
+- target artifact:
+  - `/data/scratch/murphy/outputs/cot-loop-detection/qwen3_1p7b_base_raw_control_temp0p2_gen10_ctx32768_topkneg1/text_probe_20260406/qwen3_base_text_probe.json`
+
+The probe is not finished at the time of this note update, but it has already hit the behavior I actually wanted to check:
+
+- the first few prompts clear in seconds;
+- later prompts fall into multi-minute decode batches on the same base checkpoint and sampler.
+
+That means the Qwen base control is already showing the same **runtime shape** as the OLMo2 base probe:
+
+- some prompts terminate normally;
+- others fall into a much longer decode regime under the raw base surface.
+
+The remaining question is textual rather than merely timing-related:
+
+- does Qwen base repeat math lines / answer toggles / synthetic junk the way OLMo2 base does,
+- or does it enter a different long-rollout failure mode?
+
+Separately, the OLMo2 `50`-prompt ladder now has the visualization surface Wangzhi asked for:
+
+- progression PDF + figures:
+  - `outputs/olmo2_1b_progression_bound50_20260406/olmo2_1b_progression_bound50.pdf`
+- line chart:
+  - `outputs/olmo2_1b_progression_bound50_20260406/figures/progression_rates.png`
+- within-stage alluvial / Sankey view:
+  - `outputs/olmo2_1b_progression_bound50_20260406/figures/stage_overlap_sankey.png`
+
+Those figures are built directly from the saved `50`-prompt stage JSONs, not from hand-copied table rows. They make the main OLMo2 read easier to see:
+
+- base carries the dominant loop / max-length mass;
+- SFT sharply reduces it but does not remove it;
+- `RLVR1` is the cleanest point on most datasets;
+- final instruct is mixed and re-accumulates visible degeneration on `MMLU-Pro`.
