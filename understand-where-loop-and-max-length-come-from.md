@@ -613,20 +613,41 @@ I also started a tiny saved text probe on `Qwen/Qwen3-1.7B-Base` itself:
 - target artifact:
   - `/data/scratch/murphy/outputs/cot-loop-detection/qwen3_1p7b_base_raw_control_temp0p2_gen10_ctx32768_topkneg1/text_probe_20260406/qwen3_base_text_probe.json`
 
-The probe is not finished at the time of this note update, but it has already hit the behavior I actually wanted to check:
+The text probe is now finished, and the Qwen base failure mode is **not** the same as the OLMo2 base math pathology.
 
-- the first few prompts clear in seconds;
-- later prompts fall into multi-minute decode batches on the same base checkpoint and sampler.
+Probe summary (`4` generations each on the first `2` prompts per dataset):
 
-That means the Qwen base control is already showing the same **runtime shape** as the OLMo2 base probe:
+- `MATH-500`:
+  - `0 / 8` looped generations
+  - lengths stayed moderate (`322`-`1751` tokens)
+- `GPQA`:
+  - sample `0`: `1 / 4` looped, with one generation reaching `32620` tokens
+  - sample `1`: `1 / 4` looped, with one generation reaching `32613` tokens
+- `MMLU-Pro`:
+  - sample `0`: `1 / 4` looped, with one generation reaching `32564` tokens
+  - sample `1`: `2 / 4` looped, with two generations reaching `32545` tokens
 
-- some prompts terminate normally;
-- others fall into a much longer decode regime under the raw base surface.
+So the same raw base surface does produce degenerate long rollouts on a Qwen-style model too, but the text behavior is different:
 
-The remaining question is textual rather than merely timing-related:
+- Qwen base raw is **not** looping by repeating a math derivation line the way OLMo2 base did on `MATH-500`;
+- instead, the long Qwen failures on `GPQA` / `MMLU-Pro` collapse into repetition of the answer-format instruction tail itself.
 
-- does Qwen base repeat math lines / answer toggles / synthetic junk the way OLMo2 base does,
-- or does it enter a different long-rollout failure mode?
+Representative saved prefixes from the looped Qwen base generations:
+
+- `GPQA`:
+  - `Do not output anything else. Do not explain your answer.`
+  - repeated to the context cap
+- `MMLU-Pro`:
+  - `Do not output anything else. Do not output anything that is not JSON.`
+  - or `Do not use any other data structures.`
+  - repeated to the context cap
+
+That means the current cross-family read is sharper:
+
+- OLMo2 base raw already shows real content-level degeneration, including repeated derivation lines and synthetic junk;
+- Qwen base raw also degenerates, but on these first MCQ probes it does so mainly by falling into a repeated instruction-tail / answer-format loop.
+
+So “raw base prompting can create degenerate rollouts” is already supported across both families, but the *kind* of degeneration is not identical.
 
 Separately, the OLMo2 `50`-prompt ladder now has the visualization surface Wangzhi asked for:
 
