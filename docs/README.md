@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-04-06 07:02 UTC
+Last updated: 2026-04-06 07:35 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -56,6 +56,8 @@ Key outputs:
 - OLMo degeneration-origin audit PDF: ../outputs/olmo_degeneration_origin_audit_20260404/olmo_degeneration_origin_audit_20260404.pdf
 - OLMo2 1B fifty-prompt rerun bundle: ../outputs/olmo2_1b_fifty_prompt_rerun_20260405/
 - OLMo2 1B fifty-prompt rerun PDF: ../outputs/olmo2_1b_fifty_prompt_rerun_20260405/olmo2_1b_fifty_prompt_rerun_20260405.pdf
+- OLMo2 1B progression figure bundle: ../outputs/olmo2_1b_progression_bound50_20260406/
+- OLMo2 1B progression PDF: ../outputs/olmo2_1b_progression_bound50_20260406/olmo2_1b_progression_bound50.pdf
 - Binary retrain result bundle: ../outputs/prompt_profile_binary_retrain_h256d2_20260404/
 - Binary retrain result PDF: ../outputs/prompt_profile_binary_retrain_h256d2_20260404/prompt_profile_binary_retrain_h256d2_20260404.pdf
 - Binary capacity-controls bundle: ../outputs/prompt_profile_binary_capacity_controls_20260404/
@@ -87,6 +89,13 @@ Current live status:
   - it replaces the older `8`-prompt fallback as the right stage-conclusion surface for this ladder;
   - it keeps the main base-versus-later split, but it also shows the later-stage story is not uniformly clean or monotone;
   - it is now the right artifact to cite when the question is "what survived once the slice stopped being a pilot?"
+- The OLMo2 rerun now has the explicit visualization surface Wangzhi asked for:
+  - the line-chart progression figures plus the within-stage Sankey/alluvial view live in `../outputs/olmo2_1b_progression_bound50_20260406/`
+  - those figures are generated from the saved stage JSONs, not copied by hand from Slack tables.
+- The next same-family control is now the Qwen base raw rerun on the old v2 rollout surface:
+  - the reference object is still `../outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/`
+  - the base checkpoint has to run at `32768`, not `40960`, because `Qwen/Qwen3-1.7B-Base` advertises the shorter limit and vLLM rejects the instruct horizon without an unsafe override
+  - the saved text probe already shows that Qwen base raw degenerates on MCQ mainly by repeating the answer-format instruction tail, which is a different failure mode from the OLMo2 base math loops.
 - The locked pair now has both the execution note and the finished first-run result note on disk.
 - The older `h256 d2` binary retrain note is still on disk, but it is now intermediate only:
   - it preserves the exact `2106` / `2107` depth-rerun record and raw remote metrics

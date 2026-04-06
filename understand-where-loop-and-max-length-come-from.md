@@ -231,7 +231,7 @@ So the stale `0.2` base rerun (`2088`) was canceled and replaced with one bounde
   - `base/raw`
   - `SFT/chat_template`
   - `RLVR/chat_template`
-  - `LiveCodeBench` stays raw-string prompt generation for every stage because the benchmark prompt builder itself is raw and the collector disallows chat-template wrapping there
+  - on this early bounded queue, `LiveCodeBench` still used raw benchmark strings for every stage; this was later superseded for OLMo by an explicit model-native LM-style path rather than by treating the raw-string surface as the final canonical OLMo object
 
 The live queue is now:
 
@@ -309,7 +309,7 @@ So on this bounded instruct-only pass:
 Two follow-up cautions matter before treating this bundle as directly comparable to the earlier Qwen3 surface:
 
 - `RLVR / MMLU-Pro` came back at `0 / 80` correct with `avg_generation_length = 6.15` under the same `chat_template` surface that was otherwise working on the other MCQ tasks. That shape looks more like a terminal-answer or grading mismatch than a stable capability read.
-- `LiveCodeBench` is on a different interface from the MCQ tasks by construction: it stays on the benchmark's raw-string prompt builder for every stage, so its numbers should not be read as one more ordinary MCQ point.
+- `LiveCodeBench` is on a different interface from the MCQ tasks by construction, and this early bounded pass predates the later explicit OLMo-native LM-style override. So these early `LiveCodeBench` rows should not be read as one more ordinary MCQ point or as the final OLMo `LiveCodeBench` surface.
 - `LiveCodeBench` is also not obviously a total generation failure. The saved RLVR JSON includes native codegen metrics of `pass@1 = 0.10` and `pass@10 = 0.375` on this `8`-problem slice, and the paired `livecodebench__lcb_records.json` file contains substantive code outputs rather than blanks.
 - the public `Olmo-3-7B-Instruct` model card is also a weak sanity check against reading these two suspect rows too literally: Ai2 reports nonzero coding and knowledge performance on that surface, so a total collapse on bounded `MMLU-Pro` or `LiveCodeBench` is not the default expectation. That is still only a sanity check, not a matched eval, because their table uses different benchmarks and settings.
 
@@ -329,7 +329,7 @@ There is also a real smaller-model fallback, but it is not within the same OLMo 
 
 I checked the weird rows against the local collector / adapter code before trying to trust or rerun them blindly.
 
-One concrete bug explains why the current `LiveCodeBench` row should not be treated as canonical for OLMo:
+One concrete bug explains why the earlier bounded `LiveCodeBench` row should not be treated as canonical for OLMo:
 
 - our `livecodebench_codegen` adapter was silently defaulting every non-Qwen model family to `CodeQwenInstruct` LM style when no explicit override was supplied;
 - the official LiveCodeBench repo does **not** recommend that fallback. Their README says new model families should be added explicitly in `lcb_runner/lm_styles.py` and `prompts/generation.py` before evaluation is treated as benchmark-comparable;

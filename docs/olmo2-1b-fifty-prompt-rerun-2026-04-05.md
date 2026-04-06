@@ -40,6 +40,11 @@ Shared decode contract:
 - `max_num_batched_tokens=2048`
 - `max_samples=50`
 
+Reference-surface caveat:
+- this OLMo2 ladder is the cheap same-collector fallback, not a literal replay of the older Qwen3 v2 horizon;
+- the old Qwen reference object used `max_model_len=40960` and `max_tokens=81920`;
+- OLMo2 `1B` only supports `max_model_len=4096`, so this rerun should be read as "does the stage pattern survive on a smaller same-family ladder?" rather than "did we exactly reproduce the old Qwen contract at lower cost?"
+
 Prompt surfaces:
 - base `MATH-500` / MCQ: native `raw`
 - SFT / `RLVR1` / instruct `MATH-500` / MCQ: native `chat_template`
@@ -117,6 +122,21 @@ What is already stable:
   - but it is not uniformly cleaner than `RLVR1`, and on `MMLU-Pro` it is much worse than both SFT and `RLVR1`.
 - `LiveCodeBench` makes the base-origin split especially stark: base hits max length on `475 / 500` rollouts there, while SFT drops to `48 / 500`, `RLVR1` to `4 / 500`, and instruct to `2 / 500`.
 - The native coding metric stays weak across the whole `1B` ladder (`pass@10 = 0.0` for base, SFT, and instruct; `0.02` for `RLVR1`), so `LiveCodeBench` is useful here mainly as a degeneration surface rather than a capability-ranking surface.
+
+## Visualization Follow-up
+
+The finished `50`-prompt ladder now has a direct figure bundle too:
+
+- progression PDF:
+  - `outputs/olmo2_1b_progression_bound50_20260406/olmo2_1b_progression_bound50.pdf`
+- line charts:
+  - `outputs/olmo2_1b_progression_bound50_20260406/figures/progression_rates.png`
+  - `outputs/olmo2_1b_progression_bound50_20260406/figures/progression_lengths.png`
+- within-stage overlap views:
+  - `outputs/olmo2_1b_progression_bound50_20260406/figures/stage_overlap_sankey.png`
+  - `outputs/olmo2_1b_progression_bound50_20260406/figures/stage_overlap_composition.png`
+
+Those figures are derived from the saved `50`-prompt stage JSONs, not reconstructed manually from the table above.
 
 What this changes relative to the earlier `8`-prompt pilot:
 - the pilot was directionally right that base is the main degeneration source;

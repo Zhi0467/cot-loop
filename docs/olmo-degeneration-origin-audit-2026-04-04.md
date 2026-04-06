@@ -148,3 +148,23 @@ If this thread is continued, the next honest step is not another interface audit
   - `/data/scratch/murphy/outputs/cot-loop-detection/olmo3_degeneration_origin_progression/livecodebench_hfchat_temp0p1_gen10_ctx40960/`
 - OLMo2 fallback remote root:
   - `/data/scratch/murphy/outputs/cot-loop-detection/olmo2_1b_degeneration_origin_progression/bound8_temp0p1_gen10_ctx4096_topkneg1/`
+
+## April 6 Follow-up
+
+Two later clarifications matter if this audit note is cited on its own:
+
+- the older Qwen reference object it is being compared against is the repaired v2 bundle `outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/`, with the long-horizon contract `temperature=0.2`, `num_generations=10`, `max_tokens=81920`, and `max_model_len=40960`;
+- the OLMo2 fallback here is therefore **not** a literal horizon match, because `OLMo-2-0425-1B*` only supports `4096`.
+
+There is now also a same-family Qwen base control on the old rollout surface:
+
+- model: `Qwen/Qwen3-1.7B-Base`
+- sampler and dataset family: same v2 surface as above
+- context limit: `32768`, not `40960`, because the base checkpoint advertises the shorter limit and vLLM rejects the instruct horizon without an unsafe override
+- early text-probe read: Qwen base raw does degenerate on MCQ, but mainly by repeating the answer-format instruction tail (`Do not output anything else`, `Do not explain your answer`, `Do not output anything that is not JSON`) rather than by repeating OLMo-style math-derivation lines
+
+And the OLMo2 ladder in this audit now has a dedicated figure bundle:
+
+- `outputs/olmo2_1b_progression_bound50_20260406/olmo2_1b_progression_bound50.pdf`
+- `outputs/olmo2_1b_progression_bound50_20260406/figures/progression_rates.png`
+- `outputs/olmo2_1b_progression_bound50_20260406/figures/stage_overlap_sankey.png`

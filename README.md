@@ -20,11 +20,18 @@ Latest status:
 - the OLMo degeneration line is now on a corrected result surface rather than an unresolved warning:
   - `RLVR / MMLU-Pro = 0 / 80` was a grader bug on relaxed terminal JSON-like forms such as `{"answer": I}`;
   - OLMo now has a model-native `LiveCodeBench` adapter path instead of the old silent Qwen-wrapper fallback;
-  - the cheap full-ladder control is now the finished OLMo 2 `1B` 50-prompt progression, which shows heavy loop / cap mass in base, reduced but still present mass in SFT, and much smaller mass in `RLVR1` / instruct.
+- the cheap full-ladder control is now the finished OLMo 2 `1B` 50-prompt progression, which shows heavy loop / cap mass in base, reduced but still present mass in SFT, and much smaller mass in `RLVR1` / instruct.
+- that OLMo2 ladder now has a proper visualization bundle too:
+  - progression figures and Sankey/alluvial overlap views live under `outputs/olmo2_1b_progression_bound50_20260406/`
+  - those figures are built directly from the saved `50`-prompt stage JSONs, not hand-copied tables.
+- the next same-family control is now active rather than only planned:
+  - the old Qwen reference object is the repaired v2 rollout bundle `outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/`
+  - the matching base-control rerun uses `Qwen/Qwen3-1.7B-Base` on the same sampler and dataset family, but at the base checkpoint's real `32768` context limit rather than the instruct checkpoint's `40960`
+  - the saved text probe already shows that Qwen base raw does degenerate on MCQ, but mainly by repeating the answer-format instruction tail rather than by OLMo-style math-derivation loops.
 - the current open work is now post-audit rather than pre-audit:
   - replace the 1D prompt-length control with a stronger prompt-shape baseline on the frozen prompt-profile splits;
   - test activation lift as residuals or inside matched prompt-shape strata;
-  - keep the next OLMo step on a fuller OLMo3 base-inclusive comparison rather than another OLMo2 scale-up.
+  - finish the Qwen base raw control and fold it back into the same degeneration-origin surface before deciding whether another larger OLMo rerun is warranted.
 
 **Workflow:**
 1. Build model-formatted chat prompts (shared `utils.build_prompt` source)
