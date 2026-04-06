@@ -20,7 +20,7 @@ This file is now a chronological working note, not just the original plan. The c
 - the original "base should barely have any degenerate rollouts" hypothesis is no longer the leading explanation;
 - on the scaled OLMo2 `1B` `50`-prompt ladder, heavy loop / max-length mass is already present in base, drops sharply in SFT, and is smallest at `RLVR1` on most datasets;
 - the corrected OLMo3 `7B` bounded rows do **not** support "RLVR introduces the degeneration";
-- the same-family Qwen control now shows that raw base prompting can also raise loop / max-length mass on Qwen-style models, so the phenomenon is not OLMo-only;
+- the finished Qwen base `MATH-500` control already shows that raw base prompting can also raise loop / max-length mass on Qwen-style models, so the phenomenon is not OLMo-only;
 - the textual failure mode is not identical across families:
   - OLMo2 base repeats derivation content or falls into synthetic-junk tails;
   - Qwen base raw often loops on the MCQ answer-format instruction tail itself.
@@ -31,6 +31,7 @@ Two practical notes for reading the rest of this file:
 - the durable stage-conclusion companions are:
   - `docs/olmo2-1b-fifty-prompt-rerun-2026-04-05.md`
   - `docs/olmo-degeneration-origin-audit-2026-04-04.md`
+- the Qwen same-family base control is still live, so its current companion surface is this working note plus the dated checkpoints in `roadmap.md`, not a separate finished note yet.
 
 ## Existing Reference Surface
 
@@ -704,7 +705,7 @@ Those figures are built directly from the saved `50`-prompt stage JSONs, not fro
 - `RLVR1` is the cleanest point on most datasets;
 - final instruct is mixed and re-accumulates visible degeneration on `MMLU-Pro`.
 
-The live Qwen base control has now crossed from progress receipts into finished rows, but this section is still live until the remaining four datasets finish:
+As of `2026-04-06 08:48 UTC`, the live Qwen base control has crossed from progress receipts into finished rows, but this section is still live until the remaining four datasets finish:
 
 - completed `MATH-500` row (`50` prompts, `500` rollouts):
   - `243 / 500` correct
@@ -716,11 +717,11 @@ The live Qwen base control has now crossed from progress receipts into finished 
   - old instruct row: `3628 / 5000` correct, `147 / 5000` looped, `73 / 5000` max-length-hit, `avg_generation_length = 6227.6302`
   - base raw is already worse on loop rate (`0.038` vs `0.0294`) and much worse on max-length-hit rate (`0.044` vs `0.0146`), even though the base row is much shorter on average (`1893.592` vs `6227.6302`)
 - remaining dedicated base jobs still live:
-  - latest log checkpoint (`2026-04-06 08:31 UTC`):
-    - `AIME`: `16 / 50` prompts processed
-    - `GPQA`: `11 / 50`
-    - `MMLU-Pro`: `11 / 50`
-    - `LiveCodeBench release_v6`: `6 / 50`
+  - latest log checkpoint (`2026-04-06 08:48 UTC`):
+    - `AIME`: `19 / 50` prompts processed
+    - `GPQA`: `13 / 50`
+    - `MMLU-Pro`: `15 / 50`
+    - `LiveCodeBench release_v6`: `7 / 50`
   - `GPQA` and `LiveCodeBench` are still the slowest decode legs so far on the base control; neither has emitted a finished JSON yet
 
 After `math500.json` was written, I killed the old serialized follow-on under GPU `3` because it had automatically rolled into a duplicate `AIME` run. So the active Qwen control is now cleanly one finished `MATH-500` row plus one live collector per remaining dataset, not two copies of `AIME`.

@@ -79,12 +79,13 @@ Current live status:
 - `p_loop` still wins the old bucket diagnostic for concentrating looping prompts, but that is no longer treated as proof that it should be the main training objective.
 - The note `prompt-profile-risk-screen-2026-03-30.md` is now the technical decision surface for this predictability-first correction.
 - The note `prompt-profile-plain-language-2026-03-30.md` is the collaborator-facing explanation of the same correction in plain words.
-- The repo-root note `../understand-where-loop-and-max-length-come-from.md` is still the working OLMo progression note on the older rollout-statistics module:
+- The repo-root note `../understand-where-loop-and-max-length-come-from.md` is now the working degeneration-origin note on the older rollout-statistics module:
   - it now opens with a current status snapshot;
+  - it carries both the OLMo execution history and the active same-family Qwen base control;
   - older April 4 pilot/debug sections are preserved in-place but explicitly marked `Historical`;
   - use it when you want the full chronological path, not just the cleaned stage conclusion.
 - The docs note `understand-where-loop-and-max-length-come-from.md` is only the background definitions appendix for saved `loop`, prompt-profile `cap_hit` / `p_cap`, rollout-stat `max_length_hit`, and `majority_s_0.5`.
-- The new note `olmo-degeneration-origin-audit-2026-04-04.md` is the collaborator-facing summary surface for that thread:
+- The new note `olmo-degeneration-origin-audit-2026-04-04.md` is the collaborator-facing OLMo audit surface for that thread:
   - it consolidates the repaired OLMo3 `MMLU-Pro` / `LiveCodeBench` rows plus the bounded OLMo2 `1B` ladder;
   - it is the right artifact to cite when the question is "what survived the audit?" rather than "what commands were run?"
 - The newer note `olmo2-1b-fifty-prompt-rerun-2026-04-05.md` is the larger OLMo2 follow-up:
@@ -102,7 +103,7 @@ Current live status:
   - the saved text probe already shows that Qwen base raw degenerates on MCQ mainly by repeating the answer-format instruction tail, which is a different failure mode from the OLMo2 base math loops
   - the first finished base row is now on disk: `MATH-500 243/500 correct`, `19/500` looped, `22/500` max-length-hit, with every looped rollout also hitting max length
   - that base `MATH-500` row is already worse than the old instruct v2 `MATH-500` reference on both loop rate (`0.038` vs `0.0294`) and max-length-hit rate (`0.044` vs `0.0146`), even though the base row is much shorter on average (`1893.6` vs `6227.6`)
-  - the remaining dedicated base collectors are still live; the latest node-log checkpoint is `AIME 13/50`, `GPQA 7/50`, `MMLU-Pro 8/50`, and `LiveCodeBench 4/50`
+  - only `MATH-500` is complete so far; the latest Qwen base-control checkpoint lives in `roadmap.md` until this follow-up gets its own finished note
 - The locked pair now has both the execution note and the finished first-run result note on disk.
 - The older `h256 d2` binary retrain note is still on disk, but it is now intermediate only:
   - it preserves the exact `2106` / `2107` depth-rerun record and raw remote metrics
