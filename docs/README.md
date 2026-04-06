@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-04-06 07:35 UTC
+Last updated: 2026-04-06 07:56 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -95,7 +95,10 @@ Current live status:
 - The next same-family control is now the Qwen base raw rerun on the old v2 rollout surface:
   - the reference object is still `../outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/`
   - the base checkpoint has to run at `32768`, not `40960`, because `Qwen/Qwen3-1.7B-Base` advertises the shorter limit and vLLM rejects the instruct horizon without an unsafe override
-  - the saved text probe already shows that Qwen base raw degenerates on MCQ mainly by repeating the answer-format instruction tail, which is a different failure mode from the OLMo2 base math loops.
+  - the old Qwen v2 `LiveCodeBench` row used raw strings from LiveCodeBench's `format_prompt_generation` under `CodeQwenInstruct`; the base control uses `GenericBase`, so that row is same dataset / sampler rather than a literal same-LM-style replay
+  - the saved text probe already shows that Qwen base raw degenerates on MCQ mainly by repeating the answer-format instruction tail, which is a different failure mode from the OLMo2 base math loops
+  - the first finished base row is now on disk: `MATH-500 243/500 correct`, `19/500` looped, `22/500` max-length-hit, with every looped rollout also hitting max length
+  - the remaining dedicated base collectors are still live on the other datasets: `AIME 6/50`, `GPQA 4/50`, `MMLU-Pro 3/50`, `LiveCodeBench 2/50`
 - The locked pair now has both the execution note and the finished first-run result note on disk.
 - The older `h256 d2` binary retrain note is still on disk, but it is now intermediate only:
   - it preserves the exact `2106` / `2107` depth-rerun record and raw remote metrics

@@ -592,6 +592,9 @@ I am not using that unsafe override. The active Qwen base control therefore keep
 - prompt surfaces:
   - math / GPQA / `MMLU-Pro` on explicit `raw`
   - `LiveCodeBench release_v6` on raw benchmark strings with `LM_STYLE=GenericBase`
+- old-reference caveat:
+  - the v2 Qwen `LiveCodeBench` row we are matching used raw strings from LiveCodeBench's `format_prompt_generation` under `CodeQwenInstruct`
+  - so the base `LiveCodeBench` control is same dataset and same sampler, but not a literal same-LM-style replay
 - active `50`-prompt output root:
   - `/data/scratch/murphy/outputs/cot-loop-detection/qwen3_1p7b_base_raw_control_temp0p2_gen10_ctx32768_topkneg1/bound50_20260406_gpu3/`
 
@@ -636,11 +639,28 @@ Representative saved prefixes from the looped Qwen base generations:
 
 - `GPQA`:
   - `Do not output anything else. Do not explain your answer.`
+  - then lines like `Do not use any other words than the JSON object.` and `Do not use any other characters than the JSON object.`
   - repeated to the context cap
 - `MMLU-Pro`:
   - `Do not output anything else. Do not output anything that is not JSON.`
   - or `Do not use any other data structures.`
   - repeated to the context cap
+
+That tail is coming from the raw MCQ prompt surface itself, not from a hidden chat wrapper:
+
+- the current `GPQA` raw prompt builder ends with:
+  - `On the final non-empty line, output only a JSON object of the form {"answer": "X"} ...`
+- the current `MMLU-Pro` raw prompt builder ends with the same JSON-only instruction family
+- so the Qwen base raw failure is best read as a raw-format instruction-tail loop, not as evidence that the base model is internally reproducing the same content-level failure mode as OLMo2
+
+The OLMo2 base probe makes that difference concrete too:
+
+- `MATH-500` loop example:
+  - starts with `The answer is \boxed{1}.` and then repeats the same zeta-sum derivation line over and over until the cap
+- `GPQA` loop example:
+  - flips among incompatible statements like `The answer is A. The energy difference ... 10^-8 eV.` then `The answer is D ... 10^-9 eV.`
+- `MMLU-Pro` loop example:
+  - falls into synthetic input junk such as `Input: ['A', 'B', 'C', ...]` or long `None, None, None ...` tails
 
 That means the current cross-family read is sharper:
 
@@ -664,3 +684,19 @@ Those figures are built directly from the saved `50`-prompt stage JSONs, not fro
 - SFT sharply reduces it but does not remove it;
 - `RLVR1` is the cleanest point on most datasets;
 - final instruct is mixed and re-accumulates visible degeneration on `MMLU-Pro`.
+
+The live Qwen base control has now crossed from progress receipts into finished rows:
+
+- completed `MATH-500` row (`50` prompts, `500` rollouts):
+  - `243 / 500` correct
+  - `19 / 500` looped
+  - `22 / 500` max-length hits
+  - `avg_generation_length = 1893.592`
+  - every looped rollout in that row also hit max length (`19 / 19`)
+- remaining dedicated base jobs still live:
+  - `AIME`: `6 / 50` prompts processed
+  - `GPQA`: `4 / 50`
+  - `MMLU-Pro`: `3 / 50`
+  - `LiveCodeBench release_v6`: `2 / 50`
+
+After `math500.json` was written, I killed the old serialized follow-on under GPU `3` because it had automatically rolled into a duplicate `AIME` run. So the active Qwen control is now cleanly one finished `MATH-500` row plus one live collector per remaining dataset, not two copies of `AIME`.
