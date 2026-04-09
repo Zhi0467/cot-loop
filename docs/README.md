@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-04-09 01:26 UTC
+Last updated: 2026-04-09 02:39 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -18,6 +18,7 @@ Core docs:
 - Prompt-profile natural-regression rerun note: prompt-profile-natural-regression-rerun-2026-04-05.md
 - Prompt-profile combined audit note: prompt-profile-combined-audit-2026-04-05.md
 - Prompt-profile metadata-mechanism note: prompt-profile-metadata-mechanism-2026-04-06.md
+- Prompt-profile length-mechanism note: prompt-profile-length-mechanism-2026-04-09.md
 - Prompt-profile corrected balanced-regression note: prompt-profile-balanced-regression-corrected-2026-04-04.md
 - Prompt-profile combined April surface report: prompt-profile-full-surface-update-2026-04-04.md
 - OLMo degeneration-origin audit report: olmo-degeneration-origin-audit-2026-04-04.md
@@ -47,6 +48,8 @@ Key outputs:
 - Prompt-profile metadata audit bundle: ../outputs/prompt_profile_metadata_audit_20260405/
 - Prompt-profile metadata-mechanism bundle: ../outputs/prompt_profile_metadata_mechanism_20260406/
 - Prompt-profile metadata-mechanism PDF: ../outputs/prompt_profile_metadata_mechanism_20260406/prompt_profile_metadata_mechanism_20260406.pdf
+- Prompt-profile length-mechanism bundle: ../outputs/prompt_profile_length_mechanism_20260409/
+- Prompt-profile length-mechanism PDF: ../outputs/prompt_profile_length_mechanism_20260409/prompt_profile_length_mechanism_20260409.pdf
 - Corrected balanced-regression bundle: ../outputs/prompt_profile_balanced_regression_corrected_20260404/
 - Corrected balanced-regression PDF: ../outputs/prompt_profile_balanced_regression_corrected_20260404/prompt_profile_balanced_regression_corrected_20260404.pdf
 - Full-train result bundle: ../outputs/prompt_profile_full_train_locked_pair_20260404/
@@ -71,12 +74,16 @@ Key outputs:
 - Detailed reopened-round summary PDF: ../outputs/prefill_rounds_1_to_12_detailed_summary/prefill_rounds_1_to_12_detailed_summary.pdf
 
 Current live status:
-- The new note `prompt-profile-combined-audit-2026-04-05.md` is now the collaborator-facing prompt-profile bundle:
-  - it keeps the canonical natural regression rerun, the current balanced-binary default, the cheap prompt-stat audit, and the Athena code audit in one surface;
+- The combined audit `prompt-profile-combined-audit-2026-04-05.md` is still the whole-surface prompt-profile bundle:
+  - it keeps the canonical natural regression rerun, the current balanced-binary default, the cheap prompt-stat audit, and the Athena code audit in one place;
   - it narrows the honest claim: the current reports establish lift over a 1D prompt-length baseline on some surfaces, not yet lift over strong prompt-only controls in general.
-- The next honest prompt-profile step is now a stronger prompt-shape baseline rather than another natural-regression rerun:
-  - fit a real prompt-only baseline on the frozen splits using shape features such as length, character count, newline count, and symbol counts;
-  - then measure whether the activation probes still add lift as residuals or within matched prompt-shape strata.
+- The new note `prompt-profile-length-mechanism-2026-04-09.md` is the direct plain-English answer to the narrower question "why does prompt length predict completion length at all?":
+  - on `AIME`, `MATH-500`, `MMLU-Pro`, and much of `LiveCodeBench`, prompt length mostly works as a rough workload proxy;
+  - `GPQA` is the important exception where raw length is weak and prompt structure matters more;
+  - the note is backed by a new `2`-GPU audit bundle under `../outputs/prompt_profile_length_mechanism_20260409/` plus an attached Athena plain-English read.
+- The next honest prompt-profile step is now a residualized conditional-lift audit on the natural regression head rather than another same-object rerun:
+  - keep the new length-mechanism note as the explanation of the prompt-length baseline;
+  - if the activation claim needs to move forward, evaluate activation lift over stronger prompt-shape controls or inside matched prompt-shape strata.
 - The current prompt-level predictor task is "predict terminal rollout statistics from prompt-prefill activations under one fixed model and decode policy," not "force everything into one binary loop label."
 - The objective selector is now fixed explicitly: choose the target by held-out predictability on the target itself, not by the downstream `top 20%` loop-enrichment slice.
 - Under that criterion, `mean_relative_length` is the strongest current regression target and `majority_s_0.5` is the strongest finished binary label surface, and Wangzhi locked that pair for the first full-train pass.
