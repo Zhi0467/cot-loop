@@ -11,7 +11,7 @@
 
 \title{Where Degenerate Rollouts Enter: OLMo and Qwen Combined Read}
 \author{}
-\date{2026-04-09 01:40 UTC}
+\date{2026-04-09 01:26 UTC}
 
 \begin{document}
 \maketitle
@@ -101,19 +101,21 @@ Anchor OLMo2 rows from the \texttt{50}-prompt ladder:
 \end{itemize}
 
 \section*{Qwen Read}
+The durable Qwen result is the finished base/raw bundle itself, which is visibly degenerate on every collected dataset. For rough scale only, the table below places those base rows beside the saved instruct-side v2 reference. This is not a controlled per-dataset comparison: prompt pools, rollout counts, context limits, and \texttt{LiveCodeBench} LM style are not fully aligned.
+
 \begin{center}
 \small
 \setlength{\tabcolsep}{5pt}
 \resizebox{\textwidth}{!}{
-\begin{tabular}{@{}lrrrrrr@{}}
+\begin{tabular}{@{}lrrrrrrrr@{}}
 \toprule
-Dataset & Base succ. & Base loop & Base max-hit & Instruct succ. & Instruct loop & Instruct max-hit \\
+Dataset & Base gen. & Base succ. & Base loop & Base max-hit & Instr. gen. & Instruct succ. & Instruct loop & Instruct max-hit \\
 \midrule
-\texttt{MATH-500} & 48.6\% & 3.8\% & 4.4\% & 72.6\% & 2.94\% & 1.46\% \\
-\texttt{AIME} & 4.6\% & 22.8\% & 23.2\% & 38.5\% & 15.0\% & 12.7\% \\
-\texttt{GPQA} & 8.2\% & 38.0\% & 38.0\% & 34.5\% & 16.4\% & 6.92\% \\
-\texttt{MMLU-Pro} & 11.0\% & 31.4\% & 31.4\% & 65.2\% & 4.56\% & 0.95\% \\
-\texttt{LiveCodeBench} & 20.4\% & 46.4\% & 46.8\% & 58.1\% & 15.0\% & 10.8\% \\
+\texttt{MATH-500} & 500 & 48.6\% & 3.8\% & 4.4\% & 5000 & 72.6\% & 2.94\% & 1.46\% \\
+\texttt{AIME} & 500 & 4.6\% & 22.8\% & 23.2\% & 600 & 38.5\% & 15.0\% & 12.7\% \\
+\texttt{GPQA} & 500 & 8.2\% & 38.0\% & 38.0\% & 1980 & 34.5\% & 16.4\% & 6.92\% \\
+\texttt{MMLU-Pro} & 500 & 11.0\% & 31.4\% & 31.4\% & 8000 & 65.2\% & 4.56\% & 0.95\% \\
+\texttt{LiveCodeBench} & 500 & 20.4\% & 46.4\% & 46.8\% & 8000 & 58.1\% & 15.0\% & 10.8\% \\
 \bottomrule
 \end{tabular}
 }
@@ -122,7 +124,7 @@ Dataset & Base succ. & Base loop & Base max-hit & Instruct succ. & Instruct loop
 \begin{figure}[H]
 \centering
 \includegraphics[width=\textwidth]{figures/qwen_base_vs_instruct_rates.png}
-\caption{Bounded Qwen base/raw control versus the saved Qwen3 instruct reference. The comparison is same-family and sampler-aligned, but not perfectly same-surface: raw/chat and context-limit differences remain explicit.}
+\caption{Bounded Qwen base/raw control beside the saved Qwen3 instruct reference. This is reference context, not a matched-prompt head-to-head: prompt pools, rollout counts, and interface details differ.}
 \end{figure}
 
 \begin{figure}[H]
@@ -142,6 +144,7 @@ Exact Qwen base/raw rows:
 
 Two extra points matter for interpretation:
 \begin{itemize}[leftmargin=1.5em]
+\item The instruct-side numbers above are useful as rough scale only. They should not be read as a controlled causal delta against the base bundle.
 \item The \texttt{LiveCodeBench} wrapper caveat is real but not enough by itself to explain the result. On the tiny \texttt{2}-prompt style probe, both \texttt{GenericBase} and \texttt{CodeQwenInstruct} looped to the cap with \texttt{pass@1 = 0}.
 \item Qwen's failure text still differs from OLMo2. The long MCQ failures often repeat the answer-format instruction tail itself (\texttt{Do not output anything else}, \texttt{Do not explain your answer}, \texttt{Do not output anything that is not JSON}), rather than repeating the math derivation content.
 \end{itemize}
@@ -149,7 +152,7 @@ Two extra points matter for interpretation:
 \section*{Bottom Line}
 \begin{itemize}[leftmargin=1.5em]
 \item The clean stage conclusion still comes from OLMo2 \texttt{1B}: heavy degeneracy is already present in base, then usually shrinks through SFT and RLVR rather than appearing from near zero.
-\item The finished Qwen same-family control now shows that the base/raw degeneration object is not OLMo-only.
+\item The finished Qwen same-family control now shows that substantial base/raw degeneration is not OLMo-only.
 \item What changes across families is the failure mode, not the existence of the pathology.
 \item The strongest caveat that remains is surface purity, not missing data:
 \begin{itemize}[leftmargin=1.5em]

@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-04-09 01:40 UTC
+Last updated: 2026-04-09 01:26 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -106,7 +106,7 @@ Current live status:
   - the old Qwen v2 `LiveCodeBench` row used raw strings from LiveCodeBench's `format_prompt_generation` under `CodeQwenInstruct`; the base control uses `GenericBase`, so that row is same dataset / sampler rather than a literal same-LM-style replay
   - the tiny base `LiveCodeBench` style probe still says that wrapper caveat is real but not sufficient to explain the weak base `LiveCodeBench` behavior by itself: both `GenericBase` and `CodeQwenInstruct` looped to the cap on the same `2` prompts with `pass@1 = 0`
   - the finished base rows are now all on disk and summarized in `olmo-qwen-degeneration-origin-combined-2026-04-09.md`
-  - base raw is worse than the saved instruct reference on loop fraction and max-length-hit fraction for all five datasets, which makes the base/raw pathology a cross-family phenomenon rather than an OLMo-only artifact
+  - the durable claim comes from the finished base rows themselves, which are heavily degenerate on all five datasets; the saved instruct-side v2 rows are now presented only as rough reference context because prompt pools and rollout counts differ
 - The locked pair now has both the execution note and the finished first-run result note on disk.
 - The older `h256 d2` binary retrain note is still on disk, but it is now intermediate only:
   - it preserves the exact `2106` / `2107` depth-rerun record and raw remote metrics

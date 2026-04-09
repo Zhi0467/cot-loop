@@ -766,7 +766,7 @@ Those figures are built directly from the saved `50`-prompt stage JSONs, not fro
 - `RLVR1` is the cleanest point on most datasets;
 - final instruct is mixed and re-accumulates visible degeneration on `MMLU-Pro`.
 
-As of `2026-04-09 01:05 UTC`, the Qwen same-family base control is finished on all five datasets.
+As of `2026-04-09 01:26 UTC`, the Qwen same-family base control is finished on all five datasets.
 
 - canonical finished bundle:
   - `outputs/qwen3_1p7b_base_raw_control_finished_20260409/`
@@ -776,20 +776,24 @@ As of `2026-04-09 01:05 UTC`, the Qwen same-family base control is finished on a
   - `GPQA`: `41 / 500` correct, `190 / 500` looped, `190 / 500` max-length-hit, `avg_generation_length = 12498.818`
   - `MMLU-Pro`: `55 / 500` correct, `157 / 500` looped, `157 / 500` max-length-hit, `avg_generation_length = 10268.472`
   - `LiveCodeBench release_v6`: `102 / 500` rollout-correct, `232 / 500` looped, `234 / 500` max-length-hit, `avg_generation_length = 14858.836`, native `pass@1 = 0.204`, `pass@10 = 0.34`
-- compared with the saved instruct-side Qwen v2 reference under `Qwen/Qwen3-1.7B`:
-  - base raw is worse on loop fraction and max-length-hit fraction on all five datasets, not only on `MATH-500`
-  - dataset-by-dataset loop fractions move from instruct to base as:
-    - `MATH-500`: `0.0294 -> 0.038`
-    - `AIME`: `0.15 -> 0.228`
-    - `GPQA`: `0.1641 -> 0.38`
-    - `MMLU-Pro`: `0.0456 -> 0.314`
-    - `LiveCodeBench release_v6`: `0.14975 -> 0.464`
-  - dataset-by-dataset max-length-hit fractions move from instruct to base as:
-    - `MATH-500`: `0.0146 -> 0.044`
-    - `AIME`: `0.1267 -> 0.232`
-    - `GPQA`: `0.0692 -> 0.38`
-    - `MMLU-Pro`: `0.0095 -> 0.314`
-    - `LiveCodeBench release_v6`: `0.1081 -> 0.468`
+- placed beside the saved instruct-side Qwen v2 reference under `Qwen/Qwen3-1.7B` for rough scale only:
+  - this is **not** a controlled per-dataset comparison:
+    - the base bundle is `50` prompts / `500` rollouts per dataset
+    - the saved instruct reference uses older larger prompt pools and rollout counts (`5000`, `600`, `1980`, `8000`, `8000`)
+    - `LiveCodeBench` also differs in LM style (`GenericBase` here versus `CodeQwenInstruct` in the saved instruct bundle)
+  - numerically, the saved instruct reference rows still sit below the finished base bundle on loop/max-hit rates:
+    - loop fractions:
+      - `MATH-500`: `0.0294` versus base `0.038`
+      - `AIME`: `0.15` versus base `0.228`
+      - `GPQA`: `0.1641` versus base `0.38`
+      - `MMLU-Pro`: `0.0456` versus base `0.314`
+      - `LiveCodeBench release_v6`: `0.14975` versus base `0.464`
+    - max-length-hit fractions:
+      - `MATH-500`: `0.0146` versus base `0.044`
+      - `AIME`: `0.1267` versus base `0.232`
+      - `GPQA`: `0.0692` versus base `0.38`
+      - `MMLU-Pro`: `0.0095` versus base `0.314`
+      - `LiveCodeBench release_v6`: `0.1081` versus base `0.468`
 - overlap read on the finished base/raw bundle:
   - `GPQA` and `MMLU-Pro` are exact loop-equals-max-hit rows (`190 / 190` and `157 / 157`)
   - `LiveCodeBench` is nearly exact (`232 / 234`)

@@ -24,17 +24,17 @@ Latest status:
 - that OLMo2 ladder now has a proper visualization bundle too:
   - progression figures and Sankey/alluvial overlap views live under `outputs/olmo2_1b_progression_bound50_20260406/`
   - those figures are built directly from the saved `50`-prompt stage JSONs, not hand-copied tables.
-- the next same-family control is now active rather than only planned:
+- the same-family Qwen follow-up is now finished rather than only active:
   - the old Qwen reference object is the repaired v2 rollout bundle `outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/`
   - the matching base-control rerun uses `Qwen/Qwen3-1.7B-Base` on the same sampler and dataset family, but at the base checkpoint's real `32768` context limit rather than the instruct checkpoint's `40960`
   - the `LiveCodeBench` comparison is only same dataset plus same sampler, not a literal same-LM-style replay: the old v2 instruct row used `CodeQwenInstruct`, while the base control uses `GenericBase`
-  - the saved text probe already shows that Qwen base raw does degenerate on MCQ, but mainly by repeating the answer-format instruction tail rather than by OLMo-style math-derivation loops.
-  - the first finished long-horizon base row is already on disk: `MATH-500 = 243/500` correct, `19/500` looped, `22/500` max-length-hit
-  - that base `MATH-500` row is already worse than the old instruct v2 reference on both loop rate (`0.038` vs `0.0294`) and max-length-hit rate (`0.044` vs `0.0146`), even though base is much shorter on average (`1893.6` vs `6227.6`)
+  - the finished base bundle itself is heavily degenerate across all five datasets, with `AIME 114/500` looped, `GPQA 190/500`, `MMLU-Pro 157/500`, and `LiveCodeBench 232/500`
+  - the saved text probe shows that Qwen base raw does degenerate on MCQ, but mainly by repeating the answer-format instruction tail rather than by OLMo-style math-derivation loops
+  - the saved instruct-side v2 table is still useful as rough scale, but not as a controlled per-dataset comparison, because prompt pools, rollout counts, context limits, and `LiveCodeBench` LM style do not match the new base bundle
 - the current open work is now post-audit rather than pre-audit:
   - replace the 1D prompt-length control with a stronger prompt-shape baseline on the frozen prompt-profile splits;
   - test activation lift as residuals or inside matched prompt-shape strata;
-  - finish the Qwen base raw control and fold it back into the same degeneration-origin surface before deciding whether another larger OLMo rerun is warranted.
+  - use the finished OLMo+Qwen combined report to decide whether another larger OLMo rerun is warranted, rather than treating the Qwen follow-up as still pending.
 
 **Workflow:**
 1. Build model-formatted chat prompts (shared `utils.build_prompt` source)

@@ -1,6 +1,6 @@
 # OLMo and Qwen Degeneration-Origin Combined Report
 
-Date: 2026-04-09 01:40 UTC
+Date: 2026-04-09 01:26 UTC
 
 ## Executive Summary
 
@@ -88,15 +88,15 @@ Anchor OLMo2 rows from the `50`-prompt ladder:
 
 ## Qwen Read
 
-The Qwen same-family control is now finished on all five datasets. Base/raw is worse than the saved instruct reference on loop fraction and max-length-hit fraction for every dataset:
+The Qwen same-family control is now finished on all five datasets. The durable result is the finished base/raw bundle itself, which is visibly degenerate on every collected dataset. For rough scale only, the table below places those base rows beside the saved instruct-side v2 reference. This is not a controlled per-dataset comparison: the prompt pools and rollout counts differ, and `LiveCodeBench` also differs in LM style.
 
-| Dataset | Base success | Base loop | Base max-hit | Instruct success | Instruct loop | Instruct max-hit |
-| --- | --- | --- | --- | --- | --- | --- |
-| `MATH-500` | `48.6%` | `3.8%` | `4.4%` | `72.6%` | `2.94%` | `1.46%` |
-| `AIME` | `4.6%` | `22.8%` | `23.2%` | `38.5%` | `15.0%` | `12.7%` |
-| `GPQA` | `8.2%` | `38.0%` | `38.0%` | `34.5%` | `16.4%` | `6.92%` |
-| `MMLU-Pro` | `11.0%` | `31.4%` | `31.4%` | `65.2%` | `4.56%` | `0.95%` |
-| `LiveCodeBench` | `20.4%` | `46.4%` | `46.8%` | `58.1%` | `15.0%` | `10.8%` |
+| Dataset | Base rollouts | Base success | Base loop | Base max-hit | Instruct rollouts | Instruct success | Instruct loop | Instruct max-hit |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `MATH-500` | `500` | `48.6%` | `3.8%` | `4.4%` | `5000` | `72.6%` | `2.94%` | `1.46%` |
+| `AIME` | `500` | `4.6%` | `22.8%` | `23.2%` | `600` | `38.5%` | `15.0%` | `12.7%` |
+| `GPQA` | `500` | `8.2%` | `38.0%` | `38.0%` | `1980` | `34.5%` | `16.4%` | `6.92%` |
+| `MMLU-Pro` | `500` | `11.0%` | `31.4%` | `31.4%` | `8000` | `65.2%` | `4.56%` | `0.95%` |
+| `LiveCodeBench` | `500` | `20.4%` | `46.4%` | `46.8%` | `8000` | `58.1%` | `15.0%` | `10.8%` |
 
 Exact base/raw rows:
 
@@ -108,13 +108,14 @@ Exact base/raw rows:
 
 Two extra points matter for interpretation:
 
+- The saved instruct-side table above is reference context, not a matched-prompt regression against base. The prompt IDs, rollout counts, context limits, and `LiveCodeBench` LM style are not aligned tightly enough for a clean causal delta.
 - The `LiveCodeBench` wrapper caveat is real but not enough by itself to explain the result. On the tiny `2`-prompt style probe, both `GenericBase` and `CodeQwenInstruct` looped to the cap with `pass@1 = 0`.
 - Qwen's failure text still differs from OLMo2. The long MCQ failures often repeat the answer-format instruction tail itself (`Do not output anything else`, `Do not explain your answer`, `Do not output anything that is not JSON`), rather than repeating the math derivation content.
 
 ## Bottom Line
 
 - The clean stage conclusion still comes from OLMo2 `1B`: heavy degeneracy is already present in base, then usually shrinks through SFT and RLVR rather than appearing from near zero.
-- The finished Qwen same-family control now shows that the base/raw degeneration object is not OLMo-only.
+- The finished Qwen same-family control now shows that substantial base/raw degeneration is not OLMo-only.
 - What changes across families is the failure mode, not the existence of the pathology.
 - The strongest caveat that remains is surface purity, not missing data:
   - OLMo3 still lacks a finished full `7B` base five-dataset bundle.
