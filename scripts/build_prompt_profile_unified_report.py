@@ -5,7 +5,6 @@ import argparse
 import csv
 import json
 import math
-import shutil
 import subprocess
 import textwrap
 from dataclasses import dataclass
@@ -13,11 +12,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import matplotlib
+MATPLOTLIB_IMPORT_ERROR: ModuleNotFoundError | None = None
+try:
+    import matplotlib
 
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import numpy as np
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+except ModuleNotFoundError as exc:
+    matplotlib = None
+    plt = None
+    MATPLOTLIB_IMPORT_ERROR = exc
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -130,6 +134,11 @@ def ensure_clean_dir(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
     figures_dir = path / "figures"
     figures_dir.mkdir(parents=True, exist_ok=True)
+
+
+def shifted_positions(count: int, width: float, offset_index: int) -> list[float]:
+    center = (count - 1) / 2.0
+    return [idx + (offset_index - center) * width for idx in range(len(DATASETS))]
 
 
 def fmt(value: float, digits: int = 3) -> str:
@@ -249,8 +258,9 @@ def plot_regression_views(
     regression_summary: dict[str, Any],
     prompt_models: dict[str, dict[str, dict[str, float]]],
 ) -> None:
+    if plt is None:
+        raise RuntimeError("matplotlib is required to generate regression figures")
     dataset_labels = [display for _, display in DATASETS]
-    x = np.arange(len(DATASETS))
     width = 0.15
     fig, axes = plt.subplots(2, 1, figsize=(11.5, 8.5), sharex=True)
     panels = [
@@ -259,7 +269,7 @@ def plot_regression_views(
     ]
     for panel_metric, panel_title, ax in panels:
         for idx, (model_key, label) in enumerate(REGRESSION_MODEL_ORDER):
-            xpos = x + (idx - 2) * width
+            xpos = shifted_positions(len(REGRESSION_MODEL_ORDER), width, idx)
             values: list[float] = []
             yerr: list[float] = []
             use_err = model_key in {"last_layer", "ensemble"}
@@ -292,7 +302,7 @@ def plot_regression_views(
         ax.grid(axis="y", alpha=0.25, linewidth=0.8)
         ax.set_axisbelow(True)
     axes[0].legend(ncol=3, fontsize=9, frameon=False, loc="upper left")
-    axes[1].set_xticks(x)
+    axes[1].set_xticks(range(len(DATASETS)))
     axes[1].set_xticklabels(dataset_labels, rotation=0)
     fig.suptitle("Regression views on the natural split", fontsize=14, y=0.98)
     fig.tight_layout(rect=[0, 0, 1, 0.96])
@@ -305,12 +315,13 @@ def plot_binary_views(
     binary_summary: dict[str, Any],
     best_prompt_only: dict[str, dict[str, float | str]],
 ) -> None:
+    if plt is None:
+        raise RuntimeError("matplotlib is required to generate classification figures")
     dataset_labels = [display for _, display in DATASETS]
-    x = np.arange(len(DATASETS))
     width = 0.18
     fig, ax = plt.subplots(figsize=(11.5, 4.8))
     for idx, (model_key, label) in enumerate(BINARY_MODEL_ORDER):
-        xpos = x + (idx - 1.5) * width
+        xpos = shifted_positions(len(BINARY_MODEL_ORDER), width, idx)
         values: list[float] = []
         for dataset_key, _ in DATASETS:
             row = binary_summary["datasets"][dataset_key]
@@ -342,7 +353,7 @@ def plot_binary_views(
             label=label,
             linewidth=0,
         )
-    ax.set_xticks(x)
+    ax.set_xticks(range(len(DATASETS)))
     ax.set_xticklabels(dataset_labels)
     ax.set_ylabel("PR-AUC")
     ax.set_title("Classification views on the balanced-train / natural-test split")
@@ -358,6 +369,8 @@ def plot_quartiles(
     out_path: Path,
     prompt_bins: dict[str, list[dict[str, float]]],
 ) -> None:
+    if plt is None:
+        raise RuntimeError("matplotlib is required to generate quartile figures")
     fig, axes = plt.subplots(2, 3, figsize=(11.5, 7.8))
     axes_flat = axes.flatten()
     for idx, (dataset_key, display) in enumerate(DATASETS):
@@ -803,14 +816,19 @@ Dataset & Best regression prompt-only cue & Best classification prompt-only cue 
 
 def compile_pdf(tex_path: Path) -> None:
     for _ in range(2):
-        subprocess.run(
-            ["pdflatex", "-interaction=nonstopmode", "-halt-on-error", tex_path.name],
-            cwd=tex_path.parent,
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-        )
+        try:
+            subprocess.run(
+                ["pdflatex", "-interaction=nonstopmode", "-halt-on-error", tex_path.name],
+                cwd=tex_path.parent,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+        except subprocess.CalledProcessError as exc:
+            raise SystemExit(
+                f"pdflatex failed while building {tex_path.name}.\n{exc.stdout}"
+            ) from exc
     for suffix in [".aux", ".log", ".out"]:
         aux_path = tex_path.with_suffix(suffix)
         if aux_path.exists():
@@ -821,11 +839,77 @@ def write_doc(path: Path, text: str) -> None:
     path.write_text(text)
 
 
+def maybe_reuse_existing_bundle(out_dir: Path, doc_out: Path) -> bool:
+    if MATPLOTLIB_IMPORT_ERROR is None:
+        return False
+
+    required_paths = [
+        out_dir / "prompt_profile_unified_report_20260409.pdf",
+        out_dir / "prompt_profile_unified_report_20260409.tex",
+        out_dir / "figures" / "regression_views.png",
+        out_dir / "figures" / "binary_views.png",
+        out_dir / "figures" / "prompt_length_quartiles.png",
+        doc_out,
+    ]
+    missing = [str(path) for path in required_paths if not path.exists()]
+    if missing:
+        missing_text = ", ".join(missing)
+        raise SystemExit(
+            "matplotlib is unavailable and the reusable committed bundle is incomplete "
+            f"({missing_text}). Re-run inside the prompt-profile environment or install "
+            "matplotlib first."
+        )
+    print(
+        "matplotlib is unavailable; reusing the existing committed report bundle in "
+        f"{out_dir}",
+        flush=True,
+    )
+    return True
+
+
+def ensure_figures(
+    figures_dir: Path,
+    regression_summary: dict[str, Any],
+    prompt_models: dict[str, dict[str, dict[str, float]]],
+    binary_summary: dict[str, Any],
+    best_prompt_only: dict[str, dict[str, float | str]],
+    prompt_bins: dict[str, list[dict[str, float]]],
+) -> None:
+    figure_paths = [
+        figures_dir / "regression_views.png",
+        figures_dir / "binary_views.png",
+        figures_dir / "prompt_length_quartiles.png",
+    ]
+    if MATPLOTLIB_IMPORT_ERROR is not None:
+        missing = [path.name for path in figure_paths if not path.exists()]
+        if missing:
+            missing_text = ", ".join(missing)
+            raise SystemExit(
+                "matplotlib is required to regenerate missing figures "
+                f"({missing_text}). Re-run inside the prompt-profile environment "
+                "or install matplotlib first."
+            )
+        print(
+            "matplotlib is unavailable; reusing the existing committed figures in "
+            f"{figures_dir}",
+            flush=True,
+        )
+        return
+
+    plot_regression_views(figure_paths[0], regression_summary, prompt_models)
+    plot_binary_views(figure_paths[1], binary_summary, best_prompt_only)
+    plot_quartiles(figure_paths[2], prompt_bins)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     parser.add_argument("--doc-out", type=Path, default=DOC_OUT)
     args = parser.parse_args()
+
+    ensure_clean_dir(args.out_dir)
+    if maybe_reuse_existing_bundle(args.out_dir, args.doc_out):
+        return
 
     regression_summary = load_json(REGRESSION_SUMMARY_PATH)
     binary_summary = load_json(BINARY_SUMMARY_PATH)
@@ -839,13 +923,15 @@ def main() -> None:
     best_prompt_only = build_binary_best_prompt_only(metadata_audit)
     prompt_bins = build_prompt_bins(prompt_bins_rows)
 
-    ensure_clean_dir(args.out_dir)
     figures_dir = args.out_dir / "figures"
-    plot_regression_views(
-        figures_dir / "regression_views.png", regression_summary, prompt_models
+    ensure_figures(
+        figures_dir,
+        regression_summary,
+        prompt_models,
+        binary_summary,
+        best_prompt_only,
+        prompt_bins,
     )
-    plot_binary_views(figures_dir / "binary_views.png", binary_summary, best_prompt_only)
-    plot_quartiles(figures_dir / "prompt_length_quartiles.png", prompt_bins)
 
     generated_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     tex_text = build_tex(
