@@ -1,11 +1,14 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-09 02:39 UTC
+Last updated: 2026-04-09 22:55 UTC
 
 ## Immediate Next Experiments
 
-- The current collaborator-facing prompt-profile surface is now one combined audit bundle rather than separate regression and binary notes.
+- The current collaborator-facing prompt-profile surface is now one unified report rather than three separate April PDFs.
   - Primary citation:
+    - `docs/prompt-profile-unified-report-2026-04-09.md`
+    - `outputs/prompt_profile_unified_report_20260409/prompt_profile_unified_report_20260409.pdf`
+  - Supporting source notes:
     - `docs/prompt-profile-combined-audit-2026-04-05.md`
     - `outputs/prompt_profile_combined_audit_20260405/prompt_profile_combined_audit_20260405.pdf`
     - `docs/prompt-profile-length-mechanism-2026-04-09.md`
@@ -16,6 +19,7 @@ Last updated: 2026-04-09 02:39 UTC
     - `outputs/prompt_profile_length_mechanism_20260409/`
   - What this bundle fixes:
     - it keeps the canonical natural-split / natural-sampler regression rerun and the current balanced-binary recommendation in one surface again;
+    - it adds one collaborator-facing PDF that starts from setup and predictor views, then carries visuals, results, and interpretation in the same artifact;
     - it adds a cheap prompt-stat audit from the saved prompt archives;
     - it adds Athena's codebase-level audit of the current build / label / train / summarize path;
     - it now also answers the narrower mechanism question directly, in plain English: why prompt length predicts completion length at all.

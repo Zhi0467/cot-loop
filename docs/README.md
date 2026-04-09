@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-04-09 02:39 UTC
+Last updated: 2026-04-09 22:55 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -16,6 +16,7 @@ Core docs:
 - Prompt-profile plain-language note: prompt-profile-plain-language-2026-03-30.md
 - Prompt-profile full-train plan: prompt-profile-full-train-plan-2026-04-02.md
 - Prompt-profile natural-regression rerun note: prompt-profile-natural-regression-rerun-2026-04-05.md
+- Prompt-profile unified report note: prompt-profile-unified-report-2026-04-09.md
 - Prompt-profile combined audit note: prompt-profile-combined-audit-2026-04-05.md
 - Prompt-profile metadata-mechanism note: prompt-profile-metadata-mechanism-2026-04-06.md
 - Prompt-profile length-mechanism note: prompt-profile-length-mechanism-2026-04-09.md
@@ -43,6 +44,8 @@ Key outputs:
 - Full-train plan PDF: ../outputs/prompt_profile_full_train_plan_20260402/prompt_profile_full_train_plan_20260402.pdf
 - Natural-regression rerun bundle: ../outputs/prompt_profile_natural_regression_rerun_20260405/
 - Natural-regression rerun PDF: ../outputs/prompt_profile_natural_regression_rerun_20260405/prompt_profile_natural_regression_rerun_20260405.pdf
+- Prompt-profile unified report bundle: ../outputs/prompt_profile_unified_report_20260409/
+- Prompt-profile unified report PDF: ../outputs/prompt_profile_unified_report_20260409/prompt_profile_unified_report_20260409.pdf
 - Prompt-profile combined audit bundle: ../outputs/prompt_profile_combined_audit_20260405/
 - Prompt-profile combined audit PDF: ../outputs/prompt_profile_combined_audit_20260405/prompt_profile_combined_audit_20260405.pdf
 - Prompt-profile metadata audit bundle: ../outputs/prompt_profile_metadata_audit_20260405/
