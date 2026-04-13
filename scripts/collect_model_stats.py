@@ -180,9 +180,16 @@ def _prompt_rollout_archive_path(out_path: str) -> str:
 def _prompt_rollout_archive_path_for_lcb_checkpoint(checkpoint_path: str) -> str:
     base, _ = os.path.splitext(checkpoint_path)
     suffix = "__lcb_records"
-    if not base.endswith(suffix):
+    archived_suffix = f"{suffix}__preexisting_"
+    if base.endswith(suffix):
+        prefix = base[:-len(suffix)]
+        archived_tail = ""
+    elif archived_suffix in base:
+        prefix, archived_tail = base.split(archived_suffix, 1)
+        archived_tail = f"__preexisting_{archived_tail}"
+    else:
         return ""
-    return f"{base[:-len(suffix)]}__rollout_archive.jsonl.gz"
+    return f"{prefix}__rollout_archive.jsonl{archived_tail}.gz"
 
 
 def _archive_preexisting_output(path: str) -> None:
@@ -601,6 +608,9 @@ def _collect_worker_stats(
         chunk_size = max(1, rollout_cfg.max_num_seqs // rollout_cfg.num_generations)
     else:
         chunk_size = len(items)
+    # Keep archive memory bounded even when vLLM is allowed to process the full
+    # dataset as one logical chunk.
+    prompt_rollout_spill_rows = max(1, min(chunk_size, 16))
     for start in range(0, len(items), chunk_size):
         end = min(start + chunk_size, len(items))
         batch_items = items[start:end]
@@ -643,6 +653,11 @@ def _collect_worker_stats(
                         "rollouts": [],
                     }
                 )
+                if len(agg.prompt_rollout_records) >= prompt_rollout_spill_rows:
+                    _spill_prompt_rollout_records(
+                        agg,
+                        rank=rank,
+                    )
                 if collector_cfg.task_kind == "livecodebench_codegen":
                     agg.lcb_sample_records.append(
                         LcbSampleRecord(
@@ -797,6 +812,11 @@ def _collect_worker_stats(
                         "rollouts": prompt_rollouts,
                     }
                 )
+                if len(agg.prompt_rollout_records) >= prompt_rollout_spill_rows:
+                    _spill_prompt_rollout_records(
+                        agg,
+                        rank=rank,
+                    )
 
         _spill_prompt_rollout_records(
             agg,

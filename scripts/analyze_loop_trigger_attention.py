@@ -586,20 +586,25 @@ def main() -> None:
         dataset_rows = [row for row in per_layer_rows if row["dataset"] == dataset]
         if not dataset_rows:
             continue
+        summary_layer = max(int(row["layer"]) for row in dataset_rows)
+        summary_rows = [
+            row for row in dataset_rows if int(row["layer"]) == summary_layer
+        ]
         overall_summary[dataset] = {
             "num_selected_rows": len(
-                { (row["sample_id"], row["rollout_index"]) for row in dataset_rows }
+                {(row["sample_id"], row["rollout_index"]) for row in summary_rows}
             ),
-            "mean_prev_loop_mass": _mean([float(r["mean_prev_loop_mass"]) for r in dataset_rows]),
-            "mean_last_prev_loop_mass": _mean([float(r["mean_last_prev_loop_mass"]) for r in dataset_rows]),
-            "mean_prompt_mass": _mean([float(r["mean_prompt_mass"]) for r in dataset_rows]),
-            "mean_current_trigger_mass": _mean([float(r["mean_current_trigger_mass"]) for r in dataset_rows]),
-            "mean_recent_nonloop_mass": _mean([float(r["mean_recent_nonloop_mass"]) for r in dataset_rows]),
-            "top1_fraction_previous_loop": _mean([float(r["top1_fraction_previous_loop"]) for r in dataset_rows]),
-            "top1_fraction_last_previous_loop": _mean([float(r["top1_fraction_last_previous_loop"]) for r in dataset_rows]),
-            "top1_fraction_prompt": _mean([float(r["top1_fraction_prompt"]) for r in dataset_rows]),
-            "top1_fraction_current_trigger": _mean([float(r["top1_fraction_current_trigger"]) for r in dataset_rows]),
-            "top1_fraction_recent_nonloop": _mean([float(r["top1_fraction_recent_nonloop"]) for r in dataset_rows]),
+            "summary_layer": summary_layer,
+            "mean_prev_loop_mass": _mean([float(r["mean_prev_loop_mass"]) for r in summary_rows]),
+            "mean_last_prev_loop_mass": _mean([float(r["mean_last_prev_loop_mass"]) for r in summary_rows]),
+            "mean_prompt_mass": _mean([float(r["mean_prompt_mass"]) for r in summary_rows]),
+            "mean_current_trigger_mass": _mean([float(r["mean_current_trigger_mass"]) for r in summary_rows]),
+            "mean_recent_nonloop_mass": _mean([float(r["mean_recent_nonloop_mass"]) for r in summary_rows]),
+            "top1_fraction_previous_loop": _mean([float(r["top1_fraction_previous_loop"]) for r in summary_rows]),
+            "top1_fraction_last_previous_loop": _mean([float(r["top1_fraction_last_previous_loop"]) for r in summary_rows]),
+            "top1_fraction_prompt": _mean([float(r["top1_fraction_prompt"]) for r in summary_rows]),
+            "top1_fraction_current_trigger": _mean([float(r["top1_fraction_current_trigger"]) for r in summary_rows]),
+            "top1_fraction_recent_nonloop": _mean([float(r["top1_fraction_recent_nonloop"]) for r in summary_rows]),
         }
 
     _write_json(out_dir / "attention_summary.json", overall_summary)
