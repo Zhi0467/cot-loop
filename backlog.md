@@ -154,8 +154,8 @@ This should be similar to our previous experiments on training probes on loop la
 - The first Qwen3 loop-trigger attention pilot now exists under `outputs/qwen3_loop_trigger_attention_20260413/`, with the write-up in `docs/qwen3-loop-trigger-attention-2026-04-13.md`.
   - What it proved:
     - on the short exact-trigger slice, reconstructed saved text is good enough to recover the same trigger prefix almost every time even though exact completion token IDs were never archived;
-    - the late-layer read is prompt-dominant on that slice, not previous-loop-dominant: across all `14` selected rows, final-layer prompt mass is `0.680`, current-trigger mass is `0.190`, and previous-loop mass is only `0.069`, with `0%` of final-layer heads putting top-1 attention on earlier loop copies;
-    - the full-stack claim is still too strong, because intermediate layers can carry meaningful previous-loop mass even when the final layer does not;
+    - the bounded trigger slice itself is now pinned cleanly (`14` selected rows, total prefix at most `4096`), but the old late-layer numerical summary was withdrawn after an overlap bug was found in the previous-loop binning;
+    - future readouts on this object should therefore cite the note's current boundary claim and wait for the overlap-corrected rerun instead of repeating the stale prompt-vs-loop mass table;
     - future rollout paths now save exact completion token IDs and structured trigger metadata, so this analysis does not need to rely on retrospective text reconstruction again.
   - What is still open:
     - scale the same measurement to longer trigger prefixes once GPU time is available;
