@@ -25,3 +25,6 @@ outputs/probe_runs/
 
 # macOS Google Drive folder icons.
 Icon?
+
+# accidental absolute-path mirror from local machine
+Users/
