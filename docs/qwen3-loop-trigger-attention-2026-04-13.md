@@ -1,6 +1,6 @@
 # Qwen3 Loop-Trigger Attention Pilot
 
-Last updated: 2026-04-13 18:33 UTC
+Last updated: 2026-04-13 21:18 UTC
 
 ## Question
 
@@ -14,10 +14,10 @@ One correction matters up front: an earlier draft of this pilot had a per-layer 
 
 ## Commit Audit
 
-- I fetched `upstream/main` on 2026-04-13 17:24 UTC.
-- The only new upstream change was merge commit `d4255f2` (`Merge pull request #9 from murphytheagent/task/1775257854-olmo-qwen-followup-clean`).
-- That merge lands the unified prompt-profile report surface. It does **not** add a loop-trigger attention-analysis script.
-- So the attention pilot in this note is a fresh implementation against the saved archives, not a review of a newly landed attention script.
+- I re-fetched `upstream/main` on 2026-04-13 21:18 UTC after Wangzhi's follow-up.
+- The current upstream-main head is `d10155c` (`added attention scouting script`).
+- So `main` now **does** carry the basic attention-analysis helper.
+- The replay/saver fixes and the corrected attention-summary logic in this note still live on the task branch / PR `#10`; they were not part of `d10155c`.
 
 ## Reconstruction Boundary
 
@@ -36,10 +36,10 @@ The reconstruction pass over the full saved archive family found:
 | Dataset | Rollouts | Loop rows | Exact retokenized length | Match if one hidden stop token is allowed | Trigger-prefix match |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | `GPQA` | `792` | `124` | `46 / 792` | `749 / 792` | `121 / 124` |
-| `AIME` | `240` | `31` | `38 / 240` | `236 / 240` | `30 / 31` |
+| `AIME` | `240` | `31` | `38 / 240` | `234 / 240` | `30 / 31` |
 | `MATH-500` | `2000` | `68` | `38 / 2000` | `1991 / 2000` | `68 / 68` |
 | `MMLU-Pro` | `3200` | `130` | `34 / 3200` | `3191 / 3200` | `130 / 130` |
-| `LiveCodeBench` | `3200` | `467` | `356 / 3200` | `3169 / 3200` | `462 / 467` |
+| `LiveCodeBench` | `3200` | `467` | `356 / 3200` | `3168 / 3200` | `462 / 467` |
 
 The main pattern is simple:
 
@@ -89,26 +89,18 @@ Head destinations make the same point even more strongly:
 
 So the corrected late-layer read is prompt-dominant, not previous-loop-dominant.
 
-That is not the whole story, though. When I look across layers rather than only the last one, earlier loop copies do show up in intermediate layers:
-
-- `GPQA`: best previous-loop layer is layer `1` with mean previous-loop mass `0.275`
-- `AIME`: best previous-loop layer is layer `0` with mean previous-loop mass `0.282`
-- `MATH-500`: best previous-loop layer is layer `18` with mean previous-loop mass `0.410`
-- `MMLU-Pro`: best previous-loop layer is layer `11` with mean previous-loop mass `0.229`
-- `LiveCodeBench`: best previous-loop layer is layer `13` with mean previous-loop mass `0.448`
+One more caution matters here. A later local review found that the attention wrapper also needed to respect sliding-window masking for checkpoints that use hybrid attention. I patched the script for that case, but I have **not** rerun the remote archive sweep after that final code fix in this checkout. So this note intentionally keeps only the bounded **final-layer** headline above as current. I am not making any intermediate-layer or "best layer" claim here until that rerun is refreshed.
 
 ## Read
 
-The corrected answer is more nuanced than the first draft.
-
 What the pilot supports:
 
-- if the claim is "the model completely ignores earlier loop copies," that is too strong across the whole stack; several datasets show meaningful previous-loop attention in intermediate layers
-- but if the claim is specifically about the **final layer** on this short exact-trigger slice, the model is mostly looking back to the **prompt**, not to earlier loop copies
+- if the claim is specifically about the **final layer** on this short exact-trigger slice, the model is mostly looking back to the **prompt**, not to earlier loop copies
 - previous-loop mass in the final layer is still nonzero, especially on `LiveCodeBench` and `MATH-500`, but it is much smaller than prompt mass on every dataset in this bounded pilot
 
 What the pilot does **not** yet support:
 
+- it does not support any whole-stack or intermediate-layer claim until the sliding-window-corrected rerun is refreshed;
 - it does not prove that prompt-focused final-layer attention is the causal reason the loop continues
 - it does not prove that previous-loop attention is the causal reason the loop continues;
 - it does not show the same pattern on the long `8k+` trigger rows;
@@ -116,21 +108,18 @@ What the pilot does **not** yet support:
 
 So the honest current answer is:
 
-- **No**, the full-stack claim "it is not paying attention to previous loops" is too strong; intermediate layers often do read previous loop copies.
 - **Yes**, on this short exact-trigger slice the **final layer** is overwhelmingly prompt-focused rather than previous-loop-focused.
-- So the current bounded read is: earlier loop copies are present in the computation, but they are not the dominant late-layer attention target at the trigger.
+- **Unknown for the whole stack**, because I am no longer treating the older intermediate-layer rows as current after the final sliding-window fix.
+- So the current bounded read is narrower than the previous draft: the late-layer trigger token is not dominated by previous-loop attention on this slice.
 
 ## Example Rows
 
 - `GPQA`, sample `36`, rollout `3`, total prefix `712`:
   - final layer: previous-loop mass `0.030`, prompt mass `0.848`, current-trigger mass `0.099`
-  - best previous-loop layer: layer `1`, where previous-loop mass rises to `0.424` against prompt mass `0.114`
 - `MATH-500`, sample `437`, rollout `2`, total prefix `409`:
   - final layer: previous-loop mass `0.104`, prompt mass `0.664`, current-trigger mass `0.167`
-  - best previous-loop layer: layer `16`, where previous-loop mass rises to `0.667`
 - `LiveCodeBench`, sample `132`, rollout `0`, total prefix `1544`:
   - final layer: previous-loop mass `0.077`, prompt mass `0.662`, current-trigger mass `0.224`
-  - best previous-loop layer: layer `13`, where previous-loop mass rises to `0.488` against prompt mass `0.111`
 
 ## Code Changes For Future Rollouts
 
@@ -178,6 +167,7 @@ That closes the exact replay gap for future rollout-stat runs instead of forcing
   - `attention_summary.json`
   - `attention_layer_means.csv`
   - `attention_per_sample.json`
+- Treat non-final-layer rows in `attention_layer_means.csv` / `attention_per_sample.json` as provisional until the sliding-window-corrected rerun is refreshed.
 
 ## Next Honest Step
 

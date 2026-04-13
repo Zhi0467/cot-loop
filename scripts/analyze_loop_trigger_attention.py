@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import gzip
 import json
 import math
 import os
@@ -60,7 +61,17 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out-dir", required=True)
     parser.add_argument("--model-id", default="Qwen/Qwen3-1.7B")
-    parser.add_argument("--datasets", default=",".join(DEFAULT_ARCHIVE_ROOTS))
+    parser.add_argument(
+        "--datasets",
+        default=",".join(DEFAULT_ARCHIVE_ROOTS),
+        help=(
+            "Comma-separated default dataset keys or explicit archive "
+            "directories/files. Explicit paths may point to "
+            "prompt_rollout_archive.jsonl(.gz), __rollout_archive.jsonl(.gz), "
+            "or the aggregate rollout-stats JSON that owns a matching "
+            "__rollout_archive.jsonl.gz sidecar."
+        ),
+    )
     parser.add_argument("--loop-n", type=int, default=30)
     parser.add_argument("--loop-k", type=int, default=20)
     parser.add_argument("--max-trigger-prefix", type=int, default=4096)
@@ -79,10 +90,62 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _iter_archive_rows(root: Path):
-    path = root / "diagnostics" / "prompt_rollout_archive.jsonl"
-    with path.open(encoding="utf-8") as handle:
+    path = _resolve_archive_path(root)
+    opener = gzip.open if path.suffix == ".gz" else open
+    mode = "rt" if path.suffix == ".gz" else "r"
+    with opener(path, mode, encoding="utf-8") as handle:
         for line in handle:
             yield json.loads(line)
+
+
+def _resolve_archive_path(root: Path) -> Path:
+    if root.is_file():
+        if root.suffix == ".json":
+            stem = root.stem
+            candidates: list[Path] = []
+            if "__preexisting_" in stem:
+                prefix, archived_tail = stem.split("__preexisting_", 1)
+                candidates.append(
+                    root.with_name(
+                        f"{prefix}__rollout_archive.jsonl__preexisting_{archived_tail}.gz"
+                    )
+                )
+            candidates.append(root.with_name(f"{stem}__rollout_archive.jsonl.gz"))
+            if stem.endswith("__lcb_records"):
+                candidates.append(
+                    root.with_name(
+                        f"{stem[:-len('__lcb_records')]}__rollout_archive.jsonl.gz"
+                    )
+                )
+            for candidate in candidates:
+                if candidate.is_file():
+                    return candidate
+            raise SystemExit(
+                "No rollout archive sidecar found for aggregate stats file "
+                f"{root}."
+            )
+        return root
+
+    prompt_profile_candidates = [
+        root / "diagnostics" / "prompt_rollout_archive.jsonl",
+        root / "diagnostics" / "prompt_rollout_archive.jsonl.gz",
+        root / "prompt_rollout_archive.jsonl",
+        root / "prompt_rollout_archive.jsonl.gz",
+    ]
+    for candidate in prompt_profile_candidates:
+        if candidate.is_file():
+            return candidate
+
+    rollout_sidecars = sorted(root.glob("*__rollout_archive.jsonl.gz"))
+    if len(rollout_sidecars) == 1:
+        return rollout_sidecars[0]
+    if len(rollout_sidecars) > 1:
+        raise SystemExit(
+            "Multiple rollout sidecars found under "
+            f"{root}; pass the specific file path instead."
+        )
+
+    raise SystemExit(f"No rollout archive found under {root}.")
 
 
 def _completion_token_ids_from_rollout(rollout: dict[str, Any], tokenizer) -> list[int]:
@@ -95,6 +158,14 @@ def _completion_token_ids_from_rollout(rollout: dict[str, Any], tokenizer) -> li
     )
 
 
+def _saved_completion_length(rollout: dict[str, Any]) -> int:
+    if "length" in rollout:
+        return int(rollout["length"])
+    if "completion_token_count" in rollout:
+        return int(rollout["completion_token_count"])
+    raise SystemExit("Rollout row is missing both 'length' and 'completion_token_count'.")
+
+
 def _reconstruction_summary(
     archive_root: Path,
     dataset: str,
@@ -105,10 +176,24 @@ def _reconstruction_summary(
     max_trigger_prefix: int,
     max_samples_per_dataset: int,
 ) -> tuple[dict[str, Any], list[SelectedRollout]]:
-    generation_config = GenerationConfig.from_pretrained(tokenizer.name_or_path)
-    eos_ids = generation_config.eos_token_id
+    eos_ids: int | list[int] | None = None
+    try:
+        generation_config = GenerationConfig.from_pretrained(tokenizer.name_or_path)
+    except OSError:
+        generation_config = None
+    if generation_config is not None:
+        eos_ids = generation_config.eos_token_id
     if isinstance(eos_ids, int):
         eos_ids = [eos_ids]
+    elif eos_ids is None:
+        eos_ids = []
+    if tokenizer.eos_token_id is not None and tokenizer.eos_token_id not in eos_ids:
+        eos_ids.append(int(tokenizer.eos_token_id))
+    if hasattr(tokenizer, "convert_tokens_to_ids"):
+        for token in ("<|im_end|>", "<|endoftext|>"):
+            token_id = tokenizer.convert_tokens_to_ids(token)
+            if isinstance(token_id, int) and token_id >= 0 and token_id not in eos_ids:
+                eos_ids.append(token_id)
 
     total_rollouts = 0
     loop_rows = 0
@@ -122,6 +207,7 @@ def _reconstruction_summary(
 
     for row in _iter_archive_rows(archive_root):
         prompt_token_ids = [int(v) for v in row["prompt_token_ids"]]
+        split = str(row.get("split") or row.get("source_split") or "unknown")
         for rollout in row["rollouts"]:
             total_rollouts += 1
             finish_reason = str(rollout.get("finish_reason") or "unknown")
@@ -129,14 +215,16 @@ def _reconstruction_summary(
                 rollout,
                 tokenizer,
             )
-            saved_completion_length = int(rollout["length"])
+            saved_completion_length = _saved_completion_length(rollout)
             reconstructed_length = len(completion_token_ids)
             length_diff = saved_completion_length - reconstructed_length
             length_diff_counter[length_diff] += 1
             length_diff_by_finish[finish_reason][length_diff] += 1
             if length_diff == 0:
                 exact_length_matches += 1
-            if length_diff == 0 or length_diff == 1:
+            if length_diff == 0 or (
+                length_diff == 1 and finish_reason != "length"
+            ):
                 match_if_allow_hidden_stop += 1
 
             first_loop_prefix_length = rollout.get("first_loop_prefix_length")
@@ -158,20 +246,23 @@ def _reconstruction_summary(
             prefix_match_by_finish[finish_reason][prefix_matches] += 1
             if not prefix_matches:
                 continue
-            if first_loop_prefix_length > max_trigger_prefix:
+            total_prefix_length = len(prompt_token_ids) + first_loop_prefix_length
+            if total_prefix_length > max_trigger_prefix:
                 continue
             selected = SelectedRollout(
                 dataset=dataset,
-                split=str(row["split"]),
+                split=split,
                 sample_id=int(row["sample_id"]),
-                rollout_index=int(rollout["rollout_index"]),
+                rollout_index=int(
+                    rollout.get("rollout_index", rollout.get("generation_index", -1))
+                ),
                 prompt_token_ids=prompt_token_ids,
                 completion_token_ids=completion_token_ids,
                 prompt_token_count=len(prompt_token_ids),
                 saved_completion_length=saved_completion_length,
                 reconstructed_completion_length=reconstructed_length,
                 first_loop_prefix_length=first_loop_prefix_length,
-                total_prefix_length=len(prompt_token_ids) + first_loop_prefix_length,
+                total_prefix_length=total_prefix_length,
                 finish_reason=finish_reason,
                 length_diff=length_diff,
                 loop_trigger={
@@ -248,8 +339,14 @@ def _region_builder(
         for start in ngram_positions[:-1]
     ]
     last_previous_span = previous_spans[-1] if previous_spans else None
-    previous_positions = set(_index_positions(previous_spans))
     current_positions = set(range(current_span[0], current_span[1] + 1))
+    previous_positions = set(_index_positions(previous_spans)) - current_positions
+    last_previous_positions = (
+        set(range(last_previous_span[0], last_previous_span[1] + 1))
+        - current_positions
+        if last_previous_span is not None
+        else set()
+    )
     prompt_positions = set(range(prompt_len))
     query_position = current_span[1]
 
@@ -265,7 +362,7 @@ def _region_builder(
             return "self"
         if index in current_positions:
             return "current_trigger"
-        if last_previous_span is not None and last_previous_span[0] <= index <= last_previous_span[1]:
+        if index in last_previous_positions:
             return "last_previous_loop"
         if index in previous_positions:
             return "earlier_previous_loop"
@@ -279,11 +376,7 @@ def _region_builder(
         "query_position": query_position,
         "prompt_positions": sorted(prompt_positions),
         "previous_positions": sorted(previous_positions),
-        "last_previous_positions": (
-            list(range(last_previous_span[0], last_previous_span[1] + 1))
-            if last_previous_span is not None
-            else []
-        ),
+        "last_previous_positions": sorted(last_previous_positions),
         "current_positions": sorted(current_positions),
         "recent_positions": sorted(recent_positions),
         "region_for_index": region_for_index,
@@ -346,6 +439,18 @@ def _capture_attention(
             if attention_mask is not None:
                 causal_mask = attention_mask[:, :, query_position : query_position + 1, : key_states.shape[-2]]
                 attn_logits = attn_logits + causal_mask
+            if self_attn.sliding_window is not None:
+                key_positions = torch.arange(
+                    key_states.shape[-2],
+                    device=attn_logits.device,
+                )
+                window_cutoff = query_position - int(self_attn.sliding_window)
+                if window_cutoff >= 0:
+                    sliding_mask = key_positions.view(1, 1, 1, -1) <= window_cutoff
+                    attn_logits = attn_logits.masked_fill(
+                        sliding_mask,
+                        torch.finfo(attn_logits.dtype).min,
+                    )
             attn_weights = torch.softmax(attn_logits, dim=-1, dtype=torch.float32)[
                 0, :, 0, :
             ]
@@ -457,8 +562,43 @@ def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
             handle.write("\n")
 
 
+def _load_model(
+    model_id: str,
+    *,
+    device: torch.device,
+):
+    kwargs = {
+        "trust_remote_code": True,
+        "dtype": torch.bfloat16 if device.type == "cuda" else torch.float32,
+    }
+    attn_implementations = (
+        ["flash_attention_2", "sdpa", "eager"]
+        if device.type == "cuda"
+        else ["eager"]
+    )
+    last_error: Exception | None = None
+    for attn_implementation in attn_implementations:
+        try:
+            model = AutoModelForCausalLM.from_pretrained(
+                model_id,
+                attn_implementation=attn_implementation,
+                **kwargs,
+            )
+            return model
+        except Exception as exc:  # pragma: no cover - exercised on CUDA hosts
+            last_error = exc
+    assert last_error is not None
+    raise last_error
+
+
 def main() -> None:
     args = _parse_args()
+    if "qwen3" not in args.model_id.lower():
+        raise SystemExit(
+            "scripts/analyze_loop_trigger_attention.py currently supports only "
+            "Qwen3 checkpoints because the attention wrapper depends on "
+            "Qwen3-specific internals."
+        )
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -472,17 +612,18 @@ def main() -> None:
     reconstruction_summaries: dict[str, Any] = {}
     selected_rows: list[SelectedRollout] = []
     for dataset in requested_datasets:
-        archive_root = Path(DEFAULT_ARCHIVE_ROOTS[dataset])
+        archive_root = Path(DEFAULT_ARCHIVE_ROOTS.get(dataset, dataset))
+        dataset_label = dataset
         summary, rows = _reconstruction_summary(
             archive_root,
-            dataset,
+            dataset_label,
             tokenizer,
             loop_n=args.loop_n,
             loop_k=args.loop_k,
             max_trigger_prefix=args.max_trigger_prefix,
             max_samples_per_dataset=args.max_samples_per_dataset,
         )
-        reconstruction_summaries[dataset] = summary
+        reconstruction_summaries[dataset_label] = summary
         selected_rows.extend(rows)
 
     _write_json(out_dir / "reconstruction_summary.json", reconstruction_summaries)
@@ -510,11 +651,9 @@ def main() -> None:
         return
 
     device = torch.device(args.device)
-    model = AutoModelForCausalLM.from_pretrained(
+    model = _load_model(
         args.model_id,
-        trust_remote_code=True,
-        dtype=torch.bfloat16 if device.type == "cuda" else torch.float32,
-        attn_implementation="flash_attention_2" if device.type == "cuda" else "eager",
+        device=device,
     )
     model.to(device)
     model.eval()
