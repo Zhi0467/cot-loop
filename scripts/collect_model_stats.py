@@ -1322,6 +1322,13 @@ def main() -> None:
             loop_k=args.loop_k,
         )
 
+    prompt_rollout_archive_path = _write_prompt_rollout_archive(agg, out_path)
+    if not prompt_rollout_archive_path and resume_prompt_rollout_archive:
+        prompt_rollout_archive_path = _restore_prompt_rollout_archive_for_resume(
+            resume_prompt_rollout_archive,
+            out_path,
+        )
+
     lcb_native_metrics: dict[str, Any] = {}
     if args.task_kind == "livecodebench_codegen":
         if not resume_lcb_checkpoint:
@@ -1331,13 +1338,6 @@ def main() -> None:
             lcb_benchmark,
             repo_path=args.livecodebench_repo,
             release_version=args.release_version,
-        )
-
-    prompt_rollout_archive_path = _write_prompt_rollout_archive(agg, out_path)
-    if not prompt_rollout_archive_path and resume_prompt_rollout_archive:
-        prompt_rollout_archive_path = _restore_prompt_rollout_archive_for_resume(
-            resume_prompt_rollout_archive,
-            out_path,
         )
 
     metrics = compute_metrics(agg, statistics)

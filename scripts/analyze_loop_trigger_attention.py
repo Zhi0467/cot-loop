@@ -85,6 +85,16 @@ def _iter_archive_rows(root: Path):
             yield json.loads(line)
 
 
+def _completion_token_ids_from_rollout(rollout: dict[str, Any], tokenizer) -> list[int]:
+    saved_token_ids = rollout.get("completion_token_ids")
+    if isinstance(saved_token_ids, list):
+        return [int(token_id) for token_id in saved_token_ids]
+    return tokenizer.encode(
+        str(rollout["completion_text"]),
+        add_special_tokens=False,
+    )
+
+
 def _reconstruction_summary(
     archive_root: Path,
     dataset: str,
@@ -115,9 +125,9 @@ def _reconstruction_summary(
         for rollout in row["rollouts"]:
             total_rollouts += 1
             finish_reason = str(rollout.get("finish_reason") or "unknown")
-            completion_token_ids = tokenizer.encode(
-                str(rollout["completion_text"]),
-                add_special_tokens=False,
+            completion_token_ids = _completion_token_ids_from_rollout(
+                rollout,
+                tokenizer,
             )
             saved_completion_length = int(rollout["length"])
             reconstructed_length = len(completion_token_ids)
