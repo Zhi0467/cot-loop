@@ -77,6 +77,8 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--max-trigger-prefix", type=int, default=4096)
     parser.add_argument("--max-samples-per-dataset", type=int, default=5)
     parser.add_argument("--recent-window", type=int, default=256)
+    parser.add_argument("--num-shards", type=int, default=1)
+    parser.add_argument("--shard-index", type=int, default=0)
     parser.add_argument(
         "--skip-attention",
         action="store_true",
@@ -562,6 +564,47 @@ def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
             handle.write("\n")
 
 
+def _assign_shards(
+    rows: list[SelectedRollout],
+    *,
+    num_shards: int,
+) -> tuple[list[list[SelectedRollout]], list[int]]:
+    if num_shards < 1:
+        raise ValueError("num_shards must be >= 1.")
+    ordered_rows = sorted(
+        rows,
+        key=lambda row: (
+            row.total_prefix_length,
+            row.prompt_token_count,
+            row.dataset,
+            row.sample_id,
+            row.rollout_index,
+        ),
+        reverse=True,
+    )
+    shard_rows: list[list[SelectedRollout]] = [[] for _ in range(num_shards)]
+    shard_loads = [0 for _ in range(num_shards)]
+    for row in ordered_rows:
+        target_shard = min(
+            range(num_shards),
+            key=lambda shard_idx: (shard_loads[shard_idx], len(shard_rows[shard_idx])),
+        )
+        shard_rows[target_shard].append(row)
+        shard_loads[target_shard] += row.total_prefix_length
+    for rows_for_shard in shard_rows:
+        rows_for_shard.sort(
+            key=lambda row: (
+                row.dataset,
+                row.split,
+                row.total_prefix_length,
+                row.first_loop_prefix_length,
+                row.sample_id,
+                row.rollout_index,
+            )
+        )
+    return shard_rows, shard_loads
+
+
 def _load_model(
     model_id: str,
     *,
@@ -593,6 +636,10 @@ def _load_model(
 
 def main() -> None:
     args = _parse_args()
+    if args.num_shards < 1:
+        raise SystemExit("--num-shards must be >= 1.")
+    if args.shard_index < 0 or args.shard_index >= args.num_shards:
+        raise SystemExit("--shard-index must satisfy 0 <= shard-index < num-shards.")
     if "qwen3" not in args.model_id.lower():
         raise SystemExit(
             "scripts/analyze_loop_trigger_attention.py currently supports only "
@@ -626,7 +673,24 @@ def main() -> None:
         reconstruction_summaries[dataset_label] = summary
         selected_rows.extend(rows)
 
+    shard_rows, shard_loads = _assign_shards(
+        selected_rows,
+        num_shards=args.num_shards,
+    )
+    selected_rows = shard_rows[args.shard_index]
+
     _write_json(out_dir / "reconstruction_summary.json", reconstruction_summaries)
+    _write_json(
+        out_dir / "shard_manifest.json",
+        {
+            "num_shards": args.num_shards,
+            "shard_index": args.shard_index,
+            "total_selected_rows": sum(len(rows) for rows in shard_rows),
+            "rows_in_shard": len(selected_rows),
+            "shard_total_prefix_loads": shard_loads,
+            "shard_row_counts": [len(rows) for rows in shard_rows],
+        },
+    )
     _write_jsonl(
         out_dir / "selected_rows.jsonl",
         [
@@ -651,6 +715,8 @@ def main() -> None:
         return
 
     device = torch.device(args.device)
+    if device.type == "cuda":
+        torch.cuda.set_device(device)
     model = _load_model(
         args.model_id,
         device=device,
