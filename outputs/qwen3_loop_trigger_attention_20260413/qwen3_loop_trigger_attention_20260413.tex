@@ -1,0 +1,144 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{hyperref}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\title{Qwen3 Loop-Trigger Attention Pilot}
+\author{}
+\date{2026-04-13}
+
+\begin{document}
+\maketitle
+
+\section*{Question}
+
+This note answers one bounded question on the saved March 22--23 Qwen3-1.7B instruct prompt-profile archives: when the model reaches the final repeated $30$-gram that trips the $n=30$, $k=20$ loop detector, is the trigger token attending to earlier loop copies?
+
+All numbers below come from a corrected rerun after fixing a per-layer wrapper capture bug in the first draft of the attention script.
+
+\section*{Commit Audit}
+
+I fetched \texttt{upstream/main} on 2026-04-13 17:24 UTC. The only new upstream change was merge commit \texttt{d4255f2} (PR \#9, unified prompt-profile report surface). No new loop-trigger attention-analysis script landed there, so the analysis below is a fresh implementation against the saved archives.
+
+\section*{Reconstruction Boundary}
+
+The saved prompt-profile archives preserve prompt token IDs, completion text, finish reason, saved completion length, and saved first-loop prefix length, but not exact completion token IDs. The reconstruction pass over all five saved datasets found:
+
+\begin{center}
+\begin{tabular}{lrrrr}
+\toprule
+Dataset & Rollouts & Loop rows & Exact retokenized length & Trigger-prefix match \\
+\midrule
+GPQA & 792 & 124 & 46 / 792 & 121 / 124 \\
+AIME & 240 & 31 & 38 / 240 & 30 / 31 \\
+MATH-500 & 2000 & 68 & 38 / 2000 & 68 / 68 \\
+MMLU-Pro & 3200 & 130 & 34 / 3200 & 130 / 130 \\
+LiveCodeBench & 3200 & 467 & 356 / 3200 & 462 / 467 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The dominant mismatch is exactly one missing hidden stop token on \texttt{finish\_reason=stop}. Qwen3's configured EOS IDs are \texttt{151645 = <|im\_end|>} and \texttt{151643 = <|endoftext|>}; both decode to empty text. So exact completion-ID replay is still not available from the saved text alone, but the trigger prefix is recovered on essentially every loop row.
+
+\section*{Attention Pilot}
+
+I selected the shortest exact-trigger rows with total prefix length at most \texttt{4096}:
+
+\begin{itemize}
+  \item GPQA: 3 rows (712, 1598, 1684)
+  \item AIME: 2 rows (3686, 3870)
+  \item MATH-500: 3 rows (409, 805, 1348)
+  \item MMLU-Pro: 3 rows (2034, 2048, 2112)
+  \item LiveCodeBench: 3 rows (1544, 1662, 2554)
+\end{itemize}
+
+For each row, the probe looks only at the final token of the triggering $30$-gram copy and measures how much attention mass falls on:
+
+\begin{itemize}
+  \item all earlier copies of the same loop $30$-gram,
+  \item the prompt,
+  \item the current trigger span itself,
+  \item and the top-1 attention destination of each head.
+\end{itemize}
+
+The cleanest read is the final layer:
+
+\begin{center}
+\begin{tabular}{lrrrr}
+\toprule
+Dataset & Rows & Prev-loop mass & Prompt mass & Current-trigger mass \\
+\midrule
+GPQA & 3 & 0.038 & 0.755 & 0.154 \\
+AIME & 2 & 0.035 & 0.724 & 0.170 \\
+MATH-500 & 3 & 0.102 & 0.654 & 0.192 \\
+MMLU-Pro & 3 & 0.048 & 0.657 & 0.203 \\
+LiveCodeBench & 3 & 0.112 & 0.625 & 0.224 \\
+\midrule
+Overall & 14 & 0.069 & 0.680 & 0.190 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent Head destinations make the same point even more strongly: across all 14 rows, 85.3\% of final-layer heads put their top-1 attention destination on the prompt, 14.7\% on the current trigger/self, and 0\% on earlier loop copies.
+
+\medskip
+
+That is not the whole story, though. Earlier loop copies do show up in intermediate layers:
+
+\begin{itemize}
+  \item GPQA: best previous-loop layer is layer 1 with mean previous-loop mass 0.275.
+  \item AIME: best previous-loop layer is layer 0 with mean previous-loop mass 0.282.
+  \item MATH-500: best previous-loop layer is layer 18 with mean previous-loop mass 0.410.
+  \item MMLU-Pro: best previous-loop layer is layer 11 with mean previous-loop mass 0.229.
+  \item LiveCodeBench: best previous-loop layer is layer 13 with mean previous-loop mass 0.448.
+\end{itemize}
+
+\section*{Read}
+
+The corrected answer is more nuanced than the first draft.
+
+\begin{itemize}
+  \item If the claim is ``the model completely ignores earlier loop copies,'' that is too strong across the whole stack; several datasets show meaningful previous-loop attention in intermediate layers.
+  \item But on this short exact-trigger slice, the final layer is mostly prompt-focused rather than previous-loop-focused.
+  \item Previous-loop mass in the final layer is still nonzero, especially on LiveCodeBench and MATH-500, but it is smaller than prompt mass on every dataset in this bounded pilot.
+\end{itemize}
+
+So the honest current answer is:
+
+\begin{itemize}
+  \item No, the full-stack claim ``it is not paying attention to previous loops'' is too strong.
+  \item Yes, on this short exact-trigger slice the final layer is overwhelmingly prompt-focused rather than previous-loop-focused.
+  \item The current bounded read is that earlier loop copies are present in the computation, but they are not the dominant late-layer attention target at the trigger.
+\end{itemize}
+
+\section*{Example Rows}
+
+\begin{itemize}
+  \item GPQA, sample 36, rollout 3, total prefix 712:
+  final layer: prev-loop mass 0.030, prompt mass 0.848, current-trigger mass 0.099. Best previous-loop layer is layer 1, where previous-loop mass rises to 0.424 against prompt mass 0.114.
+  \item MATH-500, sample 437, rollout 2, total prefix 409:
+  final layer: prev-loop mass 0.104, prompt mass 0.664, current-trigger mass 0.167. Best previous-loop layer is layer 16, where previous-loop mass rises to 0.667.
+  \item LiveCodeBench, sample 132, rollout 0, total prefix 1544:
+  final layer: prev-loop mass 0.077, prompt mass 0.662, current-trigger mass 0.224. Best previous-loop layer is layer 13, where previous-loop mass rises to 0.488 against prompt mass 0.111.
+\end{itemize}
+
+\section*{Code Changes For Future Rollouts}
+
+This task also patched both archive paths so future runs stop losing the exact objects this analysis needs.
+
+\begin{itemize}
+  \item \texttt{scripts/build\_probe\_dataset.py} now writes \texttt{completion\_token\_ids} and a structured \texttt{loop\_trigger} object into each prompt-profile rollout row.
+  \item \texttt{scripts/collect\_model\_stats.py} now writes a compressed sidecar
+  \texttt{\_\_rollout\_archive.jsonl.gz} beside the aggregate stats JSON, with prompt text, prompt token IDs, completion text, completion token IDs, finish reason, and structured trigger metadata.
+  \item Two review-caught implementation bugs were fixed before publish: resume-from-LiveCodeBench checkpoint now preserves the matching rollout sidecar, and the collector now spills prompt-rollout chunks batch-by-batch instead of buffering the whole archive in memory.
+\end{itemize}
+
+\section*{Next Honest Step}
+
+The next step is to repeat the same measurement on longer trigger prefixes once GPU time is available and to add a matched non-loop control slice, but future runs should use the newly saved exact completion token IDs rather than reconstructed text.
+
+\end{document}

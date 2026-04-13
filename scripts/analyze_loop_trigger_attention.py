@@ -1,0 +1,599 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import csv
+import json
+import math
+import os
+import statistics
+import sys
+from collections import Counter, defaultdict
+from dataclasses import dataclass
+from pathlib import Path
+from types import MethodType
+from typing import Any
+
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
+from transformers.models.qwen3.modeling_qwen3 import (
+    apply_rotary_pos_emb,
+    repeat_kv,
+)
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SRC = os.path.join(ROOT, "src")
+if SRC not in sys.path:
+    sys.path.insert(0, SRC)
+
+from loop_probe.labeling import find_ngram_loop_trigger
+
+
+DEFAULT_ARCHIVE_ROOTS = {
+    "gpqa": "/data/scratch/murphy/outputs/cot-loop-detection/gpqa_mean_relative_from_archive_20260322/data",
+    "aime": "/data/scratch/murphy/outputs/cot-loop-detection/aime_mean_relative_from_archive_20260322",
+    "math500": "/data/scratch/murphy/outputs/cot-loop-detection/math_mean_relative_from_archive_20260323",
+    "mmlu_pro": "/data/scratch/murphy/outputs/cot-loop-detection/mmlu_mean_relative_from_archive_20260323",
+    "livecodebench": "/data/scratch/murphy/outputs/cot-loop-detection/livecodebench_mean_relative_from_archive_20260323",
+}
+
+
+@dataclass(frozen=True)
+class SelectedRollout:
+    dataset: str
+    split: str
+    sample_id: int
+    rollout_index: int
+    prompt_token_ids: list[int]
+    completion_token_ids: list[int]
+    prompt_token_count: int
+    saved_completion_length: int
+    reconstructed_completion_length: int
+    first_loop_prefix_length: int
+    total_prefix_length: int
+    finish_reason: str
+    length_diff: int
+    loop_trigger: dict[str, Any]
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--out-dir", required=True)
+    parser.add_argument("--model-id", default="Qwen/Qwen3-1.7B")
+    parser.add_argument("--datasets", default=",".join(DEFAULT_ARCHIVE_ROOTS))
+    parser.add_argument("--loop-n", type=int, default=30)
+    parser.add_argument("--loop-k", type=int, default=20)
+    parser.add_argument("--max-trigger-prefix", type=int, default=4096)
+    parser.add_argument("--max-samples-per-dataset", type=int, default=5)
+    parser.add_argument("--recent-window", type=int, default=256)
+    parser.add_argument(
+        "--skip-attention",
+        action="store_true",
+        help="Only run reconstruction / trigger matching summary.",
+    )
+    parser.add_argument(
+        "--device",
+        default="cuda" if torch.cuda.is_available() else "cpu",
+    )
+    return parser.parse_args()
+
+
+def _iter_archive_rows(root: Path):
+    path = root / "diagnostics" / "prompt_rollout_archive.jsonl"
+    with path.open(encoding="utf-8") as handle:
+        for line in handle:
+            yield json.loads(line)
+
+
+def _reconstruction_summary(
+    archive_root: Path,
+    dataset: str,
+    tokenizer,
+    *,
+    loop_n: int,
+    loop_k: int,
+    max_trigger_prefix: int,
+    max_samples_per_dataset: int,
+) -> tuple[dict[str, Any], list[SelectedRollout]]:
+    generation_config = GenerationConfig.from_pretrained(tokenizer.name_or_path)
+    eos_ids = generation_config.eos_token_id
+    if isinstance(eos_ids, int):
+        eos_ids = [eos_ids]
+
+    total_rollouts = 0
+    loop_rows = 0
+    exact_length_matches = 0
+    length_diff_counter: Counter[int] = Counter()
+    length_diff_by_finish: dict[str, Counter[int]] = defaultdict(Counter)
+    prefix_match_counter: Counter[bool] = Counter()
+    prefix_match_by_finish: dict[str, Counter[bool]] = defaultdict(Counter)
+    match_if_allow_hidden_stop = 0
+    usable_rows: list[SelectedRollout] = []
+
+    for row in _iter_archive_rows(archive_root):
+        prompt_token_ids = [int(v) for v in row["prompt_token_ids"]]
+        for rollout in row["rollouts"]:
+            total_rollouts += 1
+            finish_reason = str(rollout.get("finish_reason") or "unknown")
+            completion_token_ids = tokenizer.encode(
+                str(rollout["completion_text"]),
+                add_special_tokens=False,
+            )
+            saved_completion_length = int(rollout["length"])
+            reconstructed_length = len(completion_token_ids)
+            length_diff = saved_completion_length - reconstructed_length
+            length_diff_counter[length_diff] += 1
+            length_diff_by_finish[finish_reason][length_diff] += 1
+            if length_diff == 0:
+                exact_length_matches += 1
+            if length_diff == 0 or length_diff == 1:
+                match_if_allow_hidden_stop += 1
+
+            first_loop_prefix_length = rollout.get("first_loop_prefix_length")
+            if first_loop_prefix_length is None:
+                continue
+
+            loop_rows += 1
+            first_loop_prefix_length = int(first_loop_prefix_length)
+            trigger = find_ngram_loop_trigger(
+                completion_token_ids,
+                n=loop_n,
+                k=loop_k,
+            )
+            prefix_matches = (
+                trigger is not None
+                and trigger.first_loop_prefix == first_loop_prefix_length
+            )
+            prefix_match_counter[prefix_matches] += 1
+            prefix_match_by_finish[finish_reason][prefix_matches] += 1
+            if not prefix_matches:
+                continue
+            if first_loop_prefix_length > max_trigger_prefix:
+                continue
+            selected = SelectedRollout(
+                dataset=dataset,
+                split=str(row["split"]),
+                sample_id=int(row["sample_id"]),
+                rollout_index=int(rollout["rollout_index"]),
+                prompt_token_ids=prompt_token_ids,
+                completion_token_ids=completion_token_ids,
+                prompt_token_count=len(prompt_token_ids),
+                saved_completion_length=saved_completion_length,
+                reconstructed_completion_length=reconstructed_length,
+                first_loop_prefix_length=first_loop_prefix_length,
+                total_prefix_length=len(prompt_token_ids) + first_loop_prefix_length,
+                finish_reason=finish_reason,
+                length_diff=length_diff,
+                loop_trigger={
+                    "ngram_start_positions": list(trigger.ngram_start_positions),
+                    "trigger_start": int(trigger.trigger_start),
+                    "trigger_end": int(trigger.trigger_end),
+                    "ngram_token_ids": list(trigger.ngram_token_ids),
+                    "hidden_stop_token_candidates": eos_ids,
+                },
+            )
+            usable_rows.append(selected)
+
+    usable_rows.sort(
+        key=lambda row: (
+            row.total_prefix_length,
+            row.first_loop_prefix_length,
+            row.sample_id,
+            row.rollout_index,
+        )
+    )
+    selected_rows = usable_rows[:max_samples_per_dataset]
+    summary = {
+        "dataset": dataset,
+        "archive_root": str(archive_root),
+        "total_rollouts": total_rollouts,
+        "loop_rows": loop_rows,
+        "exact_length_matches": exact_length_matches,
+        "length_diff_top": length_diff_counter.most_common(8),
+        "length_diff_by_finish_reason": {
+            name: counter.most_common(6)
+            for name, counter in sorted(length_diff_by_finish.items())
+        },
+        "prefix_match_counts": {
+            "true": prefix_match_counter[True],
+            "false": prefix_match_counter[False],
+        },
+        "prefix_match_by_finish_reason": {
+            name: {
+                "true": counter[True],
+                "false": counter[False],
+            }
+            for name, counter in sorted(prefix_match_by_finish.items())
+        },
+        "match_if_allow_single_hidden_stop_token": match_if_allow_hidden_stop,
+        "selected_rows": len(selected_rows),
+        "selected_total_prefix_lengths": [
+            row.total_prefix_length for row in selected_rows
+        ],
+    }
+    return summary, selected_rows
+
+
+def _index_positions(spans: list[tuple[int, int]]) -> list[int]:
+    positions: list[int] = []
+    for start, end in spans:
+        positions.extend(range(start, end + 1))
+    return positions
+
+
+def _region_builder(
+    row: SelectedRollout,
+    *,
+    recent_window: int,
+) -> dict[str, Any]:
+    ngram_positions = row.loop_trigger["ngram_start_positions"]
+    n = len(row.loop_trigger["ngram_token_ids"])
+    prompt_len = row.prompt_token_count
+    current_span = (
+        prompt_len + int(row.loop_trigger["trigger_start"]),
+        prompt_len + int(row.loop_trigger["trigger_end"]),
+    )
+    previous_spans = [
+        (prompt_len + int(start), prompt_len + int(start) + n - 1)
+        for start in ngram_positions[:-1]
+    ]
+    last_previous_span = previous_spans[-1] if previous_spans else None
+    previous_positions = set(_index_positions(previous_spans))
+    current_positions = set(range(current_span[0], current_span[1] + 1))
+    prompt_positions = set(range(prompt_len))
+    query_position = current_span[1]
+
+    recent_start = max(prompt_len, query_position - recent_window)
+    recent_positions = {
+        pos
+        for pos in range(recent_start, query_position)
+        if pos not in previous_positions and pos not in current_positions
+    }
+
+    def region_for_index(index: int) -> str:
+        if index == query_position:
+            return "self"
+        if index in current_positions:
+            return "current_trigger"
+        if last_previous_span is not None and last_previous_span[0] <= index <= last_previous_span[1]:
+            return "last_previous_loop"
+        if index in previous_positions:
+            return "earlier_previous_loop"
+        if index in prompt_positions:
+            return "prompt"
+        if index in recent_positions:
+            return "recent_nonloop"
+        return "other_completion"
+
+    return {
+        "query_position": query_position,
+        "prompt_positions": sorted(prompt_positions),
+        "previous_positions": sorted(previous_positions),
+        "last_previous_positions": (
+            list(range(last_previous_span[0], last_previous_span[1] + 1))
+            if last_previous_span is not None
+            else []
+        ),
+        "current_positions": sorted(current_positions),
+        "recent_positions": sorted(recent_positions),
+        "region_for_index": region_for_index,
+    }
+
+
+def _capture_attention(
+    model,
+    row: SelectedRollout,
+    *,
+    device: torch.device,
+    recent_window: int,
+) -> list[dict[str, Any]]:
+    region_info = _region_builder(row, recent_window=recent_window)
+    query_position = int(region_info["query_position"])
+    input_ids = row.prompt_token_ids + row.completion_token_ids[: row.first_loop_prefix_length]
+    input_tensor = torch.tensor([input_ids], dtype=torch.long, device=device)
+    attention_mask = torch.ones_like(input_tensor)
+
+    layer_summaries: list[dict[str, Any]] = []
+    original_forwards = []
+
+    def _make_wrapped_forward(
+        *,
+        layer_idx: int,
+        original_forward,
+    ):
+        def _wrapped_forward(
+            self_attn,
+            hidden_states: torch.Tensor,
+            position_embeddings,
+            attention_mask: torch.Tensor | None,
+            past_key_values=None,
+            cache_position=None,
+            **kwargs,
+        ):
+            input_shape = hidden_states.shape[:-1]
+            hidden_shape = (*input_shape, -1, self_attn.head_dim)
+
+            query_states = self_attn.q_norm(
+                self_attn.q_proj(hidden_states).view(hidden_shape)
+            ).transpose(1, 2)
+            key_states = self_attn.k_norm(
+                self_attn.k_proj(hidden_states).view(hidden_shape)
+            ).transpose(1, 2)
+
+            cos, sin = position_embeddings
+            query_states, key_states = apply_rotary_pos_emb(
+                query_states,
+                key_states,
+                cos,
+                sin,
+            )
+            key_states = repeat_kv(key_states, self_attn.num_key_value_groups)
+            selected_query = query_states[:, :, query_position : query_position + 1, :]
+            attn_logits = (
+                torch.matmul(selected_query, key_states.transpose(2, 3))
+                * self_attn.scaling
+            )
+            if attention_mask is not None:
+                causal_mask = attention_mask[:, :, query_position : query_position + 1, : key_states.shape[-2]]
+                attn_logits = attn_logits + causal_mask
+            attn_weights = torch.softmax(attn_logits, dim=-1, dtype=torch.float32)[
+                0, :, 0, :
+            ]
+
+            prev_positions = region_info["previous_positions"]
+            last_prev_positions = region_info["last_previous_positions"]
+            prompt_positions = region_info["prompt_positions"]
+            current_positions = region_info["current_positions"]
+            recent_positions = region_info["recent_positions"]
+
+            top1_indices = attn_weights.argmax(dim=-1).tolist()
+            region_counter = Counter(
+                region_info["region_for_index"](int(index)) for index in top1_indices
+            )
+
+            def _mass(indices: list[int]) -> float:
+                if not indices:
+                    return 0.0
+                return float(attn_weights[:, indices].sum(dim=-1).mean().item())
+
+            mean_attention = attn_weights.mean(dim=0)
+            top_positions = torch.topk(
+                mean_attention,
+                k=min(10, mean_attention.shape[-1]),
+            ).indices.tolist()
+
+            layer_summaries.append(
+                {
+                    "layer": int(layer_idx),
+                    "query_position": query_position,
+                    "mean_prev_loop_mass": _mass(prev_positions),
+                    "mean_last_prev_loop_mass": _mass(last_prev_positions),
+                    "mean_prompt_mass": _mass(prompt_positions),
+                    "mean_current_trigger_mass": _mass(current_positions),
+                    "mean_recent_nonloop_mass": _mass(recent_positions),
+                    "top1_fraction_previous_loop": (
+                        (region_counter["last_previous_loop"] + region_counter["earlier_previous_loop"])
+                        / float(attn_weights.shape[0])
+                    ),
+                    "top1_fraction_last_previous_loop": (
+                        region_counter["last_previous_loop"] / float(attn_weights.shape[0])
+                    ),
+                    "top1_fraction_prompt": (
+                        region_counter["prompt"] / float(attn_weights.shape[0])
+                    ),
+                    "top1_fraction_current_trigger": (
+                        (region_counter["self"] + region_counter["current_trigger"])
+                        / float(attn_weights.shape[0])
+                    ),
+                    "top1_fraction_recent_nonloop": (
+                        region_counter["recent_nonloop"] / float(attn_weights.shape[0])
+                    ),
+                    "top_mean_positions": [int(v) for v in top_positions],
+                    "top_mean_regions": [
+                        region_info["region_for_index"](int(v)) for v in top_positions
+                    ],
+                }
+            )
+            return original_forward(
+                hidden_states,
+                position_embeddings,
+                attention_mask,
+                past_key_values=past_key_values,
+                cache_position=cache_position,
+                **kwargs,
+            )
+
+        return _wrapped_forward
+
+    for layer_idx, layer in enumerate(model.model.layers):
+        original_forward = layer.self_attn.forward
+        original_forwards.append((layer.self_attn, original_forward))
+        layer.self_attn.forward = MethodType(
+            _make_wrapped_forward(
+                layer_idx=layer_idx,
+                original_forward=original_forward,
+            ),
+            layer.self_attn,
+        )
+
+    try:
+        with torch.no_grad():
+            model(
+                input_ids=input_tensor,
+                attention_mask=attention_mask,
+                use_cache=False,
+            )
+    finally:
+        for module, original_forward in original_forwards:
+            module.forward = original_forward
+
+    return layer_summaries
+
+
+def _mean(values: list[float]) -> float:
+    return float(sum(values) / len(values)) if values else 0.0
+
+
+def _write_json(path: Path, payload: Any) -> None:
+    with path.open("w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2, sort_keys=True)
+        handle.write("\n")
+
+
+def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
+    with path.open("w", encoding="utf-8") as handle:
+        for row in rows:
+            json.dump(row, handle, sort_keys=True)
+            handle.write("\n")
+
+
+def main() -> None:
+    args = _parse_args()
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    requested_datasets = [part.strip() for part in args.datasets.split(",") if part.strip()]
+    tokenizer = AutoTokenizer.from_pretrained(
+        args.model_id,
+        trust_remote_code=True,
+        use_fast=True,
+    )
+
+    reconstruction_summaries: dict[str, Any] = {}
+    selected_rows: list[SelectedRollout] = []
+    for dataset in requested_datasets:
+        archive_root = Path(DEFAULT_ARCHIVE_ROOTS[dataset])
+        summary, rows = _reconstruction_summary(
+            archive_root,
+            dataset,
+            tokenizer,
+            loop_n=args.loop_n,
+            loop_k=args.loop_k,
+            max_trigger_prefix=args.max_trigger_prefix,
+            max_samples_per_dataset=args.max_samples_per_dataset,
+        )
+        reconstruction_summaries[dataset] = summary
+        selected_rows.extend(rows)
+
+    _write_json(out_dir / "reconstruction_summary.json", reconstruction_summaries)
+    _write_jsonl(
+        out_dir / "selected_rows.jsonl",
+        [
+            {
+                "dataset": row.dataset,
+                "split": row.split,
+                "sample_id": row.sample_id,
+                "rollout_index": row.rollout_index,
+                "prompt_token_count": row.prompt_token_count,
+                "saved_completion_length": row.saved_completion_length,
+                "reconstructed_completion_length": row.reconstructed_completion_length,
+                "first_loop_prefix_length": row.first_loop_prefix_length,
+                "total_prefix_length": row.total_prefix_length,
+                "finish_reason": row.finish_reason,
+                "length_diff": row.length_diff,
+                "loop_trigger": row.loop_trigger,
+            }
+            for row in selected_rows
+        ],
+    )
+    if args.skip_attention or not selected_rows:
+        return
+
+    device = torch.device(args.device)
+    model = AutoModelForCausalLM.from_pretrained(
+        args.model_id,
+        trust_remote_code=True,
+        dtype=torch.bfloat16 if device.type == "cuda" else torch.float32,
+        attn_implementation="flash_attention_2" if device.type == "cuda" else "eager",
+    )
+    model.to(device)
+    model.eval()
+
+    per_sample_rows: list[dict[str, Any]] = []
+    per_layer_rows: list[dict[str, Any]] = []
+    for row in selected_rows:
+        layer_summaries = _capture_attention(
+            model,
+            row,
+            device=device,
+            recent_window=args.recent_window,
+        )
+        per_sample_rows.append(
+            {
+                "dataset": row.dataset,
+                "sample_id": row.sample_id,
+                "rollout_index": row.rollout_index,
+                "total_prefix_length": row.total_prefix_length,
+                "first_loop_prefix_length": row.first_loop_prefix_length,
+                "finish_reason": row.finish_reason,
+                "length_diff": row.length_diff,
+                "layer_summaries": layer_summaries,
+            }
+        )
+        for layer_summary in layer_summaries:
+            per_layer_rows.append(
+                {
+                    "dataset": row.dataset,
+                    "sample_id": row.sample_id,
+                    "rollout_index": row.rollout_index,
+                    **layer_summary,
+                }
+            )
+
+    _write_json(out_dir / "attention_per_sample.json", per_sample_rows)
+
+    grouped_by_dataset_and_layer: dict[tuple[str, int], list[dict[str, Any]]] = defaultdict(list)
+    for row in per_layer_rows:
+        grouped_by_dataset_and_layer[(row["dataset"], int(row["layer"]))].append(row)
+
+    layer_means: list[dict[str, Any]] = []
+    for (dataset, layer), rows in sorted(grouped_by_dataset_and_layer.items()):
+        layer_means.append(
+            {
+                "dataset": dataset,
+                "layer": layer,
+                "num_rows": len(rows),
+                "mean_prev_loop_mass": _mean([float(r["mean_prev_loop_mass"]) for r in rows]),
+                "mean_last_prev_loop_mass": _mean([float(r["mean_last_prev_loop_mass"]) for r in rows]),
+                "mean_prompt_mass": _mean([float(r["mean_prompt_mass"]) for r in rows]),
+                "mean_current_trigger_mass": _mean([float(r["mean_current_trigger_mass"]) for r in rows]),
+                "mean_recent_nonloop_mass": _mean([float(r["mean_recent_nonloop_mass"]) for r in rows]),
+                "top1_fraction_previous_loop": _mean([float(r["top1_fraction_previous_loop"]) for r in rows]),
+                "top1_fraction_last_previous_loop": _mean([float(r["top1_fraction_last_previous_loop"]) for r in rows]),
+                "top1_fraction_prompt": _mean([float(r["top1_fraction_prompt"]) for r in rows]),
+                "top1_fraction_current_trigger": _mean([float(r["top1_fraction_current_trigger"]) for r in rows]),
+                "top1_fraction_recent_nonloop": _mean([float(r["top1_fraction_recent_nonloop"]) for r in rows]),
+            }
+        )
+
+    with (out_dir / "attention_layer_means.csv").open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(layer_means[0].keys()))
+        writer.writeheader()
+        writer.writerows(layer_means)
+
+    overall_summary: dict[str, Any] = {}
+    for dataset in requested_datasets:
+        dataset_rows = [row for row in per_layer_rows if row["dataset"] == dataset]
+        if not dataset_rows:
+            continue
+        overall_summary[dataset] = {
+            "num_selected_rows": len(
+                { (row["sample_id"], row["rollout_index"]) for row in dataset_rows }
+            ),
+            "mean_prev_loop_mass": _mean([float(r["mean_prev_loop_mass"]) for r in dataset_rows]),
+            "mean_last_prev_loop_mass": _mean([float(r["mean_last_prev_loop_mass"]) for r in dataset_rows]),
+            "mean_prompt_mass": _mean([float(r["mean_prompt_mass"]) for r in dataset_rows]),
+            "mean_current_trigger_mass": _mean([float(r["mean_current_trigger_mass"]) for r in dataset_rows]),
+            "mean_recent_nonloop_mass": _mean([float(r["mean_recent_nonloop_mass"]) for r in dataset_rows]),
+            "top1_fraction_previous_loop": _mean([float(r["top1_fraction_previous_loop"]) for r in dataset_rows]),
+            "top1_fraction_last_previous_loop": _mean([float(r["top1_fraction_last_previous_loop"]) for r in dataset_rows]),
+            "top1_fraction_prompt": _mean([float(r["top1_fraction_prompt"]) for r in dataset_rows]),
+            "top1_fraction_current_trigger": _mean([float(r["top1_fraction_current_trigger"]) for r in dataset_rows]),
+            "top1_fraction_recent_nonloop": _mean([float(r["top1_fraction_recent_nonloop"]) for r in dataset_rows]),
+        }
+
+    _write_json(out_dir / "attention_summary.json", overall_summary)
+
+
+if __name__ == "__main__":
+    main()

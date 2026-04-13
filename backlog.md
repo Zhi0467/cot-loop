@@ -1,6 +1,6 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-09 22:55 UTC
+Last updated: 2026-04-13 18:05 UTC
 
 ## Immediate Next Experiments
 
@@ -151,6 +151,15 @@ This should be similar to our previous experiments on training probes on loop la
 
 ## Measurement And Reporting Gaps
 
+- The first Qwen3 loop-trigger attention pilot now exists under `outputs/qwen3_loop_trigger_attention_20260413/`, with the write-up in `docs/qwen3-loop-trigger-attention-2026-04-13.md`.
+  - What it proved:
+    - on the short exact-trigger slice, reconstructed saved text is good enough to recover the same trigger prefix almost every time even though exact completion token IDs were never archived;
+    - the late-layer read is prompt-dominant on that slice, not previous-loop-dominant: across all `14` selected rows, final-layer prompt mass is `0.680`, current-trigger mass is `0.190`, and previous-loop mass is only `0.069`, with `0%` of final-layer heads putting top-1 attention on earlier loop copies;
+    - the full-stack claim is still too strong, because intermediate layers can carry meaningful previous-loop mass even when the final layer does not;
+    - future rollout paths now save exact completion token IDs and structured trigger metadata, so this analysis does not need to rely on retrospective text reconstruction again.
+  - What is still open:
+    - scale the same measurement to longer trigger prefixes once GPU time is available;
+    - add a matched non-loop or pre-trigger control slice so prompt-vs-loop attention at the trigger is compared against a clean negative baseline instead of only described in isolation.
 - The explicit cross-dataset `majority_s_0.5` table now exists under `outputs/prompt_majority05_cross_dataset_rebuild_20260325/`; future replies should cite that table directly instead of falling back to `AIME`-only anecdotes.
 - The metadata-only continuous-baseline pass plus the held-out top-risk bucket comparison now exist under `outputs/prompt_profile_risk_controls_20260330/`; future replies should cite that bundle rather than paraphrasing the result.
 - The current whole-surface prompt-profile bundle now exists under `outputs/prompt_profile_combined_audit_20260405/`; future replies should cite that PDF when the question is about regression plus binary together rather than only one head.

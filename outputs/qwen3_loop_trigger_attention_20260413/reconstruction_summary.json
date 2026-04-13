@@ -1,0 +1,461 @@
+{
+  "aime": {
+    "archive_root": "/data/scratch/murphy/outputs/cot-loop-detection/aime_mean_relative_from_archive_20260322",
+    "dataset": "aime",
+    "exact_length_matches": 38,
+    "length_diff_by_finish_reason": {
+      "length": [
+        [
+          0,
+          38
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "stop": [
+        [
+          1,
+          196
+        ],
+        [
+          2,
+          2
+        ],
+        [
+          3,
+          1
+        ],
+        [
+          18,
+          1
+        ]
+      ]
+    },
+    "length_diff_top": [
+      [
+        1,
+        198
+      ],
+      [
+        0,
+        38
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        18,
+        1
+      ]
+    ],
+    "loop_rows": 31,
+    "match_if_allow_single_hidden_stop_token": 236,
+    "prefix_match_by_finish_reason": {
+      "length": {
+        "false": 1,
+        "true": 26
+      },
+      "stop": {
+        "false": 0,
+        "true": 4
+      }
+    },
+    "prefix_match_counts": {
+      "false": 1,
+      "true": 30
+    },
+    "selected_rows": 2,
+    "selected_total_prefix_lengths": [
+      3686,
+      3870
+    ],
+    "total_rollouts": 240
+  },
+  "gpqa": {
+    "archive_root": "/data/scratch/murphy/outputs/cot-loop-detection/gpqa_mean_relative_from_archive_20260322/data",
+    "dataset": "gpqa",
+    "exact_length_matches": 46,
+    "length_diff_by_finish_reason": {
+      "length": [
+        [
+          0,
+          44
+        ],
+        [
+          9,
+          1
+        ]
+      ],
+      "stop": [
+        [
+          1,
+          703
+        ],
+        [
+          2,
+          19
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          4,
+          4
+        ],
+        [
+          7,
+          2
+        ],
+        [
+          0,
+          2
+        ]
+      ]
+    },
+    "length_diff_top": [
+      [
+        1,
+        703
+      ],
+      [
+        0,
+        46
+      ],
+      [
+        2,
+        19
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        7,
+        2
+      ],
+      [
+        41,
+        1
+      ],
+      [
+        74,
+        1
+      ]
+    ],
+    "loop_rows": 124,
+    "match_if_allow_single_hidden_stop_token": 749,
+    "prefix_match_by_finish_reason": {
+      "length": {
+        "false": 1,
+        "true": 44
+      },
+      "stop": {
+        "false": 2,
+        "true": 77
+      }
+    },
+    "prefix_match_counts": {
+      "false": 3,
+      "true": 121
+    },
+    "selected_rows": 3,
+    "selected_total_prefix_lengths": [
+      712,
+      1598,
+      1684
+    ],
+    "total_rollouts": 792
+  },
+  "livecodebench": {
+    "archive_root": "/data/scratch/murphy/outputs/cot-loop-detection/livecodebench_mean_relative_from_archive_20260323",
+    "dataset": "livecodebench",
+    "exact_length_matches": 356,
+    "length_diff_by_finish_reason": {
+      "length": [
+        [
+          0,
+          351
+        ],
+        [
+          4,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          3,
+          1
+        ]
+      ],
+      "stop": [
+        [
+          1,
+          2812
+        ],
+        [
+          2,
+          16
+        ],
+        [
+          3,
+          5
+        ],
+        [
+          0,
+          5
+        ],
+        [
+          5,
+          3
+        ],
+        [
+          6,
+          2
+        ]
+      ]
+    },
+    "length_diff_top": [
+      [
+        1,
+        2813
+      ],
+      [
+        0,
+        356
+      ],
+      [
+        2,
+        16
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        43,
+        1
+      ]
+    ],
+    "loop_rows": 467,
+    "match_if_allow_single_hidden_stop_token": 3169,
+    "prefix_match_by_finish_reason": {
+      "length": {
+        "false": 2,
+        "true": 344
+      },
+      "stop": {
+        "false": 3,
+        "true": 118
+      }
+    },
+    "prefix_match_counts": {
+      "false": 5,
+      "true": 462
+    },
+    "selected_rows": 3,
+    "selected_total_prefix_lengths": [
+      1544,
+      1662,
+      2554
+    ],
+    "total_rollouts": 3200
+  },
+  "math500": {
+    "archive_root": "/data/scratch/murphy/outputs/cot-loop-detection/math_mean_relative_from_archive_20260323",
+    "dataset": "math500",
+    "exact_length_matches": 38,
+    "length_diff_by_finish_reason": {
+      "length": [
+        [
+          0,
+          37
+        ]
+      ],
+      "stop": [
+        [
+          1,
+          1953
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          7,
+          1
+        ],
+        [
+          6,
+          1
+        ],
+        [
+          -1,
+          1
+        ],
+        [
+          20,
+          1
+        ]
+      ]
+    },
+    "length_diff_top": [
+      [
+        1,
+        1953
+      ],
+      [
+        0,
+        38
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        7,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        -1,
+        1
+      ],
+      [
+        20,
+        1
+      ],
+      [
+        18,
+        1
+      ]
+    ],
+    "loop_rows": 68,
+    "match_if_allow_single_hidden_stop_token": 1991,
+    "prefix_match_by_finish_reason": {
+      "length": {
+        "false": 0,
+        "true": 29
+      },
+      "stop": {
+        "false": 0,
+        "true": 39
+      }
+    },
+    "prefix_match_counts": {
+      "false": 0,
+      "true": 68
+    },
+    "selected_rows": 3,
+    "selected_total_prefix_lengths": [
+      409,
+      805,
+      1348
+    ],
+    "total_rollouts": 2000
+  },
+  "mmlu_pro": {
+    "archive_root": "/data/scratch/murphy/outputs/cot-loop-detection/mmlu_mean_relative_from_archive_20260323",
+    "dataset": "mmlu_pro",
+    "exact_length_matches": 34,
+    "length_diff_by_finish_reason": {
+      "length": [
+        [
+          0,
+          34
+        ]
+      ],
+      "stop": [
+        [
+          1,
+          3157
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          4,
+          1
+        ]
+      ]
+    },
+    "length_diff_top": [
+      [
+        1,
+        3157
+      ],
+      [
+        0,
+        34
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        4,
+        1
+      ]
+    ],
+    "loop_rows": 130,
+    "match_if_allow_single_hidden_stop_token": 3191,
+    "prefix_match_by_finish_reason": {
+      "length": {
+        "false": 0,
+        "true": 33
+      },
+      "stop": {
+        "false": 0,
+        "true": 97
+      }
+    },
+    "prefix_match_counts": {
+      "false": 0,
+      "true": 130
+    },
+    "selected_rows": 3,
+    "selected_total_prefix_lengths": [
+      2034,
+      2048,
+      2112
+    ],
+    "total_rollouts": 3200
+  }
+}

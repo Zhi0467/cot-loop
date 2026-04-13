@@ -26,6 +26,7 @@ from loop_probe.labeling import (
     LABEL_TARGET_CHOICES,
     PROMPT_PROFILE_TARGET_CHOICES,
     aggregate_prompt_profile,
+    find_ngram_loop_trigger,
     labels_from_rollouts,
     profile_target_name,
     profile_target_value,
@@ -1303,10 +1304,16 @@ def _build_prompt_profile_targets(
             profile["first_loop_prefix_lengths"],
             strict=True,
         ):
+            loop_trigger = find_ngram_loop_trigger(
+                rollout.token_ids,
+                n=loop_n,
+                k=loop_k,
+            )
             rollout_rows.append(
                 {
                     "rollout_index": int(rollout_index),
                     "completion_text": rollout.text,
+                    "completion_token_ids": list(rollout.token_ids),
                     "finish_reason": rollout.finish_reason,
                     "length": int(length),
                     "relative_length": float(relative_length),
@@ -1314,6 +1321,9 @@ def _build_prompt_profile_targets(
                     "loop_flag": int(loop_flag),
                     "tail_hit": int(tail_hit),
                     "first_loop_prefix_length": first_loop_prefix,
+                    "loop_trigger": (
+                        asdict(loop_trigger) if loop_trigger is not None else None
+                    ),
                 }
             )
         archive_rows.append(
@@ -1667,6 +1677,10 @@ def _resolve_target_spec(
 
 def main() -> None:
     args = _parse_args()
+    if args.loop_n < 1:
+        raise SystemExit("--loop-n must be >= 1.")
+    if args.loop_k < 2:
+        raise SystemExit("--loop-k must be >= 2.")
 
     try:
         rollout_cfg = get_rollout_config(
