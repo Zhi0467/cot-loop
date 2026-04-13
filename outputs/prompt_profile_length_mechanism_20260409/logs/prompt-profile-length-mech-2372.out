@@ -1,0 +1,8 @@
+[prompt-profile-length-mech] REGRESSION_ROOT=/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405
+[prompt-profile-length-mech] OUT_ROOT=/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_length_mechanism_20260409
+[prompt-profile-length-mech] DATASETS=gpqa aime math500 mmlu_pro livecodebench
+[prompt-profile-length-mech] SELECTION_KIND=best_loss
+[prompt-profile-length-mech] HF_HOME=/data/scratch/murphy/cache/huggingface
+[prompt-profile-length-mech] VLLM_CACHE_ROOT=/data/scratch/murphy/cache/vllm
+$ python3 scripts/analyze_prompt_profile_length_mechanism.py --regression-root /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_regression_natural_rerun_20260405 --out-dir /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_length_mechanism_20260409 --selection-kind best_loss --batch-size 256 --device auto --datasets gpqa aime math500 mmlu_pro livecodebench
+Wrote prompt-length mechanism audit to /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_length_mechanism_20260409

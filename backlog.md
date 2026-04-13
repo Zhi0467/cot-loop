@@ -1,33 +1,40 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-06 07:02 UTC
+Last updated: 2026-04-09 22:55 UTC
 
 ## Immediate Next Experiments
 
-- The current collaborator-facing prompt-profile surface is now one combined audit bundle rather than separate regression and binary notes.
+- The current collaborator-facing prompt-profile surface is now one unified report rather than three separate April PDFs.
   - Primary citation:
+    - `docs/prompt-profile-unified-report-2026-04-09.md`
+    - `outputs/prompt_profile_unified_report_20260409/prompt_profile_unified_report_20260409.pdf`
+  - Supporting source notes:
     - `docs/prompt-profile-combined-audit-2026-04-05.md`
     - `outputs/prompt_profile_combined_audit_20260405/prompt_profile_combined_audit_20260405.pdf`
-    - `docs/prompt-profile-metadata-mechanism-2026-04-06.md`
-    - `outputs/prompt_profile_metadata_mechanism_20260406/prompt_profile_metadata_mechanism_20260406.pdf`
+    - `docs/prompt-profile-length-mechanism-2026-04-09.md`
+    - `outputs/prompt_profile_length_mechanism_20260409/prompt_profile_length_mechanism_20260409.pdf`
   - Supporting audit bundle:
     - `outputs/prompt_profile_metadata_audit_20260405/`
     - `outputs/prompt_profile_metadata_mechanism_20260406/`
+    - `outputs/prompt_profile_length_mechanism_20260409/`
   - What this bundle fixes:
     - it keeps the canonical natural-split / natural-sampler regression rerun and the current balanced-binary recommendation in one surface again;
+    - it adds one collaborator-facing PDF that starts from setup and predictor views, then carries visuals, results, and interpretation in the same artifact;
     - it adds a cheap prompt-stat audit from the saved prompt archives;
     - it adds Athena's codebase-level audit of the current build / label / train / summarize path;
-    - it now also answers the narrower mechanism question directly: why those prompt-only controls are strong.
+    - it now also answers the narrower mechanism question directly, in plain English: why prompt length predicts completion length at all.
   - Main correction from that audit:
     - the reported "metadata baseline" on the April full-train notes is only a train-fit 1D prompt-length scorer, because `effective_max_tokens=30000` is fixed on this surface;
     - cheap prompt-shape features such as `newline_count`, `dollar_count`, and `char_length` already match or beat raw prompt length on several datasets, and in a few places they rival or beat the current activation probes too;
-    - the new mechanism note sharpens the explanation: the current targets are mostly fixed-budget long-completion objects, and `majority_s_0.5` is largely downstream of `mean_relative_length`, so prompt-family surface cues naturally transfer to both heads.
+    - the new length-mechanism note sharpens the plain-English explanation:
+      - on `AIME`, `MATH-500`, `MMLU-Pro`, and much of `LiveCodeBench`, longer prompts are mostly the prompts with more work packed into them;
+      - `GPQA` is the important exception where raw length is weak and prompt structure matters more than raw length.
   - Next honest prompt-profile step:
-    - fit a stronger prompt-shape baseline for `mean_relative_length` on the frozen natural split;
-    - evaluate activation lift only on residual `mean_relative_length` or inside narrow prompt-shape-risk bins;
+    - keep the new length-mechanism note as the answer to the prompt-length question itself;
+    - if the activation claim needs to move forward, evaluate activation lift only on residual `mean_relative_length` or inside narrow prompt-shape-risk bins on the frozen natural split;
     - then check whether higher activation score still tracks higher `p_loop` after conditioning on prompt shape and true `mean_relative_length`;
-    - do not use `majority_s_0.5` alone to answer the mechanism question, because it is already too downstream of `mean_relative_length`;
-    - do not spend another cycle rerunning the same natural regression object unless that stronger baseline changes the read.
+    - do not use `majority_s_0.5` alone to answer the length-mechanism question;
+    - do not spend another cycle rerunning the same natural regression object unless a stronger prompt-shape control changes the read.
 - The canonical prompt-profile regression lane is now backed by both the original locked run and a fresh rerun on the current branch.
   - First citation for the current regression object:
     - `docs/prompt-profile-natural-regression-rerun-2026-04-05.md`

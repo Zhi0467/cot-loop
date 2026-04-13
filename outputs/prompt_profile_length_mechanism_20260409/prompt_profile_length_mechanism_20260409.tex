@@ -1,0 +1,165 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{array}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+
+\title{Why Prompt Length Predicts Completion Length:\\Prompt-Profile Length Mechanism Note}
+\author{}
+\date{2026-04-09 02:39 UTC}
+
+\begin{document}
+\maketitle
+
+\section*{Question}
+Why does prompt length predict completion length at all on the natural \texttt{mean\_relative\_length} regression surface, if the baseline really is just prompt length and there is no implementation bug?
+
+\section*{Short Answer}
+Because on this fixed setup, longer prompts are often the prompts that already contain more work.
+
+\begin{itemize}[leftmargin=1.5em]
+\item In \texttt{AIME} and \texttt{MATH-500}, longer prompts usually mean more math setup, more notation, or more conditions to track.
+\item In \texttt{LiveCodeBench}, longer prompts usually mean a longer programming spec with more requirements or more edge cases.
+\item In \texttt{MMLU-Pro}, length still carries some signal, but it is weaker and less clean.
+\item \texttt{GPQA} is the important exception: raw length is weak there, and prompt structure matters more than raw length.
+\end{itemize}
+
+So prompt length is not acting like a magical cause. It is acting like a rough visible summary of how much answer-work the prompt is likely to demand from this fixed model and decode policy.
+
+\section*{What This Audit Ran}
+\begin{itemize}[leftmargin=1.5em]
+\item source regression root: \texttt{outputs/prompt\_profile\_natural\_regression\_rerun\_20260405/}
+\item new audit bundle: \texttt{outputs/prompt\_profile\_length\_mechanism\_20260409/}
+\item GPU execution: \texttt{slurm/run\_prompt\_profile\_length\_mechanism\_audit.sbatch} on \texttt{2} GPUs, copied local log \texttt{logs/prompt-profile-length-mech-2372.out}
+\item exact object: target \texttt{mean\_relative\_length}, natural prompt-disjoint train/test split, frozen \texttt{best\_loss} checkpoints for \texttt{last\_layer} and \texttt{ensemble}
+\end{itemize}
+
+The audit compared:
+\begin{enumerate}[leftmargin=1.5em]
+\item raw prompt length only
+\item a linear prompt-shape regressor using \texttt{prompt\_token\_count}, \texttt{log\_token\_length}, \texttt{char\_length}, \texttt{newline\_count}, \texttt{digit\_count}, \texttt{dollar\_count}, and \texttt{choice\_count}
+\item a nonlinear prompt-shape tree on the same prompt features
+\item the saved activation probes (\texttt{last\_layer}, \texttt{ensemble})
+\end{enumerate}
+
+\section*{Cross-Dataset Read}
+\begin{center}
+\small
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Model & Mean \texttt{top\_20p\_capture} & Mean \texttt{RMSE} & Mean \texttt{Spearman} \\
+\midrule
+prompt length & 0.261 & 0.180 & 0.410 \\
+prompt-shape linear & 0.264 & 0.174 & 0.452 \\
+prompt-shape tree & 0.288 & 0.189 & 0.392 \\
+activation \texttt{last\_layer} & 0.257 & 0.179 & 0.423 \\
+activation \texttt{ensemble} & 0.304 & 0.177 & 0.586 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Main read:
+\begin{itemize}[leftmargin=1.5em]
+\item raw prompt length really does carry held-out signal on this surface
+\item adding a few cheap prompt-shape features improves the prompt-only baseline a bit, so the old length-only row was compressing real prompt structure
+\item the activation \texttt{ensemble} is still the best screening score overall
+\item the reason prompt length works is no longer mysterious: much of the signal is already visible on the prompt surface
+\end{itemize}
+
+\section*{Dataset By Dataset}
+\subsection*{\texttt{AIME}}
+This is the cleanest ``longer prompt, longer answer'' case.
+\begin{itemize}[leftmargin=1.5em]
+\item prompt-length test correlation: Pearson \texttt{0.456}, Spearman \texttt{0.676}
+\item prompt-length quartiles: \texttt{71 -> 0.422}, \texttt{96 -> 0.674}, \texttt{130 -> 0.726}, \texttt{336 -> 0.765}
+\item the same quartiles also become much more symbolic: mean \texttt{dollar\_count} rises from \texttt{8.5} to \texttt{37.3}
+\end{itemize}
+Plain reading: the longer \texttt{AIME} prompts are often the denser TeX-heavy olympiad problems, so they naturally make the model write longer solutions.
+
+\subsection*{\texttt{MATH-500}}
+This is similar to \texttt{AIME}, but milder.
+\begin{itemize}[leftmargin=1.5em]
+\item prompt-length test correlation: Pearson \texttt{0.346}, Spearman \texttt{0.461}
+\item prompt-length quartiles: \texttt{43 -> 0.125}, \texttt{64 -> 0.214}, \texttt{91 -> 0.195}, \texttt{196 -> 0.328}
+\item the longest quartile is also more structured: mean \texttt{newline\_count} rises from \texttt{5.0} to \texttt{13.2}, mean \texttt{dollar\_count} rises from \texttt{2.6} to \texttt{11.0}
+\end{itemize}
+Plain reading: longer \texttt{MATH-500} prompts usually carry more setup, more notation, or more separate conditions.
+
+\subsection*{\texttt{LiveCodeBench}}
+Prompt length works here too, but only as a rough proxy.
+\begin{itemize}[leftmargin=1.5em]
+\item prompt-length test correlation: Pearson \texttt{0.332}, Spearman \texttt{0.405}
+\item prompt-length quartiles: \texttt{351 -> 0.236}, \texttt{467 -> 0.390}, \texttt{591 -> 0.547}, \texttt{853 -> 0.462}
+\item mean \texttt{newline\_count} rises from \texttt{52.6} to \texttt{84.2}
+\item activation ensemble still wins clearly on screening: prompt length \texttt{top\_20p\_capture = 0.248}, activation ensemble \texttt{0.345}
+\end{itemize}
+Plain reading: longer coding prompts usually mean longer specs and more cases to satisfy, but length alone is not enough because similar-length tasks can still require very different amounts of work.
+
+\subsection*{\texttt{MMLU-Pro}}
+Prompt length has some signal, but this is not a simple or dominant length story.
+\begin{itemize}[leftmargin=1.5em]
+\item prompt-length test correlation: Pearson \texttt{0.332}, Spearman \texttt{0.393}
+\item prompt-length quartiles: \texttt{163 -> 0.075}, \texttt{208 -> 0.095}, \texttt{237 -> 0.137}, \texttt{395 -> 0.183}
+\item activation ensemble still helps on screening: prompt length \texttt{top\_20p\_capture = 0.292}, activation ensemble \texttt{0.364}
+\end{itemize}
+Plain reading: once the multiple-choice scaffold is mostly fixed, prompt length still tracks how much detail is in the stem, but it is only part of the story.
+
+\subsection*{\texttt{GPQA}}
+This is the important exception, and it is the clearest proof that raw length is not the right explanation by itself.
+\begin{itemize}[leftmargin=1.5em]
+\item prompt-length test correlation: Pearson \texttt{-0.069}, Spearman \texttt{0.116}
+\item prompt-length quartiles: \texttt{153 -> 0.197}, \texttt{207 -> 0.259}, \texttt{248 -> 0.377}, \texttt{407 -> 0.218}
+\item prompt length \texttt{top\_20p\_capture = 0.168}
+\item prompt-shape linear \texttt{0.184}
+\item prompt-shape tree \texttt{0.284}
+\item activation ensemble \texttt{0.240}
+\end{itemize}
+The longest prompts are not the riskiest prompts. The medium-long prompts are. Plain reading: in \texttt{GPQA}, what matters is not raw length but what kind of long prompt it is.
+
+\section*{Athena Read}
+Athena was asked the exact narrow question here: why should prompt length predict completion length at all, in plain English, using only the new note and summary bundle?
+
+Athena agreed with the local read:
+\begin{itemize}[leftmargin=1.5em]
+\item longer prompts are often just the prompts with more work packed into them
+\item that is a real pattern on \texttt{AIME}, \texttt{MATH-500}, \texttt{MMLU-Pro}, and much of \texttt{LiveCodeBench}
+\item \texttt{GPQA} is the clear place where raw length itself mostly stops working
+\item the safest summary is: prompt length works when it stands in for visible workload, and it works poorly when different prompt types end up with similar length
+\end{itemize}
+
+Copied Athena context note: \texttt{outputs/prompt\_profile\_length\_mechanism\_20260409/athena\_length\_mechanism\_context.md}
+
+\section*{What Is Actually Proved}
+\begin{itemize}[leftmargin=1.5em]
+\item There is a real prompt-length to completion-length correlation on most of these datasets. This is not an implementation bug artifact.
+\item The old prompt-length baseline was hiding real prompt-surface structure. Cheap prompt-shape features improve the prompt-only baseline.
+\item The correlation is benchmark-specific: near-monotone on \texttt{AIME}, moderate on \texttt{MATH-500}, \texttt{MMLU-Pro}, and \texttt{LiveCodeBench}, and weak and non-monotone on \texttt{GPQA}.
+\item The activation ensemble is still the strongest overall screening score, so prompt-only surface cues do not explain everything.
+\end{itemize}
+
+\section*{What This Does Not Prove}
+\begin{itemize}[leftmargin=1.5em]
+\item It does not prove that prompt length itself is the causal driver. The cleaner reading is that prompt length usually stands in for prompt workload or prompt type.
+\item It does not prove that one tiny prompt-shape model is the full metadata ceiling.
+\item It does not prove that activations stop helping once prompt shape is included.
+\item It does not justify a universal slogan like ``longer prompt always means longer completion.'' \texttt{GPQA} already breaks that.
+\end{itemize}
+
+\section*{Bottom Line}
+The simplest honest answer is:
+
+Prompt length predicts completion length here because, on most of these datasets, longer prompts are usually the prompts with more work packed into them. The model then writes longer answers. That is a real effect on \texttt{AIME}, \texttt{MATH-500}, \texttt{MMLU-Pro}, and \texttt{LiveCodeBench}. \texttt{GPQA} shows the important caveat: raw length alone is weak there, and prompt structure matters more than raw length.
+
+So the old result was not pointing to a hidden bug. It was pointing to a real correlation between visible prompt workload and visible completion length on this fixed setup.
+
+\section*{Artifacts}
+\begin{itemize}[leftmargin=1.5em]
+\item note: \texttt{docs/prompt-profile-length-mechanism-2026-04-09.md}
+\item bundle: \texttt{outputs/prompt\_profile\_length\_mechanism\_20260409/}
+\item Athena consult log: \texttt{.agent/runtime/consult\_history/1775257834.444509.jsonl}
+\end{itemize}
+
+\end{document}
