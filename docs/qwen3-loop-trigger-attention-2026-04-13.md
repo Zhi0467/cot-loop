@@ -10,7 +10,13 @@ Wangzhi asked for a first implementable test of this hypothesis on the saved Qwe
 
 This note answers that question only for a bounded pilot on the later March 22-23 prompt-profile archives. It does **not** claim exact rollout-time replay of the original completion token IDs, and it does **not** cover the long `8k+` trigger prefixes yet.
 
-One correction matters up front: an earlier draft of this pilot had a per-layer wrapper capture bug in the attention script. I fixed that and reran the full bounded slice; all numbers below are from the corrected rerun.
+One correction matters up front: an earlier draft of this pilot had a per-layer wrapper capture bug in the attention script. I fixed that and reran the full bounded slice.
+
+A later local review found one more bug that matters for the actual attention numbers: when repeated `30`-grams overlap, the old binning logic double-counted some token positions as both "previous loop" and "current trigger". I fixed that bug in the script too, but I have **not** rerun the remote archive sweep after that final fix in this checkout. So the numerical attention summaries from the earlier rerun are now withdrawn. Until the rerun lands, the durable parts of this note are:
+
+- the reconstruction boundary;
+- the definition of the bounded slice; and
+- the rollout-saving changes for future runs.
 
 ## Commit Audit
 
@@ -70,56 +76,19 @@ The attention probe looks only at the final token of the triggering `30`-gram co
 - attention mass on the **current trigger span** itself;
 - where each head's top-1 attention destination lands.
 
-The cleanest read is the **final layer**:
+The important current fact is not a number but a contract:
 
-| Dataset | Rows | Final-layer mass on previous loop spans | Prompt mass | Current-trigger mass |
-| --- | ---: | ---: | ---: | ---: |
-| `GPQA` | `3` | `0.038` | `0.755` | `0.154` |
-| `AIME` | `2` | `0.035` | `0.724` | `0.170` |
-| `MATH-500` | `3` | `0.102` | `0.654` | `0.192` |
-| `MMLU-Pro` | `3` | `0.048` | `0.657` | `0.203` |
-| `LiveCodeBench` | `3` | `0.112` | `0.625` | `0.224` |
-| **Overall** | `14` | **`0.069`** | **`0.680`** | **`0.190`** |
-
-Head destinations make the same point even more strongly:
-
-- across all `14` rows, `85.3%` of final-layer heads put their top-1 attention destination on the **prompt**
-- `14.7%` put top-1 on the **current trigger / self**
-- `0%` put top-1 on **earlier loop copies**
-
-So the corrected late-layer read is prompt-dominant, not previous-loop-dominant.
-
-One more caution matters here. A later local review found that the attention wrapper also needed to respect sliding-window masking for checkpoints that use hybrid attention. I patched the script for that case, but I have **not** rerun the remote archive sweep after that final code fix in this checkout. So this note intentionally keeps only the bounded **final-layer** headline above as current. I am not making any intermediate-layer or "best layer" claim here until that rerun is refreshed.
+- the bounded pilot is still defined by the same `14` selected short-prefix rows listed above;
+- the script now respects sliding-window masking, excludes overlapping current-trigger positions from the previous-loop bin, and accepts both prompt-profile archives and the newer `__rollout_archive.jsonl.gz` sidecar;
+- the next rerun of this exact bounded slice is the right place to refresh the actual attention summary.
 
 ## Read
 
-What the pilot supports:
+The honest current answer is therefore procedural rather than empirical:
 
-- if the claim is specifically about the **final layer** on this short exact-trigger slice, the model is mostly looking back to the **prompt**, not to earlier loop copies
-- previous-loop mass in the final layer is still nonzero, especially on `LiveCodeBench` and `MATH-500`, but it is much smaller than prompt mass on every dataset in this bounded pilot
-
-What the pilot does **not** yet support:
-
-- it does not support any whole-stack or intermediate-layer claim until the sliding-window-corrected rerun is refreshed;
-- it does not prove that prompt-focused final-layer attention is the causal reason the loop continues
-- it does not prove that previous-loop attention is the causal reason the loop continues;
-- it does not show the same pattern on the long `8k+` trigger rows;
-- it does not tell us whether the important signal is "prompt vs previous loop" or "prompt vs local current-trigger span" without a matched control slice.
-
-So the honest current answer is:
-
-- **Yes**, on this short exact-trigger slice the **final layer** is overwhelmingly prompt-focused rather than previous-loop-focused.
-- **Unknown for the whole stack**, because I am no longer treating the older intermediate-layer rows as current after the final sliding-window fix.
-- So the current bounded read is narrower than the previous draft: the late-layer trigger token is not dominated by previous-loop attention on this slice.
-
-## Example Rows
-
-- `GPQA`, sample `36`, rollout `3`, total prefix `712`:
-  - final layer: previous-loop mass `0.030`, prompt mass `0.848`, current-trigger mass `0.099`
-- `MATH-500`, sample `437`, rollout `2`, total prefix `409`:
-  - final layer: previous-loop mass `0.104`, prompt mass `0.664`, current-trigger mass `0.167`
-- `LiveCodeBench`, sample `132`, rollout `0`, total prefix `1544`:
-  - final layer: previous-loop mass `0.077`, prompt mass `0.662`, current-trigger mass `0.224`
+- the saved archives are sufficient to define and replay the bounded trigger slice;
+- the exact future-rollout saving path is now fixed, so this replay gap should not repeat on new runs;
+- the clean answer to the actual attention question is pending the overlap-corrected rerun of this same slice.
 
 ## Code Changes For Future Rollouts
 
@@ -167,7 +136,7 @@ That closes the exact replay gap for future rollout-stat runs instead of forcing
   - `attention_summary.json`
   - `attention_layer_means.csv`
   - `attention_per_sample.json`
-- Treat non-final-layer rows in `attention_layer_means.csv` / `attention_per_sample.json` as provisional until the sliding-window-corrected rerun is refreshed.
+- Treat the current attention-number artifacts in this bundle as stale until the overlap-corrected rerun is refreshed.
 
 ## Next Honest Step
 
