@@ -51,7 +51,7 @@ for (( shard_idx=0; shard_idx<NUM_SHARDS; shard_idx++ )); do
     --out-dir "${shard_out}" \
     --max-samples-per-dataset "${MAX_SAMPLES_PER_DATASET}" \
     --max-trigger-prefix "${MAX_TRIGGER_PREFIX}" \
-    --device cuda \
+    --device cuda:0 \
     --num-shards "${NUM_SHARDS}" \
     --shard-index "${shard_idx}" \
     > "${OUT_DIR}/shard_${shard_idx}.log" 2>&1 &

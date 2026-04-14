@@ -91,6 +91,19 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _resolve_device(device_arg: str) -> torch.device:
+    device = torch.device(device_arg)
+    if device.type != "cuda":
+        return device
+    if not torch.cuda.is_available():
+        raise SystemExit("CUDA requested but no CUDA device is available.")
+    if device.index is not None:
+        return device
+    # `torch.cuda.set_device` requires an explicit index; default to the first
+    # visible device so CUDA_VISIBLE_DEVICES-based sharding works as expected.
+    return torch.device("cuda:0")
+
+
 def _iter_archive_rows(root: Path):
     path = _resolve_archive_path(root)
     opener = gzip.open if path.suffix == ".gz" else open
@@ -714,7 +727,7 @@ def main() -> None:
     if args.skip_attention or not selected_rows:
         return
 
-    device = torch.device(args.device)
+    device = _resolve_device(args.device)
     if device.type == "cuda":
         torch.cuda.set_device(device)
     model = _load_model(
