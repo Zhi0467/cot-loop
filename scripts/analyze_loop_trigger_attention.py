@@ -580,6 +580,10 @@ def _capture_attention(
                 input_ids=input_tensor,
                 attention_mask=attention_mask,
                 use_cache=False,
+                # The attention probe never consumes the logits tensor itself;
+                # asking Qwen3 to keep only the final logit avoids a large
+                # full-prefix lm_head allocation on long trigger prefixes.
+                logits_to_keep=1,
             )
     finally:
         for module, original_forward in original_forwards:
