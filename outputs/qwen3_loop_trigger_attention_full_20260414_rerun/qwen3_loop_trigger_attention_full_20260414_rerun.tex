@@ -9,7 +9,7 @@
 \usepackage[utf8]{inputenc}
 \usepackage{lmodern}
 
-\title{Qwen3 Loop-Trigger Attention Query Comparison}
+\title{Qwen3 Loop-Trigger Attention: Trigger End vs Trigger Start}
 \author{}
 \date{2026-04-14}
 
@@ -18,15 +18,14 @@
 
 \section*{Object}
 
-This note compares three query positions on the same saved March 22--23 Qwen3-1.7B instruct prompt-profile rows:
+This note compares the two query positions that matter for the current question on the same saved March 22--23 Qwen3-1.7B instruct prompt-profile rows:
 
 \begin{itemize}
   \item \texttt{trigger\_end}: the final token of the twentieth repeated $30$-gram
-  \item \texttt{first\_trigger\_token}: the first token of that same twentieth repeated $30$-gram
   \item \texttt{trigger\_start}: the token immediately before that twentieth repeated copy begins
 \end{itemize}
 
-The naming change is deliberate. The earlier 2026-04-14 note had called the first-token object \texttt{trigger\_start}. I am no longer using that name, because Wangzhi's intended object was the token right before the final repeated copy, not the first token inside it.
+The naming here is deliberate. I am using \texttt{trigger\_start} only for the token right before the final repeated copy begins. The intermediate first-token view is omitted from this cleaned report surface.
 
 Everything else is held fixed:
 
@@ -76,13 +75,12 @@ For each selected row:
   \item Apply an explicit causal mask inside the probe wrapper so keys with \texttt{key\_position > query\_position} are forced to zero.
 \end{enumerate}
 
-That explicit mask matters. The earlier first-token note had been leaking attention onto future trigger tokens. The first-token and pre-trigger numbers below replace that older surface.
+That explicit mask matters. The earlier off-by-one surface had been leaking attention onto future trigger tokens. This cleaned comparison keeps only \texttt{trigger\_end} and corrected \texttt{trigger\_start}.
 
-The three query positions are:
+The two reported query positions are:
 
 \begin{itemize}
   \item \texttt{trigger\_end = prompt\_len + trigger\_end}
-  \item \texttt{first\_trigger\_token = prompt\_len + trigger\_start}
   \item \texttt{trigger\_start = prompt\_len + trigger\_start - 1}
 \end{itemize}
 
@@ -98,7 +96,7 @@ Key positions are partitioned into disjoint bins:
 
 \texttt{last\_previous\_loop} is still tracked as a subset of \texttt{previous\_loop}, but it is not plotted as a separate mass line here.
 
-There is no separate self bin. The query token contributes to the region it belongs to. So \texttt{current\_trigger} at \texttt{first\_trigger\_token} includes the first trigger token/self, while \texttt{current\_trigger} at corrected \texttt{trigger\_start} is exactly zero because the full trigger span is in the future.
+There is no separate self bin. The query token contributes to the region it belongs to. At corrected \texttt{trigger\_start}, \texttt{current\_trigger} is exactly zero because the full trigger span is in the future.
 
 Summary statistics are:
 
@@ -112,24 +110,30 @@ Summary statistics are:
 \begin{figure}[t]
 \centering
 \includegraphics[width=\textwidth]{attention_mass_by_layer_comparison.pdf}
-\caption{Row-weighted overall attention-mass progression from layer 0 to layer 27 for the three query positions.}
+\caption{Row-weighted overall attention-mass progression from layer 0 to layer 27 for the two reported query positions, with three lines per panel.}
 \end{figure}
 
-\texttt{attention\_mass\_by\_layer\_comparison.pdf} plots row-weighted overall bin mass from layer $0$ to layer $27$.
+\texttt{attention\_mass\_by\_layer\_comparison.pdf} plots row-weighted overall bin mass from layer $0$ to layer $27$ for the two reported query positions. To keep the figure readable, each panel shows three lines:
+
+\begin{itemize}
+  \item \texttt{trigger\_end}: \texttt{prompt}, \texttt{previous\_loop}, and \texttt{current\_trigger}
+  \item corrected \texttt{trigger\_start}: \texttt{prompt}, \texttt{previous\_loop}, and \texttt{other\_completion}
+\end{itemize}
+
+\texttt{recent\_nonloop} is still measured in the raw summaries and final-layer table, but it is intentionally omitted from the plot.
 
 Main read from the curves:
 
 \begin{itemize}
   \item \texttt{trigger\_end}: previous-loop mass rises early, peaks at layer $6$ (\texttt{0.193}), and then falls as the final layer becomes prompt-dominant.
-  \item \texttt{first\_trigger\_token}: previous-loop mass strengthens further and still peaks at layer $6$ (\texttt{0.263}), while \texttt{current\_trigger} shrinks to self-only and is only \texttt{0.034} at that peak.
   \item corrected \texttt{trigger\_start}: \texttt{current\_trigger} is identically \texttt{0}, previous-loop mass peaks later at layer $16$ (\texttt{0.211}), and the strongest competition there is between \texttt{prompt} (\texttt{0.260}) and \texttt{other\_completion} (\texttt{0.329}).
 \end{itemize}
 
-So the off-by-one correction does not erase previous-loop attention. It removes the spurious future-trigger mass and changes the curve shape: the clean pre-trigger object has a later, broader previous-loop peak than either of the two inside-the-trigger queries.
+So the off-by-one correction does not erase previous-loop attention. It removes the spurious future-trigger mass and leaves a clean pre-trigger object with a later, broader previous-loop peak than the trigger-end view.
 
 \section*{Final-Layer Overall Comparison}
 
-The final-layer summary is layer $27$ for all three objects.
+The final-layer summary is layer $27$ for both reported objects.
 
 \begin{center}
 \scriptsize
@@ -138,19 +142,17 @@ The final-layer summary is layer $27$ for all three objects.
 Query & Prev-loop & Prompt & Current-trigger & Recent-nonloop & Other-completion & Top-1 prev & Top-1 prompt & Top-1 current \\
 \midrule
 \texttt{trigger\_end} & 0.031 & 0.639 & 0.176 & 0.038 & 0.116 & 0.0003 & 0.874 & 0.114 \\
-\texttt{first\_trigger\_token} & 0.061 & 0.620 & 0.096 & 0.106 & 0.118 & 0.019 & 0.831 & 0.112 \\
 corrected \texttt{trigger\_start} & 0.069 & 0.634 & 0.000 & 0.108 & 0.190 & 0.027 & 0.872 & 0.000 \\
 \bottomrule
 \end{tabular}
 \normalsize
 \end{center}
 
-This comparison says three separate things:
+This comparison says two separate things:
 
 \begin{itemize}
-  \item moving from \texttt{trigger\_end} to \texttt{first\_trigger\_token} roughly doubles final-layer previous-loop mass (\texttt{0.031 -> 0.061}) and cuts current-trigger mass nearly in half (\texttt{0.176 -> 0.096}) once future-token leakage is removed;
-  \item moving one token earlier again to corrected \texttt{trigger\_start} removes \texttt{current\_trigger} entirely, nudges previous-loop mass slightly higher (\texttt{0.069}), and shifts that mass into \texttt{other\_completion} rather than back into the trigger span;
-  \item prompt tokens remain the dominant late-layer target in all three views.
+  \item moving from \texttt{trigger\_end} to corrected \texttt{trigger\_start} removes \texttt{current\_trigger} entirely, raises final-layer previous-loop mass from \texttt{0.031} to \texttt{0.069}, and shifts the competing non-prompt mass into \texttt{other\_completion} rather than the trigger span;
+  \item prompt tokens remain the dominant late-layer target in both views.
 \end{itemize}
 
 \section*{Corrected Trigger-Start By Dataset}
@@ -189,18 +191,10 @@ Dataset-level scientific read:
 The corrected read is now:
 
 \begin{itemize}
-  \item the earlier first-token report needed a causal-mask fix and should be treated as superseded;
   \item the clean pre-trigger object does show nontrivial attention to previous loops:
-  \begin{itemize}
-    \item final-layer previous-loop mass \texttt{0.069}
-    \item final-layer top-1 previous-loop \texttt{0.027}
-    \item overall previous-loop peak at layer $16$ with mass \texttt{0.211}
-  \end{itemize}
+    final-layer previous-loop mass \texttt{0.069}, final-layer top-1 previous-loop \texttt{0.027}, and overall previous-loop peak at layer $16$ with mass \texttt{0.211};
   \item but the final layer is still mostly prompt-focused rather than previous-loop-focused:
-  \begin{itemize}
-    \item final-layer prompt mass \texttt{0.634}
-    \item final-layer top-1 prompt \texttt{0.872}
-  \end{itemize}
+    final-layer prompt mass \texttt{0.634} and final-layer top-1 prompt \texttt{0.872}.
 \end{itemize}
 
 So the strongest honest statement is not ``Qwen3 is not paying attention to previous loops.'' The stronger-supported statement is:
@@ -215,7 +209,6 @@ Updated raw/report artifacts now live under:
 
 \begin{itemize}
   \item \texttt{outputs/qwen3\_loop\_trigger\_attention\_full\_20260414\_rerun/}
-  \item \texttt{outputs/qwen3\_loop\_trigger\_attention\_trigger\_start\_20260414/} (corrected first-token bundle)
   \item \texttt{outputs/qwen3\_loop\_trigger\_attention\_pre\_trigger\_start\_20260414/} (corrected trigger-start bundle)
 \end{itemize}
 

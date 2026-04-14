@@ -155,11 +155,10 @@ This should be similar to our previous experiments on training probes on loop la
   - What it established:
     - the March prompt-profile archives still do not preserve exact completion token IDs, but the replay boundary is now pinned exactly: `512 / 9432` exact retokenized completion lengths, `9333 / 9432` rows explained if one hidden empty-text stop token is allowed, and `811 / 820` loop rows with exact trigger-prefix recovery;
     - the full analyzed object is `811` replayable loop rows, not the old `14`-row slice, with total prefix lengths up to `28830`;
-    - the note now compares three query positions on that same full object, after fixing a probe bug that had been leaking attention onto future trigger tokens for pre-end queries:
+    - the cleaned report now compares only `trigger_end` and the corrected pre-token `trigger_start` on that same full object, after fixing a probe bug that had been leaking attention onto future trigger tokens for pre-end queries:
       - at `trigger_end`, the final layer is consistently prompt-dominant across datasets: prompt mass `0.620-0.671`, previous-loop mass `0.025-0.038`, current-trigger mass `0.173-0.185`, and top-1 previous-loop attention is essentially zero;
-      - at `first_trigger_token`, the corrected first-token view is still prompt-dominant, but previous-loop attention is materially stronger (`prompt 0.620`, `prev_loop 0.061`, `current_trigger 0.096`, `top1_prev_loop 0.019`);
       - at the real pre-token `trigger_start`, `current_trigger` is exactly zero by construction, previous-loop attention remains real (`prev_loop 0.069`, `top1_prev_loop 0.027`), and the final layer is still prompt-dominant (`prompt 0.634`, `top1_prompt 0.872`);
-    - the layer-progression plot changes the mechanistic read: `trigger_end` and `first_trigger_token` both peak in previous-loop mass at layer `6`, but the corrected `trigger_start` peak shifts later to layer `16`;
+    - the layer-progression figure is now the cleaned two-panel surface Wangzhi asked for: `trigger_end` shows `prompt`, `previous_loop`, and `current_trigger`, while corrected `trigger_start` shows `prompt`, `previous_loop`, and `other_completion`; the corrected `trigger_start` previous-loop peak sits at layer `16`;
     - future rollout paths now save exact completion token IDs and structured trigger metadata, so this analysis no longer has to rely on retrospective text reconstruction on new runs.
   - What is still open:
     - add a matched non-loop or pre-trigger control slice so prompt-vs-loop attention at the trigger is compared against a clean negative baseline instead of only described in isolation;
