@@ -736,7 +736,6 @@ def main() -> None:
             "max_samples_per_dataset": args.max_samples_per_dataset,
             "recent_window": args.recent_window,
             "num_shards": args.num_shards,
-            "shard_index": args.shard_index,
             "query_position_mode": args.query_position_mode,
         },
     )

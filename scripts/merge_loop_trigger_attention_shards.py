@@ -64,6 +64,12 @@ def _sample_sort_key(row: dict[str, Any]) -> tuple[Any, ...]:
     )
 
 
+def _normalized_analysis_config(payload: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(payload)
+    normalized.pop("shard_index", None)
+    return normalized
+
+
 def _weighted_merge_layer_means(shard_dirs: list[Path]) -> list[dict[str, Any]]:
     merged: dict[tuple[str, int], dict[str, float | int | str]] = {}
     for shard_dir in shard_dirs:
@@ -178,14 +184,18 @@ def main() -> None:
         raise SystemExit(f"Missing shard output directories: {', '.join(missing_shards)}")
 
     reference_reconstruction = _read_json(shard_dirs[0] / "reconstruction_summary.json")
-    reference_analysis_config = _read_json(shard_dirs[0] / "analysis_config.json")
+    reference_analysis_config = _normalized_analysis_config(
+        _read_json(shard_dirs[0] / "analysis_config.json")
+    )
     for shard_dir in shard_dirs[1:]:
         shard_reconstruction = _read_json(shard_dir / "reconstruction_summary.json")
         if shard_reconstruction != reference_reconstruction:
             raise SystemExit(
                 f"Reconstruction summary mismatch in {shard_dir}; shard outputs are inconsistent."
             )
-        shard_analysis_config = _read_json(shard_dir / "analysis_config.json")
+        shard_analysis_config = _normalized_analysis_config(
+            _read_json(shard_dir / "analysis_config.json")
+        )
         if shard_analysis_config != reference_analysis_config:
             raise SystemExit(
                 f"Analysis config mismatch in {shard_dir}; shard outputs are inconsistent."
