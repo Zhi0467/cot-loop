@@ -38,6 +38,8 @@ DEFAULT_ARCHIVE_ROOTS = {
     "livecodebench": "/data/scratch/murphy/outputs/cot-loop-detection/livecodebench_mean_relative_from_archive_20260323",
 }
 
+QUERY_POSITION_MODES = ("trigger_end", "trigger_start")
+
 
 @dataclass(frozen=True)
 class SelectedRollout:
@@ -87,6 +89,15 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--device",
         default="cuda" if torch.cuda.is_available() else "cpu",
+    )
+    parser.add_argument(
+        "--query-position-mode",
+        choices=QUERY_POSITION_MODES,
+        default="trigger_end",
+        help=(
+            "Which token inside the triggering copy to use as the attention "
+            "query."
+        ),
     )
     return parser.parse_args()
 
@@ -341,7 +352,13 @@ def _region_builder(
     row: SelectedRollout,
     *,
     recent_window: int,
+    query_position_mode: str,
 ) -> dict[str, Any]:
+    if query_position_mode not in QUERY_POSITION_MODES:
+        raise ValueError(
+            f"Unsupported query_position_mode={query_position_mode!r}; "
+            f"expected one of {QUERY_POSITION_MODES}."
+        )
     ngram_positions = row.loop_trigger["ngram_start_positions"]
     n = len(row.loop_trigger["ngram_token_ids"])
     prompt_len = row.prompt_token_count
@@ -363,7 +380,11 @@ def _region_builder(
         else set()
     )
     prompt_positions = set(range(prompt_len))
-    query_position = current_span[1]
+    query_position = (
+        current_span[1]
+        if query_position_mode == "trigger_end"
+        else current_span[0]
+    )
 
     recent_start = max(prompt_len, query_position - recent_window)
     recent_positions = {
@@ -389,6 +410,7 @@ def _region_builder(
 
     return {
         "query_position": query_position,
+        "query_position_mode": query_position_mode,
         "prompt_positions": sorted(prompt_positions),
         "previous_positions": sorted(previous_positions),
         "last_previous_positions": sorted(last_previous_positions),
@@ -404,8 +426,13 @@ def _capture_attention(
     *,
     device: torch.device,
     recent_window: int,
+    query_position_mode: str,
 ) -> list[dict[str, Any]]:
-    region_info = _region_builder(row, recent_window=recent_window)
+    region_info = _region_builder(
+        row,
+        recent_window=recent_window,
+        query_position_mode=query_position_mode,
+    )
     query_position = int(region_info["query_position"])
     input_ids = row.prompt_token_ids + row.completion_token_ids[: row.first_loop_prefix_length]
     input_tensor = torch.tensor([input_ids], dtype=torch.long, device=device)
@@ -496,6 +523,7 @@ def _capture_attention(
                 {
                     "layer": int(layer_idx),
                     "query_position": query_position,
+                    "query_position_mode": str(region_info["query_position_mode"]),
                     "mean_prev_loop_mass": _mass(prev_positions),
                     "mean_last_prev_loop_mass": _mass(last_prev_positions),
                     "mean_prompt_mass": _mass(prompt_positions),
@@ -694,6 +722,21 @@ def main() -> None:
 
     _write_json(out_dir / "reconstruction_summary.json", reconstruction_summaries)
     _write_json(
+        out_dir / "analysis_config.json",
+        {
+            "model_id": args.model_id,
+            "datasets": requested_datasets,
+            "loop_n": args.loop_n,
+            "loop_k": args.loop_k,
+            "max_trigger_prefix": args.max_trigger_prefix,
+            "max_samples_per_dataset": args.max_samples_per_dataset,
+            "recent_window": args.recent_window,
+            "num_shards": args.num_shards,
+            "shard_index": args.shard_index,
+            "query_position_mode": args.query_position_mode,
+        },
+    )
+    _write_json(
         out_dir / "shard_manifest.json",
         {
             "num_shards": args.num_shards,
@@ -702,6 +745,7 @@ def main() -> None:
             "rows_in_shard": len(selected_rows),
             "shard_total_prefix_loads": shard_loads,
             "shard_row_counts": [len(rows) for rows in shard_rows],
+            "query_position_mode": args.query_position_mode,
         },
     )
     _write_jsonl(
@@ -745,6 +789,7 @@ def main() -> None:
             row,
             device=device,
             recent_window=args.recent_window,
+            query_position_mode=args.query_position_mode,
         )
         per_sample_rows.append(
             {
@@ -755,6 +800,7 @@ def main() -> None:
                 "first_loop_prefix_length": row.first_loop_prefix_length,
                 "finish_reason": row.finish_reason,
                 "length_diff": row.length_diff,
+                "query_position_mode": args.query_position_mode,
                 "layer_summaries": layer_summaries,
             }
         )
@@ -780,6 +826,7 @@ def main() -> None:
             {
                 "dataset": dataset,
                 "layer": layer,
+                "query_position_mode": args.query_position_mode,
                 "num_rows": len(rows),
                 "mean_prev_loop_mass": _mean([float(r["mean_prev_loop_mass"]) for r in rows]),
                 "mean_last_prev_loop_mass": _mean([float(r["mean_last_prev_loop_mass"]) for r in rows]),
@@ -813,6 +860,7 @@ def main() -> None:
                 {(row["sample_id"], row["rollout_index"]) for row in summary_rows}
             ),
             "summary_layer": summary_layer,
+            "query_position_mode": args.query_position_mode,
             "mean_prev_loop_mass": _mean([float(r["mean_prev_loop_mass"]) for r in summary_rows]),
             "mean_last_prev_loop_mass": _mean([float(r["mean_last_prev_loop_mass"]) for r in summary_rows]),
             "mean_prompt_mass": _mean([float(r["mean_prompt_mass"]) for r in summary_rows]),

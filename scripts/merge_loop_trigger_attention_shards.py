@@ -79,8 +79,19 @@ def _weighted_merge_layer_means(shard_dirs: list[Path]) -> list[dict[str, Any]]:
                 key = (dataset, layer)
                 bucket = merged.setdefault(
                     key,
-                    {"dataset": dataset, "layer": layer, "num_rows": 0},
+                    {
+                        "dataset": dataset,
+                        "layer": layer,
+                        "num_rows": 0,
+                        "query_position_mode": str(row["query_position_mode"]),
+                    },
                 )
+                if str(bucket["query_position_mode"]) != str(row["query_position_mode"]):
+                    raise SystemExit(
+                        f"query_position_mode mismatch for dataset={dataset}, "
+                        f"layer={layer}: {bucket['query_position_mode']} vs "
+                        f"{row['query_position_mode']}."
+                    )
                 bucket["num_rows"] = int(bucket["num_rows"]) + num_rows
                 for metric in LAYER_METRICS:
                     bucket[metric] = float(bucket.get(metric, 0.0)) + (
@@ -95,6 +106,7 @@ def _weighted_merge_layer_means(shard_dirs: list[Path]) -> list[dict[str, Any]]:
                 "dataset": dataset,
                 "layer": layer,
                 "num_rows": num_rows,
+                "query_position_mode": str(bucket["query_position_mode"]),
                 **{
                     metric: (float(bucket[metric]) / num_rows if num_rows else 0.0)
                     for metric in LAYER_METRICS
@@ -115,12 +127,21 @@ def _weighted_merge_attention_summary(shard_dirs: list[Path]) -> dict[str, Any]:
             num_rows = int(payload["num_selected_rows"])
             bucket = merged.setdefault(
                 dataset,
-                {"num_selected_rows": 0, "summary_layer": int(payload["summary_layer"])},
+                {
+                    "num_selected_rows": 0,
+                    "summary_layer": int(payload["summary_layer"]),
+                    "query_position_mode": str(payload["query_position_mode"]),
+                },
             )
             if int(bucket["summary_layer"]) != int(payload["summary_layer"]):
                 raise SystemExit(
                     f"Summary layer mismatch for dataset {dataset}: "
                     f"{bucket['summary_layer']} vs {payload['summary_layer']}."
+                )
+            if str(bucket["query_position_mode"]) != str(payload["query_position_mode"]):
+                raise SystemExit(
+                    f"Summary query_position_mode mismatch for dataset {dataset}: "
+                    f"{bucket['query_position_mode']} vs {payload['query_position_mode']}."
                 )
             bucket["num_selected_rows"] = int(bucket["num_selected_rows"]) + num_rows
             for metric in LAYER_METRICS:
@@ -134,6 +155,7 @@ def _weighted_merge_attention_summary(shard_dirs: list[Path]) -> dict[str, Any]:
         combined[dataset] = {
             "num_selected_rows": num_rows,
             "summary_layer": int(bucket["summary_layer"]),
+            "query_position_mode": str(bucket["query_position_mode"]),
             **{
                 metric: (float(bucket[metric]) / num_rows if num_rows else 0.0)
                 for metric in LAYER_METRICS
@@ -156,11 +178,17 @@ def main() -> None:
         raise SystemExit(f"Missing shard output directories: {', '.join(missing_shards)}")
 
     reference_reconstruction = _read_json(shard_dirs[0] / "reconstruction_summary.json")
+    reference_analysis_config = _read_json(shard_dirs[0] / "analysis_config.json")
     for shard_dir in shard_dirs[1:]:
         shard_reconstruction = _read_json(shard_dir / "reconstruction_summary.json")
         if shard_reconstruction != reference_reconstruction:
             raise SystemExit(
                 f"Reconstruction summary mismatch in {shard_dir}; shard outputs are inconsistent."
+            )
+        shard_analysis_config = _read_json(shard_dir / "analysis_config.json")
+        if shard_analysis_config != reference_analysis_config:
+            raise SystemExit(
+                f"Analysis config mismatch in {shard_dir}; shard outputs are inconsistent."
             )
 
     selected_rows: list[dict[str, Any]] = []
@@ -177,6 +205,7 @@ def main() -> None:
     attention_rows.sort(key=_sample_sort_key)
 
     _write_json(out_dir / "reconstruction_summary.json", reference_reconstruction)
+    _write_json(out_dir / "analysis_config.json", reference_analysis_config)
     _write_json(out_dir / "shard_manifest.json", shard_manifests)
     _write_jsonl(out_dir / "selected_rows.jsonl", selected_rows)
     _write_json(out_dir / "attention_per_sample.json", attention_rows)

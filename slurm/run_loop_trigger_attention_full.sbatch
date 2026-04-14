@@ -24,6 +24,7 @@ MAX_SAMPLES_PER_DATASET="${MAX_SAMPLES_PER_DATASET:-1000}"
 MAX_TRIGGER_PREFIX="${MAX_TRIGGER_PREFIX:-40960}"
 NUM_SHARDS="${NUM_SHARDS:-8}"
 OMP_NUM_THREADS="${OMP_NUM_THREADS:-4}"
+QUERY_POSITION_MODE="${QUERY_POSITION_MODE:-trigger_end}"
 
 cd "${REPO_ROOT}"
 
@@ -51,6 +52,7 @@ for (( shard_idx=0; shard_idx<NUM_SHARDS; shard_idx++ )); do
     --out-dir "${shard_out}" \
     --max-samples-per-dataset "${MAX_SAMPLES_PER_DATASET}" \
     --max-trigger-prefix "${MAX_TRIGGER_PREFIX}" \
+    --query-position-mode "${QUERY_POSITION_MODE}" \
     --device cuda:0 \
     --num-shards "${NUM_SHARDS}" \
     --shard-index "${shard_idx}" \
