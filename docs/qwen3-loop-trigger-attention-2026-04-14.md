@@ -1,14 +1,15 @@
-# Qwen3 Loop-Trigger Attention Full Rerun
+# Qwen3 Loop-Trigger Attention Query Comparison
 
-Last updated: 2026-04-14 20:38 UTC
+Last updated: 2026-04-14 21:43 UTC
 
 ## Object
 
-This note answers the current loop-trigger question on the saved March 22-23 Qwen3-1.7B instruct prompt-profile archives:
+This note now answers the loop-trigger question at **two** query positions on the saved March 22-23 Qwen3-1.7B instruct prompt-profile archives:
 
-- when Qwen3 reaches the repeated `30`-gram that trips the `n=30`, `k=20` loop detector, what is the query state attending to?
+- `trigger_end`: the final token of the twentieth repeated `30`-gram
+- `trigger_start`: the first token of that same twentieth repeated `30`-gram
 
-This is the full rerun, not the earlier `14`-row bounded pilot. The analyzed object is:
+Everything else is held fixed. The analyzed object is still:
 
 - model: `Qwen/Qwen3-1.7B`
 - loop definition: `n=30`, `k=20`
@@ -21,7 +22,7 @@ This is the full rerun, not the earlier `14`-row bounded pilot. The analyzed obj
   - `LiveCodeBench 462`
 - total prefix lengths on the selected rows: median `9846`, `p95 = 22321`, max `28830`
 
-There is no extra mid-prefix truncation inside this rerun. Each HF forward sees the full prompt plus the completion prefix through the saved first loop trigger.
+There is no extra mid-prefix truncation inside either run. Each HF forward still sees the full prompt plus the completion prefix through the saved first loop trigger. The only thing that changes is which token inside the triggering copy is used as the query.
 
 ## Reconstruction Boundary
 
@@ -36,7 +37,7 @@ The March prompt-profile archives preserve exact `prompt_token_ids`, but they do
 | `LiveCodeBench` | `3200` | `467` | `356 / 3200` | `3168 / 3200` | `462 / 467` |
 | **Overall** | **`9432`** | **`820`** | **`512 / 9432`** | **`9333 / 9432`** | **`811 / 820`** |
 
-The dominant mismatch is still one hidden empty-text stop token on `finish_reason="stop"`. So this remains an exact prompt replay plus an approximate completion replay. The important boundary is that the trigger prefix is recovered on `811 / 820` loop rows, which is strong enough for a full trigger-slice attention study.
+The dominant mismatch is still one hidden empty-text stop token on `finish_reason="stop"`. So both analyses remain exact prompt replay plus approximate completion replay. The important boundary is unchanged: the trigger prefix is recovered on `811 / 820` loop rows, which is strong enough for both query-position studies.
 
 ## How The Attention Analysis Is Defined
 
@@ -44,10 +45,9 @@ The dominant mismatch is still one hidden empty-text stop token on `finish_reaso
 2. Keep only rows where the recomputed `first_loop_prefix` exactly matches the saved `first_loop_prefix_length`.
 3. Replay the model on:
    - `prompt_token_ids + completion_token_ids[:first_loop_prefix_length]`
-4. Define the query token as:
-   - `query_position = prompt_len + trigger_end = total_prefix_length - 1`
-   - so this is the **final token of the twentieth repeated 30-gram**
-   - this is **not** `trigger_start - 1` or `trigger_start`
+4. Define two query positions on that same replay:
+   - `trigger_end = prompt_len + trigger_end = total_prefix_length - 1`
+   - `trigger_start = prompt_len + trigger_start`
 5. For every layer and every head, capture the softmax attention from that one query token while preserving the model's masking behavior.
 6. Partition key positions into disjoint bins:
    - `prompt`: all prompt positions
@@ -56,19 +56,32 @@ The dominant mismatch is still one hidden empty-text stop token on `finish_reaso
    - `last_previous_loop`: the immediately preceding loop copy, again excluding overlap
    - `recent_nonloop`: the previous `256` completion positions that are in neither `previous_loop` nor `current_trigger`
    - `other_completion`: any remaining completion positions outside those bins
-7. Summaries are then defined as:
+7. Summaries are defined as:
    - `mean_*_mass`: for one row, sum the attention weights on that bin, average across heads, then average those row-level values across the selected rows
    - `top1_fraction_*`: fraction of heads whose argmax lands in that bin
 
-So the measured object is:
+One important detail for the `trigger_start` read: the bins are defined over the **full** trigger span for consistency, but the model is still causal. So positions to the right of the query token get zero mass automatically. That means `current_trigger` at `trigger_start` is effectively dominated by the first trigger token/self, whereas `current_trigger` at `trigger_end` covers the full already-written triggering copy.
 
-- the next-token state **after the full triggering copy has already been written**
-
-That makes this a defensible trigger-state read, but it is not yet the stricter "about to enter the loop" object.
-
-## Final-Layer Read
+## Final-Layer Overall Comparison
 
 The final-layer summary is layer `27` for every dataset.
+
+| Query token | Prev-loop mass | Prompt mass | Current-trigger mass | Recent-nonloop mass | Top-1 prev-loop | Top-1 prompt | Top-1 current-trigger | Top-1 recent-nonloop |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `trigger_end` | `0.031` | `0.639` | `0.176` | `0.038` | `0.0003` | `0.874` | `0.114` | `0.0005` |
+| `trigger_start` | `0.054` | `0.576` | `0.170` | `0.091` | `0.019` | `0.825` | `0.120` | `0.029` |
+
+So moving the query from the end of the triggering copy to its first token does change the late-layer read:
+
+- previous-loop mass rises from `0.031` to `0.054`
+- previous-loop top-1 fraction rises from essentially zero (`0.0003`) to a small but real `0.019`
+- prompt mass falls from `0.639` to `0.576`
+- recent-nonloop mass rises from `0.038` to `0.091`
+- current-trigger mass stays in the same rough band (`0.176` to `0.170`), but the interpretation changes because at `trigger_start` that bin is mostly self
+
+The important part is that `trigger_start` is **less** prompt-dominant than `trigger_end`, but it is still prompt-dominant in the final layer.
+
+## Trigger-End Final-Layer Read
 
 | Dataset | Rows | Prev-loop mass | Prompt mass | Current-trigger mass | Recent-nonloop mass |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -79,45 +92,57 @@ The final-layer summary is layer `27` for every dataset.
 | `LiveCodeBench` | `462` | `0.034` | `0.637` | `0.174` | `0.034` |
 | **Overall row-weighted** | **`811`** | **`0.031`** | **`0.639`** | **`0.176`** | **`0.038`** |
 
-Final-layer head destinations tell the same story:
+This is the original late-trigger read: overwhelmingly prompt-focused, with previous-loop top-1 attention essentially absent.
 
-- overall row-weighted top-1 fractions:
-  - `prompt = 0.874`
-  - `current_trigger = 0.114`
-  - `previous_loop = 0.0003`
-  - `recent_nonloop = 0.0005`
-- by dataset, `top1_fraction_previous_loop` is exactly `0` on `GPQA`, `AIME`, `MATH-500`, and `MMLU-Pro`, and only `0.00054` on `LiveCodeBench`
+## Trigger-Start Final-Layer Read
 
-So on the exact object measured here, the final layer is overwhelmingly prompt-focused rather than previous-loop-focused.
+| Dataset | Rows | Prev-loop mass | Prompt mass | Current-trigger mass | Recent-nonloop mass |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `GPQA` | `121` | `0.035` | `0.608` | `0.171` | `0.095` |
+| `AIME` | `30` | `0.073` | `0.564` | `0.163` | `0.073` |
+| `MATH-500` | `68` | `0.061` | `0.584` | `0.156` | `0.092` |
+| `MMLU-Pro` | `130` | `0.031` | `0.565` | `0.177` | `0.120` |
+| `LiveCodeBench` | `462` | `0.063` | `0.570` | `0.170` | `0.083` |
+| **Overall row-weighted** | **`811`** | **`0.054`** | **`0.576`** | **`0.170`** | **`0.091`** |
 
-## Mid-Stack Read
+Final-layer head destinations move in the same direction:
 
-Earlier loop copies are not absent. They show up much more clearly in the middle of the stack. The dataset-level peak of `mean_prev_loop_mass` is layer `6` for every dataset:
+- overall row-weighted top-1 fractions at `trigger_start`:
+  - `prompt = 0.825`
+  - `current_trigger = 0.120`
+  - `previous_loop = 0.019`
+  - `recent_nonloop = 0.029`
+- by dataset, `top1_fraction_previous_loop` ranges from `0.0019` on `MMLU-Pro` to `0.0273` on `LiveCodeBench`
 
-| Dataset | Peak prev-loop layer | Prev-loop mass | Prompt mass | Current-trigger mass |
-| --- | ---: | ---: | ---: | ---: |
-| `GPQA` | `6` | `0.181` | `0.279` | `0.229` |
-| `AIME` | `6` | `0.205` | `0.254` | `0.242` |
-| `MATH-500` | `6` | `0.198` | `0.281` | `0.214` |
-| `MMLU-Pro` | `6` | `0.179` | `0.262` | `0.235` |
-| `LiveCodeBench` | `6` | `0.199` | `0.260` | `0.218` |
-| **Overall row-weighted at layer 6** |  | **`0.193`** | **`0.265`** | **`0.223`** |
+So the stricter first-token query does pick up more late-layer previous-loop attention, but prompt tokens are still the dominant target on every dataset.
 
-So the honest read is:
+## Mid-Stack Comparison
 
-- earlier loop copies are present in the computation;
-- they are strongest around layer `6` on this full rerun;
-- but even there they are still not the dominant average target over prompt plus current-trigger mass.
+Earlier loop copies remain much more visible in the middle of the stack, and the peak layer stays `6` for every dataset under **both** query definitions.
+
+| Query token | Peak layer | Prev-loop mass | Prompt mass | Current-trigger mass | Top-1 prev-loop | Top-1 prompt | Top-1 current-trigger |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `trigger_end` | `6` | `0.193` | `0.265` | `0.223` | `0.139` | `0.596` | `0.167` |
+| `trigger_start` | `6` | `0.249` | `0.245` | `0.106` | `0.197` | `0.605` | `0.077` |
+
+At `trigger_start`, the mid-stack previous-loop signal is plainly stronger than at `trigger_end`. The clearest dataset-level peak is `AIME`, where layer `6` reaches `prev-loop mass = 0.299`; the weakest is still `GPQA`, but even there layer `6` reaches `0.218`.
 
 ## Conclusion
 
-For the exact surface measured here:
+The updated read is:
 
-- the strong claim "Qwen3 is not paying attention to previous loops" is too strong for the whole stack;
-- the narrower claim "the final-layer trigger state is mostly prompt-focused, not previous-loop-focused" is supported by the full rerun;
-- the current result does **not** yet answer the stricter "about to enter the loop" question, because the query token is the end of the triggering copy, not its start.
+- the strong claim "Qwen3 is not paying attention to previous loops" is still too strong;
+- the original narrower claim remains true at `trigger_end`: the final-layer state after the full triggering copy is written is overwhelmingly prompt-focused;
+- the stricter `trigger_start` query is meaningfully different: previous-loop attention is stronger both in the final layer (`0.054` vs `0.031`) and in the middle of the stack (`0.249` vs `0.193`);
+- but even at `trigger_start`, the final layer is still mostly prompt-focused rather than previous-loop-focused (`prompt mass = 0.576`, `top1_prompt = 0.825`).
 
-If we want the more literal pre-entry object next, the rerun should move the query to `trigger_start - 1` or `trigger_start`, ideally with matched non-loop controls.
+So if the research question is literally "what is the model looking at on the **first token** of the final repeated copy?", the answer is:
+
+- it is still looking mostly at the prompt in the final layer;
+- previous loop copies are not absent, and they are more salient than they looked at `trigger_end`;
+- the strongest previous-loop signal still lives in the middle of the stack rather than at the final layer.
+
+The next still-open refinement is the one-token-earlier `trigger_start - 1` query plus matched non-loop controls.
 
 ## Future Rollouts
 
@@ -130,16 +155,20 @@ So this exact reconstruction gap should not recur on future rollouts.
 
 ## Artifact Bundle
 
-The full rerun bundle is:
+Raw outputs now live in two sibling directories:
 
-- `outputs/qwen3_loop_trigger_attention_full_20260414_rerun/`
+- `outputs/qwen3_loop_trigger_attention_full_20260414_rerun/` for `trigger_end`
+- `outputs/qwen3_loop_trigger_attention_trigger_start_20260414/` for `trigger_start`
 
-Main files:
+Main raw files in each bundle:
 
+- `analysis_config.json`
 - `reconstruction_summary.json`
 - `selected_rows.jsonl`
 - `attention_layer_means.csv`
 - `attention_summary.json`
 - `attention_per_sample.json`
-- `qwen3_loop_trigger_attention_full_20260414_rerun.tex`
-- `qwen3_loop_trigger_attention_full_20260414_rerun.pdf`
+
+The updated report PDF stays under the original report bundle:
+
+- `outputs/qwen3_loop_trigger_attention_full_20260414_rerun/qwen3_loop_trigger_attention_full_20260414_rerun.pdf`

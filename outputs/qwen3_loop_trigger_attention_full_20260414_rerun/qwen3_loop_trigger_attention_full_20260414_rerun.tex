@@ -8,7 +8,7 @@
 \usepackage[utf8]{inputenc}
 \usepackage{lmodern}
 
-\title{Qwen3 Loop-Trigger Attention Full Rerun}
+\title{Qwen3 Loop-Trigger Attention Query Comparison}
 \author{}
 \date{2026-04-14}
 
@@ -17,20 +17,24 @@
 
 \section*{Object}
 
-This note answers the current loop-trigger question on the saved March 22--23 Qwen3-1.7B instruct prompt-profile archives: when Qwen3 reaches the repeated $30$-gram that trips the $n=30$, $k=20$ loop detector, what is the query state attending to?
+This note compares the same full Qwen3 loop-trigger rerun at two query positions on the saved March 22--23 prompt-profile archives:
 
-This is the full rerun, not the earlier $14$-row bounded pilot. The analyzed object is:
+\begin{itemize}
+  \item \texttt{trigger\_end}: the final token of the twentieth repeated $30$-gram
+  \item \texttt{trigger\_start}: the first token of that same twentieth repeated $30$-gram
+\end{itemize}
+
+Everything else is held fixed. The analyzed object is still:
 
 \begin{itemize}
   \item model: \texttt{Qwen/Qwen3-1.7B}
   \item loop definition: \texttt{n=30}, \texttt{k=20}
-  \item selection rule: all rows whose reconstructed trigger prefix matches the saved \texttt{first\_loop\_prefix\_length}, with \texttt{max\_trigger\_prefix=40960} and \texttt{max\_samples\_per\_dataset=1000}
-  \item selected rows: \texttt{811 / 820} loop rows
+  \item selected rows: \texttt{811 / 820} replayable loop rows
   \item dataset counts: \texttt{GPQA 121}, \texttt{AIME 30}, \texttt{MATH-500 68}, \texttt{MMLU-Pro 130}, \texttt{LiveCodeBench 462}
-  \item total prefix lengths on the selected rows: median \texttt{9846}, \texttt{p95 = 22321}, max \texttt{28830}
+  \item total prefix lengths: median \texttt{9846}, \texttt{p95 = 22321}, max \texttt{28830}
 \end{itemize}
 
-There is no extra mid-prefix truncation inside this rerun. Each HF forward sees the full prompt plus the completion prefix through the saved first loop trigger.
+There is no extra mid-prefix truncation inside either run. Each HF forward still sees the full prompt plus the completion prefix through the saved first loop trigger. Only the query token changes.
 
 \section*{Reconstruction Boundary}
 
@@ -54,37 +58,50 @@ Overall & 9432 & 820 & 512 / 9432 & 9333 / 9432 & 811 / 820 \\
 \normalsize
 \end{center}
 
-The dominant mismatch is still one hidden empty-text stop token on \texttt{finish\_reason=stop}. So this remains an exact prompt replay plus an approximate completion replay. The important boundary is that the trigger prefix is recovered on \texttt{811 / 820} loop rows, which is strong enough for a full trigger-slice attention study.
+So both analyses remain exact prompt replay plus approximate completion replay. The important boundary is unchanged: the trigger prefix is recovered on \texttt{811 / 820} loop rows.
 
 \section*{How The Measurement Is Defined}
 
 \begin{enumerate}
-  \item Recompute the loop trigger on the reconstructed completion token IDs with \texttt{find\_ngram\_loop\_trigger(..., n=30, k=20)}.
-  \item Keep only rows where the recomputed \texttt{first\_loop\_prefix} exactly matches the saved \texttt{first\_loop\_prefix\_length}.
+  \item Recompute the loop trigger with \texttt{find\_ngram\_loop\_trigger(..., n=30, k=20)}.
+  \item Keep only rows where the recomputed \texttt{first\_loop\_prefix} matches the saved \texttt{first\_loop\_prefix\_length}.
   \item Replay the model on \texttt{prompt\_token\_ids + completion\_token\_ids[:first\_loop\_prefix\_length]}.
-  \item Define the query token as \texttt{query\_position = prompt\_len + trigger\_end = total\_prefix\_length - 1}. This is the final token of the twentieth repeated $30$-gram, not \texttt{trigger\_start - 1}.
-  \item For every layer and head, capture the softmax attention from that one query token while preserving the model's masking behavior.
-  \item Partition key positions into disjoint bins:
+  \item Compare two query positions on that same replay:
   \begin{itemize}
-    \item \texttt{prompt}: all prompt positions
-    \item \texttt{current\_trigger}: the current triggering $30$-gram, including self
-    \item \texttt{previous\_loop}: all earlier copies of that same $30$-gram, excluding overlap with the current trigger span
-    \item \texttt{last\_previous\_loop}: the immediately preceding loop copy, again excluding overlap
-    \item \texttt{recent\_nonloop}: the previous $256$ completion positions that are in neither \texttt{previous\_loop} nor \texttt{current\_trigger}
-    \item \texttt{other\_completion}: any remaining completion positions outside those bins
+    \item \texttt{trigger\_end = prompt\_len + trigger\_end = total\_prefix\_length - 1}
+    \item \texttt{trigger\_start = prompt\_len + trigger\_start}
   \end{itemize}
-  \item Summaries are defined as:
+  \item For every layer and head, capture the softmax attention from that query token while preserving the model's masking behavior.
+  \item Partition keys into disjoint bins: \texttt{prompt}, \texttt{current\_trigger}, \texttt{previous\_loop}, \texttt{last\_previous\_loop}, \texttt{recent\_nonloop}, and \texttt{other\_completion}.
+  \item Summaries are:
   \begin{itemize}
-    \item \texttt{mean\_*\_mass}: for one row, sum the attention weights on that bin, average across heads, then average those row-level values across the selected rows
+    \item \texttt{mean\_*\_mass}: bin mass averaged across heads, then across selected rows
     \item \texttt{top1\_fraction\_*}: fraction of heads whose argmax lands in that bin
   \end{itemize}
 \end{enumerate}
 
-So the measured object is the next-token state after the full triggering copy has already been written. That makes this a defensible trigger-state read, but it is not yet the stricter ``about to enter the loop'' object.
+For \texttt{trigger\_start}, the bins are still defined over the full trigger span, but the model remains causal. So keys to the right of the query token get zero mass automatically. That means \texttt{current\_trigger} at \texttt{trigger\_start} is effectively dominated by the first trigger token/self.
 
-\section*{Final-Layer Read}
+\section*{Final-Layer Overall Comparison}
 
 The final-layer summary is layer $27$ for every dataset.
+
+\begin{center}
+\small
+\begin{tabular}{lrrrrrrrr}
+\toprule
+Query & Prev-loop & Prompt & Current-trigger & Recent-nonloop & Top-1 prev & Top-1 prompt & Top-1 current & Top-1 recent \\
+\midrule
+\texttt{trigger\_end} & 0.031 & 0.639 & 0.176 & 0.038 & 0.0003 & 0.874 & 0.114 & 0.0005 \\
+\texttt{trigger\_start} & 0.054 & 0.576 & 0.170 & 0.091 & 0.019 & 0.825 & 0.120 & 0.029 \\
+\bottomrule
+\end{tabular}
+\normalsize
+\end{center}
+
+So moving the query from the end of the triggering copy to its first token does change the late-layer read: previous-loop mass rises from \texttt{0.031} to \texttt{0.054}, previous-loop top-1 fraction rises from essentially zero to \texttt{0.019}, prompt mass falls from \texttt{0.639} to \texttt{0.576}, and recent-nonloop mass rises from \texttt{0.038} to \texttt{0.091}. But \texttt{trigger\_start} is still prompt-dominant in the final layer.
+
+\section*{Trigger-End Final Layer}
 
 \begin{center}
 \small
@@ -104,58 +121,70 @@ Overall row-weighted & 811 & 0.031 & 0.639 & 0.176 & 0.038 \\
 \normalsize
 \end{center}
 
-Final-layer head destinations tell the same story. Overall row-weighted top-1 fractions are:
-
-\begin{itemize}
-  \item prompt: \texttt{0.874}
-  \item current trigger: \texttt{0.114}
-  \item previous loop: \texttt{0.0003}
-  \item recent nonloop: \texttt{0.0005}
-\end{itemize}
-
-So on the exact object measured here, the final layer is overwhelmingly prompt-focused rather than previous-loop-focused.
-
-\section*{Mid-Stack Read}
-
-Earlier loop copies are not absent. They show up much more clearly in the middle of the stack. The dataset-level peak of \texttt{mean\_prev\_loop\_mass} is layer $6$ for every dataset:
+\section*{Trigger-Start Final Layer}
 
 \begin{center}
 \small
-\begin{tabular}{lrrrr}
+\begin{tabular}{lrrrrr}
 \toprule
-Dataset & Peak layer & Prev-loop & Prompt & Current-trigger \\
+Dataset & Rows & Prev-loop & Prompt & Current-trigger & Recent-nonloop \\
 \midrule
-GPQA & 6 & 0.181 & 0.279 & 0.229 \\
-AIME & 6 & 0.205 & 0.254 & 0.242 \\
-MATH-500 & 6 & 0.198 & 0.281 & 0.214 \\
-MMLU-Pro & 6 & 0.179 & 0.262 & 0.235 \\
-LiveCodeBench & 6 & 0.199 & 0.260 & 0.218 \\
+GPQA & 121 & 0.035 & 0.608 & 0.171 & 0.095 \\
+AIME & 30 & 0.073 & 0.564 & 0.163 & 0.073 \\
+MATH-500 & 68 & 0.061 & 0.584 & 0.156 & 0.092 \\
+MMLU-Pro & 130 & 0.031 & 0.565 & 0.177 & 0.120 \\
+LiveCodeBench & 462 & 0.063 & 0.570 & 0.170 & 0.083 \\
 \midrule
-Overall row-weighted at layer 6 &  & 0.193 & 0.265 & 0.223 \\
+Overall row-weighted & 811 & 0.054 & 0.576 & 0.170 & 0.091 \\
 \bottomrule
 \end{tabular}
 \normalsize
 \end{center}
 
-So the honest read is:
+At \texttt{trigger\_start}, overall row-weighted top-1 fractions are:
 
 \begin{itemize}
-  \item earlier loop copies are present in the computation;
-  \item they are strongest around layer $6$ on this full rerun;
-  \item but even there they are still not the dominant average target over prompt plus current-trigger mass.
+  \item prompt: \texttt{0.825}
+  \item current trigger: \texttt{0.120}
+  \item previous loop: \texttt{0.019}
+  \item recent nonloop: \texttt{0.029}
 \end{itemize}
+
+So the stricter first-token query does pick up more late-layer previous-loop attention, but prompt tokens remain the dominant target on every dataset.
+
+\section*{Mid-Stack Comparison}
+
+Earlier loop copies remain much more visible in the middle of the stack, and the peak layer stays $6$ for every dataset under both query definitions.
+
+\begin{center}
+\small
+\begin{tabular}{lrrrrrr}
+\toprule
+Query & Peak layer & Prev-loop & Prompt & Current-trigger & Top-1 prev & Top-1 prompt \\
+\midrule
+\texttt{trigger\_end} & 6 & 0.193 & 0.265 & 0.223 & 0.139 & 0.596 \\
+\texttt{trigger\_start} & 6 & 0.249 & 0.245 & 0.106 & 0.197 & 0.605 \\
+\bottomrule
+\end{tabular}
+\normalsize
+\end{center}
+
+At \texttt{trigger\_start}, the mid-stack previous-loop signal is plainly stronger than at \texttt{trigger\_end}. The clearest dataset-level peak is AIME, where layer $6$ reaches \texttt{prev-loop mass = 0.299}; the weakest is GPQA, which still reaches \texttt{0.218}.
 
 \section*{Conclusion}
 
-For the exact surface measured here:
+The updated read is:
 
 \begin{itemize}
-  \item the strong claim ``Qwen3 is not paying attention to previous loops'' is too strong for the whole stack;
-  \item the narrower claim ``the final-layer trigger state is mostly prompt-focused, not previous-loop-focused'' is supported by the full rerun;
-  \item the current result does not yet answer the stricter ``about to enter the loop'' question, because the query token is the end of the triggering copy, not its start.
+  \item the strong claim ``Qwen3 is not paying attention to previous loops'' is still too strong;
+  \item the original narrower claim remains true at \texttt{trigger\_end}: the final-layer state after the full triggering copy is written is overwhelmingly prompt-focused;
+  \item the stricter \texttt{trigger\_start} query is meaningfully different: previous-loop attention is stronger both in the final layer (\texttt{0.054} vs \texttt{0.031}) and in the middle of the stack (\texttt{0.249} vs \texttt{0.193});
+  \item but even at \texttt{trigger\_start}, the final layer is still mostly prompt-focused rather than previous-loop-focused (\texttt{prompt mass = 0.576}, \texttt{top1\_prompt = 0.825}).
 \end{itemize}
 
-If we want the more literal pre-entry object next, the rerun should move the query to \texttt{trigger\_start - 1} or \texttt{trigger\_start}, ideally with matched non-loop controls.
+So if the question is literally ``what is the model looking at on the first token of the final repeated copy?'', the answer is: still mostly the prompt in the final layer, with a clearly stronger but still secondary previous-loop signal.
+
+The next still-open refinement is the one-token-earlier \texttt{trigger\_start - 1} query plus matched non-loop controls.
 
 \section*{Future Rollouts}
 
@@ -167,5 +196,20 @@ The saver-side fixes are already on this branch:
 \end{itemize}
 
 So this exact reconstruction gap should not recur on future rollouts.
+
+\section*{Artifact Bundle}
+
+Raw outputs now live in two sibling directories:
+
+\begin{itemize}
+  \item \texttt{outputs/qwen3\_loop\_trigger\_attention\_full\_20260414\_rerun/} for \texttt{trigger\_end}
+  \item \texttt{outputs/qwen3\_loop\_trigger\_attention\_trigger\_start\_20260414/} for \texttt{trigger\_start}
+\end{itemize}
+
+The updated report PDF stays under the original report bundle:
+
+\begin{itemize}
+  \item \texttt{outputs/qwen3\_loop\_trigger\_attention\_full\_20260414\_rerun/qwen3\_loop\_trigger\_attention\_full\_20260414\_rerun.pdf}
+\end{itemize}
 
 \end{document}
