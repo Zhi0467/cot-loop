@@ -491,17 +491,41 @@ def _capture_attention(
                 torch.matmul(selected_query, key_states.transpose(2, 3))
                 * self_attn.scaling
             )
+            future_positions = torch.arange(
+                key_states.shape[-2],
+                device=attn_logits.device,
+            )
+            future_mask = future_positions.view(1, 1, 1, -1) > query_position
+            attn_logits = attn_logits.masked_fill(
+                future_mask,
+                torch.finfo(attn_logits.dtype).min,
+            )
             if attention_mask is not None:
-                causal_mask = attention_mask[:, :, query_position : query_position + 1, : key_states.shape[-2]]
-                attn_logits = attn_logits + causal_mask
+                if attention_mask.ndim == 4:
+                    additive_mask = attention_mask[
+                        :,
+                        :,
+                        query_position : query_position + 1,
+                        : key_states.shape[-2],
+                    ]
+                    attn_logits = attn_logits + additive_mask
+                elif attention_mask.ndim == 2:
+                    key_padding_mask = attention_mask[
+                        :,
+                        : key_states.shape[-2],
+                    ].view(attention_mask.shape[0], 1, 1, -1)
+                    attn_logits = attn_logits.masked_fill(
+                        key_padding_mask == 0,
+                        torch.finfo(attn_logits.dtype).min,
+                    )
+                else:
+                    raise RuntimeError(
+                        f"Unsupported attention_mask rank {attention_mask.ndim}."
+                    )
             if self_attn.sliding_window is not None:
-                key_positions = torch.arange(
-                    key_states.shape[-2],
-                    device=attn_logits.device,
-                )
                 window_cutoff = query_position - int(self_attn.sliding_window)
                 if window_cutoff >= 0:
-                    sliding_mask = key_positions.view(1, 1, 1, -1) <= window_cutoff
+                    sliding_mask = future_positions.view(1, 1, 1, -1) <= window_cutoff
                     attn_logits = attn_logits.masked_fill(
                         sliding_mask,
                         torch.finfo(attn_logits.dtype).min,
