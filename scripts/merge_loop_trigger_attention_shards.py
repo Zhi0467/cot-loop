@@ -15,11 +15,13 @@ LAYER_METRICS = [
     "mean_prompt_mass",
     "mean_current_trigger_mass",
     "mean_recent_nonloop_mass",
+    "mean_other_completion_mass",
     "top1_fraction_previous_loop",
     "top1_fraction_last_previous_loop",
     "top1_fraction_prompt",
     "top1_fraction_current_trigger",
     "top1_fraction_recent_nonloop",
+    "top1_fraction_other_completion",
 ]
 
 

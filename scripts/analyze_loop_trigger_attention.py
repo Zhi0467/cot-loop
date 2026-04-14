@@ -38,7 +38,7 @@ DEFAULT_ARCHIVE_ROOTS = {
     "livecodebench": "/data/scratch/murphy/outputs/cot-loop-detection/livecodebench_mean_relative_from_archive_20260323",
 }
 
-QUERY_POSITION_MODES = ("trigger_end", "trigger_start")
+QUERY_POSITION_MODES = ("trigger_end", "trigger_start", "pre_trigger_start")
 
 
 @dataclass(frozen=True)
@@ -380,11 +380,17 @@ def _region_builder(
         else set()
     )
     prompt_positions = set(range(prompt_len))
-    query_position = (
-        current_span[1]
-        if query_position_mode == "trigger_end"
-        else current_span[0]
-    )
+    if query_position_mode == "trigger_end":
+        query_position = current_span[1]
+    elif query_position_mode == "trigger_start":
+        query_position = current_span[0]
+    else:
+        query_position = current_span[0] - 1
+    if query_position < 0:
+        raise ValueError(
+            "Computed a negative query position for "
+            f"sample_id={row.sample_id}, rollout_index={row.rollout_index}."
+        )
 
     recent_start = max(prompt_len, query_position - recent_window)
     recent_positions = {
@@ -392,10 +398,16 @@ def _region_builder(
         for pos in range(recent_start, query_position)
         if pos not in previous_positions and pos not in current_positions
     }
+    accessible_positions = set(range(query_position + 1))
+    other_completion_positions = sorted(
+        accessible_positions
+        - prompt_positions
+        - previous_positions
+        - current_positions
+        - recent_positions
+    )
 
     def region_for_index(index: int) -> str:
-        if index == query_position:
-            return "self"
         if index in current_positions:
             return "current_trigger"
         if index in last_previous_positions:
@@ -416,6 +428,7 @@ def _region_builder(
         "last_previous_positions": sorted(last_previous_positions),
         "current_positions": sorted(current_positions),
         "recent_positions": sorted(recent_positions),
+        "other_completion_positions": other_completion_positions,
         "region_for_index": region_for_index,
     }
 
@@ -502,6 +515,7 @@ def _capture_attention(
             prompt_positions = region_info["prompt_positions"]
             current_positions = region_info["current_positions"]
             recent_positions = region_info["recent_positions"]
+            other_completion_positions = region_info["other_completion_positions"]
 
             top1_indices = attn_weights.argmax(dim=-1).tolist()
             region_counter = Counter(
@@ -529,8 +543,12 @@ def _capture_attention(
                     "mean_prompt_mass": _mass(prompt_positions),
                     "mean_current_trigger_mass": _mass(current_positions),
                     "mean_recent_nonloop_mass": _mass(recent_positions),
+                    "mean_other_completion_mass": _mass(other_completion_positions),
                     "top1_fraction_previous_loop": (
-                        (region_counter["last_previous_loop"] + region_counter["earlier_previous_loop"])
+                        (
+                            region_counter["last_previous_loop"]
+                            + region_counter["earlier_previous_loop"]
+                        )
                         / float(attn_weights.shape[0])
                     ),
                     "top1_fraction_last_previous_loop": (
@@ -540,11 +558,13 @@ def _capture_attention(
                         region_counter["prompt"] / float(attn_weights.shape[0])
                     ),
                     "top1_fraction_current_trigger": (
-                        (region_counter["self"] + region_counter["current_trigger"])
-                        / float(attn_weights.shape[0])
+                        region_counter["current_trigger"] / float(attn_weights.shape[0])
                     ),
                     "top1_fraction_recent_nonloop": (
                         region_counter["recent_nonloop"] / float(attn_weights.shape[0])
+                    ),
+                    "top1_fraction_other_completion": (
+                        region_counter["other_completion"] / float(attn_weights.shape[0])
                     ),
                     "top_mean_positions": [int(v) for v in top_positions],
                     "top_mean_regions": [
@@ -836,11 +856,13 @@ def main() -> None:
                 "mean_prompt_mass": _mean([float(r["mean_prompt_mass"]) for r in rows]),
                 "mean_current_trigger_mass": _mean([float(r["mean_current_trigger_mass"]) for r in rows]),
                 "mean_recent_nonloop_mass": _mean([float(r["mean_recent_nonloop_mass"]) for r in rows]),
+                "mean_other_completion_mass": _mean([float(r["mean_other_completion_mass"]) for r in rows]),
                 "top1_fraction_previous_loop": _mean([float(r["top1_fraction_previous_loop"]) for r in rows]),
                 "top1_fraction_last_previous_loop": _mean([float(r["top1_fraction_last_previous_loop"]) for r in rows]),
                 "top1_fraction_prompt": _mean([float(r["top1_fraction_prompt"]) for r in rows]),
                 "top1_fraction_current_trigger": _mean([float(r["top1_fraction_current_trigger"]) for r in rows]),
                 "top1_fraction_recent_nonloop": _mean([float(r["top1_fraction_recent_nonloop"]) for r in rows]),
+                "top1_fraction_other_completion": _mean([float(r["top1_fraction_other_completion"]) for r in rows]),
             }
         )
 
@@ -869,11 +891,13 @@ def main() -> None:
             "mean_prompt_mass": _mean([float(r["mean_prompt_mass"]) for r in summary_rows]),
             "mean_current_trigger_mass": _mean([float(r["mean_current_trigger_mass"]) for r in summary_rows]),
             "mean_recent_nonloop_mass": _mean([float(r["mean_recent_nonloop_mass"]) for r in summary_rows]),
+            "mean_other_completion_mass": _mean([float(r["mean_other_completion_mass"]) for r in summary_rows]),
             "top1_fraction_previous_loop": _mean([float(r["top1_fraction_previous_loop"]) for r in summary_rows]),
             "top1_fraction_last_previous_loop": _mean([float(r["top1_fraction_last_previous_loop"]) for r in summary_rows]),
             "top1_fraction_prompt": _mean([float(r["top1_fraction_prompt"]) for r in summary_rows]),
             "top1_fraction_current_trigger": _mean([float(r["top1_fraction_current_trigger"]) for r in summary_rows]),
             "top1_fraction_recent_nonloop": _mean([float(r["top1_fraction_recent_nonloop"]) for r in summary_rows]),
+            "top1_fraction_other_completion": _mean([float(r["top1_fraction_other_completion"]) for r in summary_rows]),
         }
 
     _write_json(out_dir / "attention_summary.json", overall_summary)
