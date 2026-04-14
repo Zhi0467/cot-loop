@@ -1,0 +1,17 @@
+{
+  "datasets": [
+    "gpqa",
+    "aime",
+    "math500",
+    "mmlu_pro",
+    "livecodebench"
+  ],
+  "loop_k": 20,
+  "loop_n": 30,
+  "max_samples_per_dataset": 1000,
+  "max_trigger_prefix": 40960,
+  "model_id": "Qwen/Qwen3-1.7B",
+  "num_shards": 6,
+  "query_position_mode": "pre_trigger_start",
+  "recent_window": 256
+}

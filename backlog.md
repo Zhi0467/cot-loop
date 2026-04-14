@@ -155,14 +155,15 @@ This should be similar to our previous experiments on training probes on loop la
   - What it established:
     - the March prompt-profile archives still do not preserve exact completion token IDs, but the replay boundary is now pinned exactly: `512 / 9432` exact retokenized completion lengths, `9333 / 9432` rows explained if one hidden empty-text stop token is allowed, and `811 / 820` loop rows with exact trigger-prefix recovery;
     - the full analyzed object is `811` replayable loop rows, not the old `14`-row slice, with total prefix lengths up to `28830`;
-    - the note now compares two query positions on that same full object:
+    - the note now compares three query positions on that same full object, after fixing a probe bug that had been leaking attention onto future trigger tokens for pre-end queries:
       - at `trigger_end`, the final layer is consistently prompt-dominant across datasets: prompt mass `0.620-0.671`, previous-loop mass `0.025-0.038`, current-trigger mass `0.173-0.185`, and top-1 previous-loop attention is essentially zero;
-      - at `trigger_start`, the final layer is less prompt-dominant but still prompt-dominant: overall prompt mass `0.576`, previous-loop mass `0.054`, current-trigger mass `0.170`, and top-1 previous-loop attention `0.019`;
-    - earlier loop copies do still show up in the middle of the stack, and the signal is stronger at `trigger_start`: the dataset-level peak previous-loop mass remains layer `6` for every dataset, moving from `0.179-0.205` at `trigger_end` to `0.202-0.299` at `trigger_start`;
+      - at `first_trigger_token`, the corrected first-token view is still prompt-dominant, but previous-loop attention is materially stronger (`prompt 0.620`, `prev_loop 0.061`, `current_trigger 0.096`, `top1_prev_loop 0.019`);
+      - at the real pre-token `trigger_start`, `current_trigger` is exactly zero by construction, previous-loop attention remains real (`prev_loop 0.069`, `top1_prev_loop 0.027`), and the final layer is still prompt-dominant (`prompt 0.634`, `top1_prompt 0.872`);
+    - the layer-progression plot changes the mechanistic read: `trigger_end` and `first_trigger_token` both peak in previous-loop mass at layer `6`, but the corrected `trigger_start` peak shifts later to layer `16`;
     - future rollout paths now save exact completion token IDs and structured trigger metadata, so this analysis no longer has to rely on retrospective text reconstruction on new runs.
   - What is still open:
     - add a matched non-loop or pre-trigger control slice so prompt-vs-loop attention at the trigger is compared against a clean negative baseline instead of only described in isolation;
-    - rerun the same measurement at `trigger_start - 1` if the research question is specifically the token immediately before the final copy starts rather than the first token inside that copy.
+    - extend the same corrected causal-mask measurement to matched non-loop controls, since the old ambiguity around `trigger_start - 1` is now resolved into the explicit `pre_trigger_start` object.
 - The explicit cross-dataset `majority_s_0.5` table now exists under `outputs/prompt_majority05_cross_dataset_rebuild_20260325/`; future replies should cite that table directly instead of falling back to `AIME`-only anecdotes.
 - The metadata-only continuous-baseline pass plus the held-out top-risk bucket comparison now exist under `outputs/prompt_profile_risk_controls_20260330/`; future replies should cite that bundle rather than paraphrasing the result.
 - The current whole-surface prompt-profile bundle now exists under `outputs/prompt_profile_combined_audit_20260405/`; future replies should cite that PDF when the question is about regression plus binary together rather than only one head.
