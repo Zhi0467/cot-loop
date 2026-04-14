@@ -151,15 +151,16 @@ This should be similar to our previous experiments on training probes on loop la
 
 ## Measurement And Reporting Gaps
 
-- The first Qwen3 loop-trigger attention pilot now exists under `outputs/qwen3_loop_trigger_attention_20260413/`, with the write-up in `docs/qwen3-loop-trigger-attention-2026-04-13.md`.
-  - What it proved:
-    - on the short exact-trigger slice, reconstructed saved text is good enough to recover the same trigger prefix almost every time even though exact completion token IDs were never archived;
-    - the bounded trigger slice itself is now pinned cleanly (`14` selected rows, total prefix at most `4096`), but the old late-layer numerical summary was withdrawn after an overlap bug was found in the previous-loop binning;
-    - future readouts on this object should therefore cite the note's current boundary claim and wait for the overlap-corrected rerun instead of repeating the stale prompt-vs-loop mass table;
-    - future rollout paths now save exact completion token IDs and structured trigger metadata, so this analysis does not need to rely on retrospective text reconstruction again.
+- The current Qwen3 loop-trigger attention surface is now the full rerun under `outputs/qwen3_loop_trigger_attention_full_20260414_rerun/`, with the exact-method note in `docs/qwen3-loop-trigger-attention-2026-04-14.md`.
+  - What it established:
+    - the March prompt-profile archives still do not preserve exact completion token IDs, but the replay boundary is now pinned exactly: `512 / 9432` exact retokenized completion lengths, `9333 / 9432` rows explained if one hidden empty-text stop token is allowed, and `811 / 820` loop rows with exact trigger-prefix recovery;
+    - the full analyzed object is `811` replayable loop rows, not the old `14`-row slice, with total prefix lengths up to `28830`;
+    - on the exact query surface that was measured (`query_position = trigger_end`, the final token of the twentieth repeated `30`-gram), the final layer is consistently prompt-dominant across datasets: prompt mass `0.620-0.671`, previous-loop mass `0.025-0.038`, current-trigger mass `0.173-0.185`, and top-1 previous-loop attention is essentially zero;
+    - earlier loop copies do still show up in the middle of the stack, with the dataset-level peak previous-loop mass always at layer `6` (`0.179-0.205` by dataset), so the strong full-stack claim "it is not paying attention to previous loops" remains too strong;
+    - future rollout paths now save exact completion token IDs and structured trigger metadata, so this analysis no longer has to rely on retrospective text reconstruction on new runs.
   - What is still open:
-    - scale the same measurement to longer trigger prefixes once GPU time is available;
-    - add a matched non-loop or pre-trigger control slice so prompt-vs-loop attention at the trigger is compared against a clean negative baseline instead of only described in isolation.
+    - add a matched non-loop or pre-trigger control slice so prompt-vs-loop attention at the trigger is compared against a clean negative baseline instead of only described in isolation;
+    - rerun the same measurement at `trigger_start - 1` or `trigger_start` if the research question is specifically "what is the model looking at immediately before it enters the final loop copy?" rather than "what does the next-token state look like after the triggering copy is fully written?".
 - The explicit cross-dataset `majority_s_0.5` table now exists under `outputs/prompt_majority05_cross_dataset_rebuild_20260325/`; future replies should cite that table directly instead of falling back to `AIME`-only anecdotes.
 - The metadata-only continuous-baseline pass plus the held-out top-risk bucket comparison now exist under `outputs/prompt_profile_risk_controls_20260330/`; future replies should cite that bundle rather than paraphrasing the result.
 - The current whole-surface prompt-profile bundle now exists under `outputs/prompt_profile_combined_audit_20260405/`; future replies should cite that PDF when the question is about regression plus binary together rather than only one head.
