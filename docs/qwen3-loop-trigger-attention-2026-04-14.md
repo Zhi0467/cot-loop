@@ -1,6 +1,6 @@
 # Qwen3 Loop-Trigger Attention: Trigger End vs Trigger Start
 
-Last updated: 2026-04-15 01:09 UTC
+Last updated: 2026-04-15 02:08 UTC
 
 ## Object
 
@@ -108,6 +108,42 @@ This comparison says two separate things:
 - moving from `trigger_end` to `trigger_start` removes `current_trigger` entirely, raises final-layer previous-loop mass from `0.031` to `0.069`, and raises residual completion mass from `0.154` to `0.298`;
 - prompt tokens remain the dominant late-layer target in **both** views.
 
+## Length-Adjusted Final-Layer Read
+
+Raw mass alone is not enough for the collaborator-facing conclusion, because the four bins have very different lengths on the accessible prefix.
+
+For each query definition and bin, let:
+
+- `token_share` = row-weighted mean fraction of accessible positions that lie in that bin
+- `enrichment` = `mean_mass / token_share`
+
+So `enrichment = 1` is the length-matched uniform-attention baseline. Values above `1` mean that region gets more mass than its size alone would predict; values below `1` mean it gets less.
+
+The accessible-prefix bin shares on the selected rows are:
+
+| Query | Prompt share | Prev-loop share | Current-trigger share | Other-completion share |
+| --- | ---: | ---: | ---: | ---: |
+| `trigger_end` | `0.051` | `0.069` | `0.004` | `0.876` |
+| `trigger_start` | `0.051` | `0.069` | `0.000` | `0.879` |
+
+The final-layer size-adjusted read is:
+
+| Query | Prompt enrichment | Prev-loop enrichment | Current-trigger enrichment | Other-completion enrichment |
+| --- | ---: | ---: | ---: | ---: |
+| `trigger_end` | `12.57x` | `0.46x` | `42.62x` | `0.18x` |
+| `trigger_start` | `12.41x` | `0.99x` | `0.00x` | `0.34x` |
+
+This changes the interpretation in an important way:
+
+- `other_completion` has large **raw** mass mainly because it covers about `88-91%` of the visible prefix; after length adjustment it is under-attended in both views.
+- `prompt` is the only region that stays strongly over-attended in the final layer in both views.
+- `previous_loop` is below the uniform baseline at `trigger_end`, and only about at the baseline overall at `trigger_start`.
+
+Because the bin boundaries are fixed once the query position is fixed, the token shares do not vary by layer. So the length-adjusted curves have the same peak layers as the mass curves; only the vertical scale changes. On that size-adjusted read:
+
+- `trigger_end` previous-loop enrichment still peaks at layer `6`, now at `2.80x`;
+- `trigger_start` previous-loop enrichment still peaks at layer `16`, now at `3.03x`.
+
 ## Trigger-Start By Dataset
 
 For the `trigger_start` object, `current_trigger` is zero on every dataset by construction, so the dataset-level table only reports the remaining bins.
@@ -128,9 +164,19 @@ Dataset-level scientific read:
 - `MMLU-Pro` is the weakest on this object (`0.032` prev-loop mass, `0.005` top-1 prev-loop).
 - Every dataset still stays prompt-dominant in the final layer: prompt mass is `0.619-0.648`, while `other_completion` ranges from `0.266` to `0.326`.
 
+The size-adjusted trigger-start previous-loop read is heterogeneous by dataset:
+
+- `AIME`: `2.16x`
+- `LiveCodeBench`: `1.64x`
+- `MATH-500`: `1.12x`
+- `GPQA`: `0.39x`
+- `MMLU-Pro`: `0.31x`
+
+So the overall trigger-start previous-loop enrichment near `1.0x` is hiding real spread across datasets rather than proving a uniform mechanism.
+
 ## Conclusion
 
-The read is now:
+The raw-mass read is still true but incomplete:
 
 - the pre-trigger object does show nontrivial attention to previous loops:
   - final-layer previous-loop mass `0.069`
@@ -141,7 +187,13 @@ The read is now:
   - final-layer residual completion mass `0.298`
   - final-layer top-1 prompt `0.872`
 
-So the strongest honest statement is **not** "Qwen3 is not paying attention to previous loops." The stronger-supported statement is:
+The length-adjusted read is sharper:
+
+- `prompt` is still the truly concentrated final-layer target in both views (`12.57x` at `trigger_end`, `12.41x` at `trigger_start`);
+- `other_completion` is **not** a preferred target per token; its large raw mass mostly comes from covering almost the whole prefix;
+- `previous_loop` is not dominant in the final layer overall: it is below baseline at `trigger_end` and only about baseline overall at `trigger_start`, even though its mid-stack signal becomes clearly super-baseline and some datasets exceed baseline at `trigger_start`.
+
+So the strongest honest statement is **not** "Qwen3 is paying mostly to prompt + other completions rather than previous loops," because that bundles together one strongly over-attended region (`prompt`) with one strongly under-attended region (`other_completion`). The stronger-supported statement is:
 
 > At the token immediately before the twentieth repeated copy begins, the final layer is still mostly prompt-focused, while previous-loop evidence is present and peaks in the middle of the stack.
 
@@ -152,6 +204,9 @@ Updated raw/report artifacts now live under:
 - `outputs/qwen3_loop_trigger_attention_full_20260414_rerun/`
   - `attention_mass_by_layer_comparison.pdf`
   - `attention_mass_by_layer_comparison.csv`
+  - `attention_length_adjusted_overall.csv`
+  - `attention_length_adjusted_by_dataset.csv`
+  - `attention_length_adjusted_by_layer.csv`
   - `qwen3_loop_trigger_attention_full_20260414_rerun.tex`
   - `qwen3_loop_trigger_attention_full_20260414_rerun.pdf`
 - `outputs/qwen3_loop_trigger_attention_pre_trigger_start_20260414/`
