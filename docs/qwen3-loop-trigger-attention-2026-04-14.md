@@ -1,6 +1,6 @@
 # Qwen3 Loop-Trigger Attention: Trigger End vs Trigger Start
 
-Last updated: 2026-04-14 23:17 UTC
+Last updated: 2026-04-15 00:01 UTC
 
 ## Object
 
@@ -9,7 +9,7 @@ This note compares the two query positions that matter for the current question 
 - `trigger_end`: the final token of the twentieth repeated `30`-gram
 - `trigger_start`: the token immediately **before** that twentieth repeated copy begins
 
-The naming here is deliberate. I am using `trigger_start` only for the token right before the final repeated copy begins. The intermediate first-token view is omitted from this cleaned report surface.
+This report uses `trigger_start` only for the token right before the final repeated copy begins.
 
 Everything else is held fixed:
 
@@ -55,8 +55,6 @@ For each selected row:
    - `prompt_token_ids + completion_token_ids[:first_loop_prefix_length]`
 4. Apply an **explicit causal mask** inside the attention probe wrapper so keys with `key_position > query_position` are forced to zero.
 
-That explicit mask matters. The earlier off-by-one surface had been leaking attention onto future trigger tokens. This cleaned comparison keeps only `trigger_end` and corrected `trigger_start`.
-
 The two reported query positions are:
 
 - `trigger_end = prompt_len + trigger_end`
@@ -74,7 +72,7 @@ Key positions are partitioned into disjoint bins:
 
 One important definition detail: there is **no separate self bin**. The query token contributes to the region it belongs to.
 
-- At corrected `trigger_start`, the full triggering copy is in the future, so `current_trigger` is exactly `0` by construction at every layer.
+- At `trigger_start`, the full triggering copy is in the future, so `current_trigger` is exactly `0` by construction at every layer.
 
 Summary statistics:
 
@@ -83,19 +81,19 @@ Summary statistics:
 
 ## Layer-by-Layer Progression
 
-`attention_mass_by_layer_comparison.pdf` plots row-weighted overall bin mass from layer `0` to layer `27` for the two reported query positions. To keep the figure readable, each panel shows three lines:
+`attention_mass_by_layer_comparison.pdf` plots row-weighted overall bin mass from layer `0` to layer `27` for the two reported query positions. The plotted lines are:
 
-- `trigger_end`: `prompt`, `previous_loop`, and `current_trigger`
-- corrected `trigger_start`: `prompt`, `previous_loop`, and `other_completion`
+- `trigger_end`: `prompt`, `previous_loop`, `current_trigger`, and `other_completion`
+- `trigger_start`: `prompt`, `previous_loop`, and `other_completion`
 
 `recent_nonloop` is still measured in the raw summaries and final-layer table, but it is intentionally omitted from the plot.
 
 Main read from the curves:
 
-- `trigger_end`: previous-loop mass rises early, peaks at layer `6` (`0.193`), and then falls as the final layer becomes prompt-dominant.
-- corrected `trigger_start`: `current_trigger` is identically `0`, previous-loop mass peaks later at layer `16` (`0.211`), and the strongest competition there is between `prompt` (`0.260`) and `other_completion` (`0.329`).
+- `trigger_end`: previous-loop mass rises early, peaks at layer `6` (`0.193`), and then falls as the final layer becomes prompt-dominant; by layer `27`, `current_trigger` (`0.176`) is still larger than `other_completion` (`0.116`).
+- `trigger_start`: `current_trigger` is identically `0`, previous-loop mass peaks later at layer `16` (`0.211`), and the strongest competition there is between `prompt` (`0.260`) and `other_completion` (`0.329`).
 
-So the off-by-one correction does **not** erase previous-loop attention. It removes the spurious future-trigger mass and leaves a clean pre-trigger object with a later, broader previous-loop peak than the trigger-end view.
+So the two views differ materially. Moving the query one token earlier removes `current_trigger`, raises final-layer previous-loop mass, and shifts more of the non-prompt mass into `other_completion`.
 
 ## Final-Layer Overall Comparison
 
@@ -104,16 +102,16 @@ The final-layer summary is layer `27` for both reported objects.
 | Query | Prev-loop | Prompt | Current-trigger | Recent-nonloop | Other-completion | Top-1 prev-loop | Top-1 prompt | Top-1 current-trigger |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `trigger_end` | `0.031` | `0.639` | `0.176` | `0.038` | `0.116` | `0.0003` | `0.874` | `0.114` |
-| corrected `trigger_start` | `0.069` | `0.634` | `0.000` | `0.108` | `0.190` | `0.027` | `0.872` | `0.000` |
+| `trigger_start` | `0.069` | `0.634` | `0.000` | `0.108` | `0.190` | `0.027` | `0.872` | `0.000` |
 
 This comparison says two separate things:
 
-- moving from `trigger_end` to corrected `trigger_start` removes `current_trigger` entirely, raises final-layer previous-loop mass from `0.031` to `0.069`, and shifts the competing non-prompt mass into `other_completion` rather than the trigger span;
+- moving from `trigger_end` to `trigger_start` removes `current_trigger` entirely, raises final-layer previous-loop mass from `0.031` to `0.069`, and shifts the competing non-prompt mass into `other_completion` rather than the trigger span;
 - prompt tokens remain the dominant late-layer target in **both** views.
 
-## Corrected Trigger-Start By Dataset
+## Trigger-Start By Dataset
 
-For the corrected `trigger_start` object, `current_trigger` is zero on every dataset by construction, so the dataset-level table only reports the remaining bins.
+For the `trigger_start` object, `current_trigger` is zero on every dataset by construction, so the dataset-level table only reports the remaining bins.
 
 | Dataset | Rows | Prev-loop | Prompt | Recent-nonloop | Other-completion | Top-1 prev-loop | Top-1 prompt |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -133,9 +131,9 @@ Dataset-level scientific read:
 
 ## Conclusion
 
-The corrected read is now:
+The read is now:
 
-- the clean pre-trigger object does show nontrivial attention to previous loops:
+- the pre-trigger object does show nontrivial attention to previous loops:
   - final-layer previous-loop mass `0.069`
   - final-layer top-1 previous-loop `0.027`
   - overall previous-loop peak at layer `16` with mass `0.211`
@@ -157,4 +155,4 @@ Updated raw/report artifacts now live under:
   - `qwen3_loop_trigger_attention_full_20260414_rerun.tex`
   - `qwen3_loop_trigger_attention_full_20260414_rerun.pdf`
 - `outputs/qwen3_loop_trigger_attention_pre_trigger_start_20260414/`
-  - corrected `trigger_start` bundle
+  - `trigger_start` bundle

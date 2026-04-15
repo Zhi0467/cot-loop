@@ -115,7 +115,11 @@ def _write_combined_csv(
 ) -> None:
     fieldnames = ["label", "layer", "num_rows"] + [key for key, _, _ in ALL_METRICS]
     with out_path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=fieldnames,
+            lineterminator="\n",
+        )
         writer.writeheader()
         for label, rows in bundles:
             for row in rows:
@@ -131,6 +135,7 @@ def _metrics_for_rows(rows: list[dict[str, float | int]]) -> list[tuple[str, str
             "mean_prompt_mass",
             "mean_prev_loop_mass",
             "mean_current_trigger_mass",
+            "mean_other_completion_mass",
         }
     else:
         wanted = {
@@ -187,7 +192,13 @@ def main() -> None:
     axes[0].set_ylim(0.0, 1.0)
     if legend_entries:
         handles, labels = zip(*legend_entries)
-        fig.legend(handles, labels, loc="upper center", ncol=min(len(labels), 5))
+        fig.legend(
+            handles,
+            labels,
+            loc="upper center",
+            bbox_to_anchor=(0.5, 1.08),
+            ncol=min(len(labels), 5),
+        )
     fig.suptitle(args.title, y=1.02)
 
     out_figure = Path(args.out_figure)
