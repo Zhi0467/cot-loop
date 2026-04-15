@@ -2,6 +2,7 @@
   "aime": {
     "mean_current_trigger_mass": 0.1764186148842176,
     "mean_last_prev_loop_mass": 0.007817077566869557,
+    "mean_other_completion_mass": 0.15882833615566297,
     "mean_prev_loop_mass": 0.037823860192050536,
     "mean_prompt_mass": 0.6269291887680689,
     "mean_recent_nonloop_mass": 0.02685857576628526,
@@ -9,6 +10,7 @@
     "summary_layer": 27,
     "top1_fraction_current_trigger": 0.10416666666666667,
     "top1_fraction_last_previous_loop": 0.0,
+    "top1_fraction_other_completion": 0.012500000000000025,
     "top1_fraction_previous_loop": 0.0,
     "top1_fraction_prompt": 0.8833333333333333,
     "top1_fraction_recent_nonloop": 0.0
@@ -16,6 +18,7 @@
   "gpqa": {
     "mean_current_trigger_mass": 0.17291286187477348,
     "mean_last_prev_loop_mass": 0.006529163133857141,
+    "mean_other_completion_mass": 0.13113597185882034,
     "mean_prev_loop_mass": 0.02508241779070871,
     "mean_prompt_mass": 0.6708687484756974,
     "mean_recent_nonloop_mass": 0.038689854391273266,
@@ -23,6 +26,7 @@
     "summary_layer": 27,
     "top1_fraction_current_trigger": 0.11053719008264463,
     "top1_fraction_last_previous_loop": 0.0,
+    "top1_fraction_other_completion": 0.0061983471074380375,
     "top1_fraction_previous_loop": 0.0,
     "top1_fraction_prompt": 0.8832644628099173,
     "top1_fraction_recent_nonloop": 0.0010330578512396695
@@ -30,6 +34,7 @@
   "livecodebench": {
     "mean_current_trigger_mass": 0.17361983926200764,
     "mean_last_prev_loop_mass": 0.00760120820785004,
+    "mean_other_completion_mass": 0.15520020764139286,
     "mean_prev_loop_mass": 0.034381967752377424,
     "mean_prompt_mass": 0.636797985344222,
     "mean_recent_nonloop_mass": 0.03410903084766459,
@@ -37,6 +42,7 @@
     "summary_layer": 27,
     "top1_fraction_current_trigger": 0.11404220779220779,
     "top1_fraction_last_previous_loop": 0.00027056277056277056,
+    "top1_fraction_other_completion": 0.014745670995670992,
     "top1_fraction_previous_loop": 0.0005411255411255411,
     "top1_fraction_prompt": 0.8706709956709957,
     "top1_fraction_recent_nonloop": 0.0005411255411255411
@@ -44,6 +50,7 @@
   "math500": {
     "mean_current_trigger_mass": 0.18530851191676714,
     "mean_last_prev_loop_mass": 0.006876862478427082,
+    "mean_other_completion_mass": 0.1517364018552196,
     "mean_prev_loop_mass": 0.029094366673448616,
     "mean_prompt_mass": 0.6338607195545646,
     "mean_recent_nonloop_mass": 0.03910580960526953,
@@ -51,6 +58,7 @@
     "summary_layer": 27,
     "top1_fraction_current_trigger": 0.11121323529411764,
     "top1_fraction_last_previous_loop": 0.0,
+    "top1_fraction_other_completion": 0.012867647058823484,
     "top1_fraction_previous_loop": 0.0,
     "top1_fraction_prompt": 0.8759191176470589,
     "top1_fraction_recent_nonloop": 0.0
@@ -58,6 +66,7 @@
   "mmlu_pro": {
     "mean_current_trigger_mass": 0.1852879273203703,
     "mean_last_prev_loop_mass": 0.006784421387307633,
+    "mean_other_completion_mass": 0.16798302562047657,
     "mean_prev_loop_mass": 0.026831388509330843,
     "mean_prompt_mass": 0.6198976585498223,
     "mean_recent_nonloop_mass": 0.05026367951471072,
@@ -65,6 +74,7 @@
     "summary_layer": 27,
     "top1_fraction_current_trigger": 0.12211538461538461,
     "top1_fraction_last_previous_loop": 0.0,
+    "top1_fraction_other_completion": 0.002403846153846159,
     "top1_fraction_previous_loop": 0.0,
     "top1_fraction_prompt": 0.8754807692307692,
     "top1_fraction_recent_nonloop": 0.0

@@ -1,6 +1,6 @@
 # Qwen3 Loop-Trigger Attention: Trigger End vs Trigger Start
 
-Last updated: 2026-04-15 00:01 UTC
+Last updated: 2026-04-15 01:09 UTC
 
 ## Object
 
@@ -65,8 +65,9 @@ Key positions are partitioned into disjoint bins:
 - `prompt`: all prompt positions
 - `previous_loop`: all earlier copies of the triggering `30`-gram
 - `current_trigger`: the twentieth repeated `30`-gram
-- `recent_nonloop`: the previous `256` completion positions outside the loop bins
-- `other_completion`: any remaining completion positions
+- `other_completion`: every completion position outside the loop bins
+
+`recent_nonloop` is still tracked as a diagnostic subset: the previous `256` completion positions outside the loop bins. But on the collaborator-facing surface here, `other_completion` **includes** that recent window, so the plotted lines and the main tables stay on a full prefix decomposition.
 
 `last_previous_loop` is still tracked as a subset of `previous_loop`, but it is not plotted as a separate mass line here.
 
@@ -86,48 +87,46 @@ Summary statistics:
 - `trigger_end`: `prompt`, `previous_loop`, `current_trigger`, and `other_completion`
 - `trigger_start`: `prompt`, `previous_loop`, and `other_completion`
 
-`recent_nonloop` is still measured in the raw summaries and final-layer table, but it is intentionally omitted from the plot.
-
 Main read from the curves:
 
-- `trigger_end`: previous-loop mass rises early, peaks at layer `6` (`0.193`), and then falls as the final layer becomes prompt-dominant; by layer `27`, `current_trigger` (`0.176`) is still larger than `other_completion` (`0.116`).
-- `trigger_start`: `current_trigger` is identically `0`, previous-loop mass peaks later at layer `16` (`0.211`), and the strongest competition there is between `prompt` (`0.260`) and `other_completion` (`0.329`).
+- `trigger_end`: previous-loop mass rises early, peaks at layer `6` (`0.193`), and then falls as the final layer becomes prompt-dominant; by layer `27`, `current_trigger` (`0.176`) is still larger than `other_completion` (`0.154`).
+- `trigger_start`: `current_trigger` is identically `0`, previous-loop mass peaks later at layer `16` (`0.211`), and the strongest competition there is between `prompt` (`0.260`) and `other_completion` (`0.530`).
 
-So the two views differ materially. Moving the query one token earlier removes `current_trigger`, raises final-layer previous-loop mass, and shifts more of the non-prompt mass into `other_completion`.
+So the two views differ materially. Moving the query one token earlier removes `current_trigger`, raises final-layer previous-loop mass, and still leaves most of the non-prompt mass in the residual `other_completion` bin.
 
 ## Final-Layer Overall Comparison
 
 The final-layer summary is layer `27` for both reported objects.
 
-| Query | Prev-loop | Prompt | Current-trigger | Recent-nonloop | Other-completion | Top-1 prev-loop | Top-1 prompt | Top-1 current-trigger |
+| Query | Prev-loop | Prompt | Current-trigger | Other-completion | Top-1 prev-loop | Top-1 prompt | Top-1 current-trigger | Top-1 other-completion |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `trigger_end` | `0.031` | `0.639` | `0.176` | `0.038` | `0.116` | `0.0003` | `0.874` | `0.114` |
-| `trigger_start` | `0.069` | `0.634` | `0.000` | `0.108` | `0.190` | `0.027` | `0.872` | `0.000` |
+| `trigger_end` | `0.031` | `0.639` | `0.176` | `0.154` | `0.0003` | `0.874` | `0.114` | `0.011` |
+| `trigger_start` | `0.069` | `0.634` | `0.000` | `0.298` | `0.027` | `0.872` | `0.000` | `0.100` |
 
 This comparison says two separate things:
 
-- moving from `trigger_end` to `trigger_start` removes `current_trigger` entirely, raises final-layer previous-loop mass from `0.031` to `0.069`, and shifts the competing non-prompt mass into `other_completion` rather than the trigger span;
+- moving from `trigger_end` to `trigger_start` removes `current_trigger` entirely, raises final-layer previous-loop mass from `0.031` to `0.069`, and raises residual completion mass from `0.154` to `0.298`;
 - prompt tokens remain the dominant late-layer target in **both** views.
 
 ## Trigger-Start By Dataset
 
 For the `trigger_start` object, `current_trigger` is zero on every dataset by construction, so the dataset-level table only reports the remaining bins.
 
-| Dataset | Rows | Prev-loop | Prompt | Recent-nonloop | Other-completion | Top-1 prev-loop | Top-1 prompt |
+| Dataset | Rows | Prev-loop | Prompt | Other-completion | Top-1 prev-loop | Top-1 prompt | Top-1 other-completion |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `GPQA` | `121` | `0.045` | `0.648` | `0.122` | `0.184` | `0.011` | `0.872` |
-| `AIME` | `30` | `0.107` | `0.628` | `0.082` | `0.184` | `0.050` | `0.869` |
-| `MATH-500` | `68` | `0.082` | `0.619` | `0.121` | `0.178` | `0.035` | `0.837` |
-| `MMLU-Pro` | `130` | `0.032` | `0.643` | `0.130` | `0.196` | `0.005` | `0.909` |
-| `LiveCodeBench` | `462` | `0.081` | `0.630` | `0.098` | `0.191` | `0.035` | `0.868` |
-| **Overall row-weighted** | **`811`** | **`0.069`** | **`0.634`** | **`0.108`** | **`0.190`** | **`0.027`** | **`0.872`** |
+| `GPQA` | `121` | `0.045` | `0.648` | `0.307` | `0.011` | `0.872` | `0.117` |
+| `AIME` | `30` | `0.107` | `0.628` | `0.266` | `0.050` | `0.869` | `0.081` |
+| `MATH-500` | `68` | `0.082` | `0.619` | `0.299` | `0.035` | `0.837` | `0.128` |
+| `MMLU-Pro` | `130` | `0.032` | `0.643` | `0.326` | `0.005` | `0.909` | `0.086` |
+| `LiveCodeBench` | `462` | `0.081` | `0.630` | `0.289` | `0.035` | `0.868` | `0.097` |
+| **Overall row-weighted** | **`811`** | **`0.069`** | **`0.634`** | **`0.298`** | **`0.027`** | **`0.872`** | **`0.100`** |
 
 Dataset-level scientific read:
 
 - `AIME` shows the strongest final-layer previous-loop mass (`0.107`).
 - `MATH-500` and `LiveCodeBench` are the next strongest at about `0.08`.
 - `MMLU-Pro` is the weakest on this object (`0.032` prev-loop mass, `0.005` top-1 prev-loop).
-- Every dataset still stays prompt-dominant in the final layer: prompt mass is `0.619-0.648`, and top-1 prompt is `0.837-0.909`.
+- Every dataset still stays prompt-dominant in the final layer: prompt mass is `0.619-0.648`, while `other_completion` ranges from `0.266` to `0.326`.
 
 ## Conclusion
 
@@ -139,6 +138,7 @@ The read is now:
   - overall previous-loop peak at layer `16` with mass `0.211`
 - but the final layer is still mostly prompt-focused rather than previous-loop-focused:
   - final-layer prompt mass `0.634`
+  - final-layer residual completion mass `0.298`
   - final-layer top-1 prompt `0.872`
 
 So the strongest honest statement is **not** "Qwen3 is not paying attention to previous loops." The stronger-supported statement is:

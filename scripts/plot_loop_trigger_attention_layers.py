@@ -61,18 +61,29 @@ def _parse_label_and_path(item: str) -> tuple[str, Path]:
 
 
 def _derive_other_completion(row: dict[str, str]) -> float:
-    if "mean_other_completion_mass" in row and row["mean_other_completion_mass"] != "":
-        return float(row["mean_other_completion_mass"])
-    known_mass = sum(
-        float(row[key])
-        for key in (
-            "mean_prev_loop_mass",
-            "mean_prompt_mass",
-            "mean_current_trigger_mass",
-            "mean_recent_nonloop_mass",
-        )
+    prompt_mass = float(row["mean_prompt_mass"])
+    prev_loop_mass = float(row["mean_prev_loop_mass"])
+    current_trigger_mass = float(row["mean_current_trigger_mass"])
+    recent_nonloop_mass = float(row.get("mean_recent_nonloop_mass", 0.0) or 0.0)
+    other_completion_mass = float(row.get("mean_other_completion_mass", 0.0) or 0.0)
+
+    base_total = (
+        prompt_mass
+        + prev_loop_mass
+        + current_trigger_mass
+        + other_completion_mass
     )
-    return max(0.0, 1.0 - known_mass)
+    if abs(base_total - 1.0) <= 1e-4:
+        return other_completion_mass
+
+    expanded_total = base_total + recent_nonloop_mass
+    if abs(expanded_total - 1.0) <= 1e-4:
+        return other_completion_mass + recent_nonloop_mass
+
+    return max(
+        0.0,
+        1.0 - prompt_mass - prev_loop_mass - current_trigger_mass,
+    )
 
 
 def _load_weighted_overall(csv_path: Path) -> list[dict[str, float | int]]:

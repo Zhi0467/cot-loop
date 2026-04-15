@@ -12,6 +12,7 @@
   "max_trigger_prefix": 40960,
   "model_id": "Qwen/Qwen3-1.7B",
   "num_shards": 8,
+  "other_completion_includes_recent_nonloop": true,
   "query_position_mode": "trigger_end",
   "recent_window": 256
 }

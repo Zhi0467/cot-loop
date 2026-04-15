@@ -88,9 +88,10 @@ Key positions are partitioned into disjoint bins:
   \item \texttt{prompt}
   \item \texttt{previous\_loop}
   \item \texttt{current\_trigger}
-  \item \texttt{recent\_nonloop}
   \item \texttt{other\_completion}
 \end{itemize}
+
+\texttt{recent\_nonloop} is still tracked as a diagnostic subset: the previous $256$ completion positions outside the loop bins. But on the collaborator-facing surface here, \texttt{other\_completion} includes that recent window, so the plotted lines and the main tables stay on a full prefix decomposition.
 
 \texttt{last\_previous\_loop} is still tracked as a subset of \texttt{previous\_loop}, but it is not plotted as a separate mass line here.
 
@@ -108,7 +109,7 @@ Summary statistics are:
 \begin{figure}[t]
 \centering
 \includegraphics[width=\textwidth]{attention_mass_by_layer_comparison.pdf}
-\caption{Row-weighted overall attention-mass progression from layer 0 to layer 27 for the two reported query positions. The \texttt{trigger\_end} panel includes \texttt{other\_completion}; \texttt{recent\_nonloop} remains table-only.}
+\caption{Row-weighted overall attention-mass progression from layer 0 to layer 27 for the two reported query positions. \texttt{Other\_completion} is the full residual completion mass outside the loop bins, including the recent non-loop window.}
 \end{figure}
 
 \texttt{attention\_mass\_by\_layer\_comparison.pdf} plots row-weighted overall bin mass from layer $0$ to layer $27$ for the two reported query positions. The plotted lines are:
@@ -118,16 +119,14 @@ Summary statistics are:
   \item \texttt{trigger\_start}: \texttt{prompt}, \texttt{previous\_loop}, and \texttt{other\_completion}
 \end{itemize}
 
-\texttt{recent\_nonloop} is still measured in the raw summaries and final-layer table, but it is intentionally omitted from the plot.
-
 Main read from the curves:
 
 \begin{itemize}
-  \item \texttt{trigger\_end}: previous-loop mass rises early, peaks at layer $6$ (\texttt{0.193}), and then falls as the final layer becomes prompt-dominant; by layer $27$, \texttt{current\_trigger} (\texttt{0.176}) is still larger than \texttt{other\_completion} (\texttt{0.116}).
-  \item \texttt{trigger\_start}: \texttt{current\_trigger} is identically \texttt{0}, previous-loop mass peaks later at layer $16$ (\texttt{0.211}), and the strongest competition there is between \texttt{prompt} (\texttt{0.260}) and \texttt{other\_completion} (\texttt{0.329}).
+  \item \texttt{trigger\_end}: previous-loop mass rises early, peaks at layer $6$ (\texttt{0.193}), and then falls as the final layer becomes prompt-dominant; by layer $27$, \texttt{current\_trigger} (\texttt{0.176}) is still larger than \texttt{other\_completion} (\texttt{0.154}).
+  \item \texttt{trigger\_start}: \texttt{current\_trigger} is identically \texttt{0}, previous-loop mass peaks later at layer $16$ (\texttt{0.211}), and the strongest competition there is between \texttt{prompt} (\texttt{0.260}) and \texttt{other\_completion} (\texttt{0.530}).
 \end{itemize}
 
-So the two views differ materially. Moving the query one token earlier removes \texttt{current\_trigger}, raises final-layer previous-loop mass, and shifts more of the non-prompt mass into \texttt{other\_completion}.
+So the two views differ materially. Moving the query one token earlier removes \texttt{current\_trigger}, raises final-layer previous-loop mass, and still leaves most of the non-prompt mass in the residual \texttt{other\_completion} bin.
 
 \section*{Final-Layer Overall Comparison}
 
@@ -137,10 +136,10 @@ The final-layer summary is layer $27$ for both reported objects.
 \scriptsize
 \begin{tabular}{lrrrrrrrr}
 \toprule
-Query & Prev-loop & Prompt & Current-trigger & Recent-nonloop & Other-completion & Top-1 prev & Top-1 prompt & Top-1 current \\
+Query & Prev-loop & Prompt & Current-trigger & Other-completion & Top-1 prev & Top-1 prompt & Top-1 current & Top-1 other \\
 \midrule
-\texttt{trigger\_end} & 0.031 & 0.639 & 0.176 & 0.038 & 0.116 & 0.0003 & 0.874 & 0.114 \\
-\texttt{trigger\_start} & 0.069 & 0.634 & 0.000 & 0.108 & 0.190 & 0.027 & 0.872 & 0.000 \\
+\texttt{trigger\_end} & 0.031 & 0.639 & 0.176 & 0.154 & 0.0003 & 0.874 & 0.114 & 0.011 \\
+\texttt{trigger\_start} & 0.069 & 0.634 & 0.000 & 0.298 & 0.027 & 0.872 & 0.000 & 0.100 \\
 \bottomrule
 \end{tabular}
 \normalsize
@@ -149,7 +148,7 @@ Query & Prev-loop & Prompt & Current-trigger & Recent-nonloop & Other-completion
 This comparison says two separate things:
 
 \begin{itemize}
-  \item moving from \texttt{trigger\_end} to \texttt{trigger\_start} removes \texttt{current\_trigger} entirely, raises final-layer previous-loop mass from \texttt{0.031} to \texttt{0.069}, and shifts the competing non-prompt mass into \texttt{other\_completion} rather than the trigger span;
+  \item moving from \texttt{trigger\_end} to \texttt{trigger\_start} removes \texttt{current\_trigger} entirely, raises final-layer previous-loop mass from \texttt{0.031} to \texttt{0.069}, and raises residual completion mass from \texttt{0.154} to \texttt{0.298};
   \item prompt tokens remain the dominant late-layer target in both views.
 \end{itemize}
 
@@ -161,15 +160,15 @@ For the \texttt{trigger\_start} object, \texttt{current\_trigger} is zero on eve
 \scriptsize
 \begin{tabular}{lrrrrrrr}
 \toprule
-Dataset & Rows & Prev-loop & Prompt & Recent-nonloop & Other-completion & Top-1 prev & Top-1 prompt \\
+Dataset & Rows & Prev-loop & Prompt & Other-completion & Top-1 prev & Top-1 prompt & Top-1 other \\
 \midrule
-GPQA & 121 & 0.045 & 0.648 & 0.122 & 0.184 & 0.011 & 0.872 \\
-AIME & 30 & 0.107 & 0.628 & 0.082 & 0.184 & 0.050 & 0.869 \\
-MATH-500 & 68 & 0.082 & 0.619 & 0.121 & 0.178 & 0.035 & 0.837 \\
-MMLU-Pro & 130 & 0.032 & 0.643 & 0.130 & 0.196 & 0.005 & 0.909 \\
-LiveCodeBench & 462 & 0.081 & 0.630 & 0.098 & 0.191 & 0.035 & 0.868 \\
+GPQA & 121 & 0.045 & 0.648 & 0.307 & 0.011 & 0.872 & 0.117 \\
+AIME & 30 & 0.107 & 0.628 & 0.266 & 0.050 & 0.869 & 0.081 \\
+MATH-500 & 68 & 0.082 & 0.619 & 0.299 & 0.035 & 0.837 & 0.128 \\
+MMLU-Pro & 130 & 0.032 & 0.643 & 0.326 & 0.005 & 0.909 & 0.086 \\
+LiveCodeBench & 462 & 0.081 & 0.630 & 0.289 & 0.035 & 0.868 & 0.097 \\
 \midrule
-Overall row-weighted & 811 & 0.069 & 0.634 & 0.108 & 0.190 & 0.027 & 0.872 \\
+Overall row-weighted & 811 & 0.069 & 0.634 & 0.298 & 0.027 & 0.872 & 0.100 \\
 \bottomrule
 \end{tabular}
 \normalsize
@@ -181,7 +180,7 @@ Dataset-level scientific read:
   \item \texttt{AIME} shows the strongest final-layer previous-loop mass (\texttt{0.107}).
   \item \texttt{MATH-500} and \texttt{LiveCodeBench} are next strongest at about \texttt{0.08}.
   \item \texttt{MMLU-Pro} is the weakest on this object (\texttt{0.032} prev-loop mass, \texttt{0.005} top-1 prev-loop).
-  \item Every dataset still stays prompt-dominant in the final layer: prompt mass is \texttt{0.619--0.648}, and top-1 prompt is \texttt{0.837--0.909}.
+  \item Every dataset still stays prompt-dominant in the final layer: prompt mass is \texttt{0.619--0.648}, while \texttt{other\_completion} ranges from \texttt{0.266} to \texttt{0.326}.
 \end{itemize}
 
 \section*{Conclusion}
@@ -192,7 +191,7 @@ The read is now:
   \item the pre-trigger object does show nontrivial attention to previous loops:
     final-layer previous-loop mass \texttt{0.069}, final-layer top-1 previous-loop \texttt{0.027}, and overall previous-loop peak at layer $16$ with mass \texttt{0.211};
   \item but the final layer is still mostly prompt-focused rather than previous-loop-focused:
-    final-layer prompt mass \texttt{0.634} and final-layer top-1 prompt \texttt{0.872}.
+    final-layer prompt mass \texttt{0.634}, final-layer residual completion mass \texttt{0.298}, and final-layer top-1 prompt \texttt{0.872}.
 \end{itemize}
 
 So the strongest honest statement is not ``Qwen3 is not paying attention to previous loops.'' The stronger-supported statement is:

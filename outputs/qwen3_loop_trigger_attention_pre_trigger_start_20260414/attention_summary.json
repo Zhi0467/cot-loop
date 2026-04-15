@@ -2,7 +2,7 @@
   "aime": {
     "mean_current_trigger_mass": 0.0,
     "mean_last_prev_loop_mass": 0.07010438380918155,
-    "mean_other_completion_mass": 0.18366361086567243,
+    "mean_other_completion_mass": 0.2657786283021172,
     "mean_prev_loop_mass": 0.10669074921558301,
     "mean_prompt_mass": 0.6275306224822998,
     "mean_recent_nonloop_mass": 0.08211502955527976,
@@ -11,7 +11,7 @@
     "summary_layer": 27,
     "top1_fraction_current_trigger": 0.0,
     "top1_fraction_last_previous_loop": 0.05,
-    "top1_fraction_other_completion": 0.06458333333333334,
+    "top1_fraction_other_completion": 0.08124999999999993,
     "top1_fraction_previous_loop": 0.05,
     "top1_fraction_prompt": 0.86875,
     "top1_fraction_recent_nonloop": 0.016666666666666666
@@ -19,7 +19,7 @@
   "gpqa": {
     "mean_current_trigger_mass": 0.0,
     "mean_last_prev_loop_mass": 0.024148913928017036,
-    "mean_other_completion_mass": 0.18422372987078242,
+    "mean_other_completion_mass": 0.30656790516670207,
     "mean_prev_loop_mass": 0.04548777499397801,
     "mean_prompt_mass": 0.6479443198393199,
     "mean_recent_nonloop_mass": 0.12234417842085327,
@@ -28,7 +28,7 @@
     "summary_layer": 27,
     "top1_fraction_current_trigger": 0.0,
     "top1_fraction_last_previous_loop": 0.011363636363636364,
-    "top1_fraction_other_completion": 0.08884297520661157,
+    "top1_fraction_other_completion": 0.11673553719008267,
     "top1_fraction_previous_loop": 0.011363636363636364,
     "top1_fraction_prompt": 0.871900826446281,
     "top1_fraction_recent_nonloop": 0.027892561983471075
@@ -36,7 +36,7 @@
   "livecodebench": {
     "mean_current_trigger_mass": 0.0,
     "mean_last_prev_loop_mass": 0.044700355427574015,
-    "mean_other_completion_mass": 0.1914376818224207,
+    "mean_other_completion_mass": 0.2892539204409229,
     "mean_prev_loop_mass": 0.08053960919342895,
     "mean_prompt_mass": 0.6302064703656481,
     "mean_recent_nonloop_mass": 0.09781624797229692,
@@ -45,7 +45,7 @@
     "summary_layer": 27,
     "top1_fraction_current_trigger": 0.0,
     "top1_fraction_last_previous_loop": 0.030844155844155844,
-    "top1_fraction_other_completion": 0.07589285714285714,
+    "top1_fraction_other_completion": 0.09699675324675316,
     "top1_fraction_previous_loop": 0.03530844155844156,
     "top1_fraction_prompt": 0.8676948051948052,
     "top1_fraction_recent_nonloop": 0.021103896103896104
@@ -53,7 +53,7 @@
   "math500": {
     "mean_current_trigger_mass": 0.0,
     "mean_last_prev_loop_mass": 0.047020071809931646,
-    "mean_other_completion_mass": 0.17787858958849134,
+    "mean_other_completion_mass": 0.2991872054442545,
     "mean_prev_loop_mass": 0.08195224739885067,
     "mean_prompt_mass": 0.6188605471568949,
     "mean_recent_nonloop_mass": 0.1213086305788773,
@@ -62,7 +62,7 @@
     "summary_layer": 27,
     "top1_fraction_current_trigger": 0.0,
     "top1_fraction_last_previous_loop": 0.03308823529411765,
-    "top1_fraction_other_completion": 0.07628676470588236,
+    "top1_fraction_other_completion": 0.12775735294117652,
     "top1_fraction_previous_loop": 0.034926470588235295,
     "top1_fraction_prompt": 0.8373161764705882,
     "top1_fraction_recent_nonloop": 0.051470588235294115
@@ -70,7 +70,7 @@
   "mmlu_pro": {
     "mean_current_trigger_mass": 0.0,
     "mean_last_prev_loop_mass": 0.012363804110030357,
-    "mean_other_completion_mass": 0.19602665110276296,
+    "mean_other_completion_mass": 0.32571427703548506,
     "mean_prev_loop_mass": 0.031505697317278154,
     "mean_prompt_mass": 0.6427800256472368,
     "mean_recent_nonloop_mass": 0.1296876237835162,
@@ -79,7 +79,7 @@
     "summary_layer": 27,
     "top1_fraction_current_trigger": 0.0,
     "top1_fraction_last_previous_loop": 0.005288461538461539,
-    "top1_fraction_other_completion": 0.07067307692307692,
+    "top1_fraction_other_completion": 0.08605769230769234,
     "top1_fraction_previous_loop": 0.005288461538461539,
     "top1_fraction_prompt": 0.9086538461538461,
     "top1_fraction_recent_nonloop": 0.015384615384615385

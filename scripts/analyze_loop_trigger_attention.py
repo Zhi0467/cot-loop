@@ -399,12 +399,13 @@ def _region_builder(
         if pos not in previous_positions and pos not in current_positions
     }
     accessible_positions = set(range(query_position + 1))
+    # `other_completion` is the full residual completion mass outside the loop
+    # bins, while `recent_nonloop` remains a tracked subset of that region.
     other_completion_positions = sorted(
         accessible_positions
         - prompt_positions
         - previous_positions
         - current_positions
-        - recent_positions
     )
 
     def region_for_index(index: int) -> str:
@@ -588,7 +589,11 @@ def _capture_attention(
                         region_counter["recent_nonloop"] / float(attn_weights.shape[0])
                     ),
                     "top1_fraction_other_completion": (
-                        region_counter["other_completion"] / float(attn_weights.shape[0])
+                        (
+                            region_counter["recent_nonloop"]
+                            + region_counter["other_completion"]
+                        )
+                        / float(attn_weights.shape[0])
                     ),
                     "top_mean_positions": [int(v) for v in top_positions],
                     "top_mean_regions": [
@@ -781,6 +786,7 @@ def main() -> None:
             "recent_window": args.recent_window,
             "num_shards": args.num_shards,
             "query_position_mode": args.query_position_mode,
+            "other_completion_includes_recent_nonloop": True,
         },
     )
     _write_json(
