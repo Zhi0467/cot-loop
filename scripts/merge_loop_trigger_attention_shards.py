@@ -92,6 +92,7 @@ def _weighted_merge_layer_means(shard_dirs: list[Path]) -> list[dict[str, Any]]:
                         "layer": layer,
                         "num_rows": 0,
                         "query_position_mode": str(row["query_position_mode"]),
+                        "other_completion_includes_recent_nonloop": True,
                     },
                 )
                 if str(bucket["query_position_mode"]) != str(row["query_position_mode"]):
@@ -115,6 +116,7 @@ def _weighted_merge_layer_means(shard_dirs: list[Path]) -> list[dict[str, Any]]:
                 "layer": layer,
                 "num_rows": num_rows,
                 "query_position_mode": str(bucket["query_position_mode"]),
+                "other_completion_includes_recent_nonloop": True,
                 **{
                     metric: (float(bucket[metric]) / num_rows if num_rows else 0.0)
                     for metric in LAYER_METRICS
@@ -139,6 +141,7 @@ def _weighted_merge_attention_summary(shard_dirs: list[Path]) -> dict[str, Any]:
                     "num_selected_rows": 0,
                     "summary_layer": int(payload["summary_layer"]),
                     "query_position_mode": str(payload["query_position_mode"]),
+                    "other_completion_includes_recent_nonloop": True,
                 },
             )
             if int(bucket["summary_layer"]) != int(payload["summary_layer"]):
@@ -164,6 +167,7 @@ def _weighted_merge_attention_summary(shard_dirs: list[Path]) -> dict[str, Any]:
             "num_selected_rows": num_rows,
             "summary_layer": int(bucket["summary_layer"]),
             "query_position_mode": str(bucket["query_position_mode"]),
+            "other_completion_includes_recent_nonloop": True,
             **{
                 metric: (float(bucket[metric]) / num_rows if num_rows else 0.0)
                 for metric in LAYER_METRICS
