@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-04-09 22:55 UTC
+Last updated: 2026-04-21 08:45 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -15,6 +15,7 @@ Core docs:
 - Prompt-profile risk-screen decision: prompt-profile-risk-screen-2026-03-30.md
 - Prompt-profile plain-language note: prompt-profile-plain-language-2026-03-30.md
 - Prompt-profile full-train plan: prompt-profile-full-train-plan-2026-04-02.md
+- Prompt-profile RFM + steering stage plan: prompt-profile-rfm-steering-plan-2026-04-21.md
 - Prompt-profile natural-regression rerun note: prompt-profile-natural-regression-rerun-2026-04-05.md
 - Prompt-profile unified report note: prompt-profile-unified-report-2026-04-09.md
 - Prompt-profile combined audit note: prompt-profile-combined-audit-2026-04-05.md
@@ -77,16 +78,32 @@ Key outputs:
 - Detailed reopened-round summary PDF: ../outputs/prefill_rounds_1_to_12_detailed_summary/prefill_rounds_1_to_12_detailed_summary.pdf
 
 Current live status:
+- The new note `prompt-profile-rfm-steering-plan-2026-04-21.md` is the active next-stage execution surface:
+  - it turns the attached PDF idea into a repo-grounded plan;
+  - it fixes the real source bundle to the saved March `2026-03-22` / `2026-03-23` Qwen prompt-profile archives;
+  - it keeps the active stage on the retained four-benchmark set `GPQA`, `MATH-500`, `MMLU-Pro`, and `LiveCodeBench`, with `AIME` intentionally out of the collaborator-facing stage;
+  - it restores the activation-side linear controls as a required comparison surface, distinct from the prompt-only metadata baselines;
+  - it keeps `T = 5` fixed on the first RFM pass;
+  - it now treats exported vector quality as its own object through bootstrap stability, cosine-structure, and projection-separation diagnostics before steering claims;
+  - it uses the exported per-layer benchmark-local bundle directly for the first spherical steering pass at fixed `t = 0.3`, rather than inventing a separate top-`k` rule or controller;
+  - it adds sign-flipped and random-direction controls to the first steering table instead of relying only on a no-steer baseline;
+  - it keeps the steering story alive even if RFM is not the top detector, so detector ranking and steering utility stay separate questions;
+  - it makes the final OOD step an external-benchmark averaged-"verbose"-vector test instead of a leave-one-benchmark-out exercise inside the retained training set;
+  - it separates detector quality, steering utility, and trigger-attention background context instead of blending them into one claim.
 - The combined audit `prompt-profile-combined-audit-2026-04-05.md` is still the whole-surface prompt-profile bundle:
   - it keeps the canonical natural regression rerun, the current balanced-binary default, the cheap prompt-stat audit, and the Athena code audit in one place;
   - it narrows the honest claim: the current reports establish lift over a 1D prompt-length baseline on some surfaces, not yet lift over strong prompt-only controls in general.
+- The unified report `prompt-profile-unified-report-2026-04-09.md` remains the main collaborator-facing prompt-profile summary:
+  - regression stays natural-split / natural-sampler;
+  - binary stays balanced-train / natural-test;
+  - the new RFM stage is an add-on to that surface, not a replacement for it.
 - The new note `prompt-profile-length-mechanism-2026-04-09.md` is the direct plain-English answer to the narrower question "why does prompt length predict completion length at all?":
   - on `AIME`, `MATH-500`, `MMLU-Pro`, and much of `LiveCodeBench`, prompt length mostly works as a rough workload proxy;
   - `GPQA` is the important exception where raw length is weak and prompt structure matters more;
   - the note is backed by a new `2`-GPU audit bundle under `../outputs/prompt_profile_length_mechanism_20260409/` plus an attached Athena plain-English read.
-- The next honest prompt-profile step is now a residualized conditional-lift audit on the natural regression head rather than another same-object rerun:
-  - keep the new length-mechanism note as the explanation of the prompt-length baseline;
-  - if the activation claim needs to move forward, evaluate activation lift over stronger prompt-shape controls or inside matched prompt-shape strata.
+- The stronger prompt-shape / residualized-control question is still open, but it is no longer the immediate next execution surface:
+  - first land the RFM detector-plus-steering stage on the frozen binary `majority_s_0.5` object;
+  - then use residualized or matched prompt-shape analysis if the activation-lift claim still needs to move beyond the current prompt-visible baselines.
 - The current prompt-level predictor task is "predict terminal rollout statistics from prompt-prefill activations under one fixed model and decode policy," not "force everything into one binary loop label."
 - The objective selector is now fixed explicitly: choose the target by held-out predictability on the target itself, not by the downstream `top 20%` loop-enrichment slice.
 - Under that criterion, `mean_relative_length` is the strongest current regression target and `majority_s_0.5` is the strongest finished binary label surface, and Wangzhi locked that pair for the first full-train pass.
@@ -99,6 +116,10 @@ Current live status:
   - older April 4 and April 6 live-checkpoint sections are preserved in-place but explicitly sit behind the now-finished Qwen surface;
   - use it when you want the full chronological path, not just the cleaned stage conclusion.
 - The docs note `understand-where-loop-and-max-length-come-from.md` is only the background definitions appendix for saved `loop`, prompt-profile `cap_hit` / `p_cap`, rollout-stat `max_length_hit`, and `majority_s_0.5`.
+- The trigger-attention line is no longer the active GitHub blocker surface:
+  - upstream PR `#10` is already merged;
+  - the merged note is still useful background on prompt-dominant late-layer attention plus a mid-stack previous-loop signal;
+  - it should not be used as validation for the new RFM steering stage.
 - The new note `olmo-degeneration-origin-audit-2026-04-04.md` is the collaborator-facing OLMo audit surface for that thread:
   - it consolidates the repaired OLMo3 `MMLU-Pro` / `LiveCodeBench` rows plus the bounded OLMo2 `1B` ladder;
   - it is the right artifact to cite when the question is "what survived the audit?" rather than "what commands were run?"

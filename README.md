@@ -1,15 +1,35 @@
 # CoT Loop Detection via Probe Classifiers
 
-This repository studies whether chain-of-thought loop risk is predictable from internal activations and rollout telemetry. The original workflow centered on prompt-prefill last-token probes, and the current active phase extends that line with repaired cross-dataset rollout-statistics audits so the prefill/completion findings can be checked against real loop behavior across multiple benchmark families.
+This repository studies whether chain-of-thought loop risk is predictable from internal activations and rollout telemetry. The original workflow centered on prompt-prefill last-token probes, and the current active stage is a prompt-profile RFM-plus-steering extension on the frozen Qwen prompt-profile bundle. The retained collaborator-facing benchmark set for that stage is `GPQA`, `MATH-500`, `MMLU-Pro`, and `LiveCodeBench`; `AIME` is intentionally out on this object because it mostly reads as a prompt-visible workload case. The merged trigger-attention audit remains useful background context, but it is no longer the live blocker surface for the next stage.
 
 ## Overview
 
-The project now has two active evidence streams:
+The project now has three durable evidence streams:
 - the probe line asks whether loop risk is detectable from stacked prompt-prefill activations, either by slicing one layer or by voting across all layers;
-- the rollout-statistics line measures how often looping and max-length hits actually occur under the repaired v2 collector contract across `MATH-500`, `AIME`, `GPQA`, `MMLU-Pro`, and `LiveCodeBench`.
+- the rollout-statistics line measures how often looping and max-length hits actually occur under the repaired v2 collector contract across `MATH-500`, `AIME`, `GPQA`, `MMLU-Pro`, and `LiveCodeBench`;
+- the trigger-attention line replays saved loop rows to ask where the model is attending around the repeated trigger region, but that line should now be treated as merged background evidence rather than the active phase boundary.
 
 Latest status:
-- the collaborator-facing prompt-profile surface is now the combined audit note `docs/prompt-profile-combined-audit-2026-04-05.md` plus `outputs/prompt_profile_combined_audit_20260405/`, which keeps the canonical natural-regression rerun, the current balanced-binary recommendation, the cheap prompt-stat audit, and Athena's code audit in one surface.
+- upstream PRs `#9` and `#10` are both merged, so the repo is no longer sitting on an open GitHub review surface for the old prompt-profile or trigger-attention lines.
+- the merged trigger-attention note is still scientifically narrow:
+  - it is background evidence about prompt-dominant final-layer attention plus a mid-stack previous-loop signal on the saved loop rows;
+  - it is not validation for the next-stage RFM steering object.
+- the collaborator-facing prompt-profile surface is now the unified note `docs/prompt-profile-unified-report-2026-04-09.md` plus `outputs/prompt_profile_unified_report_20260409/`, which folds the April 5 combined audit, the April 6 mechanism note, and the April 9 plain-English length audit into one canonical PDF while keeping the natural-regression lane, the balanced-binary recommendation, and the prompt-shape mechanism answer in the same surface.
+- the next execution surface is now pinned in `docs/prompt-profile-rfm-steering-plan-2026-04-21.md`:
+  - reuse the saved March `2026-03-22` / `2026-03-23` Qwen prompt-profile archives;
+  - keep the retained four-benchmark set `GPQA`, `MATH-500`, `MMLU-Pro`, and `LiveCodeBench`, with `AIME` intentionally excluded from the collaborator-facing stage;
+  - keep the binary head `majority_s_0.5`;
+  - add a native layerwise RFM path as a sibling baseline to the current activation linear and activation MLP surfaces;
+  - extend the report with direction-coherence diagnostics before making any steering claim;
+  - keep `T = 5` fixed on the first RFM pass;
+  - then run paired benchmark-local spherical steering at fixed `t = 0.3` using the exported per-layer bundle directly, not a top-`k` rule or controller;
+  - include `no_steer`, `-v`, `+v`, and random-direction controls in the first steering table;
+  - then test one external benchmark with the averaged "verbose" vector rather than doing leave-one-benchmark-out gymnastics inside the retained training set.
+- there is no live RFM or steering implementation path in current `scripts/` or `src/`; the new stage therefore requires real code additions rather than only re-running an existing launcher.
+- the repo already has activation-side linear controls distinct from the prompt-only metadata baselines:
+  - `src/loop_probe/probes/linear_probe.py`
+  - `slurm/run_prompt_profile_binary_linear_comparison.sbatch`
+  - `docs/prompt-profile-unified-report-2026-04-14.md`
 - the common-policy rollout-statistics bundle remains refreshed under one shared decode policy (`temperature=0.2`, `num_generations=10`, and `max prompts <= 800` where applicable) across `MATH-500`, `AIME`, `GPQA`, capped `MMLU-Pro`, and capped `LiveCodeBench release_v6`.
 - the repaired MC rows are materially different from the stale pre-refresh bundle: `GPQA` now reports `34.5%` rollout success instead of `3.1%`, and `MMLU-Pro` now reports `65.2%` instead of `14.2%`, both under the terminal JSON-answer contract.
 - the canonical regression lane is now pinned twice over: the original locked April natural-split / natural-sampler `mean_relative_length` run plus Slurm `2215`, which reproduced that ledger exactly from the current branch.
@@ -32,9 +52,11 @@ Latest status:
   - the saved text probe shows that Qwen base raw does degenerate on MCQ, but mainly by repeating the answer-format instruction tail rather than by OLMo-style math-derivation loops
   - the saved instruct-side v2 table is still useful as rough scale, but not as a controlled per-dataset comparison, because prompt pools, rollout counts, context limits, and `LiveCodeBench` LM style do not match the new base bundle
 - the current open work is now post-audit rather than pre-audit:
-  - replace the 1D prompt-length control with a stronger prompt-shape baseline on the frozen prompt-profile splits;
-  - test activation lift as residuals or inside matched prompt-shape strata;
-  - use the finished OLMo+Qwen combined report to decide whether another larger OLMo rerun is warranted, rather than treating the Qwen follow-up as still pending.
+  - add the retained-benchmark registry and native layerwise RFM training path on the frozen prompt-profile archives;
+  - extend the unified prompt-profile report with RFM results plus direction-coherence diagnostics against the current activation linear, activation MLP, and prompt-only baselines;
+  - export signed benchmark-local steering vectors and run paired fixed-`t = 0.3` spherical steering tables even if RFM does not become the top detector;
+  - then test one external benchmark with the averaged "verbose" vector;
+  - then revisit stronger prompt-shape controls and only later ablate layer rules, controllers, or `t` if the first steering table shows signal.
 
 **Workflow:**
 1. Build model-formatted chat prompts (shared `utils.build_prompt` source)
