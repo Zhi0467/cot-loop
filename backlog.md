@@ -1,6 +1,6 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-21 18:42 UTC
+Last updated: 2026-04-21 18:57 UTC
 
 Reference plan:
 - `docs/prompt-profile-rfm-steering-plan-2026-04-21.md`
@@ -10,18 +10,16 @@ Reference plan:
 ### P0: Add The Native RFM Detector
 
 - Treat only `LiveCodeBench` as the meaningful held-out detector object on the frozen March `majority_s_0.5` surface until the label object or split policy changes; keep `GPQA`, `MATH-500`, and `MMLU-Pro` provenance-only for now.
-- Extend the first matched `LiveCodeBench` baseline slice beyond seed `0`:
-  - prompt-only baselines from `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_prompt_baselines/livecodebench_majority_s0p5_seed0_20260421/`
-  - activation-side linear / MLP baselines from `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_baselines/livecodebench_majority_s0p5_seed0_20260421/`
+- Decide whether the detector comparison should now treat the current RFM row as fixed, or whether RFM itself also needs repeat / split-seed sweeps before the report is locked.
 - Build one detector comparison table on the exact March-reconstructed split with:
   - RFM layer `18`, bandwidth `100`, test `PR-AUC 0.1021`, test `ROC-AUC 0.7352`
-  - prompt-only `prompt_length`, `prompt_shape_linear`, `prompt_shape_tree`
-  - activation linear `last_layer` / `ensemble`
-  - activation MLP `last_layer` / `ensemble`
+  - prompt-only `prompt_length`, `prompt_shape_linear`, `prompt_shape_tree` from `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_prompt_baselines/livecodebench_majority_s0p5_seed0_20260421/`
+  - activation linear / MLP rows from `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_baselines/livecodebench_majority_s0p5_seed0_20260421/`
   - `best_rank` as the primary activation checkpoint rule, with `best_loss` kept as a diagnostic secondary view
-- Explain the first honest comparison plainly:
-  - on the current seed-`0` matched split, RFM is ahead of prompt-only and activation-linear baselines;
-  - activation MLP is still ahead of RFM on the same object.
+- State the current matched comparison plainly in the report text:
+  - prompt-only stays below RFM on this object;
+  - activation linear stays below RFM on this object;
+  - activation MLP stays above RFM on this object, including the fixed-split seed sweep (`best_rank` mean `PR-AUC`: last-layer `0.1358`, ensemble `0.1470`).
 - Add direction-coherence diagnostics for the exported RFM vectors:
   - bootstrap cosine stability
   - cross-layer cosine structure

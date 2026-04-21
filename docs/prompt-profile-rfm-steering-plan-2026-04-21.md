@@ -1,6 +1,6 @@
 # Prompt-Profile RFM Steering Stage Plan
 
-Last updated: 2026-04-21 18:42 UTC
+Last updated: 2026-04-21 18:57 UTC
 
 ## Bottom Line
 
@@ -175,6 +175,16 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
   - RFM (`PR-AUC 0.1021`, `ROC-AUC 0.7352`) is ahead of the prompt-only baselines and the activation linear baselines on the matched split;
   - activation MLP is still ahead of RFM on the same matched split, so the detector story is not an RFM win yet even before multiseed aggregation;
   - this does not close the steering question, because the plan explicitly keeps steering utility separate from detector ranking.
+- Fixed-split activation seed sweep (`2026-04-21`, seeds `0/1/2`, `best_rank`):
+  - shared output root:
+    - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_baselines/livecodebench_majority_s0p5_seed0_20260421/`
+  - mean test `PR-AUC` / `ROC-AUC` by model:
+    - linear `last_layer`: `0.0769` / `0.5129`
+    - linear `ensemble`: `0.0821` / `0.5820`
+    - MLP `h256 d1 last_layer`: `0.1358` / `0.8076`
+    - MLP `h256 d1 ensemble`: `0.1470` / `0.7614`
+  - so the fixed-split seed sweep keeps the same detector ordering as the first seed-`0` read:
+    - prompt-only < activation linear < RFM < activation MLP
 
 ### Stage 2: Export Signed Concept Vectors And Check Direction Quality
 
