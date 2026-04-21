@@ -213,7 +213,7 @@ class LaplaceRFM:
         return self.M
 
     def export_state(self) -> dict[str, object]:
-        if self.M is None or self.weights is None:
+        if self.M is None or self.weights is None or self.centers is None:
             raise SystemExit("Model state is empty; run fit_predictor first.")
         return {
             "bandwidth": self.bandwidth,
@@ -222,5 +222,6 @@ class LaplaceRFM:
             "centering": self.centering,
             "solver": self.solver,
             "M": self.M.detach().to("cpu", dtype=torch.float32),
+            "centers": self.centers.detach().to("cpu", dtype=torch.float32),
             "weights": self.weights.detach().to("cpu", dtype=torch.float32),
         }

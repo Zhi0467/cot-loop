@@ -196,11 +196,54 @@ def _metric_key(metrics: dict[str, float]) -> tuple[float, float, float]:
     )
 
 
-def _score_metrics(y_true: np.ndarray, scores: np.ndarray) -> dict[str, float]:
+def _score_metrics(
+    y_true: np.ndarray,
+    scores: np.ndarray,
+    *,
+    threshold: float,
+) -> dict[str, float]:
     scores_t = torch.tensor(scores, dtype=torch.float32)
-    predictions_t = (scores_t >= 0.5).to(dtype=torch.int64)
+    predictions_t = (scores_t >= float(threshold)).to(dtype=torch.int64)
     labels_t = torch.tensor(y_true, dtype=torch.int64)
     return evaluate_binary_metrics_from_scores(labels_t, scores_t, predictions_t)
+
+
+def _metric_float(value: object, *, default: float) -> float:
+    if value is None:
+        return default
+    value_f = float(value)
+    if math.isnan(value_f):
+        return default
+    return value_f
+
+
+def _select_threshold(y_true: np.ndarray, scores: np.ndarray) -> tuple[float, dict[str, float]]:
+    thresholds = sorted(float(value) for value in np.unique(scores).tolist())
+    if thresholds:
+        thresholds.append(float(max(thresholds) + 1.0))
+    else:
+        thresholds = [0.5]
+    best_threshold = thresholds[0]
+    best_metrics = _score_metrics(y_true, scores, threshold=best_threshold)
+    best_key = (
+        _metric_float(best_metrics.get("macro_f1"), default=float("-inf")),
+        _metric_float(best_metrics.get("positive_f1"), default=float("-inf")),
+        _metric_float(best_metrics.get("accuracy"), default=float("-inf")),
+        -best_threshold,
+    )
+    for threshold in thresholds[1:]:
+        metrics = _score_metrics(y_true, scores, threshold=threshold)
+        key = (
+            _metric_float(metrics.get("macro_f1"), default=float("-inf")),
+            _metric_float(metrics.get("positive_f1"), default=float("-inf")),
+            _metric_float(metrics.get("accuracy"), default=float("-inf")),
+            -threshold,
+        )
+        if key > best_key:
+            best_threshold = threshold
+            best_metrics = metrics
+            best_key = key
+    return best_threshold, best_metrics
 
 
 def _logistic_scores(
@@ -341,13 +384,18 @@ def _evaluate_model(
     best_result: dict[str, Any] | None = None
     best_key: tuple[float, float, float] | None = None
     selection_rows: list[dict[str, Any]] = []
+    train_labels = _labels(train_rows)
     val_labels = _labels(val_rows)
     test_labels = _labels(test_rows)
     for candidate in candidates:
+        train_scores, _ = candidate["scorer"](train_rows)
+        decision_threshold, train_metrics = _select_threshold(train_labels, train_scores)
         val_scores, model_payload = candidate["scorer"](val_rows)
-        val_metrics = _score_metrics(val_labels, val_scores)
+        val_metrics = _score_metrics(val_labels, val_scores, threshold=decision_threshold)
         selection_row = {
             "selector": candidate["selector"],
+            "decision_threshold": float(decision_threshold),
+            "train_metrics": train_metrics,
             "val_metrics": val_metrics,
         }
         selection_rows.append(selection_row)
@@ -360,8 +408,15 @@ def _evaluate_model(
                 "feature_names": list(candidate["feature_names"]),
                 "hyperparameters": candidate["selector"],
                 "model_payload": model_payload,
+                "decision_threshold": float(decision_threshold),
+                "threshold_selection_rule": "train_macro_f1_then_positive_f1_then_accuracy",
+                "train_metrics": train_metrics,
                 "val_metrics": val_metrics,
-                "test_metrics": _score_metrics(test_labels, test_scores),
+                "test_metrics": _score_metrics(
+                    test_labels,
+                    test_scores,
+                    threshold=decision_threshold,
+                ),
                 "selection_rows": selection_rows,
                 "prompt_ids": split_manifest["prompt_ids"],
                 "prompt_id_hashes": split_manifest.get("prompt_id_hashes"),
