@@ -76,33 +76,61 @@ def build_rfm_vector_bundle_record(
     vector_extraction: dict[str, Any],
     sign_convention: str,
     raw_vector_norm: float,
+    raw_vector: Any,
     normalized_vector: Any,
     git_commit: str,
+    model_id: str | None,
     model_revision: str | None,
     tokenizer_revision: str | None,
     random_seed: int,
+    prompt_text_hashes: dict[str, str] | None = None,
+    projection_rule: dict[str, Any] | None = None,
+    projection_metrics: dict[str, Any] | None = None,
+    output_path: str | None = None,
+    source_checkpoint_path: str | None = None,
+    source_detector_artifact_hash: str | None = None,
 ) -> dict[str, Any]:
+    prompt_ids = {
+        "train": train_prompt_ids,
+        "val": val_prompt_ids,
+        "test": test_prompt_ids,
+    }
+    prompt_id_hashes = {
+        split_name: stable_json_sha256(prompt_ids[split_name])
+        for split_name in prompt_ids
+    }
     record = {
         "schema_name": "prompt_profile_rfm_vector_bundle.v1",
         "benchmark": benchmark,
         "layer": layer,
-        "prompt_ids": {
-            "train": train_prompt_ids,
-            "val": val_prompt_ids,
-            "test": test_prompt_ids,
-        },
+        "prompt_ids": prompt_ids,
+        "prompt_id_hashes": prompt_id_hashes,
         "feature_key": feature_key,
         "preprocessing": preprocessing,
         "rfm_hyperparameters": rfm_hyperparameters,
         "vector_extraction": vector_extraction,
         "sign_convention": sign_convention,
         "raw_vector_norm": raw_vector_norm,
+        "raw_vector_checksum": tensor_checksum_hex(raw_vector),
         "normalized_vector_checksum": tensor_checksum_hex(normalized_vector),
         "git_commit": git_commit,
+        "model_id": model_id,
         "model_revision": model_revision,
         "tokenizer_revision": tokenizer_revision,
         "random_seed": random_seed,
     }
+    if prompt_text_hashes is not None:
+        record["prompt_text_hashes"] = prompt_text_hashes
+    if projection_rule is not None:
+        record["projection_rule"] = projection_rule
+    if projection_metrics is not None:
+        record["projection_metrics"] = projection_metrics
+    if output_path is not None:
+        record["output_path"] = output_path
+    if source_checkpoint_path is not None:
+        record["source_checkpoint_path"] = source_checkpoint_path
+    if source_detector_artifact_hash is not None:
+        record["source_detector_artifact_hash"] = source_detector_artifact_hash
     return record
 
 
