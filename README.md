@@ -31,7 +31,23 @@ Latest status:
   - `scripts/validate_prompt_profile_rfm_stage_registry.py`
   - `src/loop_probe/stage_artifacts.py`
   - `outputs/prompt_profile_rfm_stage0_registry_validation_20260421/registry_validation.json`
-- there is still no live RFM trainer or steering runner in current `scripts/` or `src/`; the remaining stage therefore still requires real modeling code rather than only re-running an existing launcher.
+- the repo now has a live native RFM detector path:
+  - `src/loop_probe/rfm.py`
+  - `scripts/train_prompt_profile_rfm.py`
+  - `slurm/run_prompt_profile_rfm.sbatch`
+- first execution reality from that stage-1 path is sharper than the plan text implied:
+  - on the frozen March `majority_s_0.5` object, `GPQA`, `MATH-500`, and `MMLU-Pro` each have `0` held-out test positives;
+  - only `LiveCodeBench` currently has a non-degenerate held-out positive slice (`train 606/34`, `test 152/8` for negative/positive prompts).
+- the first viable stage-1 detector artifact now exists on patched head `ea06bb7`:
+  - output root: `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_20260421/`
+  - best validation layer/bandwidth: `18 / 100`
+  - validation `PR-AUC`: `0.3921`
+  - test `PR-AUC`: `0.1021`
+  - test `ROC-AUC`: `0.7352`
+  - test positive `F1`: `0.1429`
+- the first `LiveCodeBench` full run also forced one implementation correction:
+  - the original `cholesky` default failed on a non-positive-definite kernel matrix;
+  - the committed default solver is now `solve`.
 - the repo already has activation-side linear controls distinct from the prompt-only metadata baselines:
   - `src/loop_probe/probes/linear_probe.py`
   - `scripts/run_prompt_profile_full_train.py`
@@ -58,8 +74,9 @@ Latest status:
   - the saved text probe shows that Qwen base raw does degenerate on MCQ, but mainly by repeating the answer-format instruction tail rather than by OLMo-style math-derivation loops
   - the saved instruct-side v2 table is still useful as rough scale, but not as a controlled per-dataset comparison, because prompt pools, rollout counts, context limits, and `LiveCodeBench` LM style do not match the new base bundle
 - the current open work is now post-audit rather than pre-audit:
-  - use the committed retained-benchmark registry and validation artifact as the frozen stage contract, then add the native layerwise RFM training path on top of that surface;
-  - extend the unified prompt-profile report with RFM results plus direction-coherence diagnostics against the current activation linear, activation MLP, and prompt-only baselines;
+  - use the committed retained-benchmark registry and the now-live RFM trainer as the frozen stage contract;
+  - rerun prompt-only, activation-linear, and activation-MLP baselines on the exact March-reconstructed split before comparing them against the new RFM rows;
+  - extend the unified prompt-profile report with RFM results plus direction-coherence diagnostics on that matched surface;
   - export signed benchmark-local steering vectors and run paired fixed-`t = 0.3` spherical steering tables even if RFM does not become the top detector;
   - then test one external benchmark with the averaged "verbose" vector;
   - then revisit stronger prompt-shape controls and only later ablate layer rules, controllers, or `t` if the first steering table shows signal.

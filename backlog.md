@@ -1,6 +1,6 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-21 09:35 UTC
+Last updated: 2026-04-21 10:15 UTC
 
 Reference plan:
 - `docs/prompt-profile-rfm-steering-plan-2026-04-21.md`
@@ -9,21 +9,21 @@ Reference plan:
 
 ### P0: Add The Native RFM Detector
 
-- Add a native layerwise RFM training path on the existing prompt-prefill stacked tensors for binary `majority_s_0.5`.
-- Keep the initial RFM surface simple:
-  - bandwidth in `{1, 10, 100}`
-  - `lambda = 1e-3`
-  - `T = 5` fixed
-- Emit held-out detector tables against all existing baseline families on the same split:
+- RFM trainer / Slurm wrapper now exist and run on-node.
+- Keep the first detector comparison honest:
+  - only `LiveCodeBench` currently has a non-degenerate held-out positive slice on the frozen March `majority_s_0.5` object;
+  - `GPQA`, `MATH-500`, and `MMLU-Pro` currently have `0` held-out test positives on that object, so do not treat their first detector rows as meaningful held-out ranking evidence.
+- Rerun the baseline families on the exact March-reconstructed split before comparing RFM against prior April tables:
   - prompt-only baselines
   - activation-side linear baselines
   - activation-side MLP baselines
+- Package the first viable detector result from `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_20260421/`.
 - Add direction-coherence diagnostics for the exported RFM vectors:
   - bootstrap cosine stability
   - cross-layer cosine structure
   - cross-benchmark cosine alignment
   - held-out 1D projection separation
-- Use bootstrap intervals in the detector report, especially on smaller held-out sets such as `GPQA`.
+- Decide with the collaborator whether the retained four-benchmark detector table should stay as-is, or whether the detector surface should become explicitly `LiveCodeBench`-first until the label object is changed.
 - Extend the unified prompt-profile report with the RFM rows and direction diagnostics before making any steering claim.
 
 ### P1: Benchmark-Local Spherical Steering

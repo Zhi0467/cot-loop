@@ -1,6 +1,6 @@
 # Prompt-Profile RFM Steering Stage Plan
 
-Last updated: 2026-04-21 09:35 UTC
+Last updated: 2026-04-21 10:15 UTC
 
 ## Bottom Line
 
@@ -35,6 +35,14 @@ Last updated: 2026-04-21 09:35 UTC
   - binary `majority_s_0.5`
   - per prompt, this is `1` when a majority of the saved rollouts exceed `50%` of the generation budget
   - this is a long-rollout / budget-usage risk proxy, not a pure loop label
+- Execution reality on the frozen March archives:
+  - `GPQA`: train `156/2`, test `40/0` for negative/positive prompts
+  - `MATH-500`: train `397/3`, test `100/0`
+  - `MMLU-Pro`: train `639/1`, test `160/0`
+  - `LiveCodeBench`: train `606/34`, test `152/8`
+- Immediate consequence:
+  - the frozen archive contract still names the retained four-benchmark set, but on the current March `majority_s_0.5` object only `LiveCodeBench` has a non-degenerate held-out positive slice;
+  - `GPQA`, `MATH-500`, and `MMLU-Pro` can still be kept in provenance tables, but they do not currently support a meaningful held-out binary detector comparison without changing the label object or the split policy.
 - Exact saved archive roots currently surfaced by the trigger-attention code for the retained stage benchmarks:
   - `GPQA`: `/data/scratch/murphy/outputs/cot-loop-detection/gpqa_mean_relative_from_archive_20260322/data`
   - `MATH-500`: `/data/scratch/murphy/outputs/cot-loop-detection/math_mean_relative_from_archive_20260323`
@@ -106,8 +114,8 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
 ### Stage 1: Add RFM As A Sibling Detector
 
 - Add a native RFM path on top of the existing stacked tensors, rather than re-extracting activations.
-- Proposed new surfaces:
-  - `src/loop_probe/rfm.py` or `src/loop_probe/probes/rfm.py`
+- Committed execution surface now exists:
+  - `src/loop_probe/rfm.py`
   - `scripts/train_prompt_profile_rfm.py`
   - `slurm/run_prompt_profile_rfm.sbatch`
 - Train one RFM per layer on the saved `[N, L, H]` prompt-prefill tensors.
@@ -115,12 +123,30 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
   - bandwidth in `{1, 10, 100}`
   - `lambda = 1e-3`
   - `T = 5` fixed
+- Default solver is now `solve`, not `cholesky`.
+  - The first non-degenerate `LiveCodeBench` full run failed under the original `cholesky` default because the kernel matrix was not positive-definite.
 - Emit held-out tables against the existing baseline families on this same binary surface:
   - prompt-only baselines
   - activation-side linear baselines
   - activation-side MLP baselines
   - `PR-AUC`, `ROC-AUC`, prevalence, and threshold diagnostics as secondary context
 - Use bootstrap intervals for the detector metrics, especially on smaller held-out sets such as `GPQA`.
+- First on-node execution receipts (`2026-04-21`):
+  - `GPQA` smoke `2756` proved the full artifact path end to end.
+  - `GPQA` full sweep `2757` also finished cleanly, but it confirmed the archive-level problem above: held-out test positives are `0`, so `test PR-AUC` / `ROC-AUC` are `NaN` and the resulting table is not scientifically useful.
+  - `LiveCodeBench` full sweep on patched head `ea06bb7` (`2760`) is the first viable stage-1 detector artifact:
+    - output root: `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_20260421/`
+    - fit-train / val / test counts: `54 / 128 / 160`
+    - positives: `27 / 7 / 8`
+    - selected layer: `18`
+    - selected bandwidth: `100`
+    - validation `PR-AUC`: `0.3921`
+    - test `PR-AUC`: `0.1021`
+    - test `ROC-AUC`: `0.7352`
+    - test positive `F1`: `0.1429`
+- Important comparison note:
+  - the April prompt-only / linear / MLP `majority_s_0.5` tables cannot be reused as the stage-1 baseline comparison, because they were trained on a different binary object with much higher held-out prevalence (for example `LiveCodeBench` test prevalence `0.3375` there versus `0.05` here);
+  - the next honest detector comparison is therefore to rerun prompt-only, activation-linear, and activation-MLP baselines on this exact March-reconstructed split before drawing any RFM-versus-baseline conclusion.
 
 ### Stage 2: Export Signed Concept Vectors And Check Direction Quality
 
