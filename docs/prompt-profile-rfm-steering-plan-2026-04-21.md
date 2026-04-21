@@ -1,6 +1,6 @@
 # Prompt-Profile RFM Steering Stage Plan
 
-Last updated: 2026-04-21 14:39 UTC
+Last updated: 2026-04-21 15:17 UTC
 
 ## Bottom Line
 
@@ -327,6 +327,19 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
       - `minus_v_spherical` does not beat random on this slice
       - both signed directions are worse than baseline on loop fraction
       - this remains an implementation/control receipt, not evidence for the steering story
+  - the first larger held-out control table is now finished too:
+    - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm_steering/livecodebench_controls32_t0p3_seed0_20260421/`
+    - all four conditions stay at `0 / 32` `pass@1`
+    - loop fractions on the larger repaired held-out slice are:
+      - `0.03125` for `no_steer`
+      - `0.28125` for `minus_v_spherical`
+      - `0.125` for `plus_v_spherical`
+      - `0.34375` for `random_spherical`
+    - the delayed `random_spherical` arm did finish; it was simply much slower than the first three conditions and ended as the worst loop-fraction control
+    - so the first larger benchmark-local steering table is also negative:
+      - there is still no accuracy movement anywhere
+      - both signed directions are worse than baseline on loop fraction
+      - the current stage no longer needs “more of the same table”; it needs either a new control, a new direction-quality result, or a different steering hypothesis
 
 ### Stage 5: External Averaged-Vector Test
 

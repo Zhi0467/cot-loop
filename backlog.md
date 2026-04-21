@@ -1,6 +1,6 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-21 14:39 UTC
+Last updated: 2026-04-21 15:17 UTC
 
 Reference plan:
 - `docs/prompt-profile-rfm-steering-plan-2026-04-21.md`
@@ -41,19 +41,6 @@ Reference plan:
 
 ### P2: Benchmark-Local Spherical Steering
 
-- The first spherical steering runner is now real:
-  - repo surfaces:
-    - `scripts/steer_prompt_profile_concept_vectors.py`
-    - `slurm/run_prompt_profile_rfm_steering.sbatch`
-  - first repaired `LiveCodeBench` smoke root:
-    - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm_steering/livecodebench_smoke_t0p3_n8_seed0_20260421_fix2/`
-  - smoke status:
-    - both `no_steer` and `minus_v_spherical` ran end to end and wrote `config.json`, per-seed summaries, condition summaries, and `prompt_profile_rfm_steering_run.v1` ledgers
-    - on this tiny `8`-prompt slice, both conditions stayed at `0 / 8` `pass@1` with mean length `1024`, so the smoke is an implementation receipt rather than a positive steering result
-    - `minus_v_spherical` also raised loop fraction from `0.0` to `0.375` on the smoke slice, so the first real steering table still needs a larger held-out surface before any directional claim
-- Keep the reviewed formatter fix from project commit `df5187b` on this lane:
-  - `LiveCodeBench` prompt recovery now uses the archive source formatter (source model plus saved `lm_style_override` where available), not the steering checkpoint formatter
-  - direct precheck on the node confirmed prompt recovery still works even when the steering model ID is changed
 - Keep the first steering pass fixed to:
   - prompt-prefill residual hooks if feasible
   - full exported per-layer bundle
@@ -70,14 +57,22 @@ Reference plan:
   - grader version
   - output path
 - Next steering TODOs:
-  - keep the reviewed-head two-condition smoke as the durable baseline receipt:
-    - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm_steering/livecodebench_smoke_t0p3_n8_seed0_20260421_fix3_sourcefmt/`
-  - keep the finished four-condition control smoke as the negative cheap-control receipt:
-    - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm_steering/livecodebench_smoke_t0p3_n8_seed0_20260421_fix4_controls/`
-    - all arms stay at `0 / 8` `pass@1` with mean length `1024`
-    - loop fractions are `0.0` (`no_steer`), `0.375` (`minus_v_spherical`), `0.125` (`plus_v_spherical`), and `0.375` (`random_spherical`)
-    - this does not show a sign-specific steering win on the smoke slice
-  - scale from `8` prompts to the first honest repaired held-out steering table
+  - freeze the first finished larger held-out control table into the collaborator-facing detector/steering writeup:
+    - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm_steering/livecodebench_controls32_t0p3_seed0_20260421/`
+    - final `32`-prompt table:
+      - `no_steer`: `0 / 32` `pass@1`, loop fraction `0.03125`
+      - `minus_v_spherical`: `0 / 32`, loop fraction `0.28125`
+      - `plus_v_spherical`: `0 / 32`, loop fraction `0.125`
+      - `random_spherical`: `0 / 32`, loop fraction `0.34375`
+    - current read:
+      - there is still no accuracy movement anywhere
+      - both signed directions are worse than baseline on loop fraction
+      - `random_spherical` finished as the worst loop-fraction control, so the table is negative rather than merely incomplete
+  - add `shuffled_label_spherical` on the repaired `LiveCodeBench` object if the steering lane is going to continue at all
+  - do not keep scaling the same benchmark-local table blindly:
+    - either move back to direction-quality / transfer prerequisites
+    - or define a new benchmark-local steering hypothesis that is not already ruled out by the finished `32`-prompt control table
+  - if further steering jobs are launched, log per-condition wall time explicitly; `random_spherical` finished much more slowly than the other three conditions
 
 ### P3: External Average-Vector Test
 
