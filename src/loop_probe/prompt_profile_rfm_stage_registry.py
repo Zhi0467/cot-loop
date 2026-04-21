@@ -21,6 +21,7 @@ DEFAULT_FEATURE_KEY = "last_token_all_layers_stack_final"
 DEFAULT_SAMPLE_SHAPE = (28, 2048)
 DEFAULT_SOURCE_TARGET_NAME = "mean_relative_length"
 DEFAULT_STAGE_LABEL_NAME = "majority_s_0.5"
+DEFAULT_STAGE_TAIL_THRESHOLD = 0.5
 STAGE_REGISTRY_VERSION = "prompt_profile_rfm_stage.v1"
 
 
@@ -39,6 +40,7 @@ class PromptProfileRFMStageDataset:
     active_stage: bool
     source_target_name: str = DEFAULT_SOURCE_TARGET_NAME
     stage_label_name: str = DEFAULT_STAGE_LABEL_NAME
+    stage_tail_threshold: float = DEFAULT_STAGE_TAIL_THRESHOLD
     feature_key: str = DEFAULT_FEATURE_KEY
     sample_shape: tuple[int, int] = DEFAULT_SAMPLE_SHAPE
 
@@ -61,6 +63,7 @@ class PromptProfileRFMStageValidationResult:
     default_feature_key: str
     sample_shape: list[int]
     target_name: str | None
+    target_tail_threshold: float | None
     train_prompt_ids: list[int]
     test_prompt_ids: list[int]
 
@@ -91,6 +94,7 @@ class PromptProfileRFMStageValidationResult:
             "default_feature_key": self.default_feature_key,
             "sample_shape": self.sample_shape,
             "target_name": self.target_name,
+            "target_tail_threshold": self.target_tail_threshold,
             "train_prompt_ids": self.train_prompt_ids,
             "test_prompt_ids": self.test_prompt_ids,
         }
@@ -321,6 +325,22 @@ def validate_stage_dataset(
             f"Dataset '{dataset.key}' target mismatch: "
             f"expected '{dataset.source_target_name}', got '{target_name}'."
         )
+    target_tail_threshold = (
+        float(target_spec.get("tail_threshold"))
+        if isinstance(target_spec, dict)
+        and isinstance(target_spec.get("tail_threshold"), (int, float))
+        else None
+    )
+    if target_tail_threshold is None:
+        raise SystemExit(
+            f"Dataset '{dataset.key}' target_spec is missing tail_threshold; "
+            f"expected {dataset.stage_tail_threshold} for stage label '{dataset.stage_label_name}'."
+        )
+    if abs(target_tail_threshold - dataset.stage_tail_threshold) > 1e-9:
+        raise SystemExit(
+            f"Dataset '{dataset.key}' tail_threshold mismatch: "
+            f"expected {dataset.stage_tail_threshold}, got {target_tail_threshold}."
+        )
 
     prompt_profile_files = manifest.get("prompt_profile_files")
     if not isinstance(prompt_profile_files, dict):
@@ -424,6 +444,7 @@ def validate_stage_dataset(
         default_feature_key=str(default_feature_key),
         sample_shape=sample_shape,
         target_name=str(target_name),
+        target_tail_threshold=target_tail_threshold,
         train_prompt_ids=train_prompt_ids,
         test_prompt_ids=test_prompt_ids,
     )

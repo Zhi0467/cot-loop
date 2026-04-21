@@ -266,3 +266,49 @@ def profile_target_value(
         f"Unknown prompt-profile target '{profile_target}'. "
         f"Valid: {PROMPT_PROFILE_TARGET_CHOICES}"
     )
+
+
+def prompt_profile_majority_tail_label(
+    row: dict[str, object],
+    *,
+    threshold: float,
+) -> int:
+    """Return the strict-majority tail label at the requested threshold.
+
+    Archived `tail_hit_count` / `majority_tail` are only valid when the row was
+    materialized at the same threshold. Otherwise recompute from per-rollout
+    relative lengths.
+    """
+    if not 0.0 < threshold <= 1.0:
+        raise ValueError("threshold must be in (0, 1].")
+
+    num_rollouts = int(row.get("num_rollouts", 0))
+    if num_rollouts < 1:
+        raise ValueError("Prompt rollout archive row is missing num_rollouts.")
+
+    stored_threshold = row.get("tail_threshold")
+    if (
+        isinstance(stored_threshold, (int, float))
+        and abs(float(stored_threshold) - float(threshold)) <= 1e-9
+    ):
+        tail_hits = row.get("tail_hit_count")
+        if isinstance(tail_hits, int):
+            return int(tail_hits > (num_rollouts / 2.0))
+        majority_tail = row.get("majority_tail")
+        if isinstance(majority_tail, (int, float)):
+            return int(majority_tail)
+
+    rollouts = row.get("rollouts")
+    if not isinstance(rollouts, list) or not rollouts:
+        raise ValueError(
+            "Prompt rollout archive row needs rollout relative lengths to recompute "
+            f"majority_tail at threshold={threshold}."
+        )
+    hits = 0
+    for rollout in rollouts:
+        relative_length = rollout.get("relative_length")
+        if not isinstance(relative_length, (int, float)):
+            raise ValueError("Rollout row is missing relative_length.")
+        if float(relative_length) >= threshold:
+            hits += 1
+    return int(hits > (len(rollouts) / 2.0))

@@ -21,6 +21,7 @@ SRC = ROOT / "src"
 if str(SRC) not in __import__("sys").path:
     __import__("sys").path.insert(0, str(SRC))
 
+from loop_probe.labeling import prompt_profile_majority_tail_label
 from loop_probe.stage_artifacts import stable_json_sha256
 from loop_probe.train_utils import evaluate_binary_metrics_from_scores
 
@@ -157,8 +158,12 @@ def _read_prompt_rows(path: Path) -> list[PromptRow]:
                 raise SystemExit(
                     f"Prompt row at {path}:{line_num} is missing prompt_token_count."
                 )
-            tail_threshold = payload.get("tail_threshold", 0.5)
-            label = _majority_tail_label(payload, threshold=float(tail_threshold))
+            stage_label = payload.get("stage_majority_tail")
+            if isinstance(stage_label, (int, float)):
+                label = int(stage_label)
+            else:
+                tail_threshold = payload.get("stage_tail_threshold", 0.5)
+                label = int(prompt_profile_majority_tail_label(payload, threshold=float(tail_threshold)))
             rows.append(
                 PromptRow(
                     sample_id=sample_id,
@@ -168,28 +173,6 @@ def _read_prompt_rows(path: Path) -> list[PromptRow]:
                 )
             )
     return rows
-
-
-def _majority_tail_label(row: dict[str, Any], *, threshold: float) -> int:
-    tail_hits = row.get("tail_hit_count")
-    num_rollouts = row.get("num_rollouts")
-    if isinstance(tail_hits, int) and isinstance(num_rollouts, int) and num_rollouts > 0:
-        return int(tail_hits > (num_rollouts / 2.0))
-    majority_tail = row.get("majority_tail")
-    if isinstance(majority_tail, (int, float)):
-        return int(round(float(majority_tail)))
-    rollouts = row.get("rollouts")
-    if not isinstance(rollouts, list) or not rollouts:
-        raise SystemExit("Prompt row is missing rollouts for label reconstruction.")
-    hits = 0
-    for rollout in rollouts:
-        relative_length = rollout.get("relative_length")
-        if not isinstance(relative_length, (int, float)):
-            raise SystemExit("Rollout row is missing relative_length.")
-        if float(relative_length) >= threshold:
-            hits += 1
-    return int(hits > (len(rollouts) / 2.0))
-
 
 def _feature_matrix(rows: list[PromptRow], feature_names: tuple[str, ...]) -> np.ndarray:
     return np.asarray(

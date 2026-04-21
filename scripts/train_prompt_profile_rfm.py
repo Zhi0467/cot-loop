@@ -21,6 +21,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from loop_probe.dataloader import ActivationDataset, read_manifest, resolve_sample_shape
+from loop_probe.labeling import prompt_profile_majority_tail_label
 from loop_probe.prompt_profile_rfm_stage_registry import (
     active_stage_datasets,
     get_stage_dataset,
@@ -144,29 +145,6 @@ def _load_archive_rows_by_key(data_dir: Path) -> dict[tuple[str, int], dict[str,
     return rows_by_key
 
 
-def _majority_tail_label(row: dict[str, Any], *, threshold: float) -> float:
-    num_rollouts = int(row.get("num_rollouts", 0))
-    if num_rollouts < 1:
-        raise SystemExit("Prompt rollout archive row is missing num_rollouts.")
-    tail_hits = row.get("tail_hit_count")
-    if isinstance(tail_hits, int):
-        return float(int(tail_hits > (num_rollouts / 2.0)))
-    majority_tail = row.get("majority_tail")
-    if isinstance(majority_tail, (int, float)):
-        return float(int(majority_tail))
-    rollouts = row.get("rollouts")
-    if not isinstance(rollouts, list) or not rollouts:
-        raise SystemExit("Prompt rollout archive row is missing rollout entries.")
-    hits = 0
-    for rollout in rollouts:
-        relative_length = rollout.get("relative_length")
-        if not isinstance(relative_length, (int, float)):
-            raise SystemExit("Rollout row is missing relative_length.")
-        if float(relative_length) >= threshold:
-            hits += 1
-    return float(int(hits > (len(rollouts) / 2.0)))
-
-
 def _load_binary_split(
     *,
     data_dir: Path,
@@ -191,7 +169,7 @@ def _load_binary_split(
         if not isinstance(prompt, str):
             raise SystemExit(f"Missing prompt text for {split}:{sample_id}.")
         prompts.append(prompt)
-        labels.append(_majority_tail_label(row, threshold=tail_threshold))
+        labels.append(float(prompt_profile_majority_tail_label(row, threshold=tail_threshold)))
     return SplitData(
         x=dataset.x.detach().to(dtype=torch.float32),
         y=torch.tensor(labels, dtype=torch.float32),

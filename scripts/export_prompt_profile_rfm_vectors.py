@@ -20,6 +20,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from loop_probe.dataloader import ActivationDataset, read_manifest
+from loop_probe.labeling import prompt_profile_majority_tail_label
 from loop_probe.stage_artifacts import (
     build_rfm_vector_bundle_record,
     current_git_commit,
@@ -217,29 +218,6 @@ def _load_archive_rows_by_key(data_dir: Path) -> dict[tuple[str, int], dict[str,
     return rows_by_key
 
 
-def _majority_tail_label(row: dict[str, Any], *, threshold: float) -> float:
-    num_rollouts = int(row.get("num_rollouts", 0))
-    if num_rollouts < 1:
-        raise SystemExit("Prompt rollout archive row is missing num_rollouts.")
-    tail_hits = row.get("tail_hit_count")
-    if isinstance(tail_hits, int):
-        return float(int(tail_hits > (num_rollouts / 2.0)))
-    majority_tail = row.get("majority_tail")
-    if isinstance(majority_tail, (int, float)):
-        return float(int(majority_tail))
-    rollouts = row.get("rollouts")
-    if not isinstance(rollouts, list) or not rollouts:
-        raise SystemExit("Prompt rollout archive row is missing rollout entries.")
-    hits = 0
-    for rollout in rollouts:
-        relative_length = rollout.get("relative_length")
-        if not isinstance(relative_length, (int, float)):
-            raise SystemExit("Rollout row is missing relative_length.")
-        if float(relative_length) >= threshold:
-            hits += 1
-    return float(int(hits > (len(rollouts) / 2.0)))
-
-
 def _load_binary_split(
     *,
     data_dir: Path,
@@ -269,7 +247,7 @@ def _load_binary_split(
         if row is None:
             raise SystemExit(f"Missing prompt rollout archive row for {source_split}:{sample_id}.")
         selected_x.append(dataset.x[index].detach().to(dtype=torch.float32))
-        labels.append(_majority_tail_label(row, threshold=tail_threshold))
+        labels.append(float(prompt_profile_majority_tail_label(row, threshold=tail_threshold)))
         resolved_sample_ids.append(int(sample_id))
     return SplitData(
         x=torch.stack(selected_x, dim=0),
