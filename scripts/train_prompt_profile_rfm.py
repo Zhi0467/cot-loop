@@ -566,6 +566,11 @@ def main() -> None:
         "source_manifest_path": str(validation.manifest_path),
         "source_target_name": benchmark.source_target_name,
         "stage_label_name": DEFAULT_STAGE_LABEL,
+        "stage_tail_threshold": benchmark.stage_tail_threshold,
+        "archive_tail_threshold": validation.archive_tail_threshold,
+        "stage_label_requires_rollout_recompute": (
+            validation.stage_label_requires_rollout_recompute
+        ),
         "feature_key": feature_key,
         "sample_shape": list(sample_shape),
         "scaler": {"kind": "identity"},

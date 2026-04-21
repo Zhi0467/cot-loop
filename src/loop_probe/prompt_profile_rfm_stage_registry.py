@@ -64,6 +64,7 @@ class PromptProfileRFMStageValidationResult:
     sample_shape: list[int]
     target_name: str | None
     archive_tail_threshold: float | None
+    stage_label_requires_rollout_recompute: bool
     train_prompt_ids: list[int]
     test_prompt_ids: list[int]
 
@@ -83,6 +84,7 @@ class PromptProfileRFMStageValidationResult:
                 "active_stage": self.dataset.active_stage,
                 "source_target_name": self.dataset.source_target_name,
                 "stage_label_name": self.dataset.stage_label_name,
+                "stage_tail_threshold": self.dataset.stage_tail_threshold,
                 "feature_key": self.dataset.feature_key,
                 "sample_shape": list(self.dataset.sample_shape),
             },
@@ -95,6 +97,7 @@ class PromptProfileRFMStageValidationResult:
             "sample_shape": self.sample_shape,
             "target_name": self.target_name,
             "archive_tail_threshold": self.archive_tail_threshold,
+            "stage_label_requires_rollout_recompute": self.stage_label_requires_rollout_recompute,
             "train_prompt_ids": self.train_prompt_ids,
             "test_prompt_ids": self.test_prompt_ids,
         }
@@ -237,6 +240,21 @@ def _read_jsonl_rows(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
+def _row_supports_tail_recompute(row: dict[str, Any]) -> bool:
+    rollouts = row.get("rollouts")
+    if not isinstance(rollouts, list) or not rollouts:
+        return False
+    num_rollouts = row.get("num_rollouts")
+    if isinstance(num_rollouts, int) and num_rollouts != len(rollouts):
+        return False
+    for rollout in rollouts:
+        if not isinstance(rollout, dict):
+            return False
+        if not isinstance(rollout.get("relative_length"), (int, float)):
+            return False
+    return True
+
+
 def _sample_ids_sha256(sample_ids: list[int]) -> str:
     body = json.dumps(sample_ids, separators=(",", ":"), ensure_ascii=True)
     return hashlib.sha256(body.encode("utf-8")).hexdigest()
@@ -354,6 +372,7 @@ def validate_stage_dataset(
         )
     archive_rows_by_key: dict[tuple[str, int], dict[str, Any]] = {}
     archive_tail_threshold: float | None = None
+    all_rows_support_tail_recompute = True
     for row in _read_jsonl_rows(data_dir / prompt_rollout_archive_file):
         split = row.get("split")
         sample_id = row.get("sample_id")
@@ -375,12 +394,19 @@ def validate_stage_dataset(
                 f"{archive_tail_threshold} vs {row_tail_threshold}."
             )
         archive_rows_by_key[(split, sample_id)] = row
+        all_rows_support_tail_recompute = (
+            all_rows_support_tail_recompute and _row_supports_tail_recompute(row)
+        )
     if archive_tail_threshold is None:
         raise SystemExit(f"Dataset '{dataset.key}' archive has no rows to validate.")
-    if abs(archive_tail_threshold - dataset.stage_tail_threshold) > 1e-9:
+    stage_label_requires_rollout_recompute = (
+        abs(archive_tail_threshold - dataset.stage_tail_threshold) > 1e-9
+    )
+    if stage_label_requires_rollout_recompute and not all_rows_support_tail_recompute:
         raise SystemExit(
             f"Dataset '{dataset.key}' tail_threshold mismatch: "
-            f"expected {dataset.stage_tail_threshold}, got {archive_tail_threshold}."
+            f"expected {dataset.stage_tail_threshold}, got {archive_tail_threshold}, "
+            "and at least one archive row cannot recompute the stage label from rollouts."
         )
 
     train_prompt_ids = _resolve_split_sample_ids(data_dir, "train", dataset.feature_key)
@@ -449,6 +475,7 @@ def validate_stage_dataset(
         sample_shape=sample_shape,
         target_name=str(target_name),
         archive_tail_threshold=archive_tail_threshold,
+        stage_label_requires_rollout_recompute=stage_label_requires_rollout_recompute,
         train_prompt_ids=train_prompt_ids,
         test_prompt_ids=test_prompt_ids,
     )

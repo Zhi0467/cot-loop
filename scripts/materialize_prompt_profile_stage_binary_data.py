@@ -302,6 +302,11 @@ def main() -> None:
         "feature_key": feature_key,
         "sample_shape": list(sample_shape),
         "stage_label_name": DEFAULT_STAGE_LABEL,
+        "stage_tail_threshold": benchmark.stage_tail_threshold,
+        "archive_tail_threshold": validation.archive_tail_threshold,
+        "stage_label_requires_rollout_recompute": (
+            validation.stage_label_requires_rollout_recompute
+        ),
         "source_target_name": benchmark.source_target_name,
         "model_id": manifest.get("model_id"),
         "model_revision": manifest.get("model_revision"),
