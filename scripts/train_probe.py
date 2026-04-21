@@ -42,6 +42,8 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-dir", required=True)
     parser.add_argument("--out-dir", required=True)
+    parser.add_argument("--train-split", default="train")
+    parser.add_argument("--eval-split", default="test")
 
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--batch-size", type=int, default=256)
@@ -118,6 +120,14 @@ def _parse_args() -> argparse.Namespace:
             "Optional dataset dir whose binary train labels define a balanced "
             "sampling distribution for the current train split. The current "
             "train split keeps all prompts; only the train sampler changes."
+        ),
+    )
+    parser.add_argument(
+        "--train-balance-reference-split",
+        default="train",
+        help=(
+            "Split name to read from --train-balance-reference-data-dir. "
+            "Defaults to train."
         ),
     )
 
@@ -214,11 +224,12 @@ def _build_balanced_sampler(
     *,
     train_dataset: ActivationDataset,
     reference_data_dir: str,
+    reference_split: str,
     feature_key: str | None,
 ) -> tuple[WeightedRandomSampler, dict[str, int]]:
     reference_dataset = ActivationDataset(
         data_dir=reference_data_dir,
-        split="train",
+        split=reference_split,
         feature_key=feature_key,
     )
     reference_labels: dict[int, int] = {}
@@ -780,7 +791,7 @@ def main() -> None:
         raise SystemExit(f"Unsupported manifest target kind '{target_kind}'.")
     train_info, resolved_feature_key = resolve_split_info(
         manifest,
-        split="train",
+        split=args.train_split,
         feature_key=args.feature_key,
     )
     input_dim = resolve_input_dim(manifest, resolved_feature_key)
@@ -810,7 +821,7 @@ def main() -> None:
 
     train_dataset = ActivationDataset(
         data_dir=args.data_dir,
-        split="train",
+        split=args.train_split,
         feature_key=resolved_feature_key,
     )
     train_sampler: WeightedRandomSampler | None = None
@@ -819,6 +830,7 @@ def main() -> None:
         train_sampler, train_sampler_summary = _build_balanced_sampler(
             train_dataset=train_dataset,
             reference_data_dir=args.train_balance_reference_data_dir,
+            reference_split=args.train_balance_reference_split,
             feature_key=resolved_feature_key,
         )
         print(
@@ -838,7 +850,7 @@ def main() -> None:
     )
     test_dataset = ActivationDataset(
         data_dir=args.data_dir,
-        split="test",
+        split=args.eval_split,
         feature_key=resolved_feature_key,
     )
     test_loader = DataLoader(
@@ -901,6 +913,8 @@ def main() -> None:
         name=args.wandb_run_name,
         config={
             "data_dir": args.data_dir,
+            "train_split": args.train_split,
+            "eval_split": args.eval_split,
             "feature_key": resolved_feature_key,
             "target_spec": target_spec,
             "input_dim": input_dim,
@@ -922,6 +936,7 @@ def main() -> None:
             "score_rule": probe_cfg.score_rule,
             "probe_config": probe_cfg.to_dict(),
             "train_balance_reference_data_dir": args.train_balance_reference_data_dir,
+            "train_balance_reference_split": args.train_balance_reference_split,
             "train_balance_reference_positive_count": (
                 train_sampler_summary["num_positive"]
                 if train_sampler_summary is not None
@@ -1086,6 +1101,8 @@ def main() -> None:
                 "target_kind": target_kind,
                 "target_name": target_spec.get("name"),
                 "seed": args.seed,
+                "train_split": args.train_split,
+                "eval_split": args.eval_split,
                 "lr": lr_now,
                 "feature_key": resolved_feature_key,
                 "sample_shape": list(sample_shape),
@@ -1095,6 +1112,7 @@ def main() -> None:
                 "vote_rule": probe_cfg.vote_rule,
                 "score_rule": probe_cfg.score_rule,
                 "train_balance_reference_data_dir": args.train_balance_reference_data_dir,
+                "train_balance_reference_split": args.train_balance_reference_split,
                 "train_balance_reference_positive_count": (
                     train_sampler_summary["num_positive"]
                     if train_sampler_summary is not None

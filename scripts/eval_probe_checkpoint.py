@@ -29,13 +29,14 @@ from loop_probe.train_utils import (
     evaluate_probe_outputs,
     resolve_classifier_layer,
 )
+from loop_probe.stage_artifacts import stable_json_sha256
 
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkpoint", required=True, help="Path to best.pt or last.pt.")
     parser.add_argument("--data-dir", required=True)
-    parser.add_argument("--split", choices=("train", "test"), default="test")
+    parser.add_argument("--split", default="test")
     parser.add_argument(
         "--feature-key",
         default=None,
@@ -318,6 +319,10 @@ def main() -> None:
         target_kind=target_kind,
         score_rule=probe_cfg.score_rule,
     )
+    dataset = loader.dataset
+    sample_ids: list[int] | None = None
+    if hasattr(dataset, "sample_ids"):
+        sample_ids = [int(value) for value in dataset.sample_ids.tolist()]
 
     out = {
         "checkpoint": args.checkpoint,
@@ -333,6 +338,9 @@ def main() -> None:
         "resolved_classifier_layer": resolved_classifier_layer,
         "vote_rule": probe_cfg.vote_rule,
         "score_rule": probe_cfg.score_rule,
+        "num_rows": num_rows,
+        "sample_ids": sample_ids,
+        "sample_ids_sha256": stable_json_sha256(sample_ids) if sample_ids is not None else None,
         **metrics,
     }
     print(json.dumps(out, indent=2, sort_keys=True))

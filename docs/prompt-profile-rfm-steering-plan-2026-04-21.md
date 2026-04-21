@@ -1,6 +1,6 @@
 # Prompt-Profile RFM Steering Stage Plan
 
-Last updated: 2026-04-21 10:15 UTC
+Last updated: 2026-04-21 18:05 UTC
 
 ## Bottom Line
 
@@ -74,8 +74,16 @@ Last updated: 2026-04-21 10:15 UTC
     - emit / validate CLI surfaces
     - machine-readable artifact helpers
     - first node-side validation artifact under `outputs/prompt_profile_rfm_stage0_registry_validation_20260421/`;
-  - there is still no live RFM trainer or steering runner in current `scripts/`, `src/`, or `slurm/`;
-  - older RFM results exist only in archived PR2 output artifacts, so this stage should be treated as a new implementation lane rather than a parameter-only follow-up.
+  - the repo now also has a live native RFM detector path:
+    - `src/loop_probe/rfm.py`
+    - `scripts/train_prompt_profile_rfm.py`
+    - `slurm/run_prompt_profile_rfm.sbatch`;
+  - there is still no live steering runner in current `scripts/`, `src/`, or `slurm/`;
+  - matched March-split baseline tooling also now exists:
+    - `scripts/materialize_prompt_profile_stage_binary_data.py`
+    - `scripts/train_probe.py` with explicit `--train-split` / `--eval-split`
+    - `scripts/eval_probe_checkpoint.py` for arbitrary split evaluation;
+  - older RFM results still exist only in archived PR2 output artifacts, so the detector and steering parts of this stage remain a new implementation lane rather than a parameter-only follow-up.
 
 ## What This Stage Is Trying To Prove
 
@@ -146,7 +154,7 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
     - test positive `F1`: `0.1429`
 - Important comparison note:
   - the April prompt-only / linear / MLP `majority_s_0.5` tables cannot be reused as the stage-1 baseline comparison, because they were trained on a different binary object with much higher held-out prevalence (for example `LiveCodeBench` test prevalence `0.3375` there versus `0.05` here);
-  - the next honest detector comparison is therefore to rerun prompt-only, activation-linear, and activation-MLP baselines on this exact March-reconstructed split before drawing any RFM-versus-baseline conclusion.
+  - the matched March-split tooling for that rerun is now in-tree, so the next honest detector comparison is to execute prompt-only, activation-linear, and activation-MLP baselines on this exact March-reconstructed split before drawing any RFM-versus-baseline conclusion.
 
 ### Stage 2: Export Signed Concept Vectors And Check Direction Quality
 

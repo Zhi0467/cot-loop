@@ -1,6 +1,6 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-21 10:15 UTC
+Last updated: 2026-04-21 18:05 UTC
 
 Reference plan:
 - `docs/prompt-profile-rfm-steering-plan-2026-04-21.md`
@@ -13,6 +13,10 @@ Reference plan:
 - Keep the first detector comparison honest:
   - only `LiveCodeBench` currently has a non-degenerate held-out positive slice on the frozen March `majority_s_0.5` object;
   - `GPQA`, `MATH-500`, and `MMLU-Pro` currently have `0` held-out test positives on that object, so do not treat their first detector rows as meaningful held-out ranking evidence.
+- The matched March-split baseline tooling now exists:
+  - `scripts/materialize_prompt_profile_stage_binary_data.py`
+  - `scripts/train_probe.py` with explicit `--train-split` / `--eval-split`
+  - `scripts/eval_probe_checkpoint.py` with arbitrary split evaluation and split sample-ID hashes
 - Rerun the baseline families on the exact March-reconstructed split before comparing RFM against prior April tables:
   - prompt-only baselines
   - activation-side linear baselines

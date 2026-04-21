@@ -1,6 +1,6 @@
 # Prompt-Profile RFM Artifact Schema
 
-Last updated: 2026-04-21 11:34 UTC
+Last updated: 2026-04-21 18:05 UTC
 
 ## Purpose
 
@@ -65,6 +65,35 @@ It should be written next to the exported checkpoint so later lookups can answer
 - whether train balancing or other preprocessing changed the natural archive split;
 - which bandwidth / regularization / iteration won on validation;
 - which score orientation and threshold were used for threshold diagnostics.
+
+## Stage Materialization Split Manifest
+
+- Supporting record: `split_manifest.json` emitted by `scripts/materialize_prompt_profile_stage_binary_data.py`
+- Required keys:
+  - `benchmark`
+  - `prompt_ids.train`
+  - `prompt_ids.val`
+  - `prompt_ids.test`
+  - `prompt_id_hashes.train`
+  - `prompt_id_hashes.val`
+  - `prompt_id_hashes.test`
+  - `prompt_text_hashes.train`
+  - `prompt_text_hashes.val`
+  - `prompt_text_hashes.test`
+  - `num_positive.train`
+  - `num_positive.val`
+  - `num_positive.test`
+  - `materialization.archive_data_dir`
+  - `materialization.prompt_rollout_archive_file`
+  - `materialization.feature_key`
+  - `materialization.model_id`
+  - `materialization.model_revision`
+  - `materialization.tokenizer_revision`
+  - `materialization.seed`
+
+This is the reusable March-object ledger for matched baseline reruns. It should
+be treated as the source of truth for which prompt IDs defined the train / val /
+test comparison object before any activation or prompt-only baseline is trained.
 
 ## RFM Vector Bundle Record
 
