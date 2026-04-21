@@ -1,6 +1,6 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-21 14:00 UTC
+Last updated: 2026-04-21 14:33 UTC
 
 Reference plan:
 - `docs/prompt-profile-rfm-steering-plan-2026-04-21.md`
@@ -70,8 +70,10 @@ Reference plan:
   - grader version
   - output path
 - Next steering TODOs:
-  - rerun the smoke from reviewed head `df5187b` so the durable smoke receipt matches the final code surface
-  - add `plus_v_spherical` and `random_spherical`
+  - keep the reviewed-head two-condition smoke as the durable baseline receipt:
+    - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm_steering/livecodebench_smoke_t0p3_n8_seed0_20260421_fix3_sourcefmt/`
+  - finish reading the live four-condition control smoke:
+    - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm_steering/livecodebench_smoke_t0p3_n8_seed0_20260421_fix4_controls/`
   - scale from `8` prompts to the first honest repaired held-out steering table
 
 ### P3: External Average-Vector Test

@@ -1,6 +1,6 @@
 # Prompt-Profile RFM Steering Stage Plan
 
-Last updated: 2026-04-21 12:34 UTC
+Last updated: 2026-04-21 14:33 UTC
 
 ## Bottom Line
 
@@ -83,7 +83,9 @@ Last updated: 2026-04-21 12:34 UTC
     - `slurm/run_prompt_profile_rfm.sbatch`;
   - the repo now also has a live vector-export surface:
     - `scripts/export_prompt_profile_rfm_vectors.py`;
-  - there is still no live steering runner in current `scripts/`, `src/`, or `slurm/`;
+  - the repo now also has a live steering runner:
+    - `scripts/steer_prompt_profile_concept_vectors.py`
+    - `slurm/run_prompt_profile_rfm_steering.sbatch`;
   - matched March-split baseline tooling also now exists:
     - `scripts/materialize_prompt_profile_stage_binary_data.py`
     - `scripts/train_probe.py` with explicit `--train-split` / `--eval-split`
@@ -252,7 +254,7 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
 
 ### Stage 4: In-Distribution Spherical Steering On Benchmark-Specific Vectors
 
-- Proposed new surfaces:
+- Committed steering surfaces:
   - `scripts/steer_prompt_profile_concept_vectors.py`
   - `slurm/run_prompt_profile_rfm_steering.sbatch`
 - For the first pass, switch from additive steering to norm-preserving spherical steering.
@@ -310,6 +312,9 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
   - one follow-up review bug was real and is now fixed in project commit `df5187b`:
     - `LiveCodeBench` prompt recovery must use the archive source formatter, not the steering checkpoint formatter
     - direct node-side precheck now confirms prompt recovery still succeeds even when the steering model ID is changed away from the archive source model
+  - the reviewed-head two-condition rerun is also now on disk:
+    - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm_steering/livecodebench_smoke_t0p3_n8_seed0_20260421_fix3_sourcefmt/`
+    - it matches the earlier repaired smoke exactly, so the durable smoke receipt now points at the final formatter-fixed code surface rather than the intermediate patch
 
 ### Stage 5: External Averaged-Vector Test
 
@@ -367,12 +372,13 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
 
 ### P2: First Steering Pass
 
-- Add the benchmark-local spherical steering runner with fixed `t = 0.3`.
+- Keep the benchmark-local spherical steering runner on the fixed `t = 0.3` surface now that it exists in-repo.
 - Match the intervention surface to the probe surface through prompt-prefill residual hooks if feasible.
 - Use the exported signed per-layer bundle directly; do not add a top-`k` layer rule, probe gate, or controller in the first pass.
 - Run paired benchmark-wise evaluation on held-out test prompts under `no_steer`, `minus_v_spherical`, `plus_v_spherical`, `random_spherical`, and `shuffled_label_spherical` where feasible.
 - Report length, loop, max-hit, `majority_s_0.5`, accuracy, and bootstrap deltas in one table.
 - Report angular-move and norm-preservation diagnostics in a separate table.
+- Keep the reviewed-head two-condition smoke as the baseline implementation receipt and use the live four-condition control smoke as the next cheap read before scaling up.
 
 ### P3: Second-Pass Follow-Ups
 

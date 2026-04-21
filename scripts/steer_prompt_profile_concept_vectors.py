@@ -1369,11 +1369,16 @@ def main() -> None:
     condition_summaries: dict[str, dict[str, Any]] = {}
 
     for condition_name in args.conditions:
+        print(f"[steer] starting condition={condition_name}", flush=True)
         condition_dir = out_dir / condition_name
         condition_dir.mkdir(parents=True, exist_ok=True)
         seed_summaries: dict[str, dict[str, Any]] = {}
         last_condition_config: dict[str, Any] | None = None
         for seed in args.seed:
+            print(
+                f"[steer] condition={condition_name} seed={int(seed)} generation+grading",
+                flush=True,
+            )
             seed_dir = condition_dir / f"seed_{seed}"
             seed_dir.mkdir(parents=True, exist_ok=True)
             rows, seed_summary, _native_metrics, condition_config = _run_condition_seed(
@@ -1431,6 +1436,14 @@ def main() -> None:
         }
         _write_json(condition_dir / "condition_summary.json", condition_summary)
         condition_summaries[condition_name] = condition_summary
+        accuracy_mean = aggregate_summary.get("accuracy", {}).get("mean")
+        loop_fraction_mean = aggregate_summary.get("loop_fraction", {}).get("mean")
+        print(
+            f"[steer] finished condition={condition_name} "
+            f"accuracy_mean={accuracy_mean} "
+            f"loop_fraction_mean={loop_fraction_mean}",
+            flush=True,
+        )
 
     no_steer_summary = condition_summaries.get("no_steer")
     no_steer_accuracy = None
