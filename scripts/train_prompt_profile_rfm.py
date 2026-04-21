@@ -456,11 +456,12 @@ def _fit_one_bandwidth(
             iteration=iteration,
         )
         history.append(row)
+        # Save the post-fit_M metric so any exported direction is learned, not the initializer.
+        model.fit_M(train_data.x[:, layer, :])
         if best_row is None or _selection_key(row) > _selection_key(best_row):
             best_row = dict(row)
             best_state = model.export_state()
             best_outputs = outputs
-        model.fit_M(train_data.x[:, layer, :])
 
     model.fit_predictor(train_data.x[:, layer, :], train_targets)
     row, outputs = _evaluate_iteration(
