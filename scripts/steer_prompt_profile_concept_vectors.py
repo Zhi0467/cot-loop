@@ -250,6 +250,26 @@ def _source_spec_for_split(source_manifest: dict[str, Any], split: str) -> Datas
     )
 
 
+def _expanded_source_spec(
+    source_manifest: dict[str, Any],
+    split: str,
+    *,
+    prompt_ids: list[int],
+) -> DatasetSpec:
+    spec = _source_spec_for_split(source_manifest, split)
+    if not prompt_ids:
+        return spec
+    required_max_samples = max(int(sample_id) for sample_id in prompt_ids) + 1
+    if spec.max_samples is None or spec.max_samples < required_max_samples:
+        return DatasetSpec(
+            dataset=spec.dataset,
+            config=spec.config,
+            split=spec.split,
+            max_samples=required_max_samples,
+        )
+    return spec
+
+
 def _manifest_model_id(source_manifest: dict[str, Any]) -> str:
     rollout_cfg = source_manifest.get("rollout_config")
     if not isinstance(rollout_cfg, dict):
@@ -385,7 +405,11 @@ def _build_prompt_items(
     task_kind = source_manifest.get("task_kind")
     if not isinstance(task_kind, str):
         raise SystemExit("Source manifest is missing task_kind.")
-    source_spec = _source_spec_for_split(source_manifest, split)
+    source_spec = _expanded_source_spec(
+        source_manifest,
+        split,
+        prompt_ids=prompt_ids,
+    )
     benchmark_subset: list[Any] | None = None
     items: list[SteeringPromptItem] = []
 
