@@ -24,12 +24,34 @@ class RolloutTerminalStats:
     first_loop_prefix: int | None
 
 
+@dataclass(frozen=True)
+class LoopTriggerSpan:
+    ngram_start_positions: tuple[int, ...]
+    trigger_start: int
+    trigger_end: int
+    ngram_token_ids: tuple[int, ...]
+
+    @property
+    def first_loop_prefix(self) -> int:
+        return self.trigger_end + 1
+
+
+@dataclass
+class _HashedNgramGroup:
+    representative_start: int
+    start_positions: list[int]
+
+
 def first_ngram_loop_prefix_length(
     token_ids: Iterable[int],
     *,
     n: int = 30,
     k: int = 20,
 ) -> int | None:
+    if n < 1:
+        raise ValueError("n must be >= 1.")
+    if k < 2:
+        raise ValueError("k must be >= 2.")
     token_ids = list(token_ids)
     if len(token_ids) < n:
         return None
@@ -52,6 +74,80 @@ def first_ngram_loop_prefix_length(
         counts[h] = c
         if c >= k:
             return i + 1
+
+    return None
+
+
+def _same_ngram(
+    token_ids: list[int],
+    left_start: int,
+    right_start: int,
+    *,
+    n: int,
+) -> bool:
+    for offset in range(n):
+        if token_ids[left_start + offset] != token_ids[right_start + offset]:
+            return False
+    return True
+
+
+def find_ngram_loop_trigger(
+    token_ids: Iterable[int],
+    *,
+    n: int = 30,
+    k: int = 20,
+) -> LoopTriggerSpan | None:
+    if n < 1:
+        raise ValueError("n must be >= 1.")
+    if k < 2:
+        raise ValueError("k must be >= 2.")
+    token_ids = list(token_ids)
+    if len(token_ids) < n:
+        return None
+
+    base = 1000003
+    mod = 1 << 64
+    mask = mod - 1
+
+    pow_n = pow(base, n, mod)
+    h = 0
+    for token_id in token_ids[:n]:
+        h = (h * base + (token_id + 1)) & mask
+
+    occurrences: dict[int, list[_HashedNgramGroup]] = {
+        h: [_HashedNgramGroup(representative_start=0, start_positions=[0])]
+    }
+
+    for i in range(n, len(token_ids)):
+        out_t = token_ids[i - n] + 1
+        in_t = token_ids[i] + 1
+        h = (h * base + in_t - (out_t * pow_n)) & mask
+        start = i - n + 1
+        bucket = occurrences.setdefault(h, [])
+        for group in bucket:
+            if not _same_ngram(
+                token_ids,
+                group.representative_start,
+                start,
+                n=n,
+            ):
+                continue
+            group.start_positions.append(start)
+            if len(group.start_positions) >= k:
+                return LoopTriggerSpan(
+                    ngram_start_positions=tuple(group.start_positions),
+                    trigger_start=start,
+                    trigger_end=start + n - 1,
+                    ngram_token_ids=tuple(token_ids[start : start + n]),
+                )
+            break
+        else:
+            bucket.append(
+                _HashedNgramGroup(
+                    representative_start=start,
+                    start_positions=[start],
+                )
+            )
 
     return None
 

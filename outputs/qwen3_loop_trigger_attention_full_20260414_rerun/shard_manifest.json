@@ -1,0 +1,210 @@
+[
+  {
+    "num_shards": 8,
+    "rows_in_shard": 101,
+    "shard_index": 0,
+    "shard_row_counts": [
+      101,
+      102,
+      101,
+      101,
+      102,
+      101,
+      101,
+      102
+    ],
+    "shard_total_prefix_loads": [
+      1116793,
+      1117396,
+      1116922,
+      1116919,
+      1117143,
+      1116784,
+      1116782,
+      1117301
+    ],
+    "total_selected_rows": 811
+  },
+  {
+    "num_shards": 8,
+    "rows_in_shard": 102,
+    "shard_index": 1,
+    "shard_row_counts": [
+      101,
+      102,
+      101,
+      101,
+      102,
+      101,
+      101,
+      102
+    ],
+    "shard_total_prefix_loads": [
+      1116793,
+      1117396,
+      1116922,
+      1116919,
+      1117143,
+      1116784,
+      1116782,
+      1117301
+    ],
+    "total_selected_rows": 811
+  },
+  {
+    "num_shards": 8,
+    "rows_in_shard": 101,
+    "shard_index": 2,
+    "shard_row_counts": [
+      101,
+      102,
+      101,
+      101,
+      102,
+      101,
+      101,
+      102
+    ],
+    "shard_total_prefix_loads": [
+      1116793,
+      1117396,
+      1116922,
+      1116919,
+      1117143,
+      1116784,
+      1116782,
+      1117301
+    ],
+    "total_selected_rows": 811
+  },
+  {
+    "num_shards": 8,
+    "rows_in_shard": 101,
+    "shard_index": 3,
+    "shard_row_counts": [
+      101,
+      102,
+      101,
+      101,
+      102,
+      101,
+      101,
+      102
+    ],
+    "shard_total_prefix_loads": [
+      1116793,
+      1117396,
+      1116922,
+      1116919,
+      1117143,
+      1116784,
+      1116782,
+      1117301
+    ],
+    "total_selected_rows": 811
+  },
+  {
+    "num_shards": 8,
+    "rows_in_shard": 102,
+    "shard_index": 4,
+    "shard_row_counts": [
+      101,
+      102,
+      101,
+      101,
+      102,
+      101,
+      101,
+      102
+    ],
+    "shard_total_prefix_loads": [
+      1116793,
+      1117396,
+      1116922,
+      1116919,
+      1117143,
+      1116784,
+      1116782,
+      1117301
+    ],
+    "total_selected_rows": 811
+  },
+  {
+    "num_shards": 8,
+    "rows_in_shard": 101,
+    "shard_index": 5,
+    "shard_row_counts": [
+      101,
+      102,
+      101,
+      101,
+      102,
+      101,
+      101,
+      102
+    ],
+    "shard_total_prefix_loads": [
+      1116793,
+      1117396,
+      1116922,
+      1116919,
+      1117143,
+      1116784,
+      1116782,
+      1117301
+    ],
+    "total_selected_rows": 811
+  },
+  {
+    "num_shards": 8,
+    "rows_in_shard": 101,
+    "shard_index": 6,
+    "shard_row_counts": [
+      101,
+      102,
+      101,
+      101,
+      102,
+      101,
+      101,
+      102
+    ],
+    "shard_total_prefix_loads": [
+      1116793,
+      1117396,
+      1116922,
+      1116919,
+      1117143,
+      1116784,
+      1116782,
+      1117301
+    ],
+    "total_selected_rows": 811
+  },
+  {
+    "num_shards": 8,
+    "rows_in_shard": 102,
+    "shard_index": 7,
+    "shard_row_counts": [
+      101,
+      102,
+      101,
+      101,
+      102,
+      101,
+      101,
+      102
+    ],
+    "shard_total_prefix_loads": [
+      1116793,
+      1117396,
+      1116922,
+      1116919,
+      1117143,
+      1116784,
+      1116782,
+      1117301
+    ],
+    "total_selected_rows": 811
+  }
+]

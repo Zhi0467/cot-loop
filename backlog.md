@@ -1,6 +1,6 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-09 22:55 UTC
+Last updated: 2026-04-13 18:05 UTC
 
 ## Immediate Next Experiments
 
@@ -151,6 +151,18 @@ This should be similar to our previous experiments on training probes on loop la
 
 ## Measurement And Reporting Gaps
 
+- The current Qwen3 loop-trigger attention surface is now the full rerun under `outputs/qwen3_loop_trigger_attention_full_20260414_rerun/`, with the exact-method note in `docs/qwen3-loop-trigger-attention-2026-04-14.md`.
+  - What it established:
+    - the March prompt-profile archives still do not preserve exact completion token IDs, but the replay boundary is now pinned exactly: `512 / 9432` exact retokenized completion lengths, `9333 / 9432` rows explained if one hidden empty-text stop token is allowed, and `811 / 820` loop rows with exact trigger-prefix recovery;
+    - the full analyzed object is `811` replayable loop rows, not the old `14`-row slice, with total prefix lengths up to `28830`;
+    - the cleaned report now compares only `trigger_end` and the corrected pre-token `trigger_start` on that same full object, after fixing a probe bug that had been leaking attention onto future trigger tokens for pre-end queries:
+      - at `trigger_end`, the final layer is consistently prompt-dominant across datasets: prompt mass `0.620-0.671`, previous-loop mass `0.025-0.038`, current-trigger mass `0.173-0.185`, and top-1 previous-loop attention is essentially zero;
+      - at the real pre-token `trigger_start`, `current_trigger` is exactly zero by construction, previous-loop attention remains real (`prev_loop 0.069`, `top1_prev_loop 0.027`), and the final layer is still prompt-dominant (`prompt 0.634`, `top1_prompt 0.872`);
+    - the layer-progression figure is now the cleaned two-panel surface Wangzhi asked for: `trigger_end` shows `prompt`, `previous_loop`, `current_trigger`, and `other_completion`, while corrected `trigger_start` shows `prompt`, `previous_loop`, and `other_completion`; here `other_completion` means the full residual completion mass outside the loop bins, including the recent non-loop window, so the plotted curves stay on a full prefix decomposition; the corrected `trigger_start` previous-loop peak sits at layer `16`;
+    - future rollout paths now save exact completion token IDs and structured trigger metadata, so this analysis no longer has to rely on retrospective text reconstruction on new runs.
+  - What is still open:
+    - add a matched non-loop or pre-trigger control slice so prompt-vs-loop attention at the trigger is compared against a clean negative baseline instead of only described in isolation;
+    - extend the same corrected causal-mask measurement to matched non-loop controls, since the old ambiguity around `trigger_start - 1` is now resolved into the explicit `pre_trigger_start` object.
 - The explicit cross-dataset `majority_s_0.5` table now exists under `outputs/prompt_majority05_cross_dataset_rebuild_20260325/`; future replies should cite that table directly instead of falling back to `AIME`-only anecdotes.
 - The metadata-only continuous-baseline pass plus the held-out top-risk bucket comparison now exist under `outputs/prompt_profile_risk_controls_20260330/`; future replies should cite that bundle rather than paraphrasing the result.
 - The current whole-surface prompt-profile bundle now exists under `outputs/prompt_profile_combined_audit_20260405/`; future replies should cite that PDF when the question is about regression plus binary together rather than only one head.
