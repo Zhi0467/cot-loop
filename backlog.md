@@ -1,6 +1,6 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-21 19:48 UTC
+Last updated: 2026-04-21 21:41 UTC
 
 Reference plan:
 - `docs/prompt-profile-rfm-steering-plan-2026-04-21.md`
@@ -32,18 +32,27 @@ Reference plan:
 - Earlier smaller train counts from the same materializer (`14/7`, `36/18`, `12/6`) were only the downsampled fit-train subsets, not the raw repaired prompt sets.
 - Decide explicitly whether those tiny-positive repaired objects should count as real transfer / alignment inputs or stay provenance-only for now.
 
-### P2: Benchmark-Local Spherical Steering
+### P2: Benchmark-Local Block-Specific Steering
 
-- The first larger benchmark-local steering table is now frozen in the report bundle and should be treated as a finished negative result:
+- The first larger benchmark-local steering table in the report bundle is only a bounded prefill-only spherical pilot and should be treated that way:
   - `outputs/livecodebench_repaired_stage_report_apr21/`
 - If the steering lane continues on `LiveCodeBench`, do not just scale the same table again.
 - Open steering-side TODOs are now:
+  - add the missing linear block-specific steering lane in parallel to spherical:
+    - `minus_v_linear`
+    - `plus_v_linear`
+    - `random_linear`
+  - decide whether the intended stage contract is decode-step steering rather than prefill-once steering; if yes, implement the decode-time controller and rerun the `LiveCodeBench` controls on that surface
+  - rerun the benchmark-local controls without the bounded pilot cap `max_new_tokens = 1024` if the stage is supposed to stay aligned with the archive-side `30000` decode budget
   - add `shuffled_label_spherical` if the benchmark-local lane is going to continue at all
   - pick a new benchmark-local steering hypothesis before launching more runs:
     - different hook surface
     - stability-informed layer restriction
     - or another control that is not already ruled out by the finished `32`-prompt table
   - if further steering jobs are launched, log per-condition wall time explicitly; `random_spherical` was much slower than the first three conditions
+  - make the direction-similarity definition explicit in the next report:
+    - it is the cosine between a bootstrap-refit signed normalized vector and the reference exported signed normalized vector for the same layer
+    - the reference vector itself comes from the top eigenvector of that layer's symmetrized final `M`, after sign selection by fit-train `PR-AUC` then `ROC-AUC`
 
 ### P3: External Average-Vector Test
 

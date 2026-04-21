@@ -22,7 +22,7 @@ Latest status:
   - add a native layerwise RFM path as a sibling baseline to the current activation linear and activation MLP surfaces;
   - extend the report with direction-coherence diagnostics before making any steering claim;
   - keep `T = 5` fixed on the first RFM pass;
-  - then run paired benchmark-local spherical steering at fixed `t = 0.3` using the exported per-layer bundle directly, not a top-`k` rule or controller;
+  - then run paired benchmark-local block-specific steering using the exported per-layer bundle directly, with linear and spherical variants side by side rather than a top-`k` rule or controller;
   - include `no_steer`, `-v`, `+v`, and random-direction controls in the first steering table;
   - then test one external benchmark with the averaged "verbose" vector rather than doing leave-one-benchmark-out gymnastics inside the retained training set.
 - the repo now has committed stage-0 RFM scaffolding:
@@ -103,7 +103,8 @@ Latest status:
 - the current open work is now:
   - decide whether the repaired detector lane is ready to freeze on the current single-seed RFM row, or whether RFM itself also needs matching multiseed / split-seed sweeps;
   - extend the unified prompt-profile report with the repaired detector table plus direction-coherence diagnostics on that repaired surface;
-  - keep exporting repaired benchmark-local steering vectors and run paired fixed-`t = 0.3` spherical steering tables even if RFM does not become the single best detector;
+  - keep exporting repaired benchmark-local steering vectors and run paired block-specific linear and fixed-`t = 0.3` spherical steering tables even if RFM does not become the single best detector;
+  - the current in-repo runner only covers the prefill-once spherical sub-lane, so linear steering and any decode-step controller are still open work rather than finished stage pieces;
   - then test one external benchmark with the averaged "verbose" vector;
   - then revisit stronger prompt-shape controls and only later ablate layer rules, controllers, or `t` if the first steering table shows signal.
 

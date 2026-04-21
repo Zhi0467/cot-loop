@@ -1,6 +1,6 @@
 # LiveCodeBench Repaired Stage Report
 
-Last updated: 2026-04-21 19:48 UTC
+Last updated: 2026-04-21 21:41 UTC
 
 ## Bottom Line
 
@@ -17,6 +17,7 @@ Last updated: 2026-04-21 19:48 UTC
   - all four conditions stay at `0 / 32` `pass@1`;
   - `no_steer` has loop fraction `0.03125`;
   - `minus_v_spherical`, `plus_v_spherical`, and `random_spherical` are all worse on loop fraction.
+  - but this table is only the bounded prefill-only spherical sub-lane, not the full block-specific linear+spherical figure contract.
 
 ## Object
 
@@ -62,6 +63,11 @@ Last updated: 2026-04-21 19:48 UTC
   - `100` replay fits per layer
   - all `28` layers clear mean cosine `>= 0.781`
   - weakest low bound: `0.693`
+- Cosine definition:
+  - for each layer, refit the same RFM on bootstrap resamples of the fit-train prompts;
+  - extract that layer's signed normalized vector from the top eigenvector of the symmetrized final `M`;
+  - choose the sign by fit-train `PR-AUC` then `ROC-AUC`;
+  - then measure cosine against the reference exported signed normalized vector for that same layer.
 - Most stable layers:
   - `23`, `24`, `25`, `26`
 - Selected detector layer `27` is still usable rather than pathological:
@@ -78,6 +84,7 @@ Last updated: 2026-04-21 19:48 UTC
   - spherical steering
   - `t = 0.3`
   - same `32` held-out prompt IDs across all conditions
+  - bounded pilot decode cap `max_new_tokens = 1024`
 - Final `32`-prompt table:
   - `no_steer`: `0 / 32` `pass@1`, loop fraction `0.03125`
   - `minus_v_spherical`: `0 / 32`, loop fraction `0.28125`
@@ -86,7 +93,8 @@ Last updated: 2026-04-21 19:48 UTC
 - Current honest read:
   - there is no accuracy movement anywhere;
   - every steered condition is worse than baseline on loop fraction;
-  - this closes the first larger benchmark-local control table as a negative result, not an in-flight pilot.
+  - this closes the first larger bounded prefill-only spherical control table as a negative result, not an in-flight pilot;
+  - it does not yet answer the full figure contract because linear steering and decode-step timing were not part of this run.
 
 ## Deliverables
 

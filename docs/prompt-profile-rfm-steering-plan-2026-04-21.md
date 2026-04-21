@@ -1,6 +1,6 @@
 # Prompt-Profile RFM Steering Stage Plan
 
-Last updated: 2026-04-21 19:48 UTC
+Last updated: 2026-04-21 21:41 UTC
 
 ## Bottom Line
 
@@ -101,7 +101,7 @@ Last updated: 2026-04-21 19:48 UTC
 
 - First, whether a layerwise RFM built on the existing prompt-prefill tensors is competitive with the current MLP surfaces on the same held-out `majority_s_0.5` task.
 - Second, whether the exported benchmark-specific RFM directions are stable enough to be treated as steering vectors rather than only as a by-product of a nonlinear classifier.
-- Third, whether those benchmark-specific directions can be used for small, controlled spherical steering interventions that reduce long-rollout risk without simply destroying accuracy.
+- Third, whether those benchmark-specific directions can be used for small, controlled block-specific steering interventions, with linear and spherical variants reported side by side, that reduce long-rollout risk without simply destroying accuracy.
 - Fourth, whether one averaged "verbose" vector built from those benchmark-local directions has measurable transfer value on a genuinely different benchmark.
 - Detector ranking and steering utility are related, but they are not the same gate for this stage. The steering story should continue even if RFM does not become the single best detector.
 - Likewise, a strong RFM detector is not by itself evidence that the exported direction is stable or useful for steering. Direction quality needs its own diagnostics.
@@ -269,31 +269,46 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
     - the first finished larger benchmark-local steering table
 - That report does not replace the later unified detector report for the whole prompt-profile surface, but it is now the collaborator-facing artifact for "finish LiveCodeBench" on this stage.
 
-### Stage 4: In-Distribution Spherical Steering On Benchmark-Specific Vectors
+### Stage 4: In-Distribution Block-Specific Steering On Benchmark-Specific Vectors
 
 - Committed steering surfaces:
   - `scripts/steer_prompt_profile_concept_vectors.py`
   - `slurm/run_prompt_profile_rfm_steering.sbatch`
-- For the first pass, switch from additive steering to norm-preserving spherical steering.
+- Follow the figure contract literally:
+  - each transformer block `l` is steered by its own exported block-specific vector `v_l`
+  - do not collapse that into one shared global direction or a top-`k` layer selector
+- Run the two block-specific steering variants in parallel:
+  - linear steering
+    - anti-risk: `h_l' = h_l - epsilon v_l`
+    - sign-flip control: `h_l' = h_l + epsilon v_l`
+  - spherical steering
+    - anti-risk target pole: `mu_l = -normalize(v_l)`
+    - sign-flip control: `+normalize(v_l)`
+- The current repo only has the spherical branch implemented. Linear block-specific steering is still missing and should be treated as open work rather than implied by the current report.
 - Use one fixed angular strength:
   - `t = 0.3`
 - Do not grid-search `t` yet. First answer whether the direction works at all.
 - A fixed `t` does not imply the same Euclidean movement at every layer or on every example, so log starting angles and realized angular movement.
-- Normalize each exported layerwise vector and define the anti-risk target as:
-  - `mu_l = -normalize(v_l)`
 - Prefer a prefill residual-activation hook route for the first causal test:
   - train on prompt-prefill residual activations
   - intervene on the same prompt-prefill residual activation surface during the prefill forward pass
 - Do not start with KV-cache intervention if the activation-hook route is feasible, because that changes the steering surface away from the probe surface.
+- Be explicit about timing:
+  - the current in-repo runner modifies only the last prompt token during prefill
+  - it does not yet steer decode steps token by token
+  - if the intended contract is decode-step steering, that controller is still missing and has to land before the steering stage is called complete
 - Do not add a separate top-`k` layer-selection rule or probe gating in the first pass.
   - Use the exported signed per-layer benchmark-local bundle directly.
   - If layer ablations or controllers matter later, treat them as follow-ups after the first steering table exists.
 - Run paired evaluation on each benchmark test set under these conditions:
   - `no_steer`
+  - `minus_v_linear`
+  - `plus_v_linear`
   - `minus_v_spherical`
   - `plus_v_spherical`
+  - `random_linear`
   - `random_spherical` with matched angular intervention protocol
-  - `shuffled_label_spherical` if implementation time allows
+  - `shuffled_label_linear` and `shuffled_label_spherical` if implementation time allows
 - Report one steering table with:
   - average completion length
   - median completion length
@@ -315,6 +330,12 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
   - the benchmark-local steering runner now exists in-repo:
     - `scripts/steer_prompt_profile_concept_vectors.py`
     - `slurm/run_prompt_profile_rfm_steering.sbatch`
+  - what exists today is narrower than the intended stage contract:
+    - spherical only
+    - hook site `prefill_layer_output_last_token`
+    - prefill-once last-prompt-token intervention
+    - bounded pilot decode cap `max_new_tokens = 1024`
+  - so the existing LiveCodeBench steering table is a bounded prefill-only spherical pilot, not the full block-specific linear+spherical stage verdict
   - first repaired `LiveCodeBench` smoke root:
     - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm_steering/livecodebench_smoke_t0p3_n8_seed0_20260421_fix2/`
   - completed smoke conditions:
@@ -324,6 +345,8 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
     - the prompt-hash checks, prompt-surface recovery, prefill-layer spherical hook, generation path, `LiveCodeBench` grading path, and steering ledgers all run end to end on the repaired object
   - what it does not prove:
     - it is only an `8`-prompt smoke and is not a useful scientific steering table by itself
+    - it uses the bounded pilot cap `max_new_tokens = 1024`, not the archive-side `30000`
+    - it is prefill-only rather than decode-step steering
     - both conditions stayed at `0 / 8` `pass@1` with mean completion length `1024`
     - `minus_v_spherical` increased loop fraction from `0.0` to `0.375` on that tiny slice, so the first honest steering claim still requires a larger held-out table
   - one follow-up review bug was real and is now fixed in project commit `df5187b`:
@@ -347,16 +370,18 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
   - the first larger held-out control table is now finished too:
     - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm_steering/livecodebench_controls32_t0p3_seed0_20260421/`
     - all four conditions stay at `0 / 32` `pass@1`
+    - the run used the same bounded pilot cap `max_new_tokens = 1024`
+    - the run is still prefill-only spherical steering, not decode-step steering and not the parallel linear+spherical figure contract
     - loop fractions on the larger repaired held-out slice are:
       - `0.03125` for `no_steer`
       - `0.28125` for `minus_v_spherical`
       - `0.125` for `plus_v_spherical`
       - `0.34375` for `random_spherical`
     - the delayed `random_spherical` arm did finish; it was simply much slower than the first three conditions and ended as the worst loop-fraction control
-    - so the first larger benchmark-local steering table is also negative:
+    - so the first larger bounded prefill-only spherical table is also negative:
       - there is still no accuracy movement anywhere
       - both signed directions are worse than baseline on loop fraction
-      - the current stage no longer needs “more of the same table”; it needs either a new control, a new direction-quality result, or a different steering hypothesis
+      - but this does not yet close the full stage under the figure contract, because linear steering and decode-step timing are still missing
   - the negative `32`-prompt table is now frozen into the report-style deliverable:
     - `docs/livecodebench-repaired-stage-report-2026-04-21.md`
     - `outputs/livecodebench_repaired_stage_report_apr21/`
@@ -418,12 +443,15 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
 ### P2: First Steering Pass
 
 - Keep the benchmark-local spherical steering runner on the fixed `t = 0.3` surface now that it exists in-repo.
+- Add the missing benchmark-local linear steering runner on the same block-specific bundle rather than treating spherical as the whole steering family.
 - Match the intervention surface to the probe surface through prompt-prefill residual hooks if feasible.
+- Decide explicitly whether the intended contract is decode-step steering rather than prefill-once steering; if yes, add that controller before calling the steering stage complete.
 - Use the exported signed per-layer bundle directly; do not add a top-`k` layer rule, probe gate, or controller in the first pass.
-- Run paired benchmark-wise evaluation on held-out test prompts under `no_steer`, `minus_v_spherical`, `plus_v_spherical`, `random_spherical`, and `shuffled_label_spherical` where feasible.
+- Run paired benchmark-wise evaluation on held-out test prompts under `no_steer`, linear controls, spherical controls, and shuffled-label controls where feasible.
 - Report length, loop, max-hit, `majority_s_0.5`, accuracy, and bootstrap deltas in one table.
 - Report angular-move and norm-preservation diagnostics in a separate table.
 - Keep the reviewed-head two-condition smoke plus the finished four-condition control smoke as implementation receipts only, then scale to the first larger held-out table before making any sign-sensitive steering claim.
+- Do not treat the finished `32`-prompt spherical table as the whole stage verdict; it is only the bounded prefill-only spherical sub-lane.
 
 ### P3: Second-Pass Follow-Ups
 
