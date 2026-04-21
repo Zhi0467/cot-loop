@@ -1,6 +1,6 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-21 12:12 UTC
+Last updated: 2026-04-21 12:34 UTC
 
 Reference plan:
 - `docs/prompt-profile-rfm-steering-plan-2026-04-21.md`
@@ -22,15 +22,19 @@ Reference plan:
     - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_baselines/livecodebench_majority_s0p5_rolloutrecompute_seed0_20260421/`
     - `best_rank` mean test `PR-AUC`: linear last-layer `0.4163`, linear ensemble `0.5698`, `mlp256d1` last-layer `0.7055`, `mlp256d1` ensemble `0.6637`
     - `best_loss` mean test `PR-AUC`: `mlp256d1` last-layer `0.7147`
-- Decide whether the detector lane is ready to freeze on the current single-seed RFM row, or whether RFM also needs matching multiseed / split-seed sweeps before the report is locked.
-- Extend the unified report with the repaired detector table instead of the superseded `54 / 128 / 160` object.
+- Freeze the repaired detector writeup into the unified report instead of the superseded `54 / 128 / 160` object.
+- Treat matching RFM multiseed / split-seed sweeps as a detector-sensitivity follow-up, not as a steering blocker.
 
 ### P1: Finish The Direction-Quality Surface
 
 - Keep the repaired LiveCodeBench vector bundle as the first real stage-2 artifact:
   - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/vector_exports/summary.json`
-- Add the missing direction diagnostics before any steering claim:
-  - bootstrap cosine stability across repeated direction estimates
+- Direction-bootstrap stability is now on disk for that bundle:
+  - `100` replay fits per layer under the fixed selected hyperparameters
+  - all `28` layers clear mean cosine `>= 0.781`
+  - the weakest `95%` low bound is `0.693`
+  - late layers `23-26` are the most direction-stable (`0.867` to `0.909` mean cosine)
+- Remaining direction tasks before any transfer claim:
   - cross-benchmark cosine alignment across the retained benchmark set
   - concise direction table on the normal prompt-profile report surface
 - Decide whether to export repaired bundles for the other retained benchmarks immediately or only after the detector lane is judged stable enough.

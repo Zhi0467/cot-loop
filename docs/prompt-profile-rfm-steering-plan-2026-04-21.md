@@ -1,6 +1,6 @@
 # Prompt-Profile RFM Steering Stage Plan
 
-Last updated: 2026-04-21 12:12 UTC
+Last updated: 2026-04-21 12:34 UTC
 
 ## Bottom Line
 
@@ -219,7 +219,14 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
     - raw and normalized checksums
     - held-out 1D projection separation metrics
     - cross-layer cosine structure
-  - this stage is still partial because bootstrap cosine stability and cross-benchmark cosine alignment are not yet on disk
+    - direction-bootstrap replay records for all `28` layers
+  - finished bootstrap-stability read on the repaired `LiveCodeBench` object:
+    - `100` replay fits per layer under the selected detector hyperparameters
+    - all `28` layers clear mean cosine `>= 0.781` against their exported signed reference vector
+    - the weakest `95%` low bound is still `0.693`
+    - late layers `23-26` are the most direction-stable (`0.867` to `0.909` mean cosine)
+    - validation selection still peaks at layer `27`, which remains stable but less extreme on cosine (`0.786`, low `0.734`)
+  - this stage is now only partial because cross-benchmark cosine alignment is still missing
 
 ### Stage 3: Extend The Unified Detector Report Before Steering
 
@@ -325,16 +332,20 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
     - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_prompt_baselines/livecodebench_majority_s0p5_rolloutrecompute_seed0_20260421/`
   - repaired activation baseline root:
     - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_baselines/livecodebench_majority_s0p5_rolloutrecompute_seed0_20260421/`
-- Decide whether the detector lane is ready to freeze on the current single-seed RFM row, or whether RFM also needs matching multiseed / split-seed sweeps before the report is locked.
-- Extend the unified report so the repaired detector table replaces the superseded `54 / 128 / 160` object.
+- Freeze the repaired detector writeup into the unified report so it replaces the superseded `54 / 128 / 160` object.
+- Keep matching RFM multiseed / split-seed sweeps as a later detector-sensitivity check, not a blocker for the steering lane.
 
 ### P1: Finish The Direction-Quality Surface
 
 - Keep the repaired LiveCodeBench vector bundle as the first real stage-2 artifact.
 - Add the missing direction-coherence diagnostics:
-  - bootstrap cosine stability across repeated direction estimates
   - cross-benchmark cosine alignment across the retained benchmark set
   - report-ready direction summary table
+- Bootstrap cosine stability is now finished on the repaired LiveCodeBench bundle:
+  - `100` replay fits per layer
+  - all `28` layers clear mean cosine `>= 0.781`
+  - the weakest `95%` low bound is `0.693`
+  - late layers `23-26` are the most stable, while selected detector layer `27` remains the validation peak
 
 ### P2: First Steering Pass
 

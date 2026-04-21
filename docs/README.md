@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-04-21 12:12 UTC
+Last updated: 2026-04-21 12:34 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -99,6 +99,11 @@ Current live status:
     - it trusted the archive's saved `0.9` tail label instead of recomputing `majority_s_0.5` from saved rollout lengths
     - the repaired `LiveCodeBench` split is `280 / 128 / 160` with `140 / 35 / 54` positives
   - on that repaired object, prompt-only tops out at `PR-AUC 0.5871`, activation linear at mean `0.5698`, current single-seed RFM is `0.7055`, and `h256 d1` MLP last-layer is essentially tied / slightly ahead depending on checkpoint rule;
+  - the repaired LiveCodeBench vector bundle now also has a finished direction-bootstrap surface under the canonical `vector_exports/summary.json`:
+    - `100` replay fits per layer
+    - all `28` layers clear mean cosine `>= 0.781`
+    - weakest `95%` low bound is `0.693`
+    - late layers `23-26` are the most stable, while detector validation still peaks at layer `27`;
   - it makes the final OOD step an external-benchmark averaged-"verbose"-vector test instead of a leave-one-benchmark-out exercise inside the retained training set;
   - it separates detector quality, steering utility, and trigger-attention background context instead of blending them into one claim.
 - The combined audit `prompt-profile-combined-audit-2026-04-05.md` is still the whole-surface prompt-profile bundle:

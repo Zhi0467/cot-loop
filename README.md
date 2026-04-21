@@ -62,9 +62,12 @@ Latest status:
   - RFM is above the cheap prompt-only baselines and above activation linear on the repaired split
   - `h256 d1` MLP last-layer is now essentially tied with the current single-seed RFM on `PR-AUC`, and it is slightly ahead if the detector comparison uses the activation `best_loss` mean
   - because the repaired activation bundle is multiseed while RFM is still single-seed, the next honest detector question is whether RFM also needs matching multiseed / split-seed sweeps before the report is locked
-- the repaired LiveCodeBench vector bundle is partially complete already:
+- the repaired LiveCodeBench vector bundle is now a real stage-2 artifact, not just an export stub:
   - `vector_exports/summary.json` carries signed per-layer vectors, prompt-ID provenance, raw / normalized checksums, held-out 1D projection separation, and cross-layer cosine structure
-  - bootstrap cosine stability and cross-benchmark cosine alignment are still missing before any steering claim
+  - `2026-04-21` direction-bootstrap replay now adds `100` fixed-hyperparameter bootstrap refits per layer under the same sign convention
+  - all `28` layers clear mean cosine `0.781` or better against their exported reference direction, and the weakest `95%` low bound is still `0.693`
+  - late layers `23-26` are the most direction-stable (`0.867` to `0.909` mean cosine), while validation selection still peaks at layer `27`
+  - cross-benchmark cosine alignment is still missing before any transfer or averaged-vector claim
 - the first `LiveCodeBench` full run also forced one implementation correction:
   - the original `cholesky` default failed on a non-positive-definite kernel matrix;
   - the committed default solver is now `solve`.
