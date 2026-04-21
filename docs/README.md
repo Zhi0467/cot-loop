@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-04-21 08:45 UTC
+Last updated: 2026-04-21 09:23 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -16,6 +16,7 @@ Core docs:
 - Prompt-profile plain-language note: prompt-profile-plain-language-2026-03-30.md
 - Prompt-profile full-train plan: prompt-profile-full-train-plan-2026-04-02.md
 - Prompt-profile RFM + steering stage plan: prompt-profile-rfm-steering-plan-2026-04-21.md
+- Prompt-profile RFM artifact schema: prompt-profile-rfm-artifact-schema-2026-04-21.md
 - Prompt-profile natural-regression rerun note: prompt-profile-natural-regression-rerun-2026-04-05.md
 - Prompt-profile unified report note: prompt-profile-unified-report-2026-04-09.md
 - Prompt-profile combined audit note: prompt-profile-combined-audit-2026-04-05.md
@@ -88,6 +89,7 @@ Current live status:
   - it uses the exported per-layer benchmark-local bundle directly for the first spherical steering pass at fixed `t = 0.3`, rather than inventing a separate top-`k` rule or controller;
   - it adds sign-flipped and random-direction controls to the first steering table instead of relying only on a no-steer baseline;
   - it keeps the steering story alive even if RFM is not the top detector, so detector ranking and steering utility stay separate questions;
+  - the machine-readable provenance contract for this stage now lives in `prompt-profile-rfm-artifact-schema-2026-04-21.md`, so vector bundles and steering runs can be looked up by schema instead of by Slack history;
   - it makes the final OOD step an external-benchmark averaged-"verbose"-vector test instead of a leave-one-benchmark-out exercise inside the retained training set;
   - it separates detector quality, steering utility, and trigger-attention background context instead of blending them into one claim.
 - The combined audit `prompt-profile-combined-audit-2026-04-05.md` is still the whole-surface prompt-profile bundle:

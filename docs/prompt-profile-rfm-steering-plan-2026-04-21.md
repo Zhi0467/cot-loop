@@ -1,13 +1,13 @@
 # Prompt-Profile RFM Steering Stage Plan
 
-Last updated: 2026-04-21 08:45 UTC
+Last updated: 2026-04-21 09:23 UTC
 
 ## Bottom Line
 
 - The next cot-loop stage is not another prompt-profile archive rebuild and not another trigger-attention cleanup pass.
 - It is a benchmark-local RFM detector plus steering stage on the frozen `Qwen/Qwen3-1.7B` prompt-profile surface that already underlies the April prompt-profile notes.
 - The collaborator-facing stage benchmark set is now `GPQA`, `MATH-500`, `MMLU-Pro`, and `LiveCodeBench`.
-  - `AIME` stays out of this stage because, on this object, it mostly acts like a prompt-visible workload case rather than the predictor question we care about; that is already the repo's collaborator-facing read in `docs/prompt-profile-unified-report-2026-04-14.md`.
+  - `AIME` stays out of this stage because, on this object, it mostly acts like a prompt-visible workload case rather than the predictor question we care about; that is already the repo's collaborator-facing read in `docs/prompt-profile-unified-report-2026-04-09.md`.
 - The attached PDF was directionally right, but the repo reality had drifted in two important ways:
   - upstream PR `#10` is already merged (`2026-04-21 04:35 UTC`, merge commit `2fcb7b7`), so trigger-attention is no longer the live GitHub blocker surface;
   - the real saved activation/archive surface is the March `2026-03-22` to `2026-03-23` prompt-profile bundle reused by the trigger-attention replay, not a vague later April rebuild.
@@ -56,8 +56,8 @@ Last updated: 2026-04-21 08:45 UTC
   - `scripts/build_prompt_profile_unified_report.py`
 - Existing activation-side linear controls, distinct from the prompt-only metadata baselines:
   - `src/loop_probe/probes/linear_probe.py`
-  - `slurm/run_prompt_profile_binary_linear_comparison.sbatch`
-  - `docs/prompt-profile-unified-report-2026-04-14.md`
+  - `scripts/run_prompt_profile_full_train.py`
+  - `docs/prompt-profile-unified-report-2026-04-09.md`
 - Existing rollout-stat collector for steering evaluation metrics:
   - `scripts/collect_model_stats.py`
 - Important negative fact:
@@ -92,6 +92,11 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
   - `LiveCodeBench`
 - Fail closed if the archive root, manifest, sample shape, or saved prompt IDs do not match the frozen contract.
 - Pull the current hard-coded archive roots out of analysis-only scripts and into that shared registry before any RFM training starts.
+- Commit one machine-readable artifact schema for:
+  - registry validation records
+  - per-benchmark per-layer RFM vector bundles
+  - steering-run ledgers
+- Keep that schema aligned with `docs/prompt-profile-rfm-artifact-schema-2026-04-21.md` so later experiment lookup does not depend on Slack thread history.
 
 ### Stage 1: Add RFM As A Sibling Detector
 

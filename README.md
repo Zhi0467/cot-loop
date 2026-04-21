@@ -28,8 +28,8 @@ Latest status:
 - there is no live RFM or steering implementation path in current `scripts/` or `src/`; the new stage therefore requires real code additions rather than only re-running an existing launcher.
 - the repo already has activation-side linear controls distinct from the prompt-only metadata baselines:
   - `src/loop_probe/probes/linear_probe.py`
-  - `slurm/run_prompt_profile_binary_linear_comparison.sbatch`
-  - `docs/prompt-profile-unified-report-2026-04-14.md`
+  - `scripts/run_prompt_profile_full_train.py`
+  - `docs/prompt-profile-unified-report-2026-04-09.md`
 - the common-policy rollout-statistics bundle remains refreshed under one shared decode policy (`temperature=0.2`, `num_generations=10`, and `max prompts <= 800` where applicable) across `MATH-500`, `AIME`, `GPQA`, capped `MMLU-Pro`, and capped `LiveCodeBench release_v6`.
 - the repaired MC rows are materially different from the stale pre-refresh bundle: `GPQA` now reports `34.5%` rollout success instead of `3.1%`, and `MMLU-Pro` now reports `65.2%` instead of `14.2%`, both under the terminal JSON-answer contract.
 - the canonical regression lane is now pinned twice over: the original locked April natural-split / natural-sampler `mean_relative_length` run plus Slurm `2215`, which reproduced that ledger exactly from the current branch.
