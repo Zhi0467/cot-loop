@@ -558,6 +558,7 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     checkpoints_dir.mkdir(parents=True, exist_ok=True)
     records_dir.mkdir(parents=True, exist_ok=True)
+    resolved_out_dir = out_dir.resolve()
 
     preprocessing = {
         "source_data_dir": str(data_dir),
@@ -765,8 +766,8 @@ def main() -> None:
             model_revision=args.model_revision,
             tokenizer_revision=args.tokenizer_revision,
             random_seed=int(args.seed),
-            output_path=str(out_dir),
-            checkpoint_path=str(checkpoint_path),
+            output_path=str(resolved_out_dir),
+            checkpoint_path=str(checkpoint_path.resolve()),
         )
         record_path = records_dir / f"layer_{layer:02d}_detector_record.json"
         write_stage_artifact_record(record_path, detector_record)

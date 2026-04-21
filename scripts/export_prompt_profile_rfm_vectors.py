@@ -271,6 +271,13 @@ def _resolve_layers(best_layers_payload: dict[str, Any], requested: list[int] | 
     return sorted(requested_set)
 
 
+def _resolve_record_path(path_text: str, *, rfm_run_dir: Path) -> Path:
+    path = Path(path_text)
+    if path.is_absolute():
+        return path
+    return (ROOT / path).resolve()
+
+
 def _extract_signed_vector(
     state: dict[str, Any],
     *,
@@ -436,7 +443,10 @@ def main() -> None:
     for layer in layers:
         detector_record_path = rfm_run_dir / "artifacts" / f"layer_{layer:02d}_detector_record.json"
         detector_record = _read_json(detector_record_path)
-        checkpoint_path = Path(detector_record["checkpoint_path"])
+        checkpoint_path = _resolve_record_path(
+            str(detector_record["checkpoint_path"]),
+            rfm_run_dir=rfm_run_dir,
+        )
         checkpoint_payload = torch.load(checkpoint_path, map_location="cpu")
         state = checkpoint_payload["state"]
         feature_key = str(detector_record["feature_key"])
