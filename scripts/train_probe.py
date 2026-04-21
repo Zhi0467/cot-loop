@@ -779,7 +779,17 @@ def main() -> None:
         ) from exc
 
     load_dotenv()
-    if not os.environ.get("WANDB_API_KEY"):
+    wandb_mode = str(os.environ.get("WANDB_MODE", "")).strip().lower()
+    wandb_disabled = str(os.environ.get("WANDB_DISABLED", "")).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+    if (
+        not wandb_disabled
+        and wandb_mode not in {"offline", "disabled"}
+        and not os.environ.get("WANDB_API_KEY")
+    ):
         raise SystemExit("WANDB_API_KEY not found. Put it in .env or environment.")
 
     import wandb
