@@ -74,7 +74,7 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--device", default="auto")
-    parser.add_argument("--solver", choices=("solve", "cholesky"), default="cholesky")
+    parser.add_argument("--solver", choices=("solve", "cholesky"), default="solve")
     parser.add_argument("--diag", action="store_true")
     parser.add_argument("--centering", action="store_true")
     parser.add_argument("--sample-batch-size", type=int, default=None)
