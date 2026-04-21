@@ -268,6 +268,13 @@ def build_steering_run_record(
     generation_config: dict[str, Any],
     grader_version: str,
     output_path: str,
+    benchmark: str | None = None,
+    prompt_text_hash: str | None = None,
+    git_commit: str | None = None,
+    model_id: str | None = None,
+    model_revision: str | None = None,
+    tokenizer_revision: str | None = None,
+    condition_config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     record = {
         "schema_name": "prompt_profile_rfm_steering_run.v1",
@@ -281,4 +288,18 @@ def build_steering_run_record(
         "grader_version": grader_version,
         "output_path": output_path,
     }
+    if benchmark is not None:
+        record["benchmark"] = benchmark
+    if prompt_text_hash is not None:
+        record["prompt_text_hash"] = prompt_text_hash
+    if git_commit is not None:
+        record["git_commit"] = git_commit
+    if model_id is not None:
+        record["model_id"] = model_id
+    if model_revision is not None:
+        record["model_revision"] = model_revision
+    if tokenizer_revision is not None:
+        record["tokenizer_revision"] = tokenizer_revision
+    if condition_config is not None:
+        record["condition_config"] = condition_config
     return record
