@@ -25,7 +25,13 @@ Latest status:
   - then run paired benchmark-local spherical steering at fixed `t = 0.3` using the exported per-layer bundle directly, not a top-`k` rule or controller;
   - include `no_steer`, `-v`, `+v`, and random-direction controls in the first steering table;
   - then test one external benchmark with the averaged "verbose" vector rather than doing leave-one-benchmark-out gymnastics inside the retained training set.
-- there is no live RFM or steering implementation path in current `scripts/` or `src/`; the new stage therefore requires real code additions rather than only re-running an existing launcher.
+- the repo now has committed stage-0 RFM scaffolding:
+  - `src/loop_probe/prompt_profile_rfm_stage_registry.py`
+  - `scripts/emit_prompt_profile_rfm_stage_registry.py`
+  - `scripts/validate_prompt_profile_rfm_stage_registry.py`
+  - `src/loop_probe/stage_artifacts.py`
+  - `outputs/prompt_profile_rfm_stage0_registry_validation_20260421/registry_validation.json`
+- there is still no live RFM trainer or steering runner in current `scripts/` or `src/`; the remaining stage therefore still requires real modeling code rather than only re-running an existing launcher.
 - the repo already has activation-side linear controls distinct from the prompt-only metadata baselines:
   - `src/loop_probe/probes/linear_probe.py`
   - `scripts/run_prompt_profile_full_train.py`
@@ -52,7 +58,7 @@ Latest status:
   - the saved text probe shows that Qwen base raw does degenerate on MCQ, but mainly by repeating the answer-format instruction tail rather than by OLMo-style math-derivation loops
   - the saved instruct-side v2 table is still useful as rough scale, but not as a controlled per-dataset comparison, because prompt pools, rollout counts, context limits, and `LiveCodeBench` LM style do not match the new base bundle
 - the current open work is now post-audit rather than pre-audit:
-  - add the retained-benchmark registry and native layerwise RFM training path on the frozen prompt-profile archives;
+  - use the committed retained-benchmark registry and validation artifact as the frozen stage contract, then add the native layerwise RFM training path on top of that surface;
   - extend the unified prompt-profile report with RFM results plus direction-coherence diagnostics against the current activation linear, activation MLP, and prompt-only baselines;
   - export signed benchmark-local steering vectors and run paired fixed-`t = 0.3` spherical steering tables even if RFM does not become the top detector;
   - then test one external benchmark with the averaged "verbose" vector;

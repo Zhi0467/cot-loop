@@ -1,23 +1,14 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-21 09:23 UTC
+Last updated: 2026-04-21 09:35 UTC
 
 Reference plan:
 - `docs/prompt-profile-rfm-steering-plan-2026-04-21.md`
 
 ## Active TODOs
 
-### P0: Freeze The Detector Surface
+### P0: Add The Native RFM Detector
 
-- Add one committed retained-benchmark registry for the active four-benchmark stage:
-  - `GPQA`
-  - `MATH-500`
-  - `MMLU-Pro`
-  - `LiveCodeBench`
-- Keep `AIME` out of the collaborator-facing detector / in-distribution steering stage.
-- Reuse the saved March `2026-03-22` to `2026-03-23` prompt-profile archive roots already referenced by the trigger-attention replay.
-- Fail closed on manifest/count/shape mismatches before training.
-- Commit the stage artifact schema for registry validation, RFM vector bundles, and steering runs.
 - Add a native layerwise RFM training path on the existing prompt-prefill stacked tensors for binary `majority_s_0.5`.
 - Keep the initial RFM surface simple:
   - bandwidth in `{1, 10, 100}`

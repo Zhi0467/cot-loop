@@ -1,6 +1,6 @@
 # Prompt-Profile RFM Steering Stage Plan
 
-Last updated: 2026-04-21 09:23 UTC
+Last updated: 2026-04-21 09:35 UTC
 
 ## Bottom Line
 
@@ -61,7 +61,12 @@ Last updated: 2026-04-21 09:23 UTC
 - Existing rollout-stat collector for steering evaluation metrics:
   - `scripts/collect_model_stats.py`
 - Important negative fact:
-  - there is no live RFM or steering implementation path in current `scripts/`, `src/`, or `slurm/`;
+  - the repo now has stage-0 RFM scaffolding:
+    - shared retained-benchmark registry
+    - emit / validate CLI surfaces
+    - machine-readable artifact helpers
+    - first node-side validation artifact under `outputs/prompt_profile_rfm_stage0_registry_validation_20260421/`;
+  - there is still no live RFM trainer or steering runner in current `scripts/`, `src/`, or `slurm/`;
   - older RFM results exist only in archived PR2 output artifacts, so this stage should be treated as a new implementation lane rather than a parameter-only follow-up.
 
 ## What This Stage Is Trying To Prove
