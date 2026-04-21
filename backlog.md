@@ -1,6 +1,6 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-21 18:05 UTC
+Last updated: 2026-04-21 18:42 UTC
 
 Reference plan:
 - `docs/prompt-profile-rfm-steering-plan-2026-04-21.md`
@@ -9,25 +9,24 @@ Reference plan:
 
 ### P0: Add The Native RFM Detector
 
-- RFM trainer / Slurm wrapper now exist and run on-node.
-- Keep the first detector comparison honest:
-  - only `LiveCodeBench` currently has a non-degenerate held-out positive slice on the frozen March `majority_s_0.5` object;
-  - `GPQA`, `MATH-500`, and `MMLU-Pro` currently have `0` held-out test positives on that object, so do not treat their first detector rows as meaningful held-out ranking evidence.
-- The matched March-split baseline tooling now exists:
-  - `scripts/materialize_prompt_profile_stage_binary_data.py`
-  - `scripts/train_probe.py` with explicit `--train-split` / `--eval-split`
-  - `scripts/eval_probe_checkpoint.py` with arbitrary split evaluation and split sample-ID hashes
-- Rerun the baseline families on the exact March-reconstructed split before comparing RFM against prior April tables:
-  - prompt-only baselines
-  - activation-side linear baselines
-  - activation-side MLP baselines
-- Package the first viable detector result from `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_20260421/`.
+- Treat only `LiveCodeBench` as the meaningful held-out detector object on the frozen March `majority_s_0.5` surface until the label object or split policy changes; keep `GPQA`, `MATH-500`, and `MMLU-Pro` provenance-only for now.
+- Extend the first matched `LiveCodeBench` baseline slice beyond seed `0`:
+  - prompt-only baselines from `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_prompt_baselines/livecodebench_majority_s0p5_seed0_20260421/`
+  - activation-side linear / MLP baselines from `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_baselines/livecodebench_majority_s0p5_seed0_20260421/`
+- Build one detector comparison table on the exact March-reconstructed split with:
+  - RFM layer `18`, bandwidth `100`, test `PR-AUC 0.1021`, test `ROC-AUC 0.7352`
+  - prompt-only `prompt_length`, `prompt_shape_linear`, `prompt_shape_tree`
+  - activation linear `last_layer` / `ensemble`
+  - activation MLP `last_layer` / `ensemble`
+  - `best_rank` as the primary activation checkpoint rule, with `best_loss` kept as a diagnostic secondary view
+- Explain the first honest comparison plainly:
+  - on the current seed-`0` matched split, RFM is ahead of prompt-only and activation-linear baselines;
+  - activation MLP is still ahead of RFM on the same object.
 - Add direction-coherence diagnostics for the exported RFM vectors:
   - bootstrap cosine stability
   - cross-layer cosine structure
   - cross-benchmark cosine alignment
   - held-out 1D projection separation
-- Decide with the collaborator whether the retained four-benchmark detector table should stay as-is, or whether the detector surface should become explicitly `LiveCodeBench`-first until the label object is changed.
 - Extend the unified prompt-profile report with the RFM rows and direction diagnostics before making any steering claim.
 
 ### P1: Benchmark-Local Spherical Steering

@@ -1,6 +1,6 @@
 # Prompt-Profile RFM Steering Stage Plan
 
-Last updated: 2026-04-21 18:05 UTC
+Last updated: 2026-04-21 18:42 UTC
 
 ## Bottom Line
 
@@ -155,6 +155,26 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
 - Important comparison note:
   - the April prompt-only / linear / MLP `majority_s_0.5` tables cannot be reused as the stage-1 baseline comparison, because they were trained on a different binary object with much higher held-out prevalence (for example `LiveCodeBench` test prevalence `0.3375` there versus `0.05` here);
   - the matched March-split tooling for that rerun is now in-tree, so the next honest detector comparison is to execute prompt-only, activation-linear, and activation-MLP baselines on this exact March-reconstructed split before drawing any RFM-versus-baseline conclusion.
+- First matched `LiveCodeBench` March-split baseline receipts (`2026-04-21`, seed `0`):
+  - materialized comparison object:
+    - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_binary/livecodebench_majority_s0p5_seed0_20260421/`
+    - fit-train / val / test counts: `54 / 128 / 160`
+    - positives: `27 / 7 / 8`
+  - prompt-only baseline bundle:
+    - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_prompt_baselines/livecodebench_majority_s0p5_seed0_20260421/`
+    - `prompt_length`: test `PR-AUC 0.0419`, test `ROC-AUC 0.3684`
+    - `prompt_shape_linear`: test `PR-AUC 0.0599`, test `ROC-AUC 0.5526`
+    - `prompt_shape_tree`: test `PR-AUC 0.0989`, test `ROC-AUC 0.6192`
+  - activation baseline bundle:
+    - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_baselines/livecodebench_majority_s0p5_seed0_20260421/`
+    - linear `last_layer` (`best_rank` = `best_loss` here): test `PR-AUC 0.0399`, test `ROC-AUC 0.3347`
+    - linear `ensemble` (`best_rank` = `best_loss` here): test `PR-AUC 0.0842`, test `ROC-AUC 0.6402`
+    - MLP `h256 d1 last_layer` (`best_rank`): test `PR-AUC 0.1440`, test `ROC-AUC 0.8109`
+    - MLP `h256 d1 ensemble` (`best_rank`): test `PR-AUC 0.1471`, test `ROC-AUC 0.7866`
+- Current honest seed-`0` read on this exact March object:
+  - RFM (`PR-AUC 0.1021`, `ROC-AUC 0.7352`) is ahead of the prompt-only baselines and the activation linear baselines on the matched split;
+  - activation MLP is still ahead of RFM on the same matched split, so the detector story is not an RFM win yet even before multiseed aggregation;
+  - this does not close the steering question, because the plan explicitly keeps steering utility separate from detector ranking.
 
 ### Stage 2: Export Signed Concept Vectors And Check Direction Quality
 
