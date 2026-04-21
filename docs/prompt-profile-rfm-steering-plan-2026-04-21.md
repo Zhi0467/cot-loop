@@ -1,6 +1,6 @@
 # Prompt-Profile RFM Steering Stage Plan
 
-Last updated: 2026-04-21 15:17 UTC
+Last updated: 2026-04-21 15:21 UTC
 
 ## Bottom Line
 
@@ -46,6 +46,11 @@ Last updated: 2026-04-21 15:17 UTC
 - Immediate consequence:
   - the earlier `54 / 128 / 160` with `27 / 7 / 8` `LiveCodeBench` table is withdrawn as a stale object
   - the retained four-benchmark registry is still the stage contract, but only `LiveCodeBench` has been rerun end to end on the repaired `majority_s_0.5` object so far
+  - quick repaired-materialization check on the other retained benchmarks (`2026-04-21`) still leaves them tiny:
+    - `GPQA`: train `14/7`, val `32/2`, test `40/2`
+    - `MATH-500`: train `36/18`, val `80/4`, test `100/4`
+    - `MMLU-Pro`: train `12/6`, val `128/1`, test `160/2`
+  - so `LiveCodeBench` remains the only repaired benchmark with a genuinely non-tiny stage object right now
 - Exact saved archive roots currently surfaced by the trigger-attention code for the retained stage benchmarks:
   - `GPQA`: `/data/scratch/murphy/outputs/cot-loop-detection/gpqa_mean_relative_from_archive_20260322/data`
   - `MATH-500`: `/data/scratch/murphy/outputs/cot-loop-detection/math_mean_relative_from_archive_20260323`
@@ -229,6 +234,7 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
     - late layers `23-26` are the most direction-stable (`0.867` to `0.909` mean cosine)
     - validation selection still peaks at layer `27`, which remains stable but less extreme on cosine (`0.786`, low `0.734`)
   - this stage is now only partial because cross-benchmark cosine alignment is still missing
+  - and that missing alignment surface is constrained by the repaired data reality above: outside `LiveCodeBench`, the current repaired splits are still tiny-positive objects rather than obviously robust transfer bundles
 
 ### Stage 3: Extend The Unified Detector Report Before Steering
 

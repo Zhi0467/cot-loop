@@ -1,6 +1,6 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-21 15:17 UTC
+Last updated: 2026-04-21 15:21 UTC
 
 Reference plan:
 - `docs/prompt-profile-rfm-steering-plan-2026-04-21.md`
@@ -37,7 +37,14 @@ Reference plan:
 - Remaining direction tasks before any transfer claim:
   - cross-benchmark cosine alignment across the retained benchmark set
   - concise direction table on the normal prompt-profile report surface
-- Decide whether to export repaired bundles for the other retained benchmarks immediately or only after the detector lane is judged stable enough.
+- Repaired-materialization probecheck on the other retained benchmarks is now on disk:
+  - `GPQA`: `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_binary/gpqa_majority_s0p5_rolloutrecompute_probecheck_20260421/`
+    - train `14/7`, val `32/2`, test `40/2`
+  - `MATH-500`: `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_binary/math500_majority_s0p5_rolloutrecompute_probecheck_20260421/`
+    - train `36/18`, val `80/4`, test `100/4`
+  - `MMLU-Pro`: `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_binary/mmlu_pro_majority_s0p5_rolloutrecompute_probecheck_20260421/`
+    - train `12/6`, val `128/1`, test `160/2`
+- Decide explicitly whether those tiny-positive repaired objects should count as real transfer / alignment inputs or stay provenance-only for now.
 
 ### P2: Benchmark-Local Spherical Steering
 
