@@ -93,7 +93,7 @@ Last updated: 2026-04-21 22:26 UTC
   - `scripts/collect_model_stats.py`
 - Important negative fact:
   - the repo now has stage-0 RFM scaffolding:
-    - shared retained-benchmark registry
+    - shared screened-stage registry
     - emit / validate CLI surfaces
     - machine-readable artifact helpers
     - first node-side validation artifact under `outputs/prompt_profile_rfm_stage0_registry_validation_20260421/`;
@@ -247,7 +247,7 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
 - Before any steering claim, add lightweight direction-coherence diagnostics:
   - bootstrap or seed cosine stability for repeated estimates of the same layerwise direction
   - cross-layer cosine structure within each benchmark
-  - cross-benchmark cosine alignment layerwise across the retained benchmark set
+  - cross-benchmark cosine alignment layerwise across screened-in datasets once at least two such datasets exist
   - held-out 1D projection separation under the declared sign convention
 - The projection score is:
   - `s_i,l = h_i,l^T v_l`
@@ -270,7 +270,7 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
     - late layers `23-26` are the most direction-stable (`0.867` to `0.909` mean cosine)
     - validation selection still peaks at layer `27`, which remains stable but less extreme on cosine (`0.786`, low `0.734`)
   - this stage is now only partial because cross-benchmark cosine alignment is still missing
-  - and that missing alignment surface is constrained by the repaired data reality above: outside `LiveCodeBench`, the current repaired splits are still tiny-positive objects rather than obviously robust transfer bundles
+  - and that missing alignment surface is constrained by the repaired data reality above: outside `LiveCodeBench`, the current repaired splits are still sub-threshold objects rather than accepted transfer bundles
 
 ### Stage 3: Extend The Unified Detector Report Before Steering
 
@@ -423,11 +423,11 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
 
 ### Stage 5: External Averaged-Vector Test
 
-- Only after the benchmark-local steering table exists, build one external-benchmark control:
-  - sign-align the retained four benchmark-local vectors layerwise
+- Only after the benchmark-local steering table exists and at least two datasets clear the `10%` gate, build one external-benchmark control:
+  - sign-align the screened-in benchmark-local vectors layerwise
   - normalize them layerwise
   - average them into one "average verbose vector"
-  - pick one benchmark outside the retained four-benchmark detector / in-distribution steering set
+  - pick one benchmark outside the screened-in detector / in-distribution steering set
   - apply that average vector to the external benchmark with the same spherical intervention protocol
 - Keep the angular strength fixed at the same `t = 0.3` for the first OOD pass.
 - Report the same paired metric table plus accuracy delta.
@@ -467,7 +467,7 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
 
 - Keep the repaired LiveCodeBench vector bundle as the first real stage-2 artifact.
 - Add the missing direction-coherence diagnostics:
-  - cross-benchmark cosine alignment across the retained benchmark set
+  - cross-benchmark cosine alignment across screened-in datasets once another dataset clears the gate
   - report-ready direction summary table
 - Bootstrap cosine stability is now finished on the repaired LiveCodeBench bundle:
   - `100` replay fits per layer
@@ -493,7 +493,7 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
 
 ### P3: Second-Pass Follow-Ups
 
-- External-benchmark steering with the averaged "verbose" vector built from the retained four benchmark-local bundles.
+- External-benchmark steering with the averaged "verbose" vector built from screened-in benchmark-local bundles once there are at least two.
 - Stronger prompt-shape controls or residualized analysis on the repaired object.
 - Layer-selection ablations, controller designs, or `t` sweeps only if the first fixed spherical steering table shows real signal.
 

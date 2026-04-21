@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the retained-benchmark registry against on-disk prompt-profile archives."""
+"""Validate the screened prompt-profile RFM registry against on-disk prompt-profile archives."""
 
 from __future__ import annotations
 
@@ -26,7 +26,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--include-excluded",
         action="store_true",
-        help="Validate excluded datasets such as AIME in addition to the active retained set.",
+        help=(
+            "Validate excluded datasets such as AIME or sub-threshold benchmark surfaces "
+            "in addition to the active screened-in set."
+        ),
     )
     parser.add_argument(
         "--out",

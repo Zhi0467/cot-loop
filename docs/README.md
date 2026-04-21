@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-04-21 19:48 UTC
+Last updated: 2026-04-21 22:26 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -85,7 +85,10 @@ Current live status:
 - The new note `prompt-profile-rfm-steering-plan-2026-04-21.md` is the active next-stage execution surface:
   - it turns the attached PDF idea into a repo-grounded plan;
   - it fixes the real source bundle to the saved March `2026-03-22` / `2026-03-23` Qwen prompt-profile archives;
-  - it keeps the active stage on the retained four-benchmark set `GPQA`, `MATH-500`, `MMLU-Pro`, and `LiveCodeBench`, with `AIME` intentionally out of the collaborator-facing stage;
+  - it now makes the repaired-train positive-rate gate explicit: only datasets with screened train positive rate `>= 10%` stay active stage inputs;
+  - on the current repaired surface, that collapses the steering-trainable set to `LiveCodeBench` alone (`140 / 420 = 33.3%`);
+  - `GPQA`, `MATH-500`, and `MMLU-Pro` now stay diagnostic-only until positive enrichment lands, with repaired train rates `7 / 133`, `18 / 338`, and `6 / 518`;
+  - it adds a stage-0.5 positive-enrichment screen ahead of any renewed cross-benchmark steering claim, with first-pass candidates `LiveCodeBench-extra`, `TACO-hard`, full `MATH` hard / level-5, and `Omni-MATH` hard;
   - it restores the activation-side linear controls as a required comparison surface, distinct from the prompt-only metadata baselines;
   - it keeps `T = 5` fixed on the first RFM pass;
   - it now treats exported vector quality as its own object through bootstrap stability, cosine-structure, and projection-separation diagnostics before steering claims;
@@ -107,8 +110,11 @@ Current live status:
     - all `28` layers clear mean cosine `>= 0.781`
     - weakest `95%` low bound is `0.693`
     - late layers `23-26` are the most stable, while detector validation still peaks at layer `27`;
-  - it makes the final OOD step an external-benchmark averaged-"verbose"-vector test instead of a leave-one-benchmark-out exercise inside the retained training set;
+  - it defers the averaged external "verbose" vector step until at least two screened-in benchmark-local bundles exist, instead of pretending the old retained-four average is already a live object;
   - it separates detector quality, steering utility, and trigger-attention background context instead of blending them into one claim.
+  - the screened registry is now aligned with that story in code too:
+    - `src/loop_probe/prompt_profile_rfm_stage_registry.py` records repaired train positive counts / rates and only exposes screened-in datasets as active stage inputs;
+    - with the current repaired counts, the active stage input set is `LiveCodeBench` only.
 - The new note `livecodebench-repaired-stage-report-2026-04-21.md` is now the shortest collaborator-facing artifact for "finish LiveCodeBench" on this stage:
   - it freezes the repaired `LiveCodeBench` prompt object, detector comparison, direction-stability read, and first larger steering control table in one place;
   - it points at the report bundle `../outputs/livecodebench_repaired_stage_report_apr21/`, which now carries:

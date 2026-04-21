@@ -26,7 +26,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--include-excluded",
         action="store_true",
-        help="Emit excluded datasets such as AIME in addition to the active retained set.",
+        help=(
+            "Emit excluded datasets such as AIME or sub-threshold benchmark surfaces "
+            "in addition to the active screened-in set."
+        ),
     )
     parser.add_argument(
         "--format",

@@ -1,4 +1,4 @@
-"""Shared retained-benchmark registry for the prompt-profile RFM stage."""
+"""Shared screened-dataset registry for the prompt-profile RFM stage."""
 
 from __future__ import annotations
 
@@ -22,6 +22,7 @@ DEFAULT_SAMPLE_SHAPE = (28, 2048)
 DEFAULT_SOURCE_TARGET_NAME = "mean_relative_length"
 DEFAULT_STAGE_LABEL_NAME = "majority_s_0.5"
 DEFAULT_STAGE_TAIL_THRESHOLD = 0.5
+DEFAULT_MIN_SCREENED_POSITIVE_RATE = 0.10
 STAGE_REGISTRY_VERSION = "prompt_profile_rfm_stage.v1"
 
 
@@ -38,11 +39,32 @@ class PromptProfileRFMStageDataset:
     train_prompt_text_sha256: str
     test_prompt_text_sha256: str
     active_stage: bool
+    screening_train_count: int | None = None
+    screening_train_positive_count: int | None = None
+    min_screened_positive_rate: float | None = DEFAULT_MIN_SCREENED_POSITIVE_RATE
+    screening_notes: str | None = None
     source_target_name: str = DEFAULT_SOURCE_TARGET_NAME
     stage_label_name: str = DEFAULT_STAGE_LABEL_NAME
     stage_tail_threshold: float = DEFAULT_STAGE_TAIL_THRESHOLD
     feature_key: str = DEFAULT_FEATURE_KEY
     sample_shape: tuple[int, int] = DEFAULT_SAMPLE_SHAPE
+
+    @property
+    def screening_positive_rate(self) -> float | None:
+        if self.screening_train_count is None or self.screening_train_positive_count is None:
+            return None
+        if self.screening_train_count <= 0:
+            raise ValueError(
+                f"screening_train_count must be positive for dataset '{self.key}'."
+            )
+        return self.screening_train_positive_count / self.screening_train_count
+
+    @property
+    def passes_positive_rate_screen(self) -> bool | None:
+        positive_rate = self.screening_positive_rate
+        if positive_rate is None or self.min_screened_positive_rate is None:
+            return None
+        return positive_rate >= self.min_screened_positive_rate
 
     def archive_data_dir(self, archive_source_root: Path | str | None = None) -> Path:
         base = Path(archive_source_root) if archive_source_root is not None else DEFAULT_ARCHIVE_SOURCE_ROOT
@@ -82,6 +104,12 @@ class PromptProfileRFMStageValidationResult:
                 "train_prompt_text_sha256": self.dataset.train_prompt_text_sha256,
                 "test_prompt_text_sha256": self.dataset.test_prompt_text_sha256,
                 "active_stage": self.dataset.active_stage,
+                "screening_train_count": self.dataset.screening_train_count,
+                "screening_train_positive_count": self.dataset.screening_train_positive_count,
+                "screening_positive_rate": self.dataset.screening_positive_rate,
+                "min_screened_positive_rate": self.dataset.min_screened_positive_rate,
+                "passes_positive_rate_screen": self.dataset.passes_positive_rate_screen,
+                "screening_notes": self.dataset.screening_notes,
                 "source_target_name": self.dataset.source_target_name,
                 "stage_label_name": self.dataset.stage_label_name,
                 "stage_tail_threshold": self.dataset.stage_tail_threshold,
@@ -115,7 +143,13 @@ ALL_STAGE_DATASETS: tuple[PromptProfileRFMStageDataset, ...] = (
         test_prompt_ids_sha256="413eda0609b696963f5dd8241b2bcf02b606b1838f58e4198f890e1d15627fc5",
         train_prompt_text_sha256="de3910e0b5320f8c51374c183aab3ea9f4a05dffe3bbef1ad66f568f437d6421",
         test_prompt_text_sha256="8fd26361b6aa35558e23d1745d167f9d4adc575a758e41016ea579db16976606",
-        active_stage=True,
+        active_stage=False,
+        screening_train_count=133,
+        screening_train_positive_count=7,
+        screening_notes=(
+            "Below the >=10% repaired train positive-rate gate; keep only as an "
+            "evaluation/diagnostic surface until positive enrichment lands."
+        ),
     ),
     PromptProfileRFMStageDataset(
         key="math500",
@@ -128,7 +162,13 @@ ALL_STAGE_DATASETS: tuple[PromptProfileRFMStageDataset, ...] = (
         test_prompt_ids_sha256="8165fdbb093b8b7f7b48a8aaa72ee75712e86bc8f056c3ec83e4f5a37e9999c4",
         train_prompt_text_sha256="4d4645c289fc264edd53ccaed51987cec3829989852279f41ae1356d516890cb",
         test_prompt_text_sha256="e654f5286d06739f44e0002041ddf83fd1eb567d9f6a313b71a8b241a799b81d",
-        active_stage=True,
+        active_stage=False,
+        screening_train_count=338,
+        screening_train_positive_count=18,
+        screening_notes=(
+            "Below the >=10% repaired train positive-rate gate; keep only as an "
+            "evaluation/diagnostic surface until positive enrichment lands."
+        ),
     ),
     PromptProfileRFMStageDataset(
         key="mmlu_pro",
@@ -141,7 +181,13 @@ ALL_STAGE_DATASETS: tuple[PromptProfileRFMStageDataset, ...] = (
         test_prompt_ids_sha256="c07a4318c49a8b30d5d7f2d69e7c6b359b3eddc0c52f5a59cbeafa4a09f7110e",
         train_prompt_text_sha256="a8651546112d920301065465f143198675ef78cf0a2d90ea2c671189b957f827",
         test_prompt_text_sha256="d4f5fdc14a4fdd3cee9548cf86ada5aa3fc10e45515c382a3248bc7cd659f977",
-        active_stage=True,
+        active_stage=False,
+        screening_train_count=518,
+        screening_train_positive_count=6,
+        screening_notes=(
+            "Below the >=10% repaired train positive-rate gate; keep only as an "
+            "evaluation/diagnostic surface until positive enrichment lands."
+        ),
     ),
     PromptProfileRFMStageDataset(
         key="livecodebench",
@@ -155,6 +201,12 @@ ALL_STAGE_DATASETS: tuple[PromptProfileRFMStageDataset, ...] = (
         train_prompt_text_sha256="aff770a20adcf388158e5f3bfed90898718a1c19c1cf3959dcdbf8aa41aeb08a",
         test_prompt_text_sha256="a26c5ca70aaa3e5f416c4b0e70524e0ffc2353af357ecde8dc27487d3d1d068a",
         active_stage=True,
+        screening_train_count=420,
+        screening_train_positive_count=140,
+        screening_notes=(
+            "Passes the >=10% repaired train positive-rate gate on the current "
+            "majority_s_0.5 stage object."
+        ),
     ),
     PromptProfileRFMStageDataset(
         key="aime",
@@ -168,6 +220,11 @@ ALL_STAGE_DATASETS: tuple[PromptProfileRFMStageDataset, ...] = (
         train_prompt_text_sha256="01366493c53b24e4bf9cf70906d44ebdf2349d3f061d0860cccb26a4b6d183ab",
         test_prompt_text_sha256="e89d907879cf19c5510f11e1246fca5483690b7881f10b3cff460f919ce2e3f4",
         active_stage=False,
+        min_screened_positive_rate=None,
+        screening_notes=(
+            "Still excluded because this surface mostly behaves like a prompt-visible "
+            "workload case rather than the steering object we care about."
+        ),
     ),
 )
 
@@ -214,6 +271,12 @@ def stage_registry_payload(
                 "train_prompt_text_sha256": dataset.train_prompt_text_sha256,
                 "test_prompt_text_sha256": dataset.test_prompt_text_sha256,
                 "active_stage": dataset.active_stage,
+                "screening_train_count": dataset.screening_train_count,
+                "screening_train_positive_count": dataset.screening_train_positive_count,
+                "screening_positive_rate": dataset.screening_positive_rate,
+                "min_screened_positive_rate": dataset.min_screened_positive_rate,
+                "passes_positive_rate_screen": dataset.passes_positive_rate_screen,
+                "screening_notes": dataset.screening_notes,
                 "source_target_name": dataset.source_target_name,
                 "stage_label_name": dataset.stage_label_name,
                 "feature_key": dataset.feature_key,
