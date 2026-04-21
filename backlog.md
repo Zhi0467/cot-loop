@@ -39,11 +39,12 @@ Reference plan:
   - concise direction table on the normal prompt-profile report surface
 - Repaired-materialization probecheck on the other retained benchmarks is now on disk:
   - `GPQA`: `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_binary/gpqa_majority_s0p5_rolloutrecompute_probecheck_20260421/`
-    - train `14/7`, val `32/2`, test `40/2`
+    - natural prompt-majority counts: train `126/7`, val `32/2`, test `40/2`
   - `MATH-500`: `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_binary/math500_majority_s0p5_rolloutrecompute_probecheck_20260421/`
-    - train `36/18`, val `80/4`, test `100/4`
+    - natural prompt-majority counts: train `320/18`, val `80/4`, test `100/4`
   - `MMLU-Pro`: `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_binary/mmlu_pro_majority_s0p5_rolloutrecompute_probecheck_20260421/`
-    - train `12/6`, val `128/1`, test `160/2`
+    - natural prompt-majority counts: train `512/6`, val `128/1`, test `160/2`
+- Earlier smaller train counts from the same materializer (`14/7`, `36/18`, `12/6`) were only the downsampled fit-train subsets, not the raw repaired prompt sets.
 - Decide explicitly whether those tiny-positive repaired objects should count as real transfer / alignment inputs or stay provenance-only for now.
 
 ### P2: Benchmark-Local Spherical Steering
