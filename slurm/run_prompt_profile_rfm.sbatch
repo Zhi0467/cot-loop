@@ -17,7 +17,9 @@ cd "${WORKDIR}"
 
 mkdir -p logs outputs
 
-if [[ -n "${CONDA_ENV:-}" ]]; then
+if [[ -n "${PYTHON_BIN:-}" && -x "${PYTHON_BIN}" ]]; then
+  :
+elif [[ -n "${CONDA_ENV:-}" ]]; then
   CONDA_SH="${CONDA_SH:-${HOME}/miniforge3/etc/profile.d/conda.sh}"
   if [[ ! -f "${CONDA_SH}" ]]; then
     echo "[prompt-profile-rfm] conda activation script not found: ${CONDA_SH}" >&2
@@ -30,7 +32,7 @@ elif [[ -f ".venv/bin/activate" ]]; then
   # shellcheck disable=SC1091
   source .venv/bin/activate
 else
-  echo "[prompt-profile-rfm] no runtime env found (.venv missing and CONDA_ENV not set)" >&2
+  echo "[prompt-profile-rfm] no runtime env found (PYTHON_BIN not executable, .venv missing, and CONDA_ENV not set)" >&2
   exit 1
 fi
 
