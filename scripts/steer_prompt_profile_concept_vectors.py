@@ -301,12 +301,28 @@ def _resolve_release_version(
 ) -> str:
     if override:
         return override
+    task_loader_config = source_manifest.get("task_loader_config")
+    if isinstance(task_loader_config, dict):
+        release_version = task_loader_config.get("release_version")
+        if isinstance(release_version, str) and release_version:
+            return release_version
     payload = source_manifest.get("test_spec")
     if isinstance(payload, dict):
         dataset_name = payload.get("dataset")
         if isinstance(dataset_name, str) and dataset_name.startswith("livecodebench_"):
             return dataset_name.removeprefix("livecodebench_")
     return "release_v6"
+
+
+def _manifest_livecodebench_lm_style_override(source_manifest: dict[str, Any]) -> str | None:
+    task_loader_config = source_manifest.get("task_loader_config")
+    if not isinstance(task_loader_config, dict):
+        return None
+    lm_style_override = task_loader_config.get("lm_style_override")
+    if not isinstance(lm_style_override, str):
+        return None
+    lm_style_override = lm_style_override.strip()
+    return lm_style_override or None
 
 
 def _load_math_gold(spec: DatasetSpec) -> dict[int, str]:
@@ -342,6 +358,7 @@ def _load_livecodebench_prompt_lookup(
     repo_path: str,
     release_version: str,
     model_id: str,
+    lm_style_override: str | None,
 ) -> tuple[list[Any], dict[str, Any]]:
     benchmark, format_prompt = livecodebench_codegen.load_benchmark(
         repo_path,
@@ -352,6 +369,7 @@ def _load_livecodebench_prompt_lookup(
         format_prompt,
         repo_path=repo_path,
         model_id=model_id,
+        lm_style_override=lm_style_override,
         max_samples=None,
     )
     if len(prompt_records) != len(benchmark):
@@ -386,7 +404,7 @@ def _build_prompt_items(
     max_samples: int | None,
     livecodebench_repo: str,
     release_version: str,
-    model_id: str,
+    steering_model_id: str,
 ) -> tuple[list[SteeringPromptItem], list[str], str, str, list[Any] | None]:
     first_record = next(iter(layer_payloads.values())).record
     benchmark = str(first_record["benchmark"])
@@ -505,10 +523,12 @@ def _build_prompt_items(
     elif task_kind == "livecodebench_codegen":
         if not livecodebench_repo:
             raise SystemExit("--livecodebench-repo is required for livecodebench steering.")
+        source_model_id = _manifest_model_id(source_manifest)
         _benchmark, prompt_to_instance = _load_livecodebench_prompt_lookup(
             repo_path=livecodebench_repo,
             release_version=release_version,
-            model_id=model_id,
+            model_id=source_model_id,
+            lm_style_override=_manifest_livecodebench_lm_style_override(source_manifest),
         )
         benchmark_subset = []
         for row, prompt in zip(selected_rows, prompts):
@@ -518,7 +538,8 @@ def _build_prompt_items(
                 raise SystemExit(
                     "LiveCodeBench archived prompt text did not match any regenerated benchmark prompt. "
                     f"sample_id={sample_id} prompt_hash={stable_json_sha256(prompt)} "
-                    f"release_version={release_version!r} model_id={model_id!r}."
+                    f"release_version={release_version!r} source_model_id={source_model_id!r} "
+                    f"steering_model_id={steering_model_id!r}."
                 )
             benchmark_subset.append(instance)
             items.append(
@@ -1265,7 +1286,7 @@ def main() -> None:
         max_samples=args.max_samples,
         livecodebench_repo=args.livecodebench_repo,
         release_version=release_version,
-        model_id=model_id,
+        steering_model_id=model_id,
     )
 
     generation_temperature = (
