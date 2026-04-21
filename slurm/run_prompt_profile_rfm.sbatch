@@ -12,6 +12,9 @@
 
 set -euo pipefail
 
+WORKDIR="${SLURM_SUBMIT_DIR:-$PWD}"
+cd "${WORKDIR}"
+
 mkdir -p logs outputs
 
 if [[ -n "${CONDA_ENV:-}" ]]; then
