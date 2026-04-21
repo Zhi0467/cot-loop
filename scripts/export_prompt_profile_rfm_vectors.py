@@ -21,7 +21,9 @@ if str(SRC) not in sys.path:
 
 from loop_probe.dataloader import ActivationDataset, read_manifest
 from loop_probe.labeling import prompt_profile_majority_tail_label
+from loop_probe.rfm import LaplaceRFM, LaplaceRFMConfig
 from loop_probe.stage_artifacts import (
+    build_rfm_vector_direction_bootstrap_record,
     build_rfm_vector_bundle_record,
     current_git_commit,
     stable_json_sha256,
@@ -54,6 +56,9 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--projection-bootstrap-samples", type=int, default=0)
     parser.add_argument("--projection-bootstrap-seed", type=int, default=0)
+    parser.add_argument("--direction-bootstrap-samples", type=int, default=0)
+    parser.add_argument("--direction-bootstrap-seed", type=int, default=0)
+    parser.add_argument("--direction-bootstrap-device", default="auto")
     return parser.parse_args()
 
 
@@ -190,6 +195,23 @@ def _bootstrap_summary(
             "high": float(np.percentile(values, 97.5)),
         }
     return summary
+
+
+def _summary_stats(values: list[float]) -> dict[str, float] | None:
+    if not values:
+        return None
+    array = np.asarray(values, dtype=np.float64)
+    return {
+        "mean": float(np.mean(array)),
+        "std": float(np.std(array)),
+        "min": float(np.min(array)),
+        "max": float(np.max(array)),
+        "low": float(np.percentile(array, 2.5)),
+        "median": float(np.percentile(array, 50.0)),
+        "high": float(np.percentile(array, 97.5)),
+        "fraction_negative": float(np.mean(array < 0.0)),
+        "fraction_below_0_5": float(np.mean(array < 0.5)),
+    }
 
 
 def _read_jsonl_rows(path: Path) -> list[dict[str, Any]]:
@@ -418,6 +440,153 @@ def _cross_layer_cosines(vectors_by_layer: dict[int, torch.Tensor]) -> dict[str,
     }
 
 
+def _fit_state_for_selected_iteration(
+    *,
+    train_x: torch.Tensor,
+    train_y: torch.Tensor,
+    rfm_hyperparameters: dict[str, Any],
+    selected_iteration: int,
+    device: str,
+) -> dict[str, Any]:
+    total_iters = int(rfm_hyperparameters["iters"])
+    if selected_iteration < 0 or selected_iteration > total_iters:
+        raise SystemExit(
+            "Bootstrap replay needs selected_iteration in "
+            f"[0, {total_iters}], got {selected_iteration}."
+        )
+    model = LaplaceRFM(
+        LaplaceRFMConfig(
+            bandwidth=float(rfm_hyperparameters["bandwidth"]),
+            reg=float(rfm_hyperparameters["reg"]),
+            diag=bool(rfm_hyperparameters["diag"]),
+            centering=bool(rfm_hyperparameters["centering"]),
+            sample_batch_size=rfm_hyperparameters["sample_batch_size"],
+            center_batch_size=rfm_hyperparameters["center_batch_size"],
+            max_agop_samples=rfm_hyperparameters["max_agop_samples"],
+            device=device,
+            solver=str(rfm_hyperparameters["solver"]),
+        )
+    )
+    train_targets = train_y.reshape(-1, 1).to(dtype=torch.float32)
+    train_x = train_x.to(dtype=torch.float32)
+    for iteration in range(total_iters):
+        model.fit_predictor(train_x, train_targets)
+        model.fit_M(train_x)
+        if iteration == selected_iteration:
+            return model.export_state()
+    model.fit_predictor(train_x, train_targets)
+    if selected_iteration == total_iters:
+        return model.export_state()
+    raise RuntimeError("Direction bootstrap replay missed the selected iteration.")
+
+
+def _direction_bootstrap_summary(
+    *,
+    benchmark: str,
+    layer: int,
+    feature_key: str,
+    preprocessing: dict[str, Any],
+    rfm_hyperparameters: dict[str, Any],
+    selected_iteration: int,
+    vector_scale: str,
+    reference_vector: torch.Tensor,
+    reference_vector_checksum: str,
+    train_data: SplitData,
+    val_prompt_ids: list[int],
+    test_prompt_ids: list[int],
+    sign_convention: str,
+    num_samples: int,
+    seed: int,
+    device: str,
+    git_commit: str,
+    model_id: str | None,
+    model_revision: str | None,
+    tokenizer_revision: str | None,
+    random_seed: int,
+    output_path: str,
+) -> dict[str, Any] | None:
+    if num_samples < 1:
+        return None
+
+    rng = np.random.default_rng(seed + layer)
+    train_x = train_data.x[:, layer, :].detach().cpu()
+    train_y = train_data.y.detach().cpu()
+    num_examples = len(train_data.sample_ids)
+    sample_rows: list[dict[str, Any]] = []
+    cosine_values: list[float] = []
+
+    for bootstrap_index in range(num_samples):
+        sampled_indices = torch.tensor(
+            rng.integers(0, num_examples, size=num_examples),
+            dtype=torch.int64,
+        )
+        bootstrap_state = _fit_state_for_selected_iteration(
+            train_x=train_x[sampled_indices],
+            train_y=train_y[sampled_indices],
+            rfm_hyperparameters=rfm_hyperparameters,
+            selected_iteration=selected_iteration,
+            device=device,
+        )
+        raw_vector, normalized_vector, extraction = _extract_signed_vector(
+            state=bootstrap_state,
+            vector_scale=vector_scale,
+        )
+        bootstrap_scores = (train_x @ normalized_vector).detach().cpu()
+        score_sign, _ = _select_score_sign(bootstrap_scores, train_y)
+        signed_vector = (normalized_vector * score_sign).detach().cpu()
+        cosine = torch.nn.functional.cosine_similarity(
+            signed_vector.unsqueeze(0),
+            reference_vector.unsqueeze(0),
+        ).item()
+        cosine_values.append(float(cosine))
+        sample_rows.append(
+            {
+                "bootstrap_index": int(bootstrap_index),
+                "score_sign": float(score_sign),
+                "cosine_to_reference": float(cosine),
+                "raw_vector_norm": float((raw_vector * score_sign).norm().item()),
+                "normalized_vector_checksum": tensor_checksum_hex(signed_vector),
+                "selected_eigenvalue": extraction.get("selected_eigenvalue"),
+            }
+        )
+
+    cosine_summary = _summary_stats(cosine_values)
+    if cosine_summary is None:
+        return None
+
+    bootstrap_record = build_rfm_vector_direction_bootstrap_record(
+        benchmark=benchmark,
+        layer=layer,
+        train_prompt_ids=[int(value) for value in train_data.sample_ids],
+        val_prompt_ids=val_prompt_ids,
+        test_prompt_ids=test_prompt_ids,
+        feature_key=feature_key,
+        preprocessing=preprocessing,
+        rfm_hyperparameters=rfm_hyperparameters,
+        vector_extraction_formula=DEFAULT_EXTRACTION_FORMULA,
+        sign_convention=sign_convention,
+        reference_vector_checksum=reference_vector_checksum,
+        bootstrap={
+            "sampling": "fit_train_with_replacement",
+            "num_requested": int(num_samples),
+            "num_completed": len(sample_rows),
+            "seed": int(seed + layer),
+            "selection_iteration": int(selected_iteration),
+            "score_sign_selection_rule": "fit_train_pr_auc_then_roc_auc",
+            "vector_scale": vector_scale,
+        },
+        cosine_to_reference=cosine_summary,
+        git_commit=git_commit,
+        model_id=model_id,
+        model_revision=model_revision,
+        tokenizer_revision=tokenizer_revision,
+        random_seed=random_seed,
+        output_path=output_path,
+        samples=sample_rows,
+    )
+    return bootstrap_record
+
+
 def main() -> None:
     args = _parse_args()
     rfm_run_dir = Path(args.rfm_run_dir).resolve()
@@ -523,6 +692,51 @@ def main() -> None:
             "decision_threshold": projection_summary["decision_threshold"],
             "threshold_selection_rule": projection_summary["threshold_selection_rule"],
         }
+        direction_bootstrap_summary = None
+        if args.direction_bootstrap_samples > 0:
+            bootstrap_record = _direction_bootstrap_summary(
+                benchmark=str(detector_record["benchmark"]),
+                layer=layer,
+                feature_key=feature_key,
+                preprocessing=preprocessing,
+                rfm_hyperparameters=dict(detector_record["rfm_hyperparameters"]),
+                selected_iteration=int(detector_record["selection"]["best_iteration"]),
+                vector_scale=args.vector_scale,
+                reference_vector=signed_normalized_vector,
+                reference_vector_checksum=tensor_checksum_hex(signed_normalized_vector),
+                train_data=train_data,
+                val_prompt_ids=[int(value) for value in prompt_ids["val"]],
+                test_prompt_ids=[int(value) for value in prompt_ids["test"]],
+                sign_convention=DEFAULT_SIGN_CONVENTION,
+                num_samples=args.direction_bootstrap_samples,
+                seed=args.direction_bootstrap_seed,
+                device=args.direction_bootstrap_device,
+                git_commit=git_commit,
+                model_id=detector_record.get("model_id"),
+                model_revision=detector_record.get("model_revision"),
+                tokenizer_revision=detector_record.get("tokenizer_revision"),
+                random_seed=int(detector_record["random_seed"]),
+                output_path=str(out_dir),
+            )
+            if bootstrap_record is not None:
+                bootstrap_record_path = (
+                    records_dir / f"layer_{layer:02d}_direction_bootstrap_record.json"
+                )
+                written_bootstrap_record = write_stage_artifact_record(
+                    bootstrap_record_path,
+                    bootstrap_record,
+                )
+                direction_bootstrap_summary = {
+                    "record_path": str(bootstrap_record_path),
+                    "sampling": written_bootstrap_record["bootstrap"]["sampling"],
+                    "num_requested": written_bootstrap_record["bootstrap"]["num_requested"],
+                    "num_completed": written_bootstrap_record["bootstrap"]["num_completed"],
+                    "seed": written_bootstrap_record["bootstrap"]["seed"],
+                    "selection_iteration": written_bootstrap_record["bootstrap"][
+                        "selection_iteration"
+                    ],
+                    "cosine_to_reference": written_bootstrap_record["cosine_to_reference"],
+                }
         bundle_record = build_rfm_vector_bundle_record(
             benchmark=str(detector_record["benchmark"]),
             layer=layer,
@@ -545,6 +759,7 @@ def main() -> None:
             prompt_text_hashes=prompt_text_hashes,
             projection_rule=projection_rule,
             projection_metrics=projection_summary["splits"],
+            direction_bootstrap=direction_bootstrap_summary,
             output_path=str(out_dir),
             source_checkpoint_path=str(checkpoint_path),
             source_detector_artifact_hash=detector_record["artifact_sha256"],
@@ -568,6 +783,26 @@ def main() -> None:
                     "positive_minus_negative_mean"
                 ],
                 "vector_checksum": written_record["normalized_vector_checksum"],
+                "direction_bootstrap_mean_cosine": (
+                    None
+                    if direction_bootstrap_summary is None
+                    else direction_bootstrap_summary["cosine_to_reference"]["mean"]
+                ),
+                "direction_bootstrap_low_cosine": (
+                    None
+                    if direction_bootstrap_summary is None
+                    else direction_bootstrap_summary["cosine_to_reference"]["low"]
+                ),
+                "direction_bootstrap_high_cosine": (
+                    None
+                    if direction_bootstrap_summary is None
+                    else direction_bootstrap_summary["cosine_to_reference"]["high"]
+                ),
+                "direction_bootstrap_num_completed": (
+                    0
+                    if direction_bootstrap_summary is None
+                    else direction_bootstrap_summary["num_completed"]
+                ),
                 "record_path": str(record_path),
                 "vector_path": str(vector_path),
             }
@@ -590,6 +825,9 @@ def main() -> None:
         "vector_scale": args.vector_scale,
         "projection_bootstrap_samples": int(args.projection_bootstrap_samples),
         "projection_bootstrap_seed": int(args.projection_bootstrap_seed),
+        "direction_bootstrap_samples": int(args.direction_bootstrap_samples),
+        "direction_bootstrap_seed": int(args.direction_bootstrap_seed),
+        "direction_bootstrap_device": args.direction_bootstrap_device,
         "feature_key": best_layers_payload["feature_key"],
         "git_commit": git_commit,
         "source_git_commit": run_config.get("git_commit"),

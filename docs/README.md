@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-04-21 09:35 UTC
+Last updated: 2026-04-21 12:12 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -91,6 +91,14 @@ Current live status:
   - it keeps the steering story alive even if RFM is not the top detector, so detector ranking and steering utility stay separate questions;
   - the machine-readable provenance contract for this stage now lives in `prompt-profile-rfm-artifact-schema-2026-04-21.md`, so vector bundles and steering runs can be looked up by schema instead of by Slack history;
   - the first implementation slice is now real, not only planned: the repo has the shared registry / emit / validate / artifact-helper surfaces plus the node-validated artifact `../outputs/prompt_profile_rfm_stage0_registry_validation_20260421/registry_validation.json`;
+  - the first repaired detector/vector object is now also on disk:
+    - repaired detector root `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/`
+    - repaired prompt-only baseline root `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_prompt_baselines/livecodebench_majority_s0p5_rolloutrecompute_seed0_20260421/`
+    - repaired activation baseline root `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_baselines/livecodebench_majority_s0p5_rolloutrecompute_seed0_20260421/`
+  - the earlier `54 / 128 / 160` `LiveCodeBench` detector table is now explicitly withdrawn from the active read:
+    - it trusted the archive's saved `0.9` tail label instead of recomputing `majority_s_0.5` from saved rollout lengths
+    - the repaired `LiveCodeBench` split is `280 / 128 / 160` with `140 / 35 / 54` positives
+  - on that repaired object, prompt-only tops out at `PR-AUC 0.5871`, activation linear at mean `0.5698`, current single-seed RFM is `0.7055`, and `h256 d1` MLP last-layer is essentially tied / slightly ahead depending on checkpoint rule;
   - it makes the final OOD step an external-benchmark averaged-"verbose"-vector test instead of a leave-one-benchmark-out exercise inside the retained training set;
   - it separates detector quality, steering utility, and trigger-attention background context instead of blending them into one claim.
 - The combined audit `prompt-profile-combined-audit-2026-04-05.md` is still the whole-surface prompt-profile bundle:

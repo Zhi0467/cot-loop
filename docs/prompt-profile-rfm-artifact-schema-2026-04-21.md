@@ -117,6 +117,44 @@ test comparison object before any activation or prompt-only baseline is trained.
   - `random_seed`
   - `artifact_sha256`
 
+- Optional keys now used once direction-stability replay exists:
+  - `direction_bootstrap.record_path`
+  - `direction_bootstrap.num_requested`
+  - `direction_bootstrap.num_completed`
+  - `direction_bootstrap.seed`
+  - `direction_bootstrap.selection_iteration`
+  - `direction_bootstrap.cosine_to_reference`
+
+## Vector Direction Bootstrap Record
+
+- Schema: `prompt_profile_rfm_vector_direction_bootstrap.v1`
+- Required keys:
+  - `benchmark`
+  - `layer`
+  - `prompt_ids.train`
+  - `prompt_ids.val`
+  - `prompt_ids.test`
+  - `feature_key`
+  - `preprocessing`
+  - `rfm_hyperparameters`
+  - `vector_extraction_formula`
+  - `sign_convention`
+  - `reference_vector_checksum`
+  - `bootstrap`
+  - `cosine_to_reference`
+  - `git_commit`
+  - `model_revision`
+  - `tokenizer_revision`
+  - `random_seed`
+  - `artifact_sha256`
+
+This is the stage-2 direction-stability ledger for one benchmark/layer bundle.
+It should answer:
+
+- how many fit-train bootstrap resamples were replayed;
+- which selected detector iteration and sign convention defined the replayed direction;
+- how tightly the resampled signed vectors align with the exported reference direction.
+
 ## Steering Run Record
 
 - Schema: `prompt_profile_rfm_steering_run.v1`

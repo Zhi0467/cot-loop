@@ -1,6 +1,6 @@
 # Prompt-Profile RFM Steering Stage Plan
 
-Last updated: 2026-04-21 18:57 UTC
+Last updated: 2026-04-21 12:12 UTC
 
 ## Bottom Line
 
@@ -35,14 +35,17 @@ Last updated: 2026-04-21 18:57 UTC
   - binary `majority_s_0.5`
   - per prompt, this is `1` when a majority of the saved rollouts exceed `50%` of the generation budget
   - this is a long-rollout / budget-usage risk proxy, not a pure loop label
-- Execution reality on the frozen March archives:
-  - `GPQA`: train `156/2`, test `40/0` for negative/positive prompts
-  - `MATH-500`: train `397/3`, test `100/0`
-  - `MMLU-Pro`: train `639/1`, test `160/0`
-  - `LiveCodeBench`: train `606/34`, test `152/8`
+- Archive-versus-stage label correction:
+  - the saved March prompt-profile archives were built with `archive_tail_threshold = 0.9`
+  - this stage is about `majority_s_0.5`
+  - on archives that still have rollout `relative_length`, the stage label should therefore be recomputed from saved rollouts rather than read from the archive's saved `0.9` label
+- First fully repaired stage object:
+  - `LiveCodeBench` is now the first benchmark rerun all the way through that rollout-recomputed path
+  - repaired split: fit-train / val / test counts `280 / 128 / 160`
+  - repaired positives: `140 / 35 / 54`
 - Immediate consequence:
-  - the frozen archive contract still names the retained four-benchmark set, but on the current March `majority_s_0.5` object only `LiveCodeBench` has a non-degenerate held-out positive slice;
-  - `GPQA`, `MATH-500`, and `MMLU-Pro` can still be kept in provenance tables, but they do not currently support a meaningful held-out binary detector comparison without changing the label object or the split policy.
+  - the earlier `54 / 128 / 160` with `27 / 7 / 8` `LiveCodeBench` table is withdrawn as a stale object
+  - the retained four-benchmark registry is still the stage contract, but only `LiveCodeBench` has been rerun end to end on the repaired `majority_s_0.5` object so far
 - Exact saved archive roots currently surfaced by the trigger-attention code for the retained stage benchmarks:
   - `GPQA`: `/data/scratch/murphy/outputs/cot-loop-detection/gpqa_mean_relative_from_archive_20260322/data`
   - `MATH-500`: `/data/scratch/murphy/outputs/cot-loop-detection/math_mean_relative_from_archive_20260323`
@@ -78,6 +81,8 @@ Last updated: 2026-04-21 18:57 UTC
     - `src/loop_probe/rfm.py`
     - `scripts/train_prompt_profile_rfm.py`
     - `slurm/run_prompt_profile_rfm.sbatch`;
+  - the repo now also has a live vector-export surface:
+    - `scripts/export_prompt_profile_rfm_vectors.py`;
   - there is still no live steering runner in current `scripts/`, `src/`, or `slurm/`;
   - matched March-split baseline tooling also now exists:
     - `scripts/materialize_prompt_profile_stage_binary_data.py`
@@ -139,57 +144,51 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
   - activation-side MLP baselines
   - `PR-AUC`, `ROC-AUC`, prevalence, and threshold diagnostics as secondary context
 - Use bootstrap intervals for the detector metrics, especially on smaller held-out sets such as `GPQA`.
-- First on-node execution receipts (`2026-04-21`):
-  - `GPQA` smoke `2756` proved the full artifact path end to end.
-  - `GPQA` full sweep `2757` also finished cleanly, but it confirmed the archive-level problem above: held-out test positives are `0`, so `test PR-AUC` / `ROC-AUC` are `NaN` and the resulting table is not scientifically useful.
-  - `LiveCodeBench` full sweep on patched head `ea06bb7` (`2760`) is the first viable stage-1 detector artifact:
-    - output root: `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_20260421/`
-    - fit-train / val / test counts: `54 / 128 / 160`
-    - positives: `27 / 7 / 8`
-    - selected layer: `18`
-    - selected bandwidth: `100`
-    - validation `PR-AUC`: `0.3921`
-    - test `PR-AUC`: `0.1021`
-    - test `ROC-AUC`: `0.7352`
-    - test positive `F1`: `0.1429`
+- First repaired stage-1 detector receipt (`2026-04-21`):
+  - repaired detector root:
+    - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/`
+  - repaired split:
+    - fit-train / val / test counts `280 / 128 / 160`
+    - positives `140 / 35 / 54`
+  - selected detector row:
+    - layer `27`
+    - bandwidth `100`
+    - validation `PR-AUC 0.6555`
+    - test `PR-AUC 0.7055`
+    - test `ROC-AUC 0.8590`
+    - test positive `F1 0.2222`
 - Important comparison note:
-  - the April prompt-only / linear / MLP `majority_s_0.5` tables cannot be reused as the stage-1 baseline comparison, because they were trained on a different binary object with much higher held-out prevalence (for example `LiveCodeBench` test prevalence `0.3375` there versus `0.05` here);
-  - the matched March-split tooling for that rerun is now in-tree, so the next honest detector comparison is to execute prompt-only, activation-linear, and activation-MLP baselines on this exact March-reconstructed split before drawing any RFM-versus-baseline conclusion.
-- First matched `LiveCodeBench` March-split baseline receipts (`2026-04-21`, seed `0`):
+  - the older March `LiveCodeBench` comparison bundle under `.../livecodebench_majority_s0p5_seed0_20260421/` is superseded for the same reason as the old detector row: it was built on the stale archive `0.9` label instead of the rollout-recomputed stage label
+  - the honest detector comparison now has to use the repaired stage materialization and the repaired prompt-only / activation reruns on the same prompt IDs
+- Repaired `LiveCodeBench` baseline receipts (`2026-04-21`):
   - materialized comparison object:
-    - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_binary/livecodebench_majority_s0p5_seed0_20260421/`
-    - fit-train / val / test counts: `54 / 128 / 160`
-    - positives: `27 / 7 / 8`
+    - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_binary/livecodebench_majority_s0p5_rolloutrecompute_seed0_20260421/`
+    - fit-train / val / test counts `280 / 128 / 160`
+    - positives `140 / 35 / 54`
   - prompt-only baseline bundle:
-    - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_prompt_baselines/livecodebench_majority_s0p5_seed0_20260421/`
-    - `prompt_length`: test `PR-AUC 0.0419`, test `ROC-AUC 0.3684`
-    - `prompt_shape_linear`: test `PR-AUC 0.0599`, test `ROC-AUC 0.5526`
-    - `prompt_shape_tree`: test `PR-AUC 0.0989`, test `ROC-AUC 0.6192`
+    - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_prompt_baselines/livecodebench_majority_s0p5_rolloutrecompute_seed0_20260421/`
+    - `prompt_length`: test `PR-AUC 0.5771`, test `ROC-AUC 0.7201`
+    - `prompt_shape_linear`: test `PR-AUC 0.5871`, test `ROC-AUC 0.7290`
+    - `prompt_shape_tree`: test `PR-AUC 0.3732`, test `ROC-AUC 0.5751`
   - activation baseline bundle:
-    - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_baselines/livecodebench_majority_s0p5_seed0_20260421/`
-    - linear `last_layer` (`best_rank` = `best_loss` here): test `PR-AUC 0.0399`, test `ROC-AUC 0.3347`
-    - linear `ensemble` (`best_rank` = `best_loss` here): test `PR-AUC 0.0842`, test `ROC-AUC 0.6402`
-    - MLP `h256 d1 last_layer` (`best_rank`): test `PR-AUC 0.1440`, test `ROC-AUC 0.8109`
-    - MLP `h256 d1 ensemble` (`best_rank`): test `PR-AUC 0.1471`, test `ROC-AUC 0.7866`
-- Current honest seed-`0` read on this exact March object:
-  - RFM (`PR-AUC 0.1021`, `ROC-AUC 0.7352`) is ahead of the prompt-only baselines and the activation linear baselines on the matched split;
-  - activation MLP is still ahead of RFM on the same matched split, so the detector story is not an RFM win yet even before multiseed aggregation;
-  - this does not close the steering question, because the plan explicitly keeps steering utility separate from detector ranking.
-- Fixed-split activation seed sweep (`2026-04-21`, seeds `0/1/2`, `best_rank`):
-  - shared output root:
-    - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_baselines/livecodebench_majority_s0p5_seed0_20260421/`
-  - mean test `PR-AUC` / `ROC-AUC` by model:
-    - linear `last_layer`: `0.0769` / `0.5129`
-    - linear `ensemble`: `0.0821` / `0.5820`
-    - MLP `h256 d1 last_layer`: `0.1358` / `0.8076`
-    - MLP `h256 d1 ensemble`: `0.1470` / `0.7614`
-  - so the fixed-split seed sweep keeps the same detector ordering as the first seed-`0` read:
-    - prompt-only < activation linear < RFM < activation MLP
+    - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_baselines/livecodebench_majority_s0p5_rolloutrecompute_seed0_20260421/`
+    - `best_rank` mean test `PR-AUC` / `ROC-AUC` across seeds `0/1/2`:
+      - linear `last_layer`: `0.4163` / `0.5486`
+      - linear `ensemble`: `0.5698` / `0.7475`
+      - MLP `h256 d1 last_layer`: `0.7055` / `0.8435`
+      - MLP `h256 d1 ensemble`: `0.6637` / `0.8458`
+    - `best_loss` mean test `PR-AUC` / `ROC-AUC` across seeds `0/1/2`:
+      - MLP `h256 d1 last_layer`: `0.7147` / `0.8489`
+- Current honest read on the repaired object:
+  - RFM is clearly above the cheap prompt-only baselines and above the activation linear baselines on the repaired split
+  - `h256 d1` MLP last-layer is now essentially tied with the current single-seed RFM on `PR-AUC`, and it is slightly ahead if the detector comparison uses the activation `best_loss` mean
+  - because RFM has only a repaired single-seed row so far while the activation baselines now have a repaired multiseed table, the detector lane is not yet a clean RFM win or a clean MLP win
+  - that still does not close the steering question, because the plan keeps steering utility separate from detector ranking
 
 ### Stage 2: Export Signed Concept Vectors And Check Direction Quality
 
 - After the RFM tables exist, export one benchmark-local concept-vector bundle.
-- Proposed new surface:
+- Live export surface:
   - `scripts/export_prompt_profile_rfm_vectors.py`
 - Save, for each benchmark and layer:
   - chosen hyperparameters
@@ -210,6 +209,17 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
 - The projection score is:
   - `s_i,l = h_i,l^T v_l`
 - This 1D score does not need to beat the full RFM detector. It only needs to show that the exported signed direction has a meaningful relationship to the label.
+- Current stage-2 status:
+  - repaired LiveCodeBench export summary exists at:
+    - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/vector_exports/summary.json`
+  - the bundle already includes:
+    - signed per-layer vectors for all `28` layers
+    - prompt-ID provenance
+    - preprocessing metadata including archive/stage tail-threshold distinction
+    - raw and normalized checksums
+    - held-out 1D projection separation metrics
+    - cross-layer cosine structure
+  - this stage is still partial because bootstrap cosine stability and cross-benchmark cosine alignment are not yet on disk
 
 ### Stage 3: Extend The Unified Detector Report Before Steering
 
@@ -305,16 +315,28 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
 
 ## Backlog For This Stage
 
-### P0: Must Land Before Any Steering Claim
+### P0: Close The Repaired Detector Table
 
-- Add the benchmark registry and manifest/count validator.
-- Implement the native layerwise RFM trainer on existing prompt-profile tensors.
-- Emit benchmark-local RFM tables against the activation linear, activation MLP, and prompt-only baselines already on the repo surface.
-- Export signed per-layer vector artifacts with explicit provenance.
-- Add direction-coherence diagnostics for the exported vectors.
-- Extend the unified report so RFM and the direction diagnostics live on the normal prompt-profile surface.
+- Treat the older March comparison object under `.../livecodebench_majority_s0p5_seed0_20260421/` as superseded.
+- Keep the repaired comparison surfaces as the current detector object:
+  - repaired detector root:
+    - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/`
+  - repaired prompt-only baseline root:
+    - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_prompt_baselines/livecodebench_majority_s0p5_rolloutrecompute_seed0_20260421/`
+  - repaired activation baseline root:
+    - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_baselines/livecodebench_majority_s0p5_rolloutrecompute_seed0_20260421/`
+- Decide whether the detector lane is ready to freeze on the current single-seed RFM row, or whether RFM also needs matching multiseed / split-seed sweeps before the report is locked.
+- Extend the unified report so the repaired detector table replaces the superseded `54 / 128 / 160` object.
 
-### P1: First Steering Pass
+### P1: Finish The Direction-Quality Surface
+
+- Keep the repaired LiveCodeBench vector bundle as the first real stage-2 artifact.
+- Add the missing direction-coherence diagnostics:
+  - bootstrap cosine stability across repeated direction estimates
+  - cross-benchmark cosine alignment across the retained benchmark set
+  - report-ready direction summary table
+
+### P2: First Steering Pass
 
 - Add the benchmark-local spherical steering runner with fixed `t = 0.3`.
 - Match the intervention surface to the probe surface through prompt-prefill residual hooks if feasible.
@@ -323,10 +345,10 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
 - Report length, loop, max-hit, `majority_s_0.5`, accuracy, and bootstrap deltas in one table.
 - Report angular-move and norm-preservation diagnostics in a separate table.
 
-### P2: Second-Pass Follow-Ups
+### P3: Second-Pass Follow-Ups
 
 - External-benchmark steering with the averaged "verbose" vector built from the retained four benchmark-local bundles.
-- Stronger prompt-shape controls or residualized analysis, because `majority_s_0.5` is still partly prompt-visible.
+- Stronger prompt-shape controls or residualized analysis on the repaired object.
 - Layer-selection ablations, controller designs, or `t` sweeps only if the first fixed spherical steering table shows real signal.
 
 ## What This Stage Should Not Claim

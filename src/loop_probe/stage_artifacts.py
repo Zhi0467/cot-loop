@@ -86,6 +86,7 @@ def build_rfm_vector_bundle_record(
     prompt_text_hashes: dict[str, str] | None = None,
     projection_rule: dict[str, Any] | None = None,
     projection_metrics: dict[str, Any] | None = None,
+    direction_bootstrap: dict[str, Any] | None = None,
     output_path: str | None = None,
     source_checkpoint_path: str | None = None,
     source_detector_artifact_hash: str | None = None,
@@ -125,12 +126,73 @@ def build_rfm_vector_bundle_record(
         record["projection_rule"] = projection_rule
     if projection_metrics is not None:
         record["projection_metrics"] = projection_metrics
+    if direction_bootstrap is not None:
+        record["direction_bootstrap"] = direction_bootstrap
     if output_path is not None:
         record["output_path"] = output_path
     if source_checkpoint_path is not None:
         record["source_checkpoint_path"] = source_checkpoint_path
     if source_detector_artifact_hash is not None:
         record["source_detector_artifact_hash"] = source_detector_artifact_hash
+    return record
+
+
+def build_rfm_vector_direction_bootstrap_record(
+    *,
+    benchmark: str,
+    layer: int,
+    train_prompt_ids: list[int],
+    val_prompt_ids: list[int],
+    test_prompt_ids: list[int],
+    feature_key: str,
+    preprocessing: dict[str, Any],
+    rfm_hyperparameters: dict[str, Any],
+    vector_extraction_formula: str,
+    sign_convention: str,
+    reference_vector_checksum: str,
+    bootstrap: dict[str, Any],
+    cosine_to_reference: dict[str, Any],
+    git_commit: str,
+    model_id: str | None,
+    model_revision: str | None,
+    tokenizer_revision: str | None,
+    random_seed: int,
+    output_path: str | None = None,
+    samples: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    prompt_ids = {
+        "train": train_prompt_ids,
+        "val": val_prompt_ids,
+        "test": test_prompt_ids,
+    }
+    prompt_id_hashes = {
+        split_name: stable_json_sha256(prompt_ids[split_name])
+        for split_name in prompt_ids
+    }
+    record = {
+        "schema_name": "prompt_profile_rfm_vector_direction_bootstrap.v1",
+        "benchmark": benchmark,
+        "layer": layer,
+        "prompt_ids": prompt_ids,
+        "prompt_id_hashes": prompt_id_hashes,
+        "feature_key": feature_key,
+        "preprocessing": preprocessing,
+        "rfm_hyperparameters": rfm_hyperparameters,
+        "vector_extraction_formula": vector_extraction_formula,
+        "sign_convention": sign_convention,
+        "reference_vector_checksum": reference_vector_checksum,
+        "bootstrap": bootstrap,
+        "cosine_to_reference": cosine_to_reference,
+        "git_commit": git_commit,
+        "model_id": model_id,
+        "model_revision": model_revision,
+        "tokenizer_revision": tokenizer_revision,
+        "random_seed": random_seed,
+    }
+    if output_path is not None:
+        record["output_path"] = output_path
+    if samples is not None:
+        record["samples"] = samples
     return record
 
 

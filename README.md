@@ -35,16 +35,36 @@ Latest status:
   - `src/loop_probe/rfm.py`
   - `scripts/train_prompt_profile_rfm.py`
   - `slurm/run_prompt_profile_rfm.sbatch`
-- first execution reality from that stage-1 path is sharper than the plan text implied:
-  - on the frozen March `majority_s_0.5` object, `GPQA`, `MATH-500`, and `MMLU-Pro` each have `0` held-out test positives;
-  - only `LiveCodeBench` currently has a non-degenerate held-out positive slice (`train 606/34`, `test 152/8` for negative/positive prompts).
-- the first viable stage-1 detector artifact now exists on patched head `ea06bb7`:
-  - output root: `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_20260421/`
-  - best validation layer/bandwidth: `18 / 100`
-  - validation `PR-AUC`: `0.3921`
-  - test `PR-AUC`: `0.1021`
-  - test `ROC-AUC`: `0.7352`
-  - test positive `F1`: `0.1429`
+- the repo now has a live vector-export surface:
+  - `scripts/export_prompt_profile_rfm_vectors.py`
+- one important repo-reality correction changed the current detector object:
+  - the saved March prompt-profile archives were built with `archive_tail_threshold = 0.9`
+  - this stage is about `majority_s_0.5`
+  - so the honest stage label is now recomputed from saved rollout `relative_length` rather than trusted from the archive's saved `0.9` label
+- the repaired `LiveCodeBench` detector/vector artifact now exists on current project head `120a808`:
+  - output root: `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/`
+  - repaired split: fit-train / val / test counts `280 / 128 / 160`, positives `140 / 35 / 54`
+  - best validation layer/bandwidth: `27 / 100`
+  - validation `PR-AUC`: `0.6555`
+  - test `PR-AUC`: `0.7055`
+  - test `ROC-AUC`: `0.8590`
+  - test positive `F1`: `0.2222`
+- the earlier `54 / 128 / 160` `LiveCodeBench` comparison object is now superseded and should not be reused for the stage report
+- repaired prompt-only baseline bundle:
+  - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_prompt_baselines/livecodebench_majority_s0p5_rolloutrecompute_seed0_20260421/`
+  - `prompt_length`: test `PR-AUC 0.5771`, test `ROC-AUC 0.7201`
+  - `prompt_shape_linear`: test `PR-AUC 0.5871`, test `ROC-AUC 0.7290`
+- repaired activation baseline bundle:
+  - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_baselines/livecodebench_majority_s0p5_rolloutrecompute_seed0_20260421/`
+  - `best_rank` mean test `PR-AUC`: linear last-layer `0.4163`, linear ensemble `0.5698`, `mlp256d1` last-layer `0.7055`, `mlp256d1` ensemble `0.6637`
+  - `best_loss` mean test `PR-AUC`: `mlp256d1` last-layer `0.7147`
+- current honest repaired detector read:
+  - RFM is above the cheap prompt-only baselines and above activation linear on the repaired split
+  - `h256 d1` MLP last-layer is now essentially tied with the current single-seed RFM on `PR-AUC`, and it is slightly ahead if the detector comparison uses the activation `best_loss` mean
+  - because the repaired activation bundle is multiseed while RFM is still single-seed, the next honest detector question is whether RFM also needs matching multiseed / split-seed sweeps before the report is locked
+- the repaired LiveCodeBench vector bundle is partially complete already:
+  - `vector_exports/summary.json` carries signed per-layer vectors, prompt-ID provenance, raw / normalized checksums, held-out 1D projection separation, and cross-layer cosine structure
+  - bootstrap cosine stability and cross-benchmark cosine alignment are still missing before any steering claim
 - the first `LiveCodeBench` full run also forced one implementation correction:
   - the original `cholesky` default failed on a non-positive-definite kernel matrix;
   - the committed default solver is now `solve`.
@@ -73,11 +93,10 @@ Latest status:
   - the finished base bundle itself is heavily degenerate across all five datasets, with `AIME 114/500` looped, `GPQA 190/500`, `MMLU-Pro 157/500`, and `LiveCodeBench 232/500`
   - the saved text probe shows that Qwen base raw does degenerate on MCQ, but mainly by repeating the answer-format instruction tail rather than by OLMo-style math-derivation loops
   - the saved instruct-side v2 table is still useful as rough scale, but not as a controlled per-dataset comparison, because prompt pools, rollout counts, context limits, and `LiveCodeBench` LM style do not match the new base bundle
-- the current open work is now post-audit rather than pre-audit:
-  - use the committed retained-benchmark registry and the now-live RFM trainer as the frozen stage contract;
-  - rerun prompt-only, activation-linear, and activation-MLP baselines on the exact March-reconstructed split before comparing them against the new RFM rows;
-  - extend the unified prompt-profile report with RFM results plus direction-coherence diagnostics on that matched surface;
-  - export signed benchmark-local steering vectors and run paired fixed-`t = 0.3` spherical steering tables even if RFM does not become the top detector;
+- the current open work is now:
+  - decide whether the repaired detector lane is ready to freeze on the current single-seed RFM row, or whether RFM itself also needs matching multiseed / split-seed sweeps;
+  - extend the unified prompt-profile report with the repaired detector table plus direction-coherence diagnostics on that repaired surface;
+  - keep exporting repaired benchmark-local steering vectors and run paired fixed-`t = 0.3` spherical steering tables even if RFM does not become the single best detector;
   - then test one external benchmark with the averaged "verbose" vector;
   - then revisit stronger prompt-shape controls and only later ablate layer rules, controllers, or `t` if the first steering table shows signal.
 

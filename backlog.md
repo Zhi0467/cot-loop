@@ -1,72 +1,66 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-21 18:57 UTC
+Last updated: 2026-04-21 12:12 UTC
 
 Reference plan:
 - `docs/prompt-profile-rfm-steering-plan-2026-04-21.md`
 
 ## Active TODOs
 
-### P0: Add The Native RFM Detector
+### P0: Close The Repaired Detector Table
 
-- Treat only `LiveCodeBench` as the meaningful held-out detector object on the frozen March `majority_s_0.5` surface until the label object or split policy changes; keep `GPQA`, `MATH-500`, and `MMLU-Pro` provenance-only for now.
-- Decide whether the detector comparison should now treat the current RFM row as fixed, or whether RFM itself also needs repeat / split-seed sweeps before the report is locked.
-- Build one detector comparison table on the exact March-reconstructed split with:
-  - RFM layer `18`, bandwidth `100`, test `PR-AUC 0.1021`, test `ROC-AUC 0.7352`
-  - prompt-only `prompt_length`, `prompt_shape_linear`, `prompt_shape_tree` from `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_prompt_baselines/livecodebench_majority_s0p5_seed0_20260421/`
-  - activation linear / MLP rows from `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_baselines/livecodebench_majority_s0p5_seed0_20260421/`
-  - `best_rank` as the primary activation checkpoint rule, with `best_loss` kept as a diagnostic secondary view
-- State the current matched comparison plainly in the report text:
-  - prompt-only stays below RFM on this object;
-  - activation linear stays below RFM on this object;
-  - activation MLP stays above RFM on this object, including the fixed-split seed sweep (`best_rank` mean `PR-AUC`: last-layer `0.1358`, ensemble `0.1470`).
-- Add direction-coherence diagnostics for the exported RFM vectors:
-  - bootstrap cosine stability
-  - cross-layer cosine structure
-  - cross-benchmark cosine alignment
-  - held-out 1D projection separation
-- Extend the unified prompt-profile report with the RFM rows and direction diagnostics before making any steering claim.
+- Treat the older March comparison object under `.../livecodebench_majority_s0p5_seed0_20260421/` as superseded.
+  - That table trusted the archive's saved `tail_threshold = 0.9` label instead of recomputing the stage label `majority_s_0.5` from saved rollout lengths.
+- Use the repaired `LiveCodeBench` detector surface as the current comparison object:
+  - RFM detector root:
+    - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/`
+    - current row: layer `27`, bandwidth `100`, validation `PR-AUC 0.6555`, test `PR-AUC 0.7055`, test `ROC-AUC 0.8590`
+  - prompt-only baseline root:
+    - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_prompt_baselines/livecodebench_majority_s0p5_rolloutrecompute_seed0_20260421/`
+    - strongest cheap prompt-only row so far: `prompt_shape_linear` with test `PR-AUC 0.5871`, test `ROC-AUC 0.7290`
+  - activation baseline root:
+    - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_baselines/livecodebench_majority_s0p5_rolloutrecompute_seed0_20260421/`
+    - `best_rank` mean test `PR-AUC`: linear last-layer `0.4163`, linear ensemble `0.5698`, `mlp256d1` last-layer `0.7055`, `mlp256d1` ensemble `0.6637`
+    - `best_loss` mean test `PR-AUC`: `mlp256d1` last-layer `0.7147`
+- Decide whether the detector lane is ready to freeze on the current single-seed RFM row, or whether RFM also needs matching multiseed / split-seed sweeps before the report is locked.
+- Extend the unified report with the repaired detector table instead of the superseded `54 / 128 / 160` object.
 
-### P1: Benchmark-Local Spherical Steering
+### P1: Finish The Direction-Quality Surface
 
-- Export signed per-layer benchmark-local vector bundles from the trained RFM surface.
-- Add the benchmark-local steering runner with fixed angular strength `t = 0.3`.
-- Match the intervention surface to the probe surface through prompt-prefill residual hooks if feasible.
-- Normalize each exported vector and steer toward the anti-risk target `mu_l = -normalize(v_l)`.
-- Use the exported signed per-layer bundle directly in the first pass; do not add a top-`k` layer rule, probe gate, or online controller yet.
-- Run paired evaluation on each benchmark test set under:
-  - `no_steer`
-  - `minus_v_spherical`
-  - `plus_v_spherical`
-  - `random_spherical`
-  - `shuffled_label_spherical`, if feasible
-- Report one table with:
-  - average completion length
-  - median completion length
-  - `>50%` budget fraction
-  - loop fraction
-  - max-length-hit fraction
-  - `majority_s_0.5` fraction
-  - accuracy
-  - accuracy delta
-  - bootstrap intervals where feasible
-- Report one diagnostics table with:
-  - mean starting angle
-  - mean angular movement
-  - pre/post norm
-  - norm-preservation error
-- Continue this steering pass even if RFM does not beat the current MLP detector on held-out `PR-AUC`.
+- Keep the repaired LiveCodeBench vector bundle as the first real stage-2 artifact:
+  - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/vector_exports/summary.json`
+- Add the missing direction diagnostics before any steering claim:
+  - bootstrap cosine stability across repeated direction estimates
+  - cross-benchmark cosine alignment across the retained benchmark set
+  - concise direction table on the normal prompt-profile report surface
+- Decide whether to export repaired bundles for the other retained benchmarks immediately or only after the detector lane is judged stable enough.
 
-### P2: External Average-Vector Test
+### P2: Benchmark-Local Spherical Steering
 
-- Build one average "verbose" vector by sign-aligning, normalizing, and averaging the retained four benchmark-local bundles layerwise.
+- Implement `scripts/steer_prompt_profile_concept_vectors.py` and `slurm/run_prompt_profile_rfm_steering.sbatch`.
+- Keep the first steering pass fixed to:
+  - prompt-prefill residual hooks if feasible
+  - full exported per-layer bundle
+  - spherical steering with `t = 0.3`
+  - controls `no_steer`, `minus_v_spherical`, `plus_v_spherical`, `random_spherical`, and `shuffled_label_spherical` if feasible
+- Log steering ledgers with:
+  - condition name
+  - vector artifact hash
+  - hook site
+  - `t`
+  - seeds
+  - prompt IDs
+  - generation config
+  - grader version
+  - output path
+
+### P3: External Average-Vector Test
+
+- Build one layerwise average "verbose" vector by sign-aligning and averaging the retained benchmark-local bundles.
 - Pick one benchmark outside the retained four-benchmark training set.
-- Apply the average vector to that external benchmark with the same fixed spherical strength `t = 0.3`.
-- Report the same paired metric table plus accuracy delta.
+- Apply the same fixed spherical protocol on that external benchmark and report the same paired metric table plus accuracy delta.
 
 ### Later Only If The First Steering Table Is Real
 
-- Prompt-shape controls or residualized analysis, because `majority_s_0.5` is still partly prompt-visible.
-- Layer-selection ablations only if the first direct per-layer-bundle steering pass shows signal.
-- `t` sweeps only if the fixed-`0.3` pass shows signal.
-- Probe gating or online-controller ideas only after the unconditional spherical pass is on disk.
+- Stronger prompt-shape or residualized controls on the repaired object.
+- Layer-selection ablations, controller variants, or `t` sweeps only after the unconditional spherical pass shows real signal.
