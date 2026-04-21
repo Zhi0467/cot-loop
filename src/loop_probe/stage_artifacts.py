@@ -106,6 +106,67 @@ def build_rfm_vector_bundle_record(
     return record
 
 
+def build_rfm_detector_run_record(
+    *,
+    benchmark: str,
+    layer: int,
+    train_prompt_ids: list[int],
+    val_prompt_ids: list[int],
+    test_prompt_ids: list[int],
+    feature_key: str,
+    preprocessing: dict[str, Any],
+    rfm_hyperparameters: dict[str, Any],
+    selection: dict[str, Any],
+    sign_convention: str,
+    score_sign: float,
+    decision_threshold: float,
+    train_metrics: dict[str, Any],
+    val_metrics: dict[str, Any],
+    test_metrics: dict[str, Any],
+    git_commit: str,
+    model_id: str | None,
+    model_revision: str | None,
+    tokenizer_revision: str | None,
+    random_seed: int,
+    output_path: str,
+    checkpoint_path: str | None,
+) -> dict[str, Any]:
+    prompt_ids = {
+        "train": train_prompt_ids,
+        "val": val_prompt_ids,
+        "test": test_prompt_ids,
+    }
+    prompt_id_hashes = {
+        split_name: stable_json_sha256(prompt_ids[split_name])
+        for split_name in prompt_ids
+    }
+    record = {
+        "schema_name": "prompt_profile_rfm_detector_run.v1",
+        "benchmark": benchmark,
+        "layer": layer,
+        "prompt_ids": prompt_ids,
+        "prompt_id_hashes": prompt_id_hashes,
+        "feature_key": feature_key,
+        "preprocessing": preprocessing,
+        "rfm_hyperparameters": rfm_hyperparameters,
+        "selection": selection,
+        "sign_convention": sign_convention,
+        "score_sign": float(score_sign),
+        "decision_threshold": float(decision_threshold),
+        "train_metrics": train_metrics,
+        "val_metrics": val_metrics,
+        "test_metrics": test_metrics,
+        "git_commit": git_commit,
+        "model_id": model_id,
+        "model_revision": model_revision,
+        "tokenizer_revision": tokenizer_revision,
+        "random_seed": random_seed,
+        "output_path": output_path,
+        "checkpoint_path": checkpoint_path,
+    }
+    return record
+
+
 def build_steering_run_record(
     *,
     condition_name: str,

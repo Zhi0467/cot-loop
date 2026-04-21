@@ -1,6 +1,6 @@
 # Prompt-Profile RFM Artifact Schema
 
-Last updated: 2026-04-21 09:13 UTC
+Last updated: 2026-04-21 11:34 UTC
 
 ## Purpose
 
@@ -28,6 +28,43 @@ Last updated: 2026-04-21 09:13 UTC
   - prompt-rollout archive file
   - prompt-profile files
   - exact train/test prompt IDs
+
+## Detector Run Record
+
+- Schema: `prompt_profile_rfm_detector_run.v1`
+- Required keys:
+  - `benchmark`
+  - `layer`
+  - `prompt_ids.train`
+  - `prompt_ids.val`
+  - `prompt_ids.test`
+  - `prompt_id_hashes`
+  - `feature_key`
+  - `preprocessing`
+  - `rfm_hyperparameters`
+  - `selection`
+  - `sign_convention`
+  - `score_sign`
+  - `decision_threshold`
+  - `train_metrics`
+  - `val_metrics`
+  - `test_metrics`
+  - `git_commit`
+  - `model_id`
+  - `model_revision`
+  - `tokenizer_revision`
+  - `random_seed`
+  - `output_path`
+  - `checkpoint_path`
+  - `artifact_sha256`
+
+This is the stage-1 ledger record for one selected benchmark/layer detector.
+It should be written next to the exported checkpoint so later lookups can answer:
+
+- which exact prompt IDs defined train / val / test;
+- whether train balancing or other preprocessing changed the natural archive split;
+- which bandwidth / regularization / iteration won on validation;
+- which score orientation and threshold were used for threshold diagnostics.
 
 ## RFM Vector Bundle Record
 
@@ -79,3 +116,6 @@ Last updated: 2026-04-21 09:13 UTC
 - `normalized_vector_checksum` should be computed after the sign convention is fixed and after normalization, so two records with opposite sign do not collide semantically.
 - `artifact_sha256` is the hash of the canonical JSON payload, not a model checkpoint digest.
 - Store these records next to the generated run outputs, not only in summary tables.
+- For stage-1 detector checkpoints, the checkpoint payload may keep the learned
+  Mahalanobis matrix and kernel weights in a Torch file, but the JSON record is
+  still the source of truth for searchable provenance.
