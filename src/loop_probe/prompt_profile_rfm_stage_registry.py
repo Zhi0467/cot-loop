@@ -63,7 +63,7 @@ class PromptProfileRFMStageValidationResult:
     default_feature_key: str
     sample_shape: list[int]
     target_name: str | None
-    target_tail_threshold: float | None
+    archive_tail_threshold: float | None
     train_prompt_ids: list[int]
     test_prompt_ids: list[int]
 
@@ -94,7 +94,7 @@ class PromptProfileRFMStageValidationResult:
             "default_feature_key": self.default_feature_key,
             "sample_shape": self.sample_shape,
             "target_name": self.target_name,
-            "target_tail_threshold": self.target_tail_threshold,
+            "archive_tail_threshold": self.archive_tail_threshold,
             "train_prompt_ids": self.train_prompt_ids,
             "test_prompt_ids": self.test_prompt_ids,
         }
@@ -325,23 +325,6 @@ def validate_stage_dataset(
             f"Dataset '{dataset.key}' target mismatch: "
             f"expected '{dataset.source_target_name}', got '{target_name}'."
         )
-    target_tail_threshold = (
-        float(target_spec.get("tail_threshold"))
-        if isinstance(target_spec, dict)
-        and isinstance(target_spec.get("tail_threshold"), (int, float))
-        else None
-    )
-    if target_tail_threshold is None:
-        raise SystemExit(
-            f"Dataset '{dataset.key}' target_spec is missing tail_threshold; "
-            f"expected {dataset.stage_tail_threshold} for stage label '{dataset.stage_label_name}'."
-        )
-    if abs(target_tail_threshold - dataset.stage_tail_threshold) > 1e-9:
-        raise SystemExit(
-            f"Dataset '{dataset.key}' tail_threshold mismatch: "
-            f"expected {dataset.stage_tail_threshold}, got {target_tail_threshold}."
-        )
-
     prompt_profile_files = manifest.get("prompt_profile_files")
     if not isinstance(prompt_profile_files, dict):
         raise SystemExit(f"Dataset '{dataset.key}' manifest is missing prompt_profile_files.")
@@ -370,6 +353,7 @@ def validate_stage_dataset(
             f"{data_dir / prompt_rollout_archive_file}"
         )
     archive_rows_by_key: dict[tuple[str, int], dict[str, Any]] = {}
+    archive_tail_threshold: float | None = None
     for row in _read_jsonl_rows(data_dir / prompt_rollout_archive_file):
         split = row.get("split")
         sample_id = row.get("sample_id")
@@ -377,7 +361,27 @@ def validate_stage_dataset(
             raise SystemExit(
                 f"Dataset '{dataset.key}' archive row is missing split/sample_id."
             )
+        row_tail_threshold = row.get("tail_threshold")
+        if not isinstance(row_tail_threshold, (int, float)):
+            raise SystemExit(
+                f"Dataset '{dataset.key}' archive row is missing tail_threshold."
+            )
+        row_tail_threshold = float(row_tail_threshold)
+        if archive_tail_threshold is None:
+            archive_tail_threshold = row_tail_threshold
+        elif abs(archive_tail_threshold - row_tail_threshold) > 1e-9:
+            raise SystemExit(
+                f"Dataset '{dataset.key}' archive rows disagree on tail_threshold: "
+                f"{archive_tail_threshold} vs {row_tail_threshold}."
+            )
         archive_rows_by_key[(split, sample_id)] = row
+    if archive_tail_threshold is None:
+        raise SystemExit(f"Dataset '{dataset.key}' archive has no rows to validate.")
+    if abs(archive_tail_threshold - dataset.stage_tail_threshold) > 1e-9:
+        raise SystemExit(
+            f"Dataset '{dataset.key}' tail_threshold mismatch: "
+            f"expected {dataset.stage_tail_threshold}, got {archive_tail_threshold}."
+        )
 
     train_prompt_ids = _resolve_split_sample_ids(data_dir, "train", dataset.feature_key)
     test_prompt_ids = _resolve_split_sample_ids(data_dir, "test", dataset.feature_key)
@@ -444,7 +448,7 @@ def validate_stage_dataset(
         default_feature_key=str(default_feature_key),
         sample_shape=sample_shape,
         target_name=str(target_name),
-        target_tail_threshold=target_tail_threshold,
+        archive_tail_threshold=archive_tail_threshold,
         train_prompt_ids=train_prompt_ids,
         test_prompt_ids=test_prompt_ids,
     )
