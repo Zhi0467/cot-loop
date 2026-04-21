@@ -1,6 +1,6 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-21 14:33 UTC
+Last updated: 2026-04-21 14:39 UTC
 
 Reference plan:
 - `docs/prompt-profile-rfm-steering-plan-2026-04-21.md`
@@ -72,8 +72,11 @@ Reference plan:
 - Next steering TODOs:
   - keep the reviewed-head two-condition smoke as the durable baseline receipt:
     - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm_steering/livecodebench_smoke_t0p3_n8_seed0_20260421_fix3_sourcefmt/`
-  - finish reading the live four-condition control smoke:
+  - keep the finished four-condition control smoke as the negative cheap-control receipt:
     - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm_steering/livecodebench_smoke_t0p3_n8_seed0_20260421_fix4_controls/`
+    - all arms stay at `0 / 8` `pass@1` with mean length `1024`
+    - loop fractions are `0.0` (`no_steer`), `0.375` (`minus_v_spherical`), `0.125` (`plus_v_spherical`), and `0.375` (`random_spherical`)
+    - this does not show a sign-specific steering win on the smoke slice
   - scale from `8` prompts to the first honest repaired held-out steering table
 
 ### P3: External Average-Vector Test

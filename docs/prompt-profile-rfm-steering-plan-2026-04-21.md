@@ -1,6 +1,6 @@
 # Prompt-Profile RFM Steering Stage Plan
 
-Last updated: 2026-04-21 14:33 UTC
+Last updated: 2026-04-21 14:39 UTC
 
 ## Bottom Line
 
@@ -315,6 +315,18 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
   - the reviewed-head two-condition rerun is also now on disk:
     - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm_steering/livecodebench_smoke_t0p3_n8_seed0_20260421_fix3_sourcefmt/`
     - it matches the earlier repaired smoke exactly, so the durable smoke receipt now points at the final formatter-fixed code surface rather than the intermediate patch
+  - the cheap four-condition control smoke is now finished too:
+    - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm_steering/livecodebench_smoke_t0p3_n8_seed0_20260421_fix4_controls/`
+    - all four conditions stay at `0 / 8` `pass@1` with average length `1024`
+    - loop fractions on the smoke slice are:
+      - `0.0` for `no_steer`
+      - `0.375` for `minus_v_spherical`
+      - `0.125` for `plus_v_spherical`
+      - `0.375` for `random_spherical`
+    - so the cheap control read is negative:
+      - `minus_v_spherical` does not beat random on this slice
+      - both signed directions are worse than baseline on loop fraction
+      - this remains an implementation/control receipt, not evidence for the steering story
 
 ### Stage 5: External Averaged-Vector Test
 
@@ -378,7 +390,7 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
 - Run paired benchmark-wise evaluation on held-out test prompts under `no_steer`, `minus_v_spherical`, `plus_v_spherical`, `random_spherical`, and `shuffled_label_spherical` where feasible.
 - Report length, loop, max-hit, `majority_s_0.5`, accuracy, and bootstrap deltas in one table.
 - Report angular-move and norm-preservation diagnostics in a separate table.
-- Keep the reviewed-head two-condition smoke as the baseline implementation receipt and use the live four-condition control smoke as the next cheap read before scaling up.
+- Keep the reviewed-head two-condition smoke plus the finished four-condition control smoke as implementation receipts only, then scale to the first larger held-out table before making any sign-sensitive steering claim.
 
 ### P3: Second-Pass Follow-Ups
 
