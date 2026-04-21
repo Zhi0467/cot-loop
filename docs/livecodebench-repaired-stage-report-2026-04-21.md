@@ -17,7 +17,7 @@ Last updated: 2026-04-21 21:41 UTC
   - all four conditions stay at `0 / 32` `pass@1`;
   - `no_steer` has loop fraction `0.03125`;
   - `minus_v_spherical`, `plus_v_spherical`, and `random_spherical` are all worse on loop fraction.
-  - but this table is only the bounded prefill-only spherical sub-lane, not the full block-specific linear+spherical figure contract.
+  - but this table is only the bounded prefill-last-token spherical sub-lane, not the full block-specific linear+spherical figure contract.
 
 ## Object
 
@@ -94,8 +94,8 @@ Last updated: 2026-04-21 21:41 UTC
 - Current honest read:
   - there is no accuracy movement anywhere;
   - every steered condition is worse than baseline on loop fraction;
-  - this closes the first larger bounded prefill-only spherical control table as a negative result, not an in-flight pilot;
-  - it does not yet answer the full figure contract because linear steering and decode-step timing were not part of this run.
+  - this closes the first larger bounded prefill-last-token spherical control table as a negative result, not an in-flight pilot;
+  - it does not yet answer the full figure contract because linear steering, all-prefill-token steering, and the full decode budget were not part of this run.
 
 ## Deliverables
 

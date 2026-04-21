@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run prompt-prefill spherical steering from exported prompt-profile RFM vectors."""
+"""Run prompt-prefill block-specific steering from exported prompt-profile RFM vectors."""
 
 from __future__ import annotations
 
@@ -43,7 +43,8 @@ from loop_probe.stage_artifacts import (
 from loop_probe.types import DatasetSpec
 
 DEFAULT_T = 0.3
-DEFAULT_HOOK_SITE = "prefill_layer_output_last_token"
+DEFAULT_EPSILON = 0.2
+DEFAULT_HOOK_SITE = "prefill_layer_output_all_tokens"
 DEFAULT_GRADER_VERSION_BY_TASK = {
     "math_freeform": "math_verify",
     "multiple_choice_gpqa": "structured_json_letter.v1",
@@ -80,13 +81,17 @@ def _parse_args() -> argparse.Namespace:
         default=["no_steer", "minus_v_spherical", "plus_v_spherical", "random_spherical"],
         choices=(
             "no_steer",
+            "minus_v_linear",
+            "plus_v_linear",
             "minus_v_spherical",
             "plus_v_spherical",
+            "random_linear",
             "random_spherical",
         ),
     )
     parser.add_argument("--layers", nargs="+", type=int, default=None)
     parser.add_argument("--t", type=float, default=DEFAULT_T)
+    parser.add_argument("--epsilon", type=float, default=DEFAULT_EPSILON)
     parser.add_argument("--max-samples", type=int, default=None)
     parser.add_argument("--batch-size", type=int, default=2)
     parser.add_argument("--seed", type=int, nargs="+", default=[0])
@@ -611,7 +616,7 @@ def _spherical_steer_batch(
     pre_norm = hidden.norm(dim=-1)
     safe_pre_norm = pre_norm.clamp_min(1e-12)
     hidden_hat = hidden / safe_pre_norm.unsqueeze(-1)
-    target_hat = target.unsqueeze(0).expand_as(hidden_hat)
+    target_hat = target.view(*([1] * (hidden_hat.ndim - 1)), -1).expand_as(hidden_hat)
     dot = (hidden_hat * target_hat).sum(dim=-1).clamp(-1.0, 1.0)
     theta = torch.arccos(dot)
     sin_theta = torch.sin(theta)
@@ -631,6 +636,32 @@ def _spherical_steer_batch(
         "post_norm": post_norm,
         "start_angle": theta,
         "move_angle": move_angle,
+        "norm_error": (post_norm - pre_norm).abs(),
+    }
+
+
+def _linear_steer_batch(
+    hidden: torch.Tensor,
+    direction: torch.Tensor,
+    *,
+    epsilon: float,
+) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
+    pre_norm = hidden.norm(dim=-1)
+    safe_pre_norm = pre_norm.clamp_min(1e-12)
+    hidden_hat = hidden / safe_pre_norm.unsqueeze(-1)
+    direction_hat = _unit_normalize(direction.unsqueeze(0))[0]
+    direction_hat = direction_hat.view(*([1] * (hidden_hat.ndim - 1)), -1).expand_as(hidden_hat)
+    steered = hidden + float(epsilon) * direction_hat.to(device=hidden.device, dtype=hidden.dtype)
+    post_norm = steered.norm(dim=-1)
+    safe_post_norm = post_norm.clamp_min(1e-12)
+    steered_hat = steered / safe_post_norm.unsqueeze(-1)
+    start_dot = (hidden_hat * direction_hat).sum(dim=-1).clamp(-1.0, 1.0)
+    move_dot = (hidden_hat * steered_hat).sum(dim=-1).clamp(-1.0, 1.0)
+    return steered, {
+        "pre_norm": pre_norm,
+        "post_norm": post_norm,
+        "start_angle": torch.arccos(start_dot),
+        "move_angle": torch.arccos(move_dot),
         "norm_error": (post_norm - pre_norm).abs(),
     }
 
@@ -675,22 +706,26 @@ class _LayerStatsAccumulator:
         }
 
 
-class PrefillLayerOutputSphericalController:
-    """Steer the final prompt token at selected layer outputs during prefill only."""
+class PrefillLayerOutputController:
+    """Steer all prompt tokens at selected layer outputs during prefill only."""
 
     def __init__(
         self,
         *,
         layers: torch.nn.ModuleList,
         targets_by_layer: dict[int, torch.Tensor],
+        method: str,
         t: float,
+        epsilon: float,
     ) -> None:
         self._layers = layers
         self._targets_by_layer = {
             int(layer): target.detach().to(dtype=torch.float32, device="cpu")
             for layer, target in targets_by_layer.items()
         }
+        self._method = str(method)
         self._t = float(t)
+        self._epsilon = float(epsilon)
         self._handles: list[Any] = []
         self._stats = {layer: _LayerStatsAccumulator() for layer in self._targets_by_layer}
         self.enabled = False
@@ -732,9 +767,13 @@ class PrefillLayerOutputSphericalController:
                 device=hidden.device,
                 dtype=hidden.dtype,
             )
-            last_token = hidden[:, -1, :]
-            steered, stats = _spherical_steer_batch(last_token, target, t=self._t)
-            hidden[:, -1, :] = steered.to(dtype=hidden.dtype)
+            if self._method == "spherical":
+                steered, stats = _spherical_steer_batch(hidden, target, t=self._t)
+            elif self._method == "linear":
+                steered, stats = _linear_steer_batch(hidden, target, epsilon=self._epsilon)
+            else:
+                raise RuntimeError(f"Unsupported steering method: {self._method}")
+            hidden[:, :, :] = steered.to(dtype=hidden.dtype)
             self._stats[layer_idx].update(
                 {
                     key: value.detach().to(dtype=torch.float32, device="cpu")
@@ -769,16 +808,45 @@ def _targets_for_condition(
     layer_payloads: dict[int, LayerVectorPayload],
     *,
     seed: int,
-) -> tuple[dict[int, torch.Tensor], dict[str, Any]]:
+) -> tuple[str | None, dict[int, torch.Tensor], dict[str, Any]]:
     if condition_name == "no_steer":
-        return {}, {"kind": "identity"}
+        return None, {}, {"kind": "identity"}
+    if condition_name == "minus_v_linear":
+        targets = {
+            layer: (-payload.vector).detach().to(dtype=torch.float32, device="cpu")
+            for layer, payload in layer_payloads.items()
+        }
+        return "linear", targets, {
+            "kind": "bundle_signed_target",
+            "method": "linear",
+            "signed_target": "-normalized_vector",
+            "target_checksums": {
+                str(layer): tensor_checksum_hex(target)
+                for layer, target in sorted(targets.items())
+            },
+        }
+    if condition_name == "plus_v_linear":
+        targets = {
+            layer: payload.vector.detach().to(dtype=torch.float32, device="cpu")
+            for layer, payload in layer_payloads.items()
+        }
+        return "linear", targets, {
+            "kind": "bundle_signed_target",
+            "method": "linear",
+            "signed_target": "+normalized_vector",
+            "target_checksums": {
+                str(layer): tensor_checksum_hex(target)
+                for layer, target in sorted(targets.items())
+            },
+        }
     if condition_name == "minus_v_spherical":
         targets = {
             layer: (-payload.vector).detach().to(dtype=torch.float32, device="cpu")
             for layer, payload in layer_payloads.items()
         }
-        return targets, {
+        return "spherical", targets, {
             "kind": "bundle_signed_target",
+            "method": "spherical",
             "signed_target": "-normalized_vector",
             "target_checksums": {
                 str(layer): tensor_checksum_hex(target)
@@ -790,9 +858,21 @@ def _targets_for_condition(
             layer: payload.vector.detach().to(dtype=torch.float32, device="cpu")
             for layer, payload in layer_payloads.items()
         }
-        return targets, {
+        return "spherical", targets, {
             "kind": "bundle_signed_target",
+            "method": "spherical",
             "signed_target": "+normalized_vector",
+            "target_checksums": {
+                str(layer): tensor_checksum_hex(target)
+                for layer, target in sorted(targets.items())
+            },
+        }
+    if condition_name == "random_linear":
+        targets = _random_unit_vectors_like(layer_payloads, seed=seed)
+        return "linear", targets, {
+            "kind": "random_unit_target",
+            "method": "linear",
+            "seed": seed,
             "target_checksums": {
                 str(layer): tensor_checksum_hex(target)
                 for layer, target in sorted(targets.items())
@@ -800,8 +880,9 @@ def _targets_for_condition(
         }
     if condition_name == "random_spherical":
         targets = _random_unit_vectors_like(layer_payloads, seed=seed)
-        return targets, {
+        return "spherical", targets, {
             "kind": "random_unit_target",
+            "method": "spherical",
             "seed": seed,
             "target_checksums": {
                 str(layer): tensor_checksum_hex(target)
@@ -1004,6 +1085,7 @@ def _run_condition_seed(
     tokenizer: Any,
     model_layers: torch.nn.ModuleList,
     controller_t: float,
+    controller_epsilon: float,
     batch_size: int,
     temperature: float,
     top_p: float,
@@ -1016,18 +1098,20 @@ def _run_condition_seed(
     do_sample = temperature > 0.0
     torch.manual_seed(seed)
     np.random.seed(seed)
-    targets_by_layer, condition_config = _targets_for_condition(
+    steering_method, targets_by_layer, condition_config = _targets_for_condition(
         condition_name,
         layer_payloads,
         seed=seed,
     )
 
-    controller: PrefillLayerOutputSphericalController | None = None
+    controller: PrefillLayerOutputController | None = None
     if targets_by_layer:
-        controller = PrefillLayerOutputSphericalController(
+        controller = PrefillLayerOutputController(
             layers=model_layers,
             targets_by_layer=targets_by_layer,
+            method=str(steering_method),
             t=controller_t,
+            epsilon=controller_epsilon,
         )
         controller.install()
         controller.reset_stats()
@@ -1350,6 +1434,7 @@ def main() -> None:
         "dtype": args.dtype,
         "hook_site": args.hook_site,
         "t": float(args.t),
+        "epsilon": float(args.epsilon),
         "conditions": list(args.conditions),
         "seeds": [int(seed) for seed in args.seed],
         "generation_config": {
@@ -1392,6 +1477,7 @@ def main() -> None:
                 tokenizer=tokenizer,
                 model_layers=model_layers,
                 controller_t=args.t,
+                controller_epsilon=args.epsilon,
                 batch_size=args.batch_size,
                 temperature=generation_temperature,
                 top_p=resolved_top_p,
@@ -1415,6 +1501,7 @@ def main() -> None:
                 vector_artifact_hash=vector_bundle_hash,
                 hook_site=args.hook_site,
                 t=float(args.t),
+                epsilon=float(args.epsilon),
                 seeds=[int(seed) for seed in args.seed],
                 prompt_ids=prompt_ids,
                 prompt_text_hash=prompt_hash,

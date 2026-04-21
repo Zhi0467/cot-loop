@@ -1,13 +1,16 @@
 # Prompt-Profile RFM Steering Stage Plan
 
-Last updated: 2026-04-21 21:41 UTC
+Last updated: 2026-04-21 22:26 UTC
 
 ## Bottom Line
 
 - The next cot-loop stage is not another prompt-profile archive rebuild and not another trigger-attention cleanup pass.
 - It is a benchmark-local RFM detector plus steering stage on the frozen `Qwen/Qwen3-1.7B` prompt-profile surface that already underlies the April prompt-profile notes.
-- The collaborator-facing stage benchmark set is now `GPQA`, `MATH-500`, `MMLU-Pro`, and `LiveCodeBench`.
-  - `AIME` stays out of this stage because, on this object, it mostly acts like a prompt-visible workload case rather than the predictor question we care about; that is already the repo's collaborator-facing read in `docs/prompt-profile-unified-report-2026-04-09.md`.
+- The collaborator-facing steering-trainable set is no longer the old retained four-benchmark list.
+  - The new gate is: only accept datasets whose repaired train positive rate is at least `10%` after screening.
+  - On the current repaired archive surface, only `LiveCodeBench` passes that gate (`140 / 420 = 33.3%`).
+  - `GPQA`, `MATH-500`, and `MMLU-Pro` now stay evaluation/diagnostic-only until positive enrichment lands, because their repaired train rates are `7 / 133 = 5.3%`, `18 / 338 = 5.3%`, and `6 / 518 = 1.2%`.
+  - `AIME` stays out of this stage for a different reason: on this object, it mostly acts like a prompt-visible workload case rather than the predictor question we care about; that is already the repo's collaborator-facing read in `docs/prompt-profile-unified-report-2026-04-09.md`.
 - The attached PDF was directionally right, but the repo reality had drifted in two important ways:
   - upstream PR `#10` is already merged (`2026-04-21 04:35 UTC`, merge commit `2fcb7b7`), so trigger-attention is no longer the live GitHub blocker surface;
   - the real saved activation/archive surface is the March `2026-03-22` to `2026-03-23` prompt-profile bundle reused by the trigger-attention replay, not a vague later April rebuild.
@@ -20,13 +23,13 @@ Last updated: 2026-04-21 21:41 UTC
   - `NUM_GENERATIONS=4`
   - `MAX_TOKENS=30000`
   - `MAX_MODEL_LEN=40960`
-- Saved prompt-disjoint archive counts exist for five benchmarks, but the active RFM/steering stage keeps only the retained four-benchmark comparison set:
+- Saved prompt-disjoint archive counts still exist for five benchmarks:
   - `GPQA`: `158 / 40`
   - `MATH-500`: `400 / 100`
   - `MMLU-Pro`: `640 / 160`
   - `LiveCodeBench`: `640 / 160`
-- Saved but intentionally excluded from this collaborator-facing stage:
   - `AIME`: `48 / 12`
+- But the active steering-trainable registry now keeps only screened-in datasets.
 - Feature surface:
   - prompt-prefill last-token stacked activations
   - manifest default feature key: `last_token_all_layers_stack_final`
@@ -45,12 +48,14 @@ Last updated: 2026-04-21 21:41 UTC
   - repaired positives: `140 / 35 / 54`
 - Immediate consequence:
   - the earlier `54 / 128 / 160` with `27 / 7 / 8` `LiveCodeBench` table is withdrawn as a stale object
-  - the retained four-benchmark registry is still the stage contract, but only `LiveCodeBench` has been rerun end to end on the repaired `majority_s_0.5` object so far
+  - the old retained-four registry is no longer the stage contract
+  - the current active stage input is `LiveCodeBench` only
   - quick repaired-materialization check on the other retained benchmarks (`2026-04-21`) still leaves them tiny:
     - `GPQA`: train `126/7`, val `32/2`, test `40/2`
     - `MATH-500`: train `320/18`, val `80/4`, test `100/4`
     - `MMLU-Pro`: train `512/6`, val `128/1`, test `160/2`
   - so `LiveCodeBench` remains the only repaired benchmark with a genuinely non-tiny stage object right now
+  - under the new gate, those tiny-positive repaired objects stay provenance / diagnostic surfaces rather than benchmark-local vector-export targets
 - Exact saved archive roots currently surfaced by the trigger-attention code for the retained stage benchmarks:
   - `GPQA`: `/data/scratch/murphy/outputs/cot-loop-detection/gpqa_mean_relative_from_archive_20260322/data`
   - `MATH-500`: `/data/scratch/murphy/outputs/cot-loop-detection/math_mean_relative_from_archive_20260323`
@@ -58,6 +63,16 @@ Last updated: 2026-04-21 21:41 UTC
   - `LiveCodeBench`: `/data/scratch/murphy/outputs/cot-loop-detection/livecodebench_mean_relative_from_archive_20260323`
 - Saved but excluded from the active stage table:
   - `AIME`: `/data/scratch/murphy/outputs/cot-loop-detection/aime_mean_relative_from_archive_20260322`
+- First positive-enrichment screening queue under the same frozen model/decode contract:
+  - `LiveCodeBench-extra`
+  - `TACO-hard`
+  - full `MATH` hard / level-5
+  - `Omni-MATH` hard
+- Second-pass screening queue:
+  - `APPS` competition
+  - `CodeContests` sample
+  - optional `SuperGPQA`
+  - optional `HLE`
 
 ## What The Repo Already Has
 
@@ -102,7 +117,7 @@ Last updated: 2026-04-21 21:41 UTC
 - First, whether a layerwise RFM built on the existing prompt-prefill tensors is competitive with the current MLP surfaces on the same held-out `majority_s_0.5` task.
 - Second, whether the exported benchmark-specific RFM directions are stable enough to be treated as steering vectors rather than only as a by-product of a nonlinear classifier.
 - Third, whether those benchmark-specific directions can be used for small, controlled block-specific steering interventions, with linear and spherical variants reported side by side, that reduce long-rollout risk without simply destroying accuracy.
-- Fourth, whether one averaged "verbose" vector built from those benchmark-local directions has measurable transfer value on a genuinely different benchmark.
+- Fourth, whether one averaged "verbose" vector built from screened-in benchmark-local directions has measurable transfer value on a genuinely different benchmark.
 - Detector ranking and steering utility are related, but they are not the same gate for this stage. The steering story should continue even if RFM does not become the single best detector.
 - Likewise, a strong RFM detector is not by itself evidence that the exported direction is stable or useful for steering. Direction quality needs its own diagnostics.
 
@@ -110,19 +125,18 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
 
 ## Stage Sequence
 
-### Stage 0: Freeze Provenance And The Four-Benchmark Registry
+### Stage 0: Freeze Provenance And The Screened Stage Registry
 
-- Add one committed retained-benchmark registry that names, in one place:
+- Add one committed screened-stage registry that names, in one place:
   - archive root
   - prompt field
   - train/test counts
+  - repaired train positive counts / rates where known
   - feature key
   - label head
-- Keep that registry to the active four-benchmark stage surface:
-  - `GPQA`
-  - `MATH-500`
-  - `MMLU-Pro`
-  - `LiveCodeBench`
+- Keep that registry honest about which datasets are currently steering-trainable:
+  - active right now: `LiveCodeBench`
+  - inactive but still tracked for diagnostics / screening provenance: `GPQA`, `MATH-500`, `MMLU-Pro`, `AIME`
 - Fail closed if the archive root, manifest, sample shape, or saved prompt IDs do not match the frozen contract.
 - Pull the current hard-coded archive roots out of analysis-only scripts and into that shared registry before any RFM training starts.
 - Commit one machine-readable artifact schema for:
@@ -130,6 +144,28 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
   - per-benchmark per-layer RFM vector bundles
   - steering-run ledgers
 - Keep that schema aligned with `docs/prompt-profile-rfm-artifact-schema-2026-04-21.md` so later experiment lookup does not depend on Slack thread history.
+
+### Stage 0.5: Positive-Enrichment Screening
+
+- Run the same frozen model/decode policy on candidate pools before promoting anything beyond `LiveCodeBench` into the steering-trainable registry.
+- For each candidate pool, report:
+  - prompt count
+  - repaired train positive count and repaired train positive rate under `majority_s_0.5`
+  - completion-level `>50%` fraction
+  - loop fraction
+  - max-length-hit fraction
+  - average / median completion length
+  - accuracy if a grader exists
+  - prompt-length stats
+- Promotion rule:
+  - only accept datasets whose repaired train positive rate is at least `10%`
+  - if a candidate stays below `10%`, keep it diagnostic-only even if the raw archive exists
+- First pass should start with:
+  - `LiveCodeBench-extra`
+  - `TACO-hard`
+  - full `MATH` hard / level-5
+  - `Omni-MATH` hard
+- MCQ-style academic extensions such as `SuperGPQA` or `HLE` are optional screens, not default steering-trainable surfaces.
 
 ### Stage 1: Add RFM As A Sibling Detector
 
@@ -284,7 +320,6 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
   - spherical steering
     - anti-risk target pole: `mu_l = -normalize(v_l)`
     - sign-flip control: `+normalize(v_l)`
-- The current repo only has the spherical branch implemented. Linear block-specific steering is still missing and should be treated as open work rather than implied by the current report.
 - Use one fixed angular strength:
   - `t = 0.3`
 - Do not grid-search `t` yet. First answer whether the direction works at all.
@@ -294,9 +329,9 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
   - intervene on the same prompt-prefill residual activation surface during the prefill forward pass
 - Do not start with KV-cache intervention if the activation-hook route is feasible, because that changes the steering surface away from the probe surface.
 - Be explicit about timing:
-  - the current in-repo runner modifies only the last prompt token during prefill
-  - it does not yet steer decode steps token by token
-  - if the intended contract is decode-step steering, that controller is still missing and has to land before the steering stage is called complete
+  - Wangzhi clarified the intended contract on 2026-04-21: prefill-only is correct
+  - but every prompt token at block `l` should be steered by that block's own vector during the prefill forward pass
+  - do not reinterpret the figure as last-prompt-token-only steering
 - Do not add a separate top-`k` layer-selection rule or probe gating in the first pass.
   - Use the exported signed per-layer benchmark-local bundle directly.
   - If layer ablations or controllers matter later, treat them as follow-ups after the first steering table exists.
@@ -330,12 +365,12 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
   - the benchmark-local steering runner now exists in-repo:
     - `scripts/steer_prompt_profile_concept_vectors.py`
     - `slurm/run_prompt_profile_rfm_steering.sbatch`
-  - what exists today is narrower than the intended stage contract:
-    - spherical only
-    - hook site `prefill_layer_output_last_token`
-    - prefill-once last-prompt-token intervention
-    - bounded pilot decode cap `max_new_tokens = 1024`
-  - so the existing LiveCodeBench steering table is a bounded prefill-only spherical pilot, not the full block-specific linear+spherical stage verdict
+  - the corrected rerun target is:
+    - linear plus spherical steering
+    - hook site `prefill_layer_output_all_tokens`
+    - prefill-only all-prompt-token intervention
+    - full archive-aligned decode budget rather than the old `1024` pilot cap
+  - so the existing LiveCodeBench steering table should now be treated as a superseded prefill-last-token spherical pilot, not the full block-specific linear+spherical stage verdict
   - first repaired `LiveCodeBench` smoke root:
     - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm_steering/livecodebench_smoke_t0p3_n8_seed0_20260421_fix2/`
   - completed smoke conditions:
@@ -346,7 +381,7 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
   - what it does not prove:
     - it is only an `8`-prompt smoke and is not a useful scientific steering table by itself
     - it uses the bounded pilot cap `max_new_tokens = 1024`, not the archive-side `30000`
-    - it is prefill-only rather than decode-step steering
+    - it steers only the last prompt token rather than all prompt tokens during prefill
     - both conditions stayed at `0 / 8` `pass@1` with mean completion length `1024`
     - `minus_v_spherical` increased loop fraction from `0.0` to `0.375` on that tiny slice, so the first honest steering claim still requires a larger held-out table
   - one follow-up review bug was real and is now fixed in project commit `df5187b`:
@@ -371,17 +406,17 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
     - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm_steering/livecodebench_controls32_t0p3_seed0_20260421/`
     - all four conditions stay at `0 / 32` `pass@1`
     - the run used the same bounded pilot cap `max_new_tokens = 1024`
-    - the run is still prefill-only spherical steering, not decode-step steering and not the parallel linear+spherical figure contract
+    - the run is still last-prompt-token spherical steering, not the all-prefill-token linear+spherical figure contract
     - loop fractions on the larger repaired held-out slice are:
       - `0.03125` for `no_steer`
       - `0.28125` for `minus_v_spherical`
       - `0.125` for `plus_v_spherical`
       - `0.34375` for `random_spherical`
     - the delayed `random_spherical` arm did finish; it was simply much slower than the first three conditions and ended as the worst loop-fraction control
-    - so the first larger bounded prefill-only spherical table is also negative:
+    - so the first larger bounded prefill-last-token spherical table is also negative:
       - there is still no accuracy movement anywhere
       - both signed directions are worse than baseline on loop fraction
-      - but this does not yet close the full stage under the figure contract, because linear steering and decode-step timing are still missing
+      - but this does not yet close the full stage under the figure contract, because the figure contract is all-prefill-token linear+spherical steering at full decode length
   - the negative `32`-prompt table is now frozen into the report-style deliverable:
     - `docs/livecodebench-repaired-stage-report-2026-04-21.md`
     - `outputs/livecodebench_repaired_stage_report_apr21/`
@@ -442,16 +477,19 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
 
 ### P2: First Steering Pass
 
-- Keep the benchmark-local spherical steering runner on the fixed `t = 0.3` surface now that it exists in-repo.
-- Add the missing benchmark-local linear steering runner on the same block-specific bundle rather than treating spherical as the whole steering family.
+- Re-run the same `32` held-out `LiveCodeBench` prompts under the corrected figure contract:
+  - full decode budget (`30000`, not `1024`)
+  - hook site `prefill_layer_output_all_tokens`
+  - prefill-only all-prompt-token steering
+  - block-specific linear and spherical conditions in parallel
+- Keep the benchmark-local steering runner on the fixed `t = 0.3` surface.
 - Match the intervention surface to the probe surface through prompt-prefill residual hooks if feasible.
-- Decide explicitly whether the intended contract is decode-step steering rather than prefill-once steering; if yes, add that controller before calling the steering stage complete.
 - Use the exported signed per-layer bundle directly; do not add a top-`k` layer rule, probe gate, or controller in the first pass.
 - Run paired benchmark-wise evaluation on held-out test prompts under `no_steer`, linear controls, spherical controls, and shuffled-label controls where feasible.
 - Report length, loop, max-hit, `majority_s_0.5`, accuracy, and bootstrap deltas in one table.
 - Report angular-move and norm-preservation diagnostics in a separate table.
 - Keep the reviewed-head two-condition smoke plus the finished four-condition control smoke as implementation receipts only, then scale to the first larger held-out table before making any sign-sensitive steering claim.
-- Do not treat the finished `32`-prompt spherical table as the whole stage verdict; it is only the bounded prefill-only spherical sub-lane.
+- Do not treat the finished `32`-prompt spherical table as the whole stage verdict; it is only the bounded prefill-last-token spherical sub-lane.
 
 ### P3: Second-Pass Follow-Ups
 

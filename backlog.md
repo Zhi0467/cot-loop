@@ -1,13 +1,40 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-21 21:41 UTC
+Last updated: 2026-04-21 22:26 UTC
 
 Reference plan:
 - `docs/prompt-profile-rfm-steering-plan-2026-04-21.md`
 
 ## Active TODOs
 
-### P0: Close The Repaired Detector Table
+### P0: Positive-Enrichment Screening Gate
+
+- The active steering-trainable set is now gated by repaired train positive rate:
+  - only promote datasets with train positive rate `>= 10%` after screening
+  - on the current repaired surface, only `LiveCodeBench` passes (`140 / 420 = 33.3%`)
+  - keep `GPQA`, `MATH-500`, and `MMLU-Pro` diagnostic-only for now (`7 / 133`, `18 / 338`, `6 / 518`)
+- First screening queue:
+  - `LiveCodeBench-extra`
+  - `TACO-hard`
+  - full `MATH` hard / level-5
+  - `Omni-MATH` hard
+- Second screening queue:
+  - `APPS` competition
+  - `CodeContests` sample
+  - optional `SuperGPQA`
+  - optional `HLE`
+- For each screened pool, report:
+  - prompt count
+  - repaired train positive count and positive rate under `majority_s_0.5`
+  - completion-level `>50%` fraction
+  - loop fraction
+  - max-hit fraction
+  - average / median completion length
+  - accuracy if a grader exists
+  - prompt-length stats
+- Do not revive cross-benchmark vector averaging or cosine-alignment claims until at least one more dataset clears the `10%` gate.
+
+### P1: Close The Repaired Detector Table
 
 - The repaired `LiveCodeBench` detector object is now frozen in the report bundle:
   - `outputs/livecodebench_repaired_stage_report_apr21/`
@@ -15,13 +42,13 @@ Reference plan:
   - decide whether detector ranking needs matching RFM multiseed or split-seed sensitivity before it is treated as the durable RFM-versus-MLP read.
 - If that follow-up is skipped, propagate the repaired `LiveCodeBench` detector table into the next unified prompt-profile summary instead of reusing the superseded `54 / 128 / 160` March object.
 
-### P1: Finish The Direction-Quality Surface
+### P2: Finish The Direction-Quality Surface
 
 - The repaired `LiveCodeBench` vector bundle and its report-style direction summary are now frozen in:
   - `outputs/livecodebench_repaired_stage_report_apr21/`
 - Remaining direction tasks before any transfer claim:
-  - cross-benchmark cosine alignment across the retained benchmark set
-  - explicit decision on whether the tiny-positive repaired non-`LiveCodeBench` objects count as real alignment inputs or stay provenance-only
+  - cross-benchmark cosine alignment across screened-in datasets, not the old retained-four list
+  - explicit decision on whether any future sub-`10%` repaired object should remain provenance-only even after materialization
 - Repaired-materialization probecheck on the other retained benchmarks is now on disk:
   - `GPQA`: `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_binary/gpqa_majority_s0p5_rolloutrecompute_probecheck_20260421/`
     - natural prompt-majority counts: train `126/7`, val `32/2`, test `40/2`
@@ -30,20 +57,27 @@ Reference plan:
   - `MMLU-Pro`: `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_binary/mmlu_pro_majority_s0p5_rolloutrecompute_probecheck_20260421/`
     - natural prompt-majority counts: train `512/6`, val `128/1`, test `160/2`
 - Earlier smaller train counts from the same materializer (`14/7`, `36/18`, `12/6`) were only the downsampled fit-train subsets, not the raw repaired prompt sets.
-- Decide explicitly whether those tiny-positive repaired objects should count as real transfer / alignment inputs or stay provenance-only for now.
+- Under the new gate, those tiny-positive repaired objects stay provenance-only for now unless an enrichment pass creates a screened-in variant.
 
-### P2: Benchmark-Local Block-Specific Steering
+### P3: Benchmark-Local Block-Specific Steering
 
-- The first larger benchmark-local steering table in the report bundle is only a bounded prefill-only spherical pilot and should be treated that way:
+- The first larger benchmark-local steering table in the report bundle is only a bounded prefill-last-token spherical pilot and should be treated that way:
   - `outputs/livecodebench_repaired_stage_report_apr21/`
-- If the steering lane continues on `LiveCodeBench`, do not just scale the same table again.
+- If the steering lane continues on `LiveCodeBench`, the first required step is not a new hypothesis; it is the corrected same-slice rerun under the figure contract Wangzhi clarified on April 21.
 - Open steering-side TODOs are now:
-  - add the missing linear block-specific steering lane in parallel to spherical:
-    - `minus_v_linear`
-    - `plus_v_linear`
-    - `random_linear`
-  - decide whether the intended stage contract is decode-step steering rather than prefill-once steering; if yes, implement the decode-time controller and rerun the `LiveCodeBench` controls on that surface
-  - rerun the benchmark-local controls without the bounded pilot cap `max_new_tokens = 1024` if the stage is supposed to stay aligned with the archive-side `30000` decode budget
+  - rerun the same `32` held-out `LiveCodeBench` prompt IDs with:
+    - full decode budget (`30000`, not `1024`)
+    - prefill-only timing
+    - every prompt token steered at every selected block during prefill
+    - block-specific linear conditions:
+      - `minus_v_linear`
+      - `plus_v_linear`
+      - `random_linear`
+    - block-specific spherical conditions:
+      - `minus_v_spherical`
+      - `plus_v_spherical`
+      - `random_spherical`
+  - record the rerun as superseding the old last-token `1024` pilot rather than as another comparable row in the same table
   - add `shuffled_label_spherical` if the benchmark-local lane is going to continue at all
   - pick a new benchmark-local steering hypothesis before launching more runs:
     - different hook surface
@@ -54,11 +88,13 @@ Reference plan:
     - it is the cosine between a bootstrap-refit signed normalized vector and the reference exported signed normalized vector for the same layer
     - the reference vector itself comes from the top eigenvector of that layer's symmetrized final `M`, after sign selection by fit-train `PR-AUC` then `ROC-AUC`
 
-### P3: External Average-Vector Test
+### P4: External Average-Vector Test
 
-- Build one layerwise average "verbose" vector by sign-aligning and averaging the retained benchmark-local bundles.
-- Pick one benchmark outside the retained four-benchmark training set.
-- Apply the same fixed spherical protocol on that external benchmark and report the same paired metric table plus accuracy delta.
+- This stays blocked until at least two screened-in benchmark-local bundles exist.
+- Once that gate is met:
+  - build one layerwise average "verbose" vector by sign-aligning and averaging the screened-in benchmark-local bundles
+  - pick one benchmark outside that screened-in training set
+  - apply the same fixed spherical protocol on that external benchmark and report the same paired metric table plus accuracy delta
 
 ### Later Only If The First Steering Table Is Real
 

@@ -263,6 +263,7 @@ def build_steering_run_record(
     vector_artifact_hash: str,
     hook_site: str,
     t: float,
+    epsilon: float | None = None,
     seeds: list[int],
     prompt_ids: list[int],
     generation_config: dict[str, Any],
@@ -288,6 +289,8 @@ def build_steering_run_record(
         "grader_version": grader_version,
         "output_path": output_path,
     }
+    if epsilon is not None:
+        record["epsilon"] = epsilon
     if benchmark is not None:
         record["benchmark"] = benchmark
     if prompt_text_hash is not None:

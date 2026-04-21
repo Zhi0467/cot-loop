@@ -70,6 +70,7 @@ SPLIT="${SPLIT:-test}"
 CONDITIONS="${CONDITIONS:-no_steer minus_v_spherical}"
 SEEDS="${SEEDS:-0}"
 T="${T:-0.3}"
+EPSILON="${EPSILON:-}"
 MAX_SAMPLES="${MAX_SAMPLES:-}"
 BATCH_SIZE="${BATCH_SIZE:-2}"
 MAX_NEW_TOKENS="${MAX_NEW_TOKENS:-}"
@@ -83,7 +84,7 @@ ATTN_IMPLEMENTATION="${ATTN_IMPLEMENTATION:-}"
 MODEL_ID="${MODEL_ID:-}"
 MODEL_REVISION="${MODEL_REVISION:-}"
 TOKENIZER_REVISION="${TOKENIZER_REVISION:-}"
-HOOK_SITE="${HOOK_SITE:-prefill_layer_output_last_token}"
+HOOK_SITE="${HOOK_SITE:-prefill_layer_output_all_tokens}"
 LIVECODEBENCH_REPO="${LIVECODEBENCH_REPO:-}"
 RELEASE_VERSION="${RELEASE_VERSION:-}"
 
@@ -105,6 +106,10 @@ cmd=(
   --dtype "${DTYPE}"
   --hook-site "${HOOK_SITE}"
 )
+
+if [[ -n "${EPSILON}" ]]; then
+  cmd+=(--epsilon "${EPSILON}")
+fi
 
 cmd+=(--conditions)
 for condition in ${CONDITIONS}; do

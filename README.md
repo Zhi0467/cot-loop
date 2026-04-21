@@ -1,6 +1,6 @@
 # CoT Loop Detection via Probe Classifiers
 
-This repository studies whether chain-of-thought loop risk is predictable from internal activations and rollout telemetry. The original workflow centered on prompt-prefill last-token probes, and the current active stage is a prompt-profile RFM-plus-steering extension on the frozen Qwen prompt-profile bundle. The retained collaborator-facing benchmark set for that stage is `GPQA`, `MATH-500`, `MMLU-Pro`, and `LiveCodeBench`; `AIME` is intentionally out on this object because it mostly reads as a prompt-visible workload case. The merged trigger-attention audit remains useful background context, but it is no longer the live blocker surface for the next stage.
+This repository studies whether chain-of-thought loop risk is predictable from internal activations and rollout telemetry. The original workflow centered on prompt-prefill last-token probes, and the current active stage is a screened prompt-profile RFM-plus-steering extension on the frozen Qwen prompt-profile bundle. Under the repaired-train positive-rate gate (`>= 10%` after screening), only `LiveCodeBench` is currently steering-trainable on this object (`140 / 420 = 33.3%`); `GPQA`, `MATH-500`, and `MMLU-Pro` stay diagnostic-only for now because their repaired train rates are `5.3%`, `5.3%`, and `1.2%`. `AIME` remains out because it mostly reads as a prompt-visible workload case here. The merged trigger-attention audit remains useful background context, but it is no longer the live blocker surface for the next stage.
 
 ## Overview
 
@@ -17,20 +17,26 @@ Latest status:
 - the collaborator-facing prompt-profile surface is now the unified note `docs/prompt-profile-unified-report-2026-04-09.md` plus `outputs/prompt_profile_unified_report_20260409/`, which folds the April 5 combined audit, the April 6 mechanism note, and the April 9 plain-English length audit into one canonical PDF while keeping the natural-regression lane, the balanced-binary recommendation, and the prompt-shape mechanism answer in the same surface.
 - the next execution surface is now pinned in `docs/prompt-profile-rfm-steering-plan-2026-04-21.md`:
   - reuse the saved March `2026-03-22` / `2026-03-23` Qwen prompt-profile archives;
-  - keep the retained four-benchmark set `GPQA`, `MATH-500`, `MMLU-Pro`, and `LiveCodeBench`, with `AIME` intentionally excluded from the collaborator-facing stage;
+  - keep only screened-in datasets with repaired train positive rate `>= 10%` as steering-trainable stage inputs;
+  - on the current repaired surface, that narrows the active stage to `LiveCodeBench` alone (`140 / 420 = 33.3%`);
+  - keep `GPQA`, `MATH-500`, and `MMLU-Pro` as evaluation/diagnostic surfaces until positive enrichment lands, with current repaired train rates `7 / 133`, `18 / 338`, and `6 / 518`;
+  - add an explicit stage-0.5 positive-enrichment screen ahead of any renewed cross-benchmark steering claim, starting with `LiveCodeBench-extra`, `TACO-hard`, full `MATH` hard / level-5, and `Omni-MATH` hard;
   - keep the binary head `majority_s_0.5`;
   - add a native layerwise RFM path as a sibling baseline to the current activation linear and activation MLP surfaces;
   - extend the report with direction-coherence diagnostics before making any steering claim;
   - keep `T = 5` fixed on the first RFM pass;
   - then run paired benchmark-local block-specific steering using the exported per-layer bundle directly, with linear and spherical variants side by side rather than a top-`k` rule or controller;
   - include `no_steer`, `-v`, `+v`, and random-direction controls in the first steering table;
-  - then test one external benchmark with the averaged "verbose" vector rather than doing leave-one-benchmark-out gymnastics inside the retained training set.
+  - only revisit the averaged external "verbose" vector once at least two screened-in benchmark-local bundles exist.
 - the repo now has committed stage-0 RFM scaffolding:
   - `src/loop_probe/prompt_profile_rfm_stage_registry.py`
   - `scripts/emit_prompt_profile_rfm_stage_registry.py`
   - `scripts/validate_prompt_profile_rfm_stage_registry.py`
   - `src/loop_probe/stage_artifacts.py`
   - `outputs/prompt_profile_rfm_stage0_registry_validation_20260421/registry_validation.json`
+- the screened registry now makes that gate real in code rather than only in docs:
+  - `src/loop_probe/prompt_profile_rfm_stage_registry.py` records repaired train positive counts / rates and only exposes screened-in datasets as active stage inputs;
+  - with the current repaired counts, `active_stage_datasets()` now resolves to `LiveCodeBench` only.
 - the repo now has a live native RFM detector path:
   - `src/loop_probe/rfm.py`
   - `scripts/train_prompt_profile_rfm.py`
@@ -66,6 +72,9 @@ Latest status:
   - RFM is above the cheap prompt-only baselines and above activation linear on the repaired split
   - `h256 d1` MLP last-layer is now essentially tied with the current single-seed RFM on `PR-AUC`, and it is slightly ahead if the detector comparison uses the activation `best_loss` mean
   - because the repaired activation bundle is multiseed while RFM is still single-seed, the next honest detector question is whether RFM also needs matching multiseed / split-seed sweeps before the report is locked
+- the next open dataset-level move is no longer "which of the retained four should we steer first?";
+  - that question is closed by the new gate because only `LiveCodeBench` currently qualifies;
+  - the real next dataset-level work is the positive-enrichment screen on code/math candidates, with `GPQA`, `MATH-500`, and `MMLU-Pro` held out of benchmark-local vector export until some enriched pool clears `10%`.
 - the repaired LiveCodeBench vector bundle is now a real stage-2 artifact, not just an export stub:
   - `vector_exports/summary.json` carries signed per-layer vectors, prompt-ID provenance, raw / normalized checksums, held-out 1D projection separation, and cross-layer cosine structure
   - `2026-04-21` direction-bootstrap replay now adds `100` fixed-hyperparameter bootstrap refits per layer under the same sign convention
@@ -104,7 +113,7 @@ Latest status:
   - decide whether the repaired detector lane is ready to freeze on the current single-seed RFM row, or whether RFM itself also needs matching multiseed / split-seed sweeps;
   - extend the unified prompt-profile report with the repaired detector table plus direction-coherence diagnostics on that repaired surface;
   - keep exporting repaired benchmark-local steering vectors and run paired block-specific linear and fixed-`t = 0.3` spherical steering tables even if RFM does not become the single best detector;
-  - the current in-repo runner only covers the prefill-once spherical sub-lane, so linear steering and any decode-step controller are still open work rather than finished stage pieces;
+  - treat the finished `32`-prompt steering table as obsolete under the corrected figure contract: the rerun has to use full decode length and steer every prompt token during prefill at every block, with block-specific linear and spherical variants in parallel;
   - then test one external benchmark with the averaged "verbose" vector;
   - then revisit stronger prompt-shape controls and only later ablate layer rules, controllers, or `t` if the first steering table shows signal.
 
