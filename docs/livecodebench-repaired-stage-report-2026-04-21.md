@@ -64,10 +64,11 @@ Last updated: 2026-04-21 21:41 UTC
   - all `28` layers clear mean cosine `>= 0.781`
   - weakest low bound: `0.693`
 - Cosine definition:
-  - for each layer, refit the same RFM on bootstrap resamples of the fit-train prompts;
-  - extract that layer's signed normalized vector from the top eigenvector of the symmetrized final `M`;
+  - fix one reference vector by fitting the chosen RFM once on the original full fit-train split for that layer;
+  - then, for each bootstrap replay, refit the same RFM on a with-replacement resample of those fit-train prompts;
+  - extract that replay's signed normalized vector from the top eigenvector of the symmetrized final `M`;
   - choose the sign by fit-train `PR-AUC` then `ROC-AUC`;
-  - then measure cosine against the reference exported signed normalized vector for that same layer.
+  - then measure cosine between that bootstrap-refit vector and the fixed reference exported signed normalized vector for that same layer.
 - Most stable layers:
   - `23`, `24`, `25`, `26`
 - Selected detector layer `27` is still usable rather than pathological:
