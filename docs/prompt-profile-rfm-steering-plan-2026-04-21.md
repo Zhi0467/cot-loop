@@ -292,6 +292,24 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
   - mean post-intervention norm
   - norm-preservation error
 - The diagnostics table should verify that the spherical implementation is actually norm-preserving in practice.
+- Current stage-4 status:
+  - the benchmark-local steering runner now exists in-repo:
+    - `scripts/steer_prompt_profile_concept_vectors.py`
+    - `slurm/run_prompt_profile_rfm_steering.sbatch`
+  - first repaired `LiveCodeBench` smoke root:
+    - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm_steering/livecodebench_smoke_t0p3_n8_seed0_20260421_fix2/`
+  - completed smoke conditions:
+    - `no_steer`
+    - `minus_v_spherical`
+  - what that smoke actually proves:
+    - the prompt-hash checks, prompt-surface recovery, prefill-layer spherical hook, generation path, `LiveCodeBench` grading path, and steering ledgers all run end to end on the repaired object
+  - what it does not prove:
+    - it is only an `8`-prompt smoke and is not a useful scientific steering table by itself
+    - both conditions stayed at `0 / 8` `pass@1` with mean completion length `1024`
+    - `minus_v_spherical` increased loop fraction from `0.0` to `0.375` on that tiny slice, so the first honest steering claim still requires a larger held-out table
+  - one follow-up review bug was real and is now fixed in project commit `df5187b`:
+    - `LiveCodeBench` prompt recovery must use the archive source formatter, not the steering checkpoint formatter
+    - direct node-side precheck now confirms prompt recovery still succeeds even when the steering model ID is changed away from the archive source model
 
 ### Stage 5: External Averaged-Vector Test
 

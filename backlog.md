@@ -1,6 +1,6 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-21 12:34 UTC
+Last updated: 2026-04-21 14:00 UTC
 
 Reference plan:
 - `docs/prompt-profile-rfm-steering-plan-2026-04-21.md`
@@ -41,7 +41,19 @@ Reference plan:
 
 ### P2: Benchmark-Local Spherical Steering
 
-- Implement `scripts/steer_prompt_profile_concept_vectors.py` and `slurm/run_prompt_profile_rfm_steering.sbatch`.
+- The first spherical steering runner is now real:
+  - repo surfaces:
+    - `scripts/steer_prompt_profile_concept_vectors.py`
+    - `slurm/run_prompt_profile_rfm_steering.sbatch`
+  - first repaired `LiveCodeBench` smoke root:
+    - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm_steering/livecodebench_smoke_t0p3_n8_seed0_20260421_fix2/`
+  - smoke status:
+    - both `no_steer` and `minus_v_spherical` ran end to end and wrote `config.json`, per-seed summaries, condition summaries, and `prompt_profile_rfm_steering_run.v1` ledgers
+    - on this tiny `8`-prompt slice, both conditions stayed at `0 / 8` `pass@1` with mean length `1024`, so the smoke is an implementation receipt rather than a positive steering result
+    - `minus_v_spherical` also raised loop fraction from `0.0` to `0.375` on the smoke slice, so the first real steering table still needs a larger held-out surface before any directional claim
+- Keep the reviewed formatter fix from project commit `df5187b` on this lane:
+  - `LiveCodeBench` prompt recovery now uses the archive source formatter (source model plus saved `lm_style_override` where available), not the steering checkpoint formatter
+  - direct precheck on the node confirmed prompt recovery still works even when the steering model ID is changed
 - Keep the first steering pass fixed to:
   - prompt-prefill residual hooks if feasible
   - full exported per-layer bundle
@@ -57,6 +69,10 @@ Reference plan:
   - generation config
   - grader version
   - output path
+- Next steering TODOs:
+  - rerun the smoke from reviewed head `df5187b` so the durable smoke receipt matches the final code surface
+  - add `plus_v_spherical` and `random_spherical`
+  - scale from `8` prompts to the first honest repaired held-out steering table
 
 ### P3: External Average-Vector Test
 
