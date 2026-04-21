@@ -337,6 +337,46 @@ def _load_mmlu_gold(spec: DatasetSpec) -> dict[int, tuple[str, int | None]]:
     }
 
 
+def _load_livecodebench_prompt_lookup(
+    *,
+    repo_path: str,
+    release_version: str,
+    model_id: str,
+) -> tuple[list[Any], dict[str, Any]]:
+    benchmark, format_prompt = livecodebench_codegen.load_benchmark(
+        repo_path,
+        release_version,
+    )
+    prompt_records, _prompt_format = livecodebench_codegen.build_prompts(
+        benchmark,
+        format_prompt,
+        repo_path=repo_path,
+        model_id=model_id,
+        max_samples=None,
+    )
+    if len(prompt_records) != len(benchmark):
+        raise SystemExit(
+            "LiveCodeBench prompt builder returned a different number of prompts than benchmark rows: "
+            f"{len(prompt_records)} != {len(benchmark)}."
+        )
+    prompt_to_instance: dict[str, Any] = {}
+    for instance, prompt_record in zip(benchmark, prompt_records):
+        question_id, prompt_text = prompt_record
+        expected_question_id = str(instance.question_id)
+        if str(question_id) != expected_question_id:
+            raise SystemExit(
+                "LiveCodeBench prompt builder question_id drifted from benchmark order: "
+                f"{question_id!r} != {expected_question_id!r}."
+            )
+        if prompt_text in prompt_to_instance:
+            raise SystemExit(
+                "LiveCodeBench prompt builder produced duplicate prompt text; "
+                "cannot resolve archived prompts back to benchmark instances."
+            )
+        prompt_to_instance[prompt_text] = instance
+    return benchmark, prompt_to_instance
+
+
 def _build_prompt_items(
     *,
     source_manifest: dict[str, Any],
@@ -346,6 +386,7 @@ def _build_prompt_items(
     max_samples: int | None,
     livecodebench_repo: str,
     release_version: str,
+    model_id: str,
 ) -> tuple[list[SteeringPromptItem], list[str], str, str, list[Any] | None]:
     first_record = next(iter(layer_payloads.values())).record
     benchmark = str(first_record["benchmark"])
@@ -464,21 +505,21 @@ def _build_prompt_items(
     elif task_kind == "livecodebench_codegen":
         if not livecodebench_repo:
             raise SystemExit("--livecodebench-repo is required for livecodebench steering.")
-        benchmark, _ = livecodebench_codegen.load_benchmark(
-            livecodebench_repo,
-            release_version,
+        _benchmark, prompt_to_instance = _load_livecodebench_prompt_lookup(
+            repo_path=livecodebench_repo,
+            release_version=release_version,
+            model_id=model_id,
         )
-        if source_spec.max_samples is not None:
-            benchmark = benchmark[: source_spec.max_samples]
         benchmark_subset = []
         for row, prompt in zip(selected_rows, prompts):
             sample_id = int(row["sample_id"])
-            if sample_id < 0 or sample_id >= len(benchmark):
+            instance = prompt_to_instance.get(prompt)
+            if instance is None:
                 raise SystemExit(
-                    f"LiveCodeBench sample_id={sample_id} is outside loaded benchmark range "
-                    f"[0, {len(benchmark)})."
+                    "LiveCodeBench archived prompt text did not match any regenerated benchmark prompt. "
+                    f"sample_id={sample_id} prompt_hash={stable_json_sha256(prompt)} "
+                    f"release_version={release_version!r} model_id={model_id!r}."
                 )
-            instance = benchmark[sample_id]
             benchmark_subset.append(instance)
             items.append(
                 SteeringPromptItem(
@@ -1224,6 +1265,7 @@ def main() -> None:
         max_samples=args.max_samples,
         livecodebench_repo=args.livecodebench_repo,
         release_version=release_version,
+        model_id=model_id,
     )
 
     generation_temperature = (
