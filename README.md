@@ -49,6 +49,10 @@ Latest status:
   - test `PR-AUC`: `0.7055`
   - test `ROC-AUC`: `0.8590`
   - test positive `F1`: `0.2222`
+- the first report-style LiveCodeBench deliverable now exists too:
+  - note: `docs/livecodebench-repaired-stage-report-2026-04-21.md`
+  - bundle: `outputs/livecodebench_repaired_stage_report_apr21/`
+  - it freezes the repaired prompt object, detector comparison, direction-stability read, and first larger steering control table in one PDF-plus-JSON handoff surface
 - the earlier `54 / 128 / 160` `LiveCodeBench` comparison object is now superseded and should not be reused for the stage report
 - repaired prompt-only baseline bundle:
   - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_prompt_baselines/livecodebench_majority_s0p5_rolloutrecompute_seed0_20260421/`

@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-04-21 12:34 UTC
+Last updated: 2026-04-21 19:48 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -17,6 +17,7 @@ Core docs:
 - Prompt-profile full-train plan: prompt-profile-full-train-plan-2026-04-02.md
 - Prompt-profile RFM + steering stage plan: prompt-profile-rfm-steering-plan-2026-04-21.md
 - Prompt-profile RFM artifact schema: prompt-profile-rfm-artifact-schema-2026-04-21.md
+- LiveCodeBench repaired stage report: livecodebench-repaired-stage-report-2026-04-21.md
 - Prompt-profile natural-regression rerun note: prompt-profile-natural-regression-rerun-2026-04-05.md
 - Prompt-profile unified report note: prompt-profile-unified-report-2026-04-09.md
 - Prompt-profile combined audit note: prompt-profile-combined-audit-2026-04-05.md
@@ -48,6 +49,8 @@ Key outputs:
 - Natural-regression rerun PDF: ../outputs/prompt_profile_natural_regression_rerun_20260405/prompt_profile_natural_regression_rerun_20260405.pdf
 - Prompt-profile unified report bundle: ../outputs/prompt_profile_unified_report_20260409/
 - Prompt-profile unified report PDF: ../outputs/prompt_profile_unified_report_20260409/prompt_profile_unified_report_20260409.pdf
+- LiveCodeBench repaired stage report bundle: ../outputs/livecodebench_repaired_stage_report_apr21/
+- LiveCodeBench repaired stage report PDF: ../outputs/livecodebench_repaired_stage_report_apr21/livecodebench_repaired_stage_report_apr21.pdf
 - Prompt-profile combined audit bundle: ../outputs/prompt_profile_combined_audit_20260405/
 - Prompt-profile combined audit PDF: ../outputs/prompt_profile_combined_audit_20260405/prompt_profile_combined_audit_20260405.pdf
 - Prompt-profile metadata audit bundle: ../outputs/prompt_profile_metadata_audit_20260405/
@@ -106,6 +109,16 @@ Current live status:
     - late layers `23-26` are the most stable, while detector validation still peaks at layer `27`;
   - it makes the final OOD step an external-benchmark averaged-"verbose"-vector test instead of a leave-one-benchmark-out exercise inside the retained training set;
   - it separates detector quality, steering utility, and trigger-attention background context instead of blending them into one claim.
+- The new note `livecodebench-repaired-stage-report-2026-04-21.md` is now the shortest collaborator-facing artifact for "finish LiveCodeBench" on this stage:
+  - it freezes the repaired `LiveCodeBench` prompt object, detector comparison, direction-stability read, and first larger steering control table in one place;
+  - it points at the report bundle `../outputs/livecodebench_repaired_stage_report_apr21/`, which now carries:
+    - `livecodebench_repaired_stage_report_apr21.pdf`
+    - `livecodebench_stage_summary.json`
+    - detector, direction-stability, and steering figures;
+  - its scientific read is narrower than the full stage plan:
+    - detector side: RFM is competitive but not a clean activation-MLP win;
+    - direction side: the exported bundle is stable enough to study causally;
+    - steering side: the first larger `32`-prompt spherical control table is negative, with all steered conditions worse than baseline on loop fraction.
 - The combined audit `prompt-profile-combined-audit-2026-04-05.md` is still the whole-surface prompt-profile bundle:
   - it keeps the canonical natural regression rerun, the current balanced-binary default, the cheap prompt-stat audit, and the Athena code audit in one place;
   - it narrows the honest claim: the current reports establish lift over a 1D prompt-length baseline on some surfaces, not yet lift over strong prompt-only controls in general.

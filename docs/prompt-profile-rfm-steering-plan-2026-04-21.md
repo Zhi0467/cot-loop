@@ -1,6 +1,6 @@
 # Prompt-Profile RFM Steering Stage Plan
 
-Last updated: 2026-04-21 15:21 UTC
+Last updated: 2026-04-21 19:48 UTC
 
 ## Bottom Line
 
@@ -257,6 +257,17 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
   - sign convention check
   - cross-benchmark cosine where relevant
 - Keep this report separate from trigger-attention narrative. The attention note is background context, not validation for the RFM stage.
+- First report-style LiveCodeBench deliverable now exists:
+  - note:
+    - `docs/livecodebench-repaired-stage-report-2026-04-21.md`
+  - bundle:
+    - `outputs/livecodebench_repaired_stage_report_apr21/`
+  - what it freezes:
+    - the repaired `LiveCodeBench` prompt object
+    - the detector comparison against repaired prompt-only / activation baselines
+    - the direction-bootstrap stability surface
+    - the first finished larger benchmark-local steering table
+- That report does not replace the later unified detector report for the whole prompt-profile surface, but it is now the collaborator-facing artifact for "finish LiveCodeBench" on this stage.
 
 ### Stage 4: In-Distribution Spherical Steering On Benchmark-Specific Vectors
 
@@ -346,6 +357,9 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
       - there is still no accuracy movement anywhere
       - both signed directions are worse than baseline on loop fraction
       - the current stage no longer needs “more of the same table”; it needs either a new control, a new direction-quality result, or a different steering hypothesis
+  - the negative `32`-prompt table is now frozen into the report-style deliverable:
+    - `docs/livecodebench-repaired-stage-report-2026-04-21.md`
+    - `outputs/livecodebench_repaired_stage_report_apr21/`
 
 ### Stage 5: External Averaged-Vector Test
 
@@ -429,4 +443,6 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
 
 - One committed stage-plan note: this file.
 - One backlog/roadmap update that makes the stage executable without Slack archaeology.
-- After implementation, one unified detector report first, then one steering report.
+- One LiveCodeBench report-style bundle now exists for the repaired stage object:
+  - `outputs/livecodebench_repaired_stage_report_apr21/`
+- After broader implementation beyond `LiveCodeBench`, one unified detector report first, then one steering report.

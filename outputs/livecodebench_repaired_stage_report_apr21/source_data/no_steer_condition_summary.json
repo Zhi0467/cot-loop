@@ -1,0 +1,157 @@
+{
+  "aggregate": {
+    "accuracy": {
+      "max": 0.0,
+      "mean": 0.0,
+      "min": 0.0
+    },
+    "accuracy_delta_vs_no_steer": 0.0,
+    "avg_generation_length": {
+      "max": 1024.0,
+      "mean": 1024.0,
+      "min": 1024.0
+    },
+    "loop_fraction": {
+      "max": 0.03125,
+      "mean": 0.03125,
+      "min": 0.03125
+    },
+    "max_length_hit_fraction": {
+      "max": 0.0,
+      "mean": 0.0,
+      "min": 0.0
+    },
+    "median_generation_length": {
+      "max": 1024.0,
+      "mean": 1024.0,
+      "min": 1024.0
+    },
+    "over_half_budget_fraction": {
+      "max": 1.0,
+      "mean": 1.0,
+      "min": 1.0
+    },
+    "seeds": [
+      0
+    ]
+  },
+  "condition_name": "no_steer",
+  "record": {
+    "artifact_sha256": "f7ca8841fd2007e90437fd84066ca8cd103ed9f6206d1b38392c8f6cd7e4d834",
+    "benchmark": "livecodebench",
+    "condition_config": {
+      "kind": "identity"
+    },
+    "condition_name": "no_steer",
+    "created_at": "2026-04-21T14:57:28.811483+00:00",
+    "generation_config": {
+      "batch_size": 2,
+      "do_sample": true,
+      "max_model_len": 40960,
+      "max_new_tokens": 1024,
+      "temperature": 0.2,
+      "top_k": 20,
+      "top_p": 0.95
+    },
+    "git_commit": "26a94687531b48cff30af1f2a829ec711740663e",
+    "grader_version": "livecodebench_codegen.release_v6@28fef95ea8c9f7a547c8329f2cd3d32b92c1fa24",
+    "hook_site": "prefill_layer_output_last_token",
+    "model_id": "Qwen/Qwen3-1.7B",
+    "output_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm_steering/livecodebench_controls32_t0p3_seed0_20260421/no_steer",
+    "prompt_ids": [
+      54,
+      608,
+      205,
+      313,
+      141,
+      706,
+      447,
+      56,
+      563,
+      530,
+      375,
+      459,
+      420,
+      67,
+      214,
+      715,
+      786,
+      34,
+      473,
+      791,
+      357,
+      104,
+      232,
+      396,
+      536,
+      69,
+      518,
+      304,
+      615,
+      336,
+      322,
+      793
+    ],
+    "prompt_text_hash": "3b51c41723f6769f3d6033a55dc3ee5bcf15c73f7f4ae4a7b9c7346a442c0b7f",
+    "schema_name": "prompt_profile_rfm_steering_run.v1",
+    "seeds": [
+      0
+    ],
+    "t": 0.3,
+    "vector_artifact_hash": "46422ae875f70b20c0622af8bfbbd148a99e6a35c32202c87d3a55b2092d69b8"
+  },
+  "seed_summaries": {
+    "0": {
+      "accuracy": 0.0,
+      "avg_generation_length": 1024.0,
+      "diagnostics_by_layer": {},
+      "loop_fraction": 0.03125,
+      "max_length_hit_fraction": 0.0,
+      "median_generation_length": 1024.0,
+      "native_metrics": {
+        "detail": {
+          "pass@1": {
+            "0": 0.0,
+            "1": 0.0,
+            "10": 0.0,
+            "11": 0.0,
+            "12": 0.0,
+            "13": 0.0,
+            "14": 0.0,
+            "15": 0.0,
+            "16": 0.0,
+            "17": 0.0,
+            "18": 0.0,
+            "19": 0.0,
+            "2": 0.0,
+            "20": 0.0,
+            "21": 0.0,
+            "22": 0.0,
+            "23": 0.0,
+            "24": 0.0,
+            "25": 0.0,
+            "26": 0.0,
+            "27": 0.0,
+            "28": 0.0,
+            "29": 0.0,
+            "3": 0.0,
+            "30": 0.0,
+            "31": 0.0,
+            "4": 0.0,
+            "5": 0.0,
+            "6": 0.0,
+            "7": 0.0,
+            "8": 0.0,
+            "9": 0.0
+          }
+        },
+        "pass@1": 0.0
+      },
+      "num_generated": 32,
+      "num_graded": 32,
+      "num_prompt_too_long": 0,
+      "num_prompts": 32,
+      "over_half_budget_fraction": 1.0
+    }
+  }
+}
