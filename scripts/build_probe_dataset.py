@@ -1307,6 +1307,7 @@ def _build_prompt_profile_targets(
                 {
                     "rollout_index": int(rollout_index),
                     "completion_text": rollout.text,
+                    "completion_token_ids": [int(tok) for tok in rollout.token_ids],
                     "finish_reason": rollout.finish_reason,
                     "length": int(length),
                     "relative_length": float(relative_length),

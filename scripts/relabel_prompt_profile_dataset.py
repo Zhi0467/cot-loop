@@ -426,6 +426,7 @@ def _profile_from_archive_row(
             {
                 "rollout_index": int(rollout.get("rollout_index", len(rebuilt_rollouts))),
                 "completion_text": rollout.get("completion_text"),
+                "completion_token_ids": rollout.get("completion_token_ids"),
                 "finish_reason": finish_reason,
                 "length": length,
                 "relative_length": relative_length,

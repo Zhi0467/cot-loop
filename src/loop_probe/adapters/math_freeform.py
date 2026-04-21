@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-import os
 from typing import Any
 
-from datasets import load_dataset
-
-from ._common import load_local_rows, resolve_sample_id
+from ._common import (
+    collect_row_metadata,
+    load_rows_from_dataset,
+    resolve_sample_id,
+    row_matches_filter,
+)
 from ..types import DatasetSpec, SampleRecord
 
 _MATH_VERIFY_CONFIGS: tuple[list[Any], list[Any]] | None = None
@@ -96,27 +98,30 @@ def load_samples(
     *,
     question_field: str = "question",
     answer_field: str = "answer",
+    record_id_field: str | None = None,
+    metadata_fields: list[str] | None = None,
+    row_filter: dict[str, dict[str, object]] | None = None,
 ) -> list[tuple[SampleRecord, str]]:
     if spec.max_samples is not None and spec.max_samples < 1:
         raise SystemExit("--max-samples must be >= 1 when provided.")
 
-    if os.path.isfile(spec.dataset):
-        rows = load_local_rows(spec.dataset)
-        if spec.max_samples is not None:
-            rows = rows[: spec.max_samples]
-    else:
-        ds = load_dataset(spec.dataset, spec.config, split=spec.split)
-        if question_field not in ds.column_names or answer_field not in ds.column_names:
+    rows = load_rows_from_dataset(
+        spec.dataset,
+        config=spec.config,
+        split=spec.split,
+    )
+    if rows:
+        first_row = rows[0]
+        if question_field not in first_row or answer_field not in first_row:
             raise SystemExit(
                 f"Dataset '{spec.dataset}' must include '{question_field}' and "
-                f"'{answer_field}' columns; found {list(ds.column_names)}."
+                f"'{answer_field}' columns; found {sorted(first_row.keys())}."
             )
-        if spec.max_samples is not None:
-            ds = ds.select(range(min(len(ds), spec.max_samples)))
-        rows = list(ds)
 
     samples: list[tuple[SampleRecord, str]] = []
     for idx, row in enumerate(rows):
+        if not row_matches_filter(row, row_filter):
+            continue
         if question_field not in row or answer_field not in row:
             raise SystemExit(
                 f"Row {idx} is missing '{question_field}' or '{answer_field}'."
@@ -132,8 +137,19 @@ def load_samples(
                     sample_id=sample_id,
                     prompt=str(prompt),
                     source_split=spec.split,
+                    record_id=(
+                        str(row.get(record_id_field))
+                        if record_id_field and row.get(record_id_field) is not None
+                        else None
+                    ),
+                    metadata=collect_row_metadata(
+                        row,
+                        metadata_fields=metadata_fields,
+                    ),
                 ),
                 str(answer),
             )
         )
+        if spec.max_samples is not None and len(samples) >= spec.max_samples:
+            break
     return samples

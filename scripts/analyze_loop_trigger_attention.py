@@ -385,6 +385,7 @@ def main() -> None:
 
     prompt_text = row.get("prompt")
     saved_prompt_ids = row.get("prompt_token_ids")
+    saved_completion_ids = rollout.get("completion_token_ids")
 
     if saved_prompt_ids is not None and isinstance(saved_prompt_ids, list):
         prompt_ids = [int(t) for t in saved_prompt_ids]
@@ -393,10 +394,15 @@ def main() -> None:
     else:
         raise SystemExit("Row has neither 'prompt_token_ids' nor 'prompt' string.")
 
-    completion_ids = tokenizer.encode(completion_text, add_special_tokens=False)
+    if saved_completion_ids is not None and isinstance(saved_completion_ids, list):
+        completion_ids = [int(t) for t in saved_completion_ids]
+        completion_ids_source = "saved_completion_token_ids"
+    else:
+        completion_ids = tokenizer.encode(completion_text, add_special_tokens=False)
+        completion_ids_source = "tokenizer_encode_completion_text"
     print(
         f"Prompt tokens: {len(prompt_ids)}, "
-        f"completion tokens (re-tokenized): {len(completion_ids)}"
+        f"completion tokens ({completion_ids_source}): {len(completion_ids)}"
     )
 
     # ── Detect loop ────────────────────────────────────────────────────
@@ -484,12 +490,20 @@ def main() -> None:
         "retokenize_loop_mismatch": retokenize_loop_mismatch,
         "prompt_token_count_retokenized": len(prompt_ids),
         "completion_token_count_retokenized": len(completion_ids),
-        "caveats": [
-            "Attention from a single teacher-forcing forward pass, not from "
-            "the original vLLM autoregressive decode.",
-            "Completion token IDs recovered via tokenizer.encode(completion_text); "
-            "bitwise match with original generation stream is not guaranteed.",
-        ],
+        "completion_token_ids_source": completion_ids_source,
+        "caveats": (
+            [
+                "Attention from a single teacher-forcing forward pass, not from "
+                "the original vLLM autoregressive decode.",
+            ]
+            if completion_ids_source == "saved_completion_token_ids"
+            else [
+                "Attention from a single teacher-forcing forward pass, not from "
+                "the original vLLM autoregressive decode.",
+                "Completion token IDs recovered via tokenizer.encode(completion_text); "
+                "bitwise match with original generation stream is not guaranteed.",
+            ]
+        ),
     }
     trigger_dict = asdict(trigger)
     trigger_dict["pattern_end_exclusive"] = trigger.pattern_end_exclusive

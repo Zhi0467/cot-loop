@@ -1,6 +1,6 @@
 # Prompt-Profile RFM Steering Stage Plan
 
-Last updated: 2026-04-21 22:26 UTC
+Last updated: 2026-04-21 23:41 UTC
 
 ## Bottom Line
 
@@ -148,6 +148,20 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
 ### Stage 0.5: Positive-Enrichment Screening
 
 - Run the same frozen model/decode policy on candidate pools before promoting anything beyond `LiveCodeBench` into the steering-trainable registry.
+- First pass contract now fixed in-thread:
+  - `300` prompts per dataset
+  - save a replayable prompt-level archive, not only the aggregate stats JSON
+- The stage-0.5 archive contract should preserve enough to reconstruct both activations and labels later:
+  - prompt text
+  - prompt token IDs
+  - dataset `record_id`
+  - dataset-side `record_metadata`
+  - prompt-level `majority_s_0.5` summary fields
+  - per-rollout completion text
+  - per-rollout `completion_token_ids`
+  - finish reason, relative length, loop flag, cap hit, and correctness where a grader exists
+- `LiveCodeBench-extra` has one more requirement beyond the generic screen:
+  - keep it prompt-disjoint from the March `LiveCodeBench` stage object by exact prompt-text exclusion rather than by guessed release-window boundaries
 - For each candidate pool, report:
   - prompt count
   - repaired train positive count and repaired train positive rate under `majority_s_0.5`
@@ -165,7 +179,22 @@ This stage is not trying to prove a mechanistic explanation of looping, and it i
   - `TACO-hard`
   - full `MATH` hard / level-5
   - `Omni-MATH` hard
+- Public/local score sanity should be used where the benchmark surface actually supports it:
+  - `LiveCodeBench` and `MATH`-family screens have public Qwen3 anchors worth checking against to catch prompt-format or grader drift
+  - `TACO-hard` is still prevalence-first on the first pass because the repo does not yet have a benchmark-native evaluator there
 - MCQ-style academic extensions such as `SuperGPQA` or `HLE` are optional screens, not default steering-trainable surfaces.
+
+Current live first pass (`2026-04-21 23:41 UTC`):
+- remote worktree:
+  `/home/murphy/projects/worktrees/cot-loop-positive-screening/`
+- output root:
+  `/home/murphy/projects/worktrees/cot-loop-positive-screening/outputs/model_stats/positive_screen/`
+- log root:
+  `/home/murphy/projects/worktrees/cot-loop-positive-screening/logs/positive_screen/`
+- GPU `6`: `LiveCodeBench-extra` -> `MATH level-5`
+- GPU `7`: `TACO-hard` -> `Omni-MATH >= 7`
+- infrastructure caveat:
+  - `/data` is effectively full and current Slurm backfill is too far out, so this first pass is running directly with home-backed caches/outputs instead of the normal `/data/scratch` path
 
 ### Stage 1: Add RFM As A Sibling Detector
 

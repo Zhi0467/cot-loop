@@ -1,6 +1,6 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-21 22:26 UTC
+Last updated: 2026-04-21 23:41 UTC
 
 Reference plan:
 - `docs/prompt-profile-rfm-steering-plan-2026-04-21.md`
@@ -18,6 +18,23 @@ Reference plan:
   - `TACO-hard`
   - full `MATH` hard / level-5
   - `Omni-MATH` hard
+- First `300`-prompt pass is now live under the direct node worktree:
+  - output root:
+    `/home/murphy/projects/worktrees/cot-loop-positive-screening/outputs/model_stats/positive_screen/`
+  - log root:
+    `/home/murphy/projects/worktrees/cot-loop-positive-screening/logs/positive_screen/`
+  - launch order:
+    - GPU `6`: `LiveCodeBench-extra` -> `MATH level-5`
+    - GPU `7`: `TACO-hard` -> `Omni-MATH >= 7`
+- The screening archive contract is now stricter than the older rollout-stats JSON:
+  - save prompt text plus prompt token IDs
+  - save dataset `record_id` plus dataset-side `record_metadata`
+  - save per-rollout completion text plus exact `completion_token_ids`
+  - save prompt-level `majority_s_0.5` summary fields in a separate prompt-profile sidecar
+  - keep these sidecars next to the aggregate stats JSON so later activation replay and relabeling do not depend on Slack archaeology
+- `LiveCodeBench-extra` must stay prompt-disjoint from the March stage object:
+  - current screen uses exact prompt-text exclusion from
+    `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_projection_livecodebench_majority05_seed0_20260323/data/diagnostics/prompt_rollout_archive.jsonl`
 - Second screening queue:
   - `APPS` competition
   - `CodeContests` sample
@@ -32,6 +49,9 @@ Reference plan:
   - average / median completion length
   - accuracy if a grader exists
   - prompt-length stats
+- Keep the “accuracy if a grader exists” caveat literal:
+  - `LiveCodeBench-extra` and `MATH`-family screens have usable sanity anchors
+  - `TACO-hard` is still ungraded in-repo on the first pass, so treat it as prevalence-first until an evaluator lands
 - Do not revive cross-benchmark vector averaging or cosine-alignment claims until at least one more dataset clears the `10%` gate.
 
 ### P1: Close The Repaired Detector Table

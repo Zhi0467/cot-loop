@@ -1,6 +1,6 @@
 # Prompt-Profile RFM Artifact Schema
 
-Last updated: 2026-04-21 18:05 UTC
+Last updated: 2026-04-21 23:41 UTC
 
 ## Purpose
 
@@ -28,6 +28,69 @@ Last updated: 2026-04-21 18:05 UTC
   - prompt-rollout archive file
   - prompt-profile files
   - exact train/test prompt IDs
+
+## Stage-0.5 Screening Summary Record
+
+- Current implementation surface:
+  - aggregate JSON written by `scripts/collect_model_stats.py`
+  - schema fields already exposed in the live screen:
+    - `metadata.prompt_profile_summary`
+    - `metadata.prompt_profile_file`
+    - `metadata.prompt_rollout_archive_file`
+    - `metadata.prompt_rollout_archive_schema`
+    - `counts.num_prompt_profiled`
+    - `counts.num_prompt_majority_tail_positive`
+    - `metrics.majority_s_0.5_positive_rate`
+    - `metrics.completion_tail_fraction`
+    - `metrics.median_generation_length`
+- Required provenance keys for stage-0.5 summaries:
+  - dataset and split
+  - task kind
+  - prompt formatter
+  - generation config
+  - loop-detector config
+  - prompt-profile summary
+  - archive schema name
+  - row filter used for the candidate slice
+  - any prompt-exclusion source used to keep the screen disjoint from an older stage object
+- This is the stage-0.5 ledger for deciding whether a candidate pool clears the repaired positive-rate gate before any activation dataset is built from it.
+
+## Stage-0.5 Screening Archive Row
+
+- Schema: `prompt_rollout_archive.v2`
+- Required top-level keys per prompt:
+  - `split`
+  - `sample_id`
+  - `record_id`
+  - `question_id` where the benchmark has one
+  - `prompt_style`
+  - `prompt`
+  - `prompt_token_ids`
+  - `prompt_token_count`
+  - `effective_max_tokens`
+  - `target_name`
+  - `target_value`
+  - `majority_tail`
+  - `p_cap`
+  - `p_loop`
+  - `loop_budget_share`
+  - `mean_relative_length`
+  - `num_rollouts`
+  - `record_metadata`
+  - `rollouts`
+- Required per-rollout keys:
+  - `rollout_index`
+  - `completion_text`
+  - `completion_token_ids`
+  - `finish_reason`
+  - `length`
+  - `relative_length`
+  - `cap_hit`
+  - `loop_flag`
+  - `tail_hit`
+  - `first_loop_prefix_length`
+  - `correct`
+- This row schema is the replay surface for later activation lookup, relabeling, prompt-text deduplication, and attention or prompt-profile follow-ups. If exact completion token IDs are present, downstream analyses should prefer them over retokenizing `completion_text`.
 
 ## Detector Run Record
 

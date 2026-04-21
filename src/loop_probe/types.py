@@ -16,3 +16,5 @@ class SampleRecord:
     source_split: str
     prompt_style: str = "math_freeform"
     choices: tuple[str, ...] | None = None
+    record_id: str | None = None
+    metadata: dict[str, object] | None = None
