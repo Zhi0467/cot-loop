@@ -1,6 +1,6 @@
 # Prompt-Profile RFM Artifact Schema
 
-Last updated: 2026-04-21 23:41 UTC
+Last updated: 2026-04-22 00:03 UTC
 
 ## Purpose
 
@@ -33,7 +33,10 @@ Last updated: 2026-04-21 23:41 UTC
 
 - Current implementation surface:
   - aggregate JSON written by `scripts/collect_model_stats.py`
+  - incremental `__progress.json` written by the same collector during long screens
   - schema fields already exposed in the live screen:
+    - `status`
+    - `metadata.timestamp`
     - `metadata.prompt_profile_summary`
     - `metadata.prompt_profile_file`
     - `metadata.prompt_rollout_archive_file`
@@ -54,6 +57,43 @@ Last updated: 2026-04-21 23:41 UTC
   - row filter used for the candidate slice
   - any prompt-exclusion source used to keep the screen disjoint from an older stage object
 - This is the stage-0.5 ledger for deciding whether a candidate pool clears the repaired positive-rate gate before any activation dataset is built from it.
+
+## Stage-0.5 Incremental Progress Record
+
+- File pattern: `<out_base>__progress.json`
+- Purpose:
+  - expose partial positive-rate / tail-rate / length signals before the full `300`-prompt summary lands
+  - make long shared-node screens restart-safe instead of all-or-nothing
+  - point the next session at the live sidecars without requiring log archaeology
+- Required top-level keys:
+  - `status`
+  - `metadata`
+  - `counts`
+  - `metrics`
+- Required metadata keys:
+  - `task_kind`
+  - `model_id`
+  - `seed`
+  - `timestamp`
+  - `prompt_profile_summary`
+  - `prompt_profile_file`
+  - `prompt_rollout_archive_file`
+  - `prompt_rollout_archive_schema`
+- Required count keys:
+  - `num_samples`
+  - `num_generated`
+  - `num_looped`
+  - `num_max_length_hits`
+  - `num_prompt_too_long`
+  - `num_prompt_profiled`
+  - `num_prompt_majority_tail_positive`
+- Required metric keys:
+  - `loop_fraction`
+  - `max_length_hit_fraction`
+  - `avg_generation_length`
+  - `median_generation_length`
+  - `majority_s_0.5_positive_rate`
+  - `completion_tail_fraction`
 
 ## Stage-0.5 Screening Archive Row
 

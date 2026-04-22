@@ -249,6 +249,11 @@ def _prompt_rollout_archive_path(out_path: str) -> str:
     return f"{base}__prompt_rollout_archive.jsonl"
 
 
+def _progress_path(out_path: str) -> str:
+    base, _ext = os.path.splitext(out_path)
+    return f"{base}__progress.json"
+
+
 def _archive_preexisting_output(path: str) -> None:
     if not os.path.exists(path):
         return
@@ -278,6 +283,7 @@ def _prepare_output_paths(
     _archive_preexisting_output(out_path)
     _archive_preexisting_output(_prompt_profile_path(out_path))
     _archive_preexisting_output(_prompt_rollout_archive_path(out_path))
+    _archive_preexisting_output(_progress_path(out_path))
     if args.task_kind == "livecodebench_codegen":
         checkpoint_path = _lcb_records_checkpoint_path(out_path)
         if preserve_lcb_checkpoint_path and os.path.abspath(
@@ -840,6 +846,14 @@ def _write_jsonl_rows(path: str, rows: list[dict[str, object]]) -> None:
             handle.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
+def _append_jsonl_row(path: str, row: dict[str, object]) -> None:
+    out_dir = os.path.dirname(path)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
+    with open(path, "a", encoding="utf-8") as handle:
+        handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
 def _prompt_profile_summary(
     rows: list[dict[str, object]],
     *,
@@ -892,6 +906,63 @@ def _prompt_profile_summary(
     }
 
 
+def _write_progress_checkpoint(
+    agg: WorkerAggregator,
+    collector_cfg: CollectorConfig,
+    *,
+    tail_threshold: float,
+    out_path: str,
+) -> str:
+    prompt_profile_summary = _prompt_profile_summary(
+        agg.prompt_profile_rows,
+        tail_threshold=tail_threshold,
+    )
+    metrics = compute_metrics(agg, collector_cfg.statistics)
+    payload = {
+        "status": "in_progress",
+        "metadata": {
+            "task_kind": collector_cfg.task_kind,
+            "model_id": collector_cfg.rollout_cfg.model_id,
+            "seed": collector_cfg.seed,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "prompt_profile_summary": prompt_profile_summary,
+            "prompt_profile_file": os.path.basename(_prompt_profile_path(out_path)),
+            "prompt_rollout_archive_file": os.path.basename(_prompt_rollout_archive_path(out_path)),
+            "prompt_rollout_archive_schema": PROMPT_PROFILE_ARCHIVE_SCHEMA,
+        },
+        "counts": {
+            "num_samples": agg.num_samples_seen,
+            "num_generated": agg.num_generated,
+            "num_graded": agg.num_graded,
+            "num_correct": agg.num_correct,
+            "num_wrong": agg.num_wrong,
+            "num_looped": agg.num_looped,
+            "num_max_length_hits": agg.num_max_length_hits,
+            "num_prompt_too_long": agg.num_prompt_too_long,
+            "num_looped_and_max_length_hit": agg.num_looped_and_max_length_hit,
+            "num_correct_and_looped": agg.num_correct_and_looped,
+            "num_correct_and_max_length_hit": agg.num_correct_and_max_length_hit,
+            "num_correct_and_looped_and_max_length_hit": (
+                agg.num_correct_and_looped_and_max_length_hit
+            ),
+            "num_prompt_profiled": int(prompt_profile_summary["prompt_count_profiled"]),
+            "num_prompt_majority_tail_positive": int(
+                prompt_profile_summary["prompt_positive_count"]
+            ),
+        },
+        "metrics": {
+            **metrics,
+            "majority_s_0.5_positive_rate": prompt_profile_summary["prompt_positive_rate"],
+            "completion_tail_fraction": prompt_profile_summary["completion_tail_fraction"],
+            "median_generation_length": prompt_profile_summary["median_generation_length"],
+        },
+    }
+    path = _progress_path(out_path)
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2)
+    return path
+
+
 def _collect_worker_stats(
     items: list[PromptWorkItem],
     collector_cfg: CollectorConfig,
@@ -899,6 +970,7 @@ def _collect_worker_stats(
     loop_n: int,
     loop_k: int,
     tail_threshold: float,
+    progress_out_path: str | None = None,
     rank: int = 0,
 ) -> WorkerAggregator:
     try:
@@ -1002,6 +1074,15 @@ def _collect_worker_stats(
                 )
                 agg.prompt_profile_rows.append(profile_row)
                 agg.prompt_rollout_archive_rows.append(archive_row)
+                if progress_out_path:
+                    _append_jsonl_row(_prompt_profile_path(progress_out_path), profile_row)
+                    _append_jsonl_row(_prompt_rollout_archive_path(progress_out_path), archive_row)
+                    _write_progress_checkpoint(
+                        agg,
+                        collector_cfg,
+                        tail_threshold=tail_threshold,
+                        out_path=progress_out_path,
+                    )
                 if collector_cfg.task_kind == "livecodebench_codegen":
                     agg.lcb_sample_records.append(
                         LcbSampleRecord(
@@ -1172,6 +1253,17 @@ def _collect_worker_stats(
                 )
                 agg.prompt_profile_rows.append(prompt_profile_row)
                 agg.prompt_rollout_archive_rows.append(archive_row)
+                if progress_out_path:
+                    _append_jsonl_row(_prompt_profile_path(progress_out_path), prompt_profile_row)
+                    _append_jsonl_row(_prompt_rollout_archive_path(progress_out_path), archive_row)
+                    _write_progress_checkpoint(
+                        agg,
+                        collector_cfg,
+                        tail_threshold=tail_threshold,
+                        out_path=progress_out_path,
+                    )
+                    if collector_cfg.task_kind == "livecodebench_codegen":
+                        _write_lcb_records_checkpoint(agg, progress_out_path)
 
         print(
             f"[collect-dp-rank {rank}] processed {end}/{len(items)} prompts",
@@ -1255,6 +1347,7 @@ def _run_collection(
     loop_n: int,
     loop_k: int,
     tail_threshold: float,
+    progress_out_path: str | None = None,
 ) -> WorkerAggregator:
     if collector_cfg.rollout_cfg.dp == 1:
         return _collect_worker_stats(
@@ -1263,6 +1356,7 @@ def _run_collection(
             loop_n=loop_n,
             loop_k=loop_k,
             tail_threshold=tail_threshold,
+            progress_out_path=progress_out_path,
         )
 
     devices = get_visible_devices()
@@ -1647,6 +1741,7 @@ def main() -> None:
             loop_n=args.loop_n,
             loop_k=args.loop_k,
             tail_threshold=args.profile_tail_threshold,
+            progress_out_path=out_path,
         )
 
     lcb_native_metrics: dict[str, Any] = {}
