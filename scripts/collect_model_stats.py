@@ -28,6 +28,7 @@ from loop_probe.adapters import (
     math_freeform,
     multiple_choice_gpqa,
     multiple_choice_mmlupro,
+    taco_codegen,
 )
 from loop_probe.adapters._common import parse_row_filter_json
 from loop_probe.collector import (
@@ -58,6 +59,7 @@ from utils import get_visible_devices, suppress_sem_unlink_errors
 TASK_CHOICES = (
     "math_freeform",
     "codegen_ungraded",
+    "taco_codegen",
     "multiple_choice_gpqa",
     "multiple_choice_mmlupro",
     "livecodebench_codegen",
@@ -398,6 +400,8 @@ def _run_dependency_preflight(
 
     if args.task_kind == "math_freeform":
         math_freeform.preflight()
+    elif args.task_kind == "taco_codegen":
+        taco_codegen.preflight()
     elif args.task_kind == "livecodebench_codegen":
         try:
             livecodebench_codegen.preflight(
@@ -546,6 +550,50 @@ def _load_prompt_items(
             PromptWorkItem(
                 sample_id=record.sample_id,
                 prompt=codegen_ungraded.build_codegen_prompt(
+                    tokenizer,
+                    record.prompt,
+                    starter_code=(
+                        None
+                        if record.metadata is None
+                            else str(record.metadata.get(args.starter_code_field, "") or "")
+                    ),
+                    prompt_format=resolved_prompt_format,
+                    thinking_mode=args.thinking_mode,
+                ),
+                record_id=record.record_id,
+                source_split=record.source_split,
+                prompt_style=record.prompt_style,
+                choices=record.choices,
+                record_metadata=record.metadata,
+            )
+            for record in samples
+        ]
+        return items, {
+            "prompt_format_requested": args.prompt_format,
+            "prompt_format_resolved": resolved_prompt_format,
+            **_thinking_mode_metadata(
+                requested=args.thinking_mode,
+                resolved=resolved_thinking_mode,
+            ),
+            "starter_code_field": args.starter_code_field or None,
+            "record_id_field": record_id_field,
+            "metadata_fields": metadata_fields,
+            **({"row_filter": row_filter} if row_filter is not None else {}),
+        }, None
+
+    if args.task_kind == "taco_codegen":
+        samples = taco_codegen.load_samples(
+            spec,
+            question_field=args.question_field,
+            starter_code_field=args.starter_code_field or None,
+            record_id_field=record_id_field,
+            metadata_fields=metadata_fields,
+            row_filter=row_filter,
+        )
+        items = [
+            PromptWorkItem(
+                sample_id=record.sample_id,
+                prompt=taco_codegen.build_codegen_prompt(
                     tokenizer,
                     record.prompt,
                     starter_code=(
@@ -1005,6 +1053,7 @@ def _write_progress_checkpoint(
             "model_id": collector_cfg.rollout_cfg.model_id,
             "seed": collector_cfg.seed,
             "timestamp": datetime.now(timezone.utc).isoformat(),
+            **(collector_cfg.progress_metadata or {}),
             "prompt_profile_summary": prompt_profile_summary,
             "prompt_profile_file": os.path.basename(_prompt_profile_path(out_path)),
             "prompt_rollout_archive_file": os.path.basename(_prompt_rollout_archive_path(out_path)),
@@ -1717,6 +1766,71 @@ def _annotate_lcb_prompt_rows_with_grades(
         row["correct_flags"] = correct_flags
 
 
+def _apply_taco_grades(
+    agg: WorkerAggregator,
+) -> tuple[dict[str, object], dict[tuple[int, int], bool]]:
+    native_metrics, grading_by_record_key = taco_codegen.evaluate_prompt_archive_rows(
+        agg.prompt_rollout_archive_rows,
+    )
+    agg.num_graded = 0
+    agg.num_correct = 0
+    agg.num_wrong = 0
+    agg.correct_length_sum = 0
+    agg.wrong_length_sum = 0
+    agg.num_correct_and_looped = 0
+    agg.num_correct_and_max_length_hit = 0
+    agg.num_correct_and_looped_and_max_length_hit = 0
+
+    for row in agg.prompt_rollout_archive_rows:
+        sample_id = row.get("sample_id")
+        rollouts = row.get("rollouts")
+        if not isinstance(sample_id, int) or not isinstance(rollouts, list):
+            continue
+        correct_flags: list[int | None] = []
+        for rollout in rollouts:
+            if not isinstance(rollout, dict):
+                correct_flags.append(None)
+                continue
+            rollout_index = int(rollout.get("rollout_index", len(correct_flags)))
+            passed = grading_by_record_key.get((sample_id, rollout_index))
+            rollout["correct"] = None if passed is None else int(bool(passed))
+            correct_flags.append(rollout["correct"])
+            if passed is None:
+                continue
+            agg.num_graded += 1
+            token_count = int(rollout.get("length", 0))
+            loop_flag = bool(int(rollout.get("loop_flag", 0)))
+            max_length_hit = bool(int(rollout.get("cap_hit", 0)))
+            if passed:
+                agg.num_correct += 1
+                agg.correct_length_sum += token_count
+                if loop_flag:
+                    agg.num_correct_and_looped += 1
+                if max_length_hit:
+                    agg.num_correct_and_max_length_hit += 1
+                if loop_flag and max_length_hit:
+                    agg.num_correct_and_looped_and_max_length_hit += 1
+            else:
+                agg.num_wrong += 1
+                agg.wrong_length_sum += token_count
+        row["correct_flags"] = correct_flags
+
+    by_sample_id = {
+        int(row.get("sample_id")): row
+        for row in agg.prompt_rollout_archive_rows
+        if isinstance(row, dict) and isinstance(row.get("sample_id"), int)
+    }
+    for row in agg.prompt_profile_rows:
+        sample_id = row.get("sample_id")
+        if not isinstance(sample_id, int):
+            continue
+        archive_row = by_sample_id.get(sample_id)
+        if not isinstance(archive_row, dict):
+            continue
+        row["correct_flags"] = archive_row.get("correct_flags")
+    return native_metrics, grading_by_record_key
+
+
 def _write_lcb_records_checkpoint(agg: WorkerAggregator, out_path: str) -> str:
     checkpoint_path = _lcb_records_checkpoint_path(out_path)
     checkpoint_dir = os.path.dirname(checkpoint_path)
@@ -1796,6 +1910,33 @@ def main() -> None:
         livecodebench_repo=args.livecodebench_repo or None,
         release_version=args.release_version,
         lm_style_override=args.lm_style_override,
+        progress_metadata={
+            "dataset": args.dataset,
+            "config": args.dataset_config,
+            "split": args.split,
+            "generation_config": {
+                **rollout_cfg.to_dict(),
+                "top_p": resolve_sampling_defaults(
+                    rollout_cfg.model_id,
+                    top_p=rollout_cfg.top_p,
+                    top_k=rollout_cfg.top_k,
+                )[0],
+                "top_k": resolve_sampling_defaults(
+                    rollout_cfg.model_id,
+                    top_p=rollout_cfg.top_p,
+                    top_k=rollout_cfg.top_k,
+                )[1],
+            },
+            "statistics": statistics,
+            "loop_detector": {"n": args.loop_n, "k": args.loop_k},
+            **({"max_samples": args.max_samples} if args.max_samples is not None else {}),
+            **(
+                {"release_version": args.release_version}
+                if args.task_kind == "livecodebench_codegen"
+                else {}
+            ),
+            **task_metadata,
+        },
     )
 
     if resume_lcb_checkpoint:
@@ -1825,6 +1966,7 @@ def main() -> None:
         )
 
     lcb_native_metrics: dict[str, Any] = {}
+    taco_native_metrics: dict[str, object] = {}
     if args.task_kind == "livecodebench_codegen":
         if not resume_lcb_checkpoint:
             _write_lcb_records_checkpoint(agg, out_path)
@@ -1838,6 +1980,8 @@ def main() -> None:
             agg,
             grading_by_record_key=grading_by_record_key,
         )
+    elif args.task_kind == "taco_codegen":
+        taco_native_metrics, _grading_by_record_key = _apply_taco_grades(agg)
     agg.prompt_profile_rows.sort(key=lambda row: int(row.get("sample_id", -1)))
     agg.prompt_rollout_archive_rows.sort(key=lambda row: int(row.get("sample_id", -1)))
 
@@ -1928,6 +2072,8 @@ def main() -> None:
     ]
     if lcb_native_metrics:
         payload["metadata"]["lcb_native_metrics"] = lcb_native_metrics
+    if taco_native_metrics:
+        payload["metadata"]["taco_native_metrics"] = taco_native_metrics
 
     out_dir = os.path.dirname(out_path)
     if out_dir:

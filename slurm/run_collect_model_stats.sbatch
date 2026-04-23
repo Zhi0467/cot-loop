@@ -122,6 +122,7 @@ RELEASE_VERSION="${RELEASE_VERSION:-release_v6}"
 LIVECODEBENCH_REPO="${LIVECODEBENCH_REPO:-}"
 LM_STYLE_OVERRIDE="${LM_STYLE_OVERRIDE:-}"
 PROMPT_FORMAT="${PROMPT_FORMAT:-}"
+THINKING_MODE="${THINKING_MODE:-}"
 OUT="${OUT:-}"
 EXTRA_ARGS="${EXTRA_ARGS:-}"
 
@@ -233,6 +234,10 @@ fi
 
 if [[ -n "${PROMPT_FORMAT}" ]]; then
   ARGS+=(--prompt-format "$PROMPT_FORMAT")
+fi
+
+if [[ -n "${THINKING_MODE}" ]]; then
+  ARGS+=(--thinking-mode "$THINKING_MODE")
 fi
 
 if [[ -n "${OUT}" ]]; then

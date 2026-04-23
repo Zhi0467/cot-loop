@@ -31,6 +31,7 @@ class CollectorConfig:
     livecodebench_repo: str | None = None
     release_version: str = "release_v6"
     lm_style_override: str | None = None
+    progress_metadata: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
