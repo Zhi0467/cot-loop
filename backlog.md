@@ -1,11 +1,32 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-23 18:25 UTC
+Last updated: 2026-04-23 19:50 UTC
 
 Reference docs:
 - `docs/main-four-dataset-rollout-rebuild-2026-04-23.md`
+- `docs/prompt-profile-rfm-steering-summary-2026-04-23.md`
 - `docs/prompt-profile-rfm-artifact-schema-2026-04-21.md`
 - `docs/understand-where-loop-and-max-length-come-from.md`
+
+## Steering summary from the 2026-04-23 thread
+
+- `LiveCodeBench` stays the first steering benchmark.
+- The active steering claim is now two matched paths, not one mixed path:
+  - thinking `on`: stats -> prompt-level materialization -> RFM -> vector export -> steering
+  - thinking `off`: the same chain
+- Do not use cross-mode rows as stage evidence.
+  - the earlier thinking-on steered rows used the older non-thinking/raw vector bundle, so those rows are runner receipts only
+- Keep the corrected steering contract:
+  - prefill-only
+  - all prompt tokens steered
+  - block-specific direction at each block
+  - both linear and spherical steering
+  - full decode budget
+- If the non-thinking path is still node-fragile, land the first clean mode-consistent row linear-first, then extend to spherical.
+- Keep transfer mode-local too.
+  - no mixed thinking-on / thinking-off average vector
+- Treat the current screen lane as prevalence scouting only.
+  - only promote a new dataset after a mode-tagged collector receipt on that same path still clears the `>= 10%` gate
 
 ## Fixed current object
 
