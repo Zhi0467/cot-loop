@@ -5,6 +5,7 @@ import os
 from dataclasses import dataclass
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PROJECT_ROOT = os.path.dirname(ROOT)
 
 DEFAULT_STATISTICS = (
     "success_fraction,loop_fraction,avg_generation_length,"
@@ -113,6 +114,17 @@ SUITE_DATASETS: tuple[MainRolloutDataset, ...] = (
         answer_field="solution",
         metadata_fields=("level", "type"),
         row_filter={"field_in": {"level": ["Level 5"]}},
+        prompt_format="chat_template",
+    ),
+    MainRolloutDataset(
+        key="omni_math_ge7",
+        display_name="Omni-MATH >= 7",
+        task_kind="math_freeform",
+        dataset=os.path.join(PROJECT_ROOT, "data", "omni_math_ge7_screen_300.jsonl"),
+        split="screen_300",
+        question_field="problem",
+        answer_field="answer",
+        metadata_fields=("difficulty", "domain", "source"),
         prompt_format="chat_template",
     ),
 )

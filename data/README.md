@@ -4,6 +4,13 @@
 
 `data/aime_2024_2025.jsonl` remains the default local corpus for quick experiments and script defaults.
 
+The current main-rollout rebuild also vendors one screened local math pool:
+
+- `data/omni_math_ge7_screen_300.jsonl`
+  - `300` raw Omni-MATH problems from the finished `>= 7` screening merge
+  - each row keeps `_source_sample_id`, `problem`, `answer`, `difficulty`, `domain`, and `source`
+  - use `question_field=problem`, `answer_field=answer`, and `prompt_format=chat_template`
+
 ## Expected Record Format (Per Line JSON)
 
 ```json

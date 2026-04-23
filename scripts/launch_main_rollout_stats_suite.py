@@ -40,12 +40,12 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--job-prefix",
-        default="q3-main4",
+        default="q3-main",
         help="Prefix for sbatch job names.",
     )
     parser.add_argument(
         "--output-root",
-        default=os.path.join(ROOT, "outputs", "model_stats", "main_four_dataset_rebuild"),
+        default=os.path.join(ROOT, "outputs", "model_stats", "main_rollout_stats_rebuild"),
         help="Root directory for collector JSONs and the suite manifest.",
     )
     parser.add_argument(
@@ -121,7 +121,7 @@ def main() -> None:
 
     os.makedirs(args.output_root, exist_ok=True)
     manifest: dict[str, object] = {
-        "schema_name": "main_rollout_stats_suite.v1",
+        "schema_name": "main_rollout_stats_suite.v2",
         "created_at": datetime.now(timezone.utc).isoformat(),
         "submit": bool(args.submit),
         "suite_config": suite_config.__dict__,
