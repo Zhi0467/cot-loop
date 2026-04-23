@@ -1,20 +1,24 @@
 # CoT Loop Detection via Probe Classifiers
 
-This repository studies whether chain-of-thought loop risk is predictable from internal activations and rollout telemetry. The active stage is now a rebuilt four-dataset rollout-stat suite for `Qwen/Qwen3-1.7B`, not another March patch-up: `LiveCodeBench`, `LiveCodeBench-extra`, `TACO-hard`, and `MATH level-5`, each collected with explicit thinking `on` / `off` surfaces and reusable prompt-rollout archives. The durable status surface for that reset is `docs/main-four-dataset-rollout-rebuild-2026-04-23.md`, which records the corrected dataset/verifier/chat-template contract, the TACO loader/grader fixes that were needed to make the suite runnable again, the smoke receipts, and the live eight-job queue under `/data/scratch/murphy/outputs/cot-loop-detection/main_four_dataset_rebuild_20260423/`. The older March-provenance and LiveCodeBench-only rerun thread is now historical debugging context rather than the current contract.
+This repository studies whether chain-of-thought loop risk is predictable from internal activations and rollout telemetry. The active stage is now a rebuilt five-dataset rollout-stat suite for `Qwen/Qwen3-1.7B`, not another March patch-up: `LiveCodeBench`, `LiveCodeBench-extra`, `TACO-hard`, `MATH level-5`, and `Omni-MATH >= 7`, each collected with explicit thinking `on` / `off` surfaces and reusable prompt-rollout archives. The durable status surface for that reset is `docs/main-four-dataset-rollout-rebuild-2026-04-23.md`, which records the corrected dataset/verifier/chat-template contract, the TACO loader/grader fixes, the promoted Omni local dataset surface, and the live ten-job queue under `/data/scratch/murphy/outputs/cot-loop-detection/main_four_dataset_rebuild_20260423/`. The older March-provenance and LiveCodeBench-only rerun thread is now historical debugging context rather than the current contract.
 
 ## Overview
 
 The project now has three durable evidence streams:
 - the probe line asks whether loop risk is detectable from stacked prompt-prefill activations, either by slicing one layer or by voting across all layers;
-- the rollout-statistics line measures how often looping and max-length hits actually occur under the repaired v2 collector contract, with the current rebuild surface focused on `LiveCodeBench`, `LiveCodeBench-extra`, `TACO-hard`, and `MATH level-5`;
+- the rollout-statistics line measures how often looping and max-length hits actually occur under the repaired v2 collector contract, with the current rebuild surface focused on `LiveCodeBench`, `LiveCodeBench-extra`, `TACO-hard`, `MATH level-5`, and `Omni-MATH >= 7`;
 - the trigger-attention line replays saved loop rows to ask where the model is attending around the repeated trigger region, but that line should now be treated as merged background evidence rather than the active phase boundary.
 
 Latest status:
-- the current live execution object is the four-dataset rebuild described in `docs/main-four-dataset-rollout-rebuild-2026-04-23.md`:
+- the current live execution object is the five-dataset rebuild described in `docs/main-four-dataset-rollout-rebuild-2026-04-23.md`:
   - the suite launcher is `scripts/launch_main_rollout_stats_suite.py`
   - the new main output root is `/data/scratch/murphy/outputs/cot-loop-detection/main_four_dataset_rebuild_20260423/`
-  - submitted jobs `2850` to `2857` cover the four datasets times thinking `on` / `off`
-  - `2850` (`LiveCodeBench`, on) and `2851` (`LiveCodeBench-extra`, on) are already running; the remaining six jobs are queued behind them
+  - the first wave `2850` to `2857` covers `LiveCodeBench`, `LiveCodeBench-extra`, `TACO-hard`, and `MATH level-5` times thinking `on` / `off`
+  - the appended Omni pair is `2863` (`Omni-MATH >= 7`, on) and `2864` (`Omni-MATH >= 7`, off)
+  - `2850` (`LiveCodeBench`, on) and `2851` (`LiveCodeBench-extra`, on) are already running; `2852` to `2857`, `2863`, and `2864` are queued behind them
+  - the Omni leg is intentionally local rather than HF-backed:
+    - `data/omni_math_ge7_screen_300.jsonl` is the merged `300`-row `>= 7` screen pool
+    - each row keeps `_source_sample_id`, `problem`, `answer`, `difficulty`, `domain`, and `source`
   - the TACO path is no longer provisional:
     - `src/loop_probe/adapters/taco_codegen.py` now provides the native execution-based grader
     - `src/loop_probe/adapters/_common.py` now falls back to `hf://datasets/BAAI/TACO/ALL/<split>-*.parquet` because the old `TACO.py` dataset-script path is retired under the current `datasets` library
@@ -30,10 +34,10 @@ Latest status:
   - it records that only two full-contract thinking-on rows are finished and five are still running;
   - it records that every attempted non-thinking row failed before first row on dirty-slot CUDA OOM, so that lane is infrastructure-blocked rather than scientifically negative;
   - it updates the screening lane from a plan-only item to a live evidence surface:
-    - `LiveCodeBench-extra`: `255` profiled, positive rate `0.5529`
-    - `TACO-hard`: `213` profiled, positive rate `0.8075`
-    - `MATH level-5`: `180` profiled, positive rate `0.1389`
-    - `Omni-MATH >= 7`: dependency-pending;
+    - `LiveCodeBench-extra`: `141 / 255`, positive rate `0.5529`
+    - `TACO-hard`: `192 / 236`, positive rate `0.8136`
+    - `MATH level-5`: `46 / 300`, positive rate `0.1533`
+    - `Omni-MATH >= 7`: `176 / 300`, positive rate `0.5867`
   - it also records the repo/runtime drift:
     - local stage state is ahead of draft PR `#11`
     - the current positive-enrichment screen is running with home-backed caches because `/data` is effectively full.

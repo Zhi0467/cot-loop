@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-04-23 05:55 UTC
+Last updated: 2026-04-23 16:03 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -9,7 +9,7 @@ Purpose:
 Core docs:
 - Project roadmap: ../roadmap.md
 - Open experiment ledger / next runs: ../backlog.md
-- Main four-dataset rebuild note: main-four-dataset-rollout-rebuild-2026-04-23.md
+- Main rollout rebuild note: main-four-dataset-rollout-rebuild-2026-04-23.md
 - Degeneracy-origin rollout-stat plan: ../understand-where-loop-and-max-length-come-from.md
 - Prompt-profile implementation path: prompt-profile-probe.md
 - Prompt-profile evaluation contract: prompt-profile-eval-contract.md
@@ -89,12 +89,14 @@ Key outputs:
 Current live status:
 - `main-four-dataset-rollout-rebuild-2026-04-23.md` is now the live rollout-stat status surface:
   - it replaces the narrower March-repair / LiveCodeBench-only rerun framing for the current task;
-  - it fixes the canonical dataset set to `LiveCodeBench`, `LiveCodeBench-extra`, `TACO-hard`, and `MATH level-5`;
+  - it now fixes the canonical dataset set to `LiveCodeBench`, `LiveCodeBench-extra`, `TACO-hard`, `MATH level-5`, and `Omni-MATH >= 7`;
   - it records the two runtime fixes that made the suite runnable again:
     - TACO native grading had to stop rebinding top-level functions as methods;
     - `BAAI/TACO` now loads through the HF parquet surface because the old `TACO.py` dataset-script path is retired under the current `datasets` library;
+  - it records the promoted Omni surface:
+    - `data/omni_math_ge7_screen_300.jsonl` is the merged local `300`-row `>= 7` screen pool used for the appended stats pair;
   - it records the archive-level smoke receipt proving that prompt text, token ids, rollout text, completion token ids, and row metadata are all preserved for later reuse;
-  - it points at the live suite output root `../outputs/model_stats/main_four_dataset_rebuild_20260423/` and the remote run root `/data/scratch/murphy/outputs/cot-loop-detection/main_four_dataset_rebuild_20260423/`.
+  - it points at the live suite output root `../outputs/model_stats/main_four_dataset_rebuild_20260423/` and the remote run root `/data/scratch/murphy/outputs/cot-loop-detection/main_four_dataset_rebuild_20260423/`, whose manifest is now `v2` with appended Omni jobs `2863` / `2864`.
 - `prompt-profile-rfm-steering-grounded-stage-2026-04-23.md` is now the live status surface for this stage:
   - it keeps the repaired `LiveCodeBench` object fixed at fit-train / val / test `280 / 128 / 160` with positives `140 / 35 / 54`;
   - it separates finished evidence, live evidence, and blocked evidence instead of treating the whole stage as one undifferentiated status blob;
@@ -108,7 +110,7 @@ Current live status:
     - `LiveCodeBench-extra`: `255` profiled, positive rate `0.5529`
     - `TACO-hard`: `213` profiled, positive rate `0.8075`
     - `MATH level-5`: `180` profiled, positive rate `0.1389`
-    - `Omni-MATH >= 7`: dependency-pending
+    - `Omni-MATH >= 7`: `176 / 300`, positive rate `0.5867`
   - it records that the explicit `LiveCodeBench` `HFChatTemplate` `thinking on/off` provenance pair is queued as `2829` / `2830`, but is not the main steering result;
   - it also makes the repo/runtime drift explicit:
     - local worktree state is ahead of the published draft PR `#11`;

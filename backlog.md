@@ -1,6 +1,6 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-23 05:55 UTC
+Last updated: 2026-04-23 16:03 UTC
 
 Reference docs:
 - `docs/main-four-dataset-rollout-rebuild-2026-04-23.md`
@@ -15,6 +15,7 @@ Reference docs:
   - `LiveCodeBench-extra`
   - `TACO-hard`
   - `MATH level-5`
+  - `Omni-MATH >= 7`
 - Every dataset is being collected twice:
   - thinking `on`
   - thinking `off`
@@ -30,8 +31,11 @@ Reference docs:
   - `max_num_batched_tokens=4096`
 - Prompt/verifier contract:
   - `LiveCodeBench` and `LiveCodeBench-extra` use `LM_STYLE_OVERRIDE=HFChatTemplate`
-  - `TACO-hard` and `MATH level-5` use `PROMPT_FORMAT=chat_template`
+  - `TACO-hard`, `MATH level-5`, and `Omni-MATH >= 7` use `PROMPT_FORMAT=chat_template`
   - `TACO-hard` uses the native execution-based grader over saved `input_output`
+  - `Omni-MATH >= 7` uses the merged local screen pool `data/omni_math_ge7_screen_300.jsonl`
+    - the current pool is `300` screened rows rather than a full HF split
+    - each row preserves `_source_sample_id`, `problem`, `answer`, `difficulty`, `domain`, and `source`
 - Reuse contract:
   - finished archives must preserve `record_id`, prompt text, `prompt_token_ids`, rollout `completion_text`, `completion_token_ids`, and raw row metadata so the same rollouts can later drive prompt-profile relabeling, probe training, and steering
 
@@ -72,15 +76,17 @@ Reference docs:
   - `2855` `q3-main4r1-livecodebench_extra-off`
   - `2856` `q3-main4r1-taco_hard-off`
   - `2857` `q3-main4r1-math_level5-off`
+  - `2863` `q3-main5r1-omni_math_ge7-on`
+  - `2864` `q3-main5r1-omni_math_ge7-off`
 - Current queue state:
   - `2850` and `2851` are running
-  - `2852` through `2857` are waiting behind them
+  - `2852` through `2857`, `2863`, and `2864` are waiting behind them
 
 ## Active TODOs
 
 ### P0: keep the rebuild receipts clean
 
-1. Monitor `2850` through `2857` until all eight receipts land.
+1. Monitor `2850` through `2857` plus `2863` / `2864` until all ten receipts land.
 2. Treat any first-row failure as a launch/runtime bug, not as a scientific result.
 3. Preserve the paired contract if repairs are needed:
    - same dataset
@@ -91,7 +97,7 @@ Reference docs:
 ### P1: materialize the next prompt-profile objects from these rebuilt archives
 
 1. Recompute prompt-level labels from the new prompt-rollout archives instead of reusing March-era bundle assumptions.
-2. Build the mode-tagged prompt-profile objects for the four datasets from the rebuilt archives.
+2. Build the mode-tagged prompt-profile objects for all five datasets from the rebuilt archives.
 3. Keep thinking `on` and `off` as separate prompt-profile objects all the way through detector training.
 
 ### P2: train mode-local probes and vectors from the rebuilt data
