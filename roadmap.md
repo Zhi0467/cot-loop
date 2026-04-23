@@ -1,6 +1,6 @@
 # Roadmap - CoT Loop Detection
 
-Last updated: 2026-04-23 04:22 UTC
+Last updated: 2026-04-23 04:30 UTC
 
 Scope:
 - Build and validate a probe pipeline for CoT loop detection across prefill and completion feature views.
@@ -11,6 +11,7 @@ Scope:
 - Milestone 2 gate: complete.
 - Milestone 3 gate: complete.
 - Active milestone: Milestone 5 (deployment readiness).
+- 2026-04-23 04:30 UTC: the narrow `HFChatTemplate` replay now has a real launch bug diagnosis and a corrected rerun rather than just a queue note. The collaborator was also right that the Slack task should have been parked as `waiting_human` once it had reduced to "wait for Slurm"; leaving it as `in_progress` created a noisy redispatch loop rather than useful work. On the runtime side, `scontrol` showed that the first queued pair had actually started and then failed fast: `2829` (`q3-lcb-thon`) ran from `2026-04-23T04:22:17` to `04:25:08`, and `2830` (`q3-lcb-thoff`) ran from `04:25:08` to `04:27:58`, both ending with `ExitCode=1:0`. Their stderr logs make the failure mechanical: `--max-num-seqs must be >= --num-generations when sampling multiple generations per prompt.` So those first jobs do not count as science results; they were a bad launch config (`max_num_seqs=8` with `num_generations=10`). I immediately resubmitted the same paired replay with `MAX_NUM_SEQS=10`. The corrected thinking-on job `2831` (`q3-lcb-thon10`) is now `RUNNING` and had already cleared the old parameter abort on first log check, while the corrected thinking-off job `2832` (`q3-lcb-thoff10`) is `PENDING (Resources)`. The project state is therefore slightly better than it was at `04:22 UTC`: there is still no finished corrected row, but the launch bug is identified, the corrected thinking-on replay is live, and the matched thinking-off replay is waiting behind it.
 - 2026-04-23 04:22 UTC: Wangzhi tightened the stage contract again, and this time it changes the live queue rather than only the wording. The active stage is no longer "finish the old thinking-on steering table, then unblock non-thinking later." It is now a two-path schema where each lane has to close `stats -> probe -> steer` inside one mode. I wrote a new durable note and PDF bundle for that corrected object:
   - note: `docs/prompt-profile-rfm-mode-consistent-stage-2026-04-23.md`
   - PDF: `outputs/prompt_profile_rfm_mode_consistent_stage_20260423/prompt_profile_rfm_mode_consistent_stage_20260423.pdf`
