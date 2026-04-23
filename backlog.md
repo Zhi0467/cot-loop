@@ -1,137 +1,153 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-23 01:16 UTC
+Last updated: 2026-04-23 02:20 UTC
 
-Reference plan:
+Reference docs:
+- `docs/prompt-profile-rfm-steering-grounded-stage-2026-04-23.md`
 - `docs/prompt-profile-rfm-steering-plan-2026-04-21.md`
+
+## Fixed current object
+
+- Active benchmark-local stage:
+  - repaired `LiveCodeBench` prompt-level `majority_s_0.5`
+  - fit-train / val / test = `280 / 128 / 160`
+  - positives = `140 / 35 / 54`
+- Steering evaluation contract:
+  - full test `160`, not the old `32`-prompt pilot
+  - full decode budget `30000`
+  - prefill-only
+  - all prompt tokens steered at every selected block
+  - block-specific linear and spherical conditions
+- Published PR surface is still stale relative to local reality:
+  - draft PR `#11` head at last check: `5a521d1`
+  - local worktree head before this grounded-doc patch: `a255ff1`
+
+## Finished evidence
+
+- Repaired detector lane:
+  - RFM layer `27`
+  - validation `PR-AUC 0.6555`
+  - test `PR-AUC 0.7055`
+  - test `ROC-AUC 0.8590`
+  - honest read: RFM > prompt-only, RFM > activation linear, RFM about tied with activation MLP last-layer
+- Vector-quality lane:
+  - all `28` layers have mean bootstrap cosine `>= 0.781`
+  - late layers `23` to `26` are the most coherent
+- Finished full-contract thinking-on steering rows:
+  - `no_steer`: `2 / 160` `pass@1`, loop fraction `0.65625`, over-half-budget fraction `0.6375`
+  - `plus_v_linear`: `2 / 160` `pass@1`, loop fraction `0.6125`, over-half-budget fraction `0.6000`
 
 ## Active TODOs
 
-### P0: Positive-Enrichment Screening Gate
+### P0: Finish the work already running
 
-- The active steering-trainable set is now gated by repaired train positive rate:
-  - only promote datasets with train positive rate `>= 10%` after screening
-  - on the current repaired surface, only `LiveCodeBench` passes (`140 / 420 = 33.3%`)
-  - keep `GPQA`, `MATH-500`, and `MMLU-Pro` diagnostic-only for now (`7 / 133`, `18 / 338`, `6 / 518`)
-- First screening queue:
+#### P0.1: Close the full thinking-on steering table
+
+- Running jobs:
+  - `2804` - `minus_v_linear`
+  - `2810` - `random_linear`
+  - `2811` - `minus_v_spherical`
+  - `2815` - `plus_v_spherical`
+  - `2816` - `random_spherical`
+- Required deliverable:
+  - one finished seven-row thinking-on table with:
+    - `no_steer`
+    - `minus_v_linear`
+    - `plus_v_linear`
+    - `random_linear`
+    - `minus_v_spherical`
+    - `plus_v_spherical`
+    - `random_spherical`
+  - report `pass@1`, loop fraction, over-half-budget fraction, avg/median generation length, and max-length-hit fraction
+- Do not launch:
+  - `t` sweeps
+  - layer-restriction ablations
+  - controller variants
+  until this table exists.
+
+#### P0.2: Finish the positive-enrichment screening gate
+
+- Current sidecar checkpoints:
+  - `LiveCodeBench-extra`: `255` profiled, `141` positives, positive rate `0.5529`, completion-tail fraction `0.5765`, loop fraction `0.3029`
+  - `TACO-hard`: `213` profiled, `172` positives, positive rate `0.8075`, completion-tail fraction `0.8263`, loop fraction `0.3779`
+  - `MATH level-5` parallel path: `180` profiled, `25` positives, positive rate `0.1389`, completion-tail fraction `0.2069`, loop fraction `0.0833`, success fraction `0.7750`
+  - `Omni-MATH >= 7`: dependency-pending behind `2818`
+- Finish the current `300`-prompt passes before opening another screening family.
+- Promotion rule stays literal:
+  - only promote datasets whose final repaired prompt-majority train positive rate stays `>= 10%`
+- Per-dataset admission receipt must include:
+  - profiled prompt count
+  - prompt-majority positive count and rate
+  - completion-tail fraction
+  - loop fraction
+  - max-length-hit fraction
+  - accuracy if a grader exists
+  - exact prompt/completion sidecar paths
+- Keep `LiveCodeBench-extra` prompt-disjoint from the repaired March `LiveCodeBench` object by exact prompt-text exclusion.
+
+#### P0.3: Let the March prompt-surface provenance pair run
+
+- Queued jobs:
+  - `2829` - `LiveCodeBench` `HFChatTemplate` `thinking-mode on`
+  - `2830` - same surface with `thinking-mode off`
+- Purpose:
+  - settle the narrow provenance question around the March collector surface
+- Priority rule:
+  - this is real work, but it is below the full thinking-on steering table and below finishing the current screening gate
+
+### P1: Unblock the non-thinking steering lane correctly
+
+- Current status:
+  - `2821`, `2822`, `2823`, `2825`, and `2826` all failed on dirty-slot CUDA OOM before first row
+  - there is still no non-thinking condition summary on disk
+- Interpretation:
+  - this is currently a node-geometry blocker, not a science result
+- Next action:
+  - do not keep blind-retrying while the same contaminated slots are visible
+  - wait for a clean slot or for the current thinking-on jobs to release capacity
+  - rerun a narrow serial table first:
+    - `no_steer`
+    - `minus_v_linear`
+    - `plus_v_linear`
+    - `random_linear`
+- Only extend non-thinking to spherical once at least one non-thinking row has landed.
+
+### P2: Promote the first new screened-in dataset(s)
+
+- Promotion order after the current screen finishes:
   - `LiveCodeBench-extra`
   - `TACO-hard`
-  - full `MATH` hard / level-5
-  - `Omni-MATH` hard
-- First `300`-prompt pass is now live under the direct node worktree:
-  - output root:
-    `/home/murphy/projects/worktrees/cot-loop-positive-screening/outputs/model_stats/positive_screen/`
-  - log root:
-    `/home/murphy/projects/worktrees/cot-loop-positive-screening/logs/positive_screen/`
-  - current checkpointed launch order:
-    - GPU `5`: `LiveCodeBench-extra` -> `MATH level-5`
-    - GPU `3`: `TACO-hard` -> `Omni-MATH >= 7`
-  - the original direct launch on GPUs `6` and `7` is now superseded:
-    - the first collector surface only wrote sidecars at the end of the full run
-    - the first checkpointed relaunch on `6` / `7` then failed on shared-node GPU memory pressure
-    - the current live chains therefore run with lower vLLM memory targets (`0.60` on GPU `5`, `0.65` on GPU `3`)
-- The screening archive contract is now stricter than the older rollout-stats JSON:
-  - save prompt text plus prompt token IDs
-  - save dataset `record_id` plus dataset-side `record_metadata`
-  - save per-rollout completion text plus exact `completion_token_ids`
-  - save prompt-level `majority_s_0.5` summary fields in a separate prompt-profile sidecar
-  - keep these sidecars next to the aggregate stats JSON so later activation replay and relabeling do not depend on Slack archaeology
-  - write the sidecars incrementally, not only at the end of the `300`-prompt pass:
-    - `__prompt_profile.jsonl`
-    - `__prompt_rollout_archive.jsonl`
-    - `__progress.json`
-- `LiveCodeBench-extra` must stay prompt-disjoint from the March stage object:
-  - current screen uses exact prompt-text exclusion from
-    `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_projection_livecodebench_majority05_seed0_20260323/data/diagnostics/prompt_rollout_archive.jsonl`
-- Second screening queue:
-  - `APPS` competition
-  - `CodeContests` sample
-  - optional `SuperGPQA`
-  - optional `HLE`
-- For each screened pool, report:
-  - prompt count
-  - repaired train positive count and positive rate under `majority_s_0.5`
-  - completion-level `>50%` fraction
-  - loop fraction
-  - max-hit fraction
-  - average / median completion length
-  - accuracy if a grader exists
-  - prompt-length stats
-- Keep the “accuracy if a grader exists” caveat literal:
-  - `LiveCodeBench-extra` and `MATH`-family screens have usable sanity anchors
-  - `TACO-hard` is still ungraded in-repo on the first pass, so treat it as prevalence-first until an evaluator lands
-- Early partial readout from the checkpointed run, before any candidate-level decision:
-  - `LiveCodeBench-extra`: `0 / 2` prompt-majority positives so far, completion-tail fraction `0.0`
-  - `TACO-hard`: `0 / 1` prompt-majority positives so far, but the first prompt already has completion-tail fraction `0.5`, one looped rollout, and one rollout that hit the full `30000` token cap
-- Do not revive cross-benchmark vector averaging or cosine-alignment claims until at least one more dataset clears the `10%` gate.
-- For future Qwen rollout-stat reruns, keep the prompt-surface provenance explicit:
-  - the March bundle was already thinking-on for `MATH-500`, `AIME`, `GPQA`, and `MMLU-Pro`;
-  - only the saved March `LiveCodeBench` row bypassed the Qwen chat template because it used raw `CodeQwenInstruct`;
-  - any new paired thinking comparison should therefore target `LiveCodeBench` under `--lm-style-override HFChatTemplate` with explicit `--thinking-mode on/off`, not a blind five-dataset redo.
+  - `MATH level-5` if the final `300`-prompt pass stays above the gate
+  - `Omni-MATH >= 7` after the dependency chain completes
+- For each promoted dataset:
+  - materialize the repaired `majority_s_0.5` object
+  - train the benchmark-local RFM detector
+  - export block-specific vectors
+  - run the same bootstrap direction-stability diagnostics used for `LiveCodeBench`
+  - write a report-style receipt before treating the dataset as part of the shared vector pool
 
-### P1: Close The Repaired Detector Table
+### P3: Cross-benchmark vector pooling and transfer
 
-- The repaired `LiveCodeBench` detector object is now frozen in the report bundle:
-  - `outputs/livecodebench_repaired_stage_report_apr21/`
-- Remaining detector-side TODO:
-  - decide whether detector ranking needs matching RFM multiseed or split-seed sensitivity before it is treated as the durable RFM-versus-MLP read.
-- If that follow-up is skipped, propagate the repaired `LiveCodeBench` detector table into the next unified prompt-profile summary instead of reusing the superseded `54 / 128 / 160` March object.
+- This stays blocked until at least two non-`LiveCodeBench` benchmark-local bundles:
+  - pass the screen
+  - are materialized
+  - export stable directions
+  - and have readable benchmark-local receipts
+- Only after that:
+  - build a sign-aligned average vector
+  - test it on an external held-out benchmark
 
-### P2: Finish The Direction-Quality Surface
+## Defer until the main stage is settled
 
-- The repaired `LiveCodeBench` vector bundle and its report-style direction summary are now frozen in:
-  - `outputs/livecodebench_repaired_stage_report_apr21/`
-- Remaining direction tasks before any transfer claim:
-  - cross-benchmark cosine alignment across screened-in datasets, not the old retained-four list
-  - explicit decision on whether any future sub-`10%` repaired object should remain provenance-only even after materialization
-- Repaired-materialization probecheck on the other retained benchmarks is now on disk:
-  - `GPQA`: `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_binary/gpqa_majority_s0p5_rolloutrecompute_probecheck_20260421/`
-    - natural prompt-majority counts: train `126/7`, val `32/2`, test `40/2`
-  - `MATH-500`: `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_binary/math500_majority_s0p5_rolloutrecompute_probecheck_20260421/`
-    - natural prompt-majority counts: train `320/18`, val `80/4`, test `100/4`
-  - `MMLU-Pro`: `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_binary/mmlu_pro_majority_s0p5_rolloutrecompute_probecheck_20260421/`
-    - natural prompt-majority counts: train `512/6`, val `128/1`, test `160/2`
-- Earlier smaller train counts from the same materializer (`14/7`, `36/18`, `12/6`) were only the downsampled fit-train subsets, not the raw repaired prompt sets.
-- Under the new gate, those tiny-positive repaired objects stay provenance-only for now unless an enrichment pass creates a screened-in variant.
+- RFM multiseed / split-seed sensitivity on the repaired detector object:
+  - still useful, but not the current critical path
+- New steering hypotheses beyond the corrected figure contract
+- Non-thinking spherical runs before the first non-thinking linear row exists
+- Any reuse of the old `32`-prompt steering pilot as if it were current evidence
 
-### P3: Benchmark-Local Block-Specific Steering
+## Runtime and infra notes
 
-- The first larger benchmark-local steering table in the report bundle is only a bounded prefill-last-token spherical pilot and should be treated that way:
-  - `outputs/livecodebench_repaired_stage_report_apr21/`
-- If the steering lane continues on `LiveCodeBench`, the first required step is not a new hypothesis; it is the corrected same-slice rerun under the figure contract Wangzhi clarified on April 21.
-- Open steering-side TODOs are now:
-  - rerun the same `32` held-out `LiveCodeBench` prompt IDs with:
-    - full decode budget (`30000`, not `1024`)
-    - prefill-only timing
-    - every prompt token steered at every selected block during prefill
-    - block-specific linear conditions:
-      - `minus_v_linear`
-      - `plus_v_linear`
-      - `random_linear`
-    - block-specific spherical conditions:
-      - `minus_v_spherical`
-      - `plus_v_spherical`
-      - `random_spherical`
-  - record the rerun as superseding the old last-token `1024` pilot rather than as another comparable row in the same table
-  - add `shuffled_label_spherical` if the benchmark-local lane is going to continue at all
-  - pick a new benchmark-local steering hypothesis before launching more runs:
-    - different hook surface
-    - stability-informed layer restriction
-    - or another control that is not already ruled out by the finished `32`-prompt table
-  - if further steering jobs are launched, log per-condition wall time explicitly; `random_spherical` was much slower than the first three conditions
-  - make the direction-similarity definition explicit in the next report:
-    - it is the cosine between a bootstrap-refit signed normalized vector and the reference exported signed normalized vector for the same layer
-    - the reference vector itself comes from the top eigenvector of that layer's symmetrized final `M`, after sign selection by fit-train `PR-AUC` then `ROC-AUC`
-
-### P4: External Average-Vector Test
-
-- This stays blocked until at least two screened-in benchmark-local bundles exist.
-- Once that gate is met:
-  - build one layerwise average "verbose" vector by sign-aligning and averaging the screened-in benchmark-local bundles
-  - pick one benchmark outside that screened-in training set
-  - apply the same fixed spherical protocol on that external benchmark and report the same paired metric table plus accuracy delta
-
-### Later Only If The First Steering Table Is Real
-
-- Stronger prompt-shape or residualized controls on the repaired object.
-- Layer-selection ablations, controller variants, or `t` sweeps only after the unconditional spherical pass shows real signal.
+- The positive-enrichment screen is currently using home-backed caches:
+  - `/home/murphy/.cache/cot-loop-positive-screening/...`
+  because `/data` is effectively full.
+- Treat this as active execution context, not a footnote. It matters for reruns and for where the current sidecars live.

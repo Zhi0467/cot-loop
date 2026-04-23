@@ -1,6 +1,6 @@
 # Roadmap - CoT Loop Detection
 
-Last updated: 2026-04-23 01:30 UTC
+Last updated: 2026-04-23 02:20 UTC
 
 Scope:
 - Build and validate a probe pipeline for CoT loop detection across prefill and completion feature views.
@@ -11,6 +11,20 @@ Scope:
 - Milestone 2 gate: complete.
 - Milestone 3 gate: complete.
 - Active milestone: Milestone 5 (deployment readiness).
+- 2026-04-23 02:20 UTC: grounded the April 21 steering-stage plan against the actual repo/runtime state and wrote a new durable note plus PDF bundle:
+  - note: `docs/prompt-profile-rfm-steering-grounded-stage-2026-04-23.md`
+  - PDF: `outputs/prompt_profile_rfm_stage_grounded_plan_20260423/prompt_profile_rfm_stage_grounded_plan_20260423.pdf`
+  - exact current object is still the repaired `LiveCodeBench` prompt-level `majority_s_0.5` split `280 / 128 / 160` with positives `140 / 35 / 54`
+  - finished full-contract thinking-on rows are still only `no_steer` and `plus_v_linear`
+  - the remaining five thinking-on rows (`2804`, `2810`, `2811`, `2815`, `2816`) are still the real live steering table
+  - every attempted non-thinking row (`2821`, `2822`, `2823`, `2825`, `2826`) failed on the same dirty-slot CUDA OOM before first row, so the non-thinking lane is now recorded as an infrastructure blocker rather than as negative science
+  - the stage-0.5 screening lane is now materially real rather than speculative:
+    - `LiveCodeBench-extra`: `255` profiled, positive rate `0.5529`
+    - `TACO-hard`: `213` profiled, positive rate `0.8075`
+    - `MATH level-5`: `180` profiled, positive rate `0.1389`
+    - `Omni-MATH >= 7`: still dependency-pending
+  - the explicit `LiveCodeBench` `HFChatTemplate` `thinking on/off` provenance pair remains queued as `2829` / `2830`
+  - repo reality is now called out directly too: draft PR `#11` is behind the local worktree state, and the positive-enrichment screen is currently running with home-backed caches because `/data` is effectively full
 - 2026-04-23 01:30 UTC: queued the exact narrow replay that the provenance audit pointed to instead of leaving it as a doc-only recommendation. On `tianhaowang-gpu0`, the remote preflight still looks tight but workable: cache root resolves to `/data/scratch/murphy/cache`, home usage is `79%`, and `/data` is still effectively full (`100%`, about `18G` free). I fetched `origin/task/1776752262-rfm-stage0` into a fresh detached worktree at `/data/scratch/murphy/projects/worktrees/cot-loop-lcb-thinking-stats`, validated `collect_model_stats.py` under conda env `swe311`, and queued the paired `LiveCodeBench` `HFChatTemplate` jobs on the exact March-style decode surface (`Qwen/Qwen3-1.7B`, `temperature=0.0`, `num_generations=10`, `tp=1`, `dp=4`, `max_num_seqs=8`, `max_num_batched_tokens=4096`). Job `2829` (`q3-lcb-thon`) is the explicit `--thinking-mode on` run and currently sits at `PENDING (Resources)`; job `2830` (`q3-lcb-thoff`) is the matched explicit `--thinking-mode off` control and currently sits at `PENDING (Priority)`. Slurm is presently backfill-estimating both for `2026-04-24 02:30:31 UTC`. One provenance caveat remains explicit in the log: the old March artifact never serialized `top_p` / `top_k`, so these queued replays leave them unset and let the collector resolve the current Qwen generation-config defaults at runtime (`top_p=0.95`, `top_k=20`).
 - 2026-04-23 01:16 UTC: audited the March Qwen rollout-stat provenance before relaunching anything expensive. The saved `2026-03-15` bundle is not uniformly non-thinking: the original `collect_model_stats.py` hardwired `math_freeform`, `multiple_choice_gpqa`, and `multiple_choice_mmlupro` through `tokenizer.apply_chat_template(..., add_generation_prompt=True)`, and Qwen's public tokenizer template only inserts the empty `<think></think>` block when `enable_thinking=false`. So those four dataset families were already on the native Qwen reasoning surface. The real surface mismatch is narrower: March `LiveCodeBench` still used raw `format_prompt_generation` strings under `CodeQwenInstruct`, while the newer HF steering results are on a reasoning-mode chat-template codegen surface. I patched the collector so future rollout-stat runs can record and control this explicitly: `scripts/collect_model_stats.py` now accepts `--thinking-mode {default,on,off}`, the chat-template prompt builders propagate it through math/MCQ/codegen plus the `HFChatTemplate` LiveCodeBench path, and both rollout report builders now surface `thinking_mode_requested` / `thinking_mode_resolved`. That means the meaningful next rerun is a targeted `LiveCodeBench` `HFChatTemplate` on/off comparison, not a blind five-dataset March redo.
 - Latest result: the active collaborator-facing artifact is no longer only the older unified prompt-profile note. The project now also has a LiveCodeBench-only repaired stage report at `docs/livecodebench-repaired-stage-report-2026-04-21.md` plus `outputs/livecodebench_repaired_stage_report_apr21/`, which freezes the repaired prompt object, detector comparison, direction-stability read, and first larger steering control table in one report-style bundle.

@@ -1,6 +1,6 @@
 # CoT Loop Detection via Probe Classifiers
 
-This repository studies whether chain-of-thought loop risk is predictable from internal activations and rollout telemetry. The original workflow centered on prompt-prefill last-token probes, and the current active stage is a screened prompt-profile RFM-plus-steering extension on the frozen Qwen prompt-profile bundle. Under the repaired-train positive-rate gate (`>= 10%` after screening), only `LiveCodeBench` is currently steering-trainable on this object (`140 / 420 = 33.3%`); `GPQA`, `MATH-500`, and `MMLU-Pro` stay diagnostic-only for now because their repaired train rates are `5.3%`, `5.3%`, and `1.2%`. `AIME` remains out because it mostly reads as a prompt-visible workload case here. The merged trigger-attention audit remains useful background context, but it is no longer the live blocker surface for the next stage.
+This repository studies whether chain-of-thought loop risk is predictable from internal activations and rollout telemetry. The original workflow centered on prompt-prefill last-token probes, and the current active stage is a screened prompt-profile RFM-plus-steering extension on the frozen Qwen prompt-profile bundle. The durable status surface is now `docs/prompt-profile-rfm-steering-grounded-stage-2026-04-23.md`: the active benchmark-local object is still repaired `LiveCodeBench` `majority_s_0.5` (`280 / 128 / 160` with positives `140 / 35 / 54`), only two full-contract thinking-on steering rows are finished so far (`no_steer` and `plus_v_linear`), the remaining five thinking-on rows are still running, and the non-thinking comparison is currently blocked by dirty-slot CUDA OOM before first row. Under the repaired-train positive-rate gate (`>= 10%` after screening), only the original `LiveCodeBench` object is already admitted; `LiveCodeBench-extra`, `TACO-hard`, and `MATH level-5` are the current positive-enrichment candidates in flight. The merged trigger-attention audit remains useful background context, but it is no longer the live blocker surface for the next stage.
 
 ## Overview
 
@@ -15,19 +15,18 @@ Latest status:
   - it is background evidence about prompt-dominant final-layer attention plus a mid-stack previous-loop signal on the saved loop rows;
   - it is not validation for the next-stage RFM steering object.
 - the collaborator-facing prompt-profile surface is now the unified note `docs/prompt-profile-unified-report-2026-04-09.md` plus `outputs/prompt_profile_unified_report_20260409/`, which folds the April 5 combined audit, the April 6 mechanism note, and the April 9 plain-English length audit into one canonical PDF while keeping the natural-regression lane, the balanced-binary recommendation, and the prompt-shape mechanism answer in the same surface.
-- the next execution surface is now pinned in `docs/prompt-profile-rfm-steering-plan-2026-04-21.md`:
-  - reuse the saved March `2026-03-22` / `2026-03-23` Qwen prompt-profile archives;
-  - keep only screened-in datasets with repaired train positive rate `>= 10%` as steering-trainable stage inputs;
-  - on the current repaired surface, that narrows the active stage to `LiveCodeBench` alone (`140 / 420 = 33.3%`);
-  - keep `GPQA`, `MATH-500`, and `MMLU-Pro` as evaluation/diagnostic surfaces until positive enrichment lands, with current repaired train rates `7 / 133`, `18 / 338`, and `6 / 518`;
-  - add an explicit stage-0.5 positive-enrichment screen ahead of any renewed cross-benchmark steering claim, starting with `LiveCodeBench-extra`, `TACO-hard`, full `MATH` hard / level-5, and `Omni-MATH` hard;
-  - keep the binary head `majority_s_0.5`;
-  - add a native layerwise RFM path as a sibling baseline to the current activation linear and activation MLP surfaces;
-  - extend the report with direction-coherence diagnostics before making any steering claim;
-  - keep `T = 5` fixed on the first RFM pass;
-  - then run paired benchmark-local block-specific steering using the exported per-layer bundle directly, with linear and spherical variants side by side rather than a top-`k` rule or controller;
-  - include `no_steer`, `-v`, `+v`, and random-direction controls in the first steering table;
-  - only revisit the averaged external "verbose" vector once at least two screened-in benchmark-local bundles exist.
+- the April 21 plan note `docs/prompt-profile-rfm-steering-plan-2026-04-21.md` is still the design document for this stage, but the current grounded status now lives in `docs/prompt-profile-rfm-steering-grounded-stage-2026-04-23.md`:
+  - it keeps the exact repaired `LiveCodeBench` object fixed;
+  - it records that only two full-contract thinking-on rows are finished and five are still running;
+  - it records that every attempted non-thinking row failed before first row on dirty-slot CUDA OOM, so that lane is infrastructure-blocked rather than scientifically negative;
+  - it updates the screening lane from a plan-only item to a live evidence surface:
+    - `LiveCodeBench-extra`: `255` profiled, positive rate `0.5529`
+    - `TACO-hard`: `213` profiled, positive rate `0.8075`
+    - `MATH level-5`: `180` profiled, positive rate `0.1389`
+    - `Omni-MATH >= 7`: dependency-pending;
+  - it also records the repo/runtime drift:
+    - local stage state is ahead of draft PR `#11`
+    - the current positive-enrichment screen is running with home-backed caches because `/data` is effectively full.
 - the repo now has committed stage-0 RFM scaffolding:
   - `src/loop_probe/prompt_profile_rfm_stage_registry.py`
   - `scripts/emit_prompt_profile_rfm_stage_registry.py`

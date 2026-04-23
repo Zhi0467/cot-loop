@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-04-21 22:26 UTC
+Last updated: 2026-04-23 02:20 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -16,6 +16,7 @@ Core docs:
 - Prompt-profile plain-language note: prompt-profile-plain-language-2026-03-30.md
 - Prompt-profile full-train plan: prompt-profile-full-train-plan-2026-04-02.md
 - Prompt-profile RFM + steering stage plan: prompt-profile-rfm-steering-plan-2026-04-21.md
+- Prompt-profile RFM + steering grounded stage note: prompt-profile-rfm-steering-grounded-stage-2026-04-23.md
 - Prompt-profile RFM artifact schema: prompt-profile-rfm-artifact-schema-2026-04-21.md
 - LiveCodeBench repaired stage report: livecodebench-repaired-stage-report-2026-04-21.md
 - Prompt-profile natural-regression rerun note: prompt-profile-natural-regression-rerun-2026-04-05.md
@@ -45,6 +46,7 @@ Key outputs:
 - Prompt-profile risk-control bundle: ../outputs/prompt_profile_risk_controls_20260330/
 - Plain-language objective PDF: ../outputs/prompt_profile_plain_language_20260330/prompt_profile_plain_language_20260330.pdf
 - Full-train plan PDF: ../outputs/prompt_profile_full_train_plan_20260402/prompt_profile_full_train_plan_20260402.pdf
+- Grounded stage note PDF: ../outputs/prompt_profile_rfm_stage_grounded_plan_20260423/prompt_profile_rfm_stage_grounded_plan_20260423.pdf
 - Natural-regression rerun bundle: ../outputs/prompt_profile_natural_regression_rerun_20260405/
 - Natural-regression rerun PDF: ../outputs/prompt_profile_natural_regression_rerun_20260405/prompt_profile_natural_regression_rerun_20260405.pdf
 - Prompt-profile unified report bundle: ../outputs/prompt_profile_unified_report_20260409/
@@ -82,40 +84,26 @@ Key outputs:
 - Detailed reopened-round summary PDF: ../outputs/prefill_rounds_1_to_12_detailed_summary/prefill_rounds_1_to_12_detailed_summary.pdf
 
 Current live status:
-- The new note `prompt-profile-rfm-steering-plan-2026-04-21.md` is the active next-stage execution surface:
-  - it turns the attached PDF idea into a repo-grounded plan;
-  - it fixes the real source bundle to the saved March `2026-03-22` / `2026-03-23` Qwen prompt-profile archives;
-  - it now makes the repaired-train positive-rate gate explicit: only datasets with screened train positive rate `>= 10%` stay active stage inputs;
-  - on the current repaired surface, that collapses the steering-trainable set to `LiveCodeBench` alone (`140 / 420 = 33.3%`);
-  - `GPQA`, `MATH-500`, and `MMLU-Pro` now stay diagnostic-only until positive enrichment lands, with repaired train rates `7 / 133`, `18 / 338`, and `6 / 518`;
-  - it adds a stage-0.5 positive-enrichment screen ahead of any renewed cross-benchmark steering claim, with first-pass candidates `LiveCodeBench-extra`, `TACO-hard`, full `MATH` hard / level-5, and `Omni-MATH` hard;
-  - it restores the activation-side linear controls as a required comparison surface, distinct from the prompt-only metadata baselines;
-  - it keeps `T = 5` fixed on the first RFM pass;
-  - it now treats exported vector quality as its own object through bootstrap stability, cosine-structure, and projection-separation diagnostics before steering claims;
-  - it uses the exported per-layer benchmark-local bundle directly for the first spherical steering pass at fixed `t = 0.3`, rather than inventing a separate top-`k` rule or controller;
-  - it adds sign-flipped and random-direction controls to the first steering table instead of relying only on a no-steer baseline;
-  - it keeps the steering story alive even if RFM is not the top detector, so detector ranking and steering utility stay separate questions;
-  - the machine-readable provenance contract for this stage now lives in `prompt-profile-rfm-artifact-schema-2026-04-21.md`, so vector bundles and steering runs can be looked up by schema instead of by Slack history;
-  - the first implementation slice is now real, not only planned: the repo has the shared registry / emit / validate / artifact-helper surfaces plus the node-validated artifact `../outputs/prompt_profile_rfm_stage0_registry_validation_20260421/registry_validation.json`;
-  - the first repaired detector/vector object is now also on disk:
-    - repaired detector root `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/`
-    - repaired prompt-only baseline root `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_prompt_baselines/livecodebench_majority_s0p5_rolloutrecompute_seed0_20260421/`
-    - repaired activation baseline root `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_stage_baselines/livecodebench_majority_s0p5_rolloutrecompute_seed0_20260421/`
-  - the earlier `54 / 128 / 160` `LiveCodeBench` detector table is now explicitly withdrawn from the active read:
-    - it trusted the archive's saved `0.9` tail label instead of recomputing `majority_s_0.5` from saved rollout lengths
-    - the repaired `LiveCodeBench` split is `280 / 128 / 160` with `140 / 35 / 54` positives
-  - on that repaired object, prompt-only tops out at `PR-AUC 0.5871`, activation linear at mean `0.5698`, current single-seed RFM is `0.7055`, and `h256 d1` MLP last-layer is essentially tied / slightly ahead depending on checkpoint rule;
-  - the repaired LiveCodeBench vector bundle now also has a finished direction-bootstrap surface under the canonical `vector_exports/summary.json`:
-    - `100` replay fits per layer
-    - all `28` layers clear mean cosine `>= 0.781`
-    - weakest `95%` low bound is `0.693`
-    - late layers `23-26` are the most stable, while detector validation still peaks at layer `27`;
-  - it defers the averaged external "verbose" vector step until at least two screened-in benchmark-local bundles exist, instead of pretending the old retained-four average is already a live object;
-  - it separates detector quality, steering utility, and trigger-attention background context instead of blending them into one claim.
-  - the screened registry is now aligned with that story in code too:
-    - `src/loop_probe/prompt_profile_rfm_stage_registry.py` records repaired train positive counts / rates and only exposes screened-in datasets as active stage inputs;
-    - with the current repaired counts, the active stage input set is `LiveCodeBench` only.
-- The new note `livecodebench-repaired-stage-report-2026-04-21.md` is now the shortest collaborator-facing artifact for "finish LiveCodeBench" on this stage:
+- `prompt-profile-rfm-steering-grounded-stage-2026-04-23.md` is now the live status surface for this stage:
+  - it keeps the repaired `LiveCodeBench` object fixed at fit-train / val / test `280 / 128 / 160` with positives `140 / 35 / 54`;
+  - it separates finished evidence, live evidence, and blocked evidence instead of treating the whole stage as one undifferentiated status blob;
+  - it records that only two full-contract thinking-on rows are finished so far:
+    - `no_steer`: `2 / 160` `pass@1`, loop fraction `0.65625`
+    - `plus_v_linear`: `2 / 160` `pass@1`, loop fraction `0.6125`
+  - it records that the remaining five full-contract thinking-on rows are still running:
+    - `2804`, `2810`, `2811`, `2815`, `2816`
+  - it records that every attempted non-thinking row failed on the same dirty-slot CUDA OOM before first row, so the non-thinking lane is still infrastructure-blocked rather than scientifically read out;
+  - it updates the screening gate from a plan-only item to a live evidence surface:
+    - `LiveCodeBench-extra`: `255` profiled, positive rate `0.5529`
+    - `TACO-hard`: `213` profiled, positive rate `0.8075`
+    - `MATH level-5`: `180` profiled, positive rate `0.1389`
+    - `Omni-MATH >= 7`: dependency-pending
+  - it records that the explicit `LiveCodeBench` `HFChatTemplate` `thinking on/off` provenance pair is queued as `2829` / `2830`, but is not the main steering result;
+  - it also makes the repo/runtime drift explicit:
+    - local worktree state is ahead of the published draft PR `#11`;
+    - the positive-enrichment screen is currently running with home-backed caches because `/data` is effectively full.
+- `prompt-profile-rfm-steering-plan-2026-04-21.md` remains the design document for why this stage exists and what it is trying to prove.
+- The new note `livecodebench-repaired-stage-report-2026-04-21.md` is still the shortest collaborator-facing artifact for "finish LiveCodeBench" on the repaired detector/vector object:
   - it freezes the repaired `LiveCodeBench` prompt object, detector comparison, direction-stability read, and first larger steering control table in one place;
   - it points at the report bundle `../outputs/livecodebench_repaired_stage_report_apr21/`, which now carries:
     - `livecodebench_repaired_stage_report_apr21.pdf`
