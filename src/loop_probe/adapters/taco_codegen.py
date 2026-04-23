@@ -405,12 +405,11 @@ def _compile_and_get_callable(program: str, method_name: str) -> Any | None:
     try:
         namespace: dict[str, object] = {}
         exec(program, namespace)
-        target: object
         if "class Solution" in program and "Solution" in namespace:
             target = namespace["Solution"]()  # type: ignore[operator]
-        else:
-            target = type("_Namespace", (), namespace)()
-        return getattr(target, method_name)
+            return getattr(target, method_name)
+        target = namespace.get(method_name)
+        return target if callable(target) else None
     except Exception:
         return None
     finally:
