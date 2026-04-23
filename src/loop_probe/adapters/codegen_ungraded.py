@@ -8,6 +8,7 @@ from ._common import (
     resolve_sample_id,
     row_matches_filter,
 )
+from ..prompt_format import format_user_prompt
 from ..types import DatasetSpec, SampleRecord
 
 
@@ -74,6 +75,7 @@ def build_codegen_prompt(
     *,
     starter_code: str | None,
     prompt_format: str,
+    thinking_mode: str = "default",
 ) -> str:
     prompt_text = prompt.rstrip()
     starter = (starter_code or "").strip()
@@ -87,8 +89,9 @@ def build_codegen_prompt(
         return prompt_text
     if tokenizer is None:
         raise SystemExit("Tokenizer is required for chat_template codegen prompts.")
-    return tokenizer.apply_chat_template(
-        [{"role": "user", "content": prompt_text}],
-        tokenize=False,
-        add_generation_prompt=True,
+    return format_user_prompt(
+        tokenizer,
+        prompt_text,
+        prompt_format=prompt_format,
+        thinking_mode=thinking_mode,
     )

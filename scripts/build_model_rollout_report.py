@@ -215,6 +215,14 @@ def _load_stats_payloads(stats_dir: Path) -> list[tuple[Path, dict[str, Any]]]:
 
 
 def _prompt_format_text(row: dict[str, Any], info: DatasetInfo) -> str:
+    thinking_mode = row.get("thinking_mode_resolved")
+    thinking_suffix = ""
+    if thinking_mode == "on":
+        thinking_suffix = " Thinking mode on."
+    elif thinking_mode == "off":
+        thinking_suffix = " Thinking mode off."
+    elif thinking_mode == "default":
+        thinking_suffix = " Native template thinking behavior."
     if info.task_kind == "livecodebench_codegen":
         resolved = row.get("prompt_format_resolved")
         lm_style = row.get("lm_style")
@@ -222,9 +230,12 @@ def _prompt_format_text(row: dict[str, Any], info: DatasetInfo) -> str:
             if lm_style:
                 return (
                     "Tokenizer chat template around the LiveCodeBench generic prompt "
-                    f"with LM style {lm_style}."
+                    f"with LM style {lm_style}.{thinking_suffix}"
                 )
-            return "Tokenizer chat template around the LiveCodeBench generic prompt."
+            return (
+                "Tokenizer chat template around the LiveCodeBench generic prompt."
+                f"{thinking_suffix}"
+            )
         if lm_style:
             return (
                 "Raw string prompt from LiveCodeBench format_prompt_generation "
@@ -239,7 +250,7 @@ def _prompt_format_text(row: dict[str, Any], info: DatasetInfo) -> str:
         prefix = "Plain-text prompt without chat wrapper"
     else:
         prefix = f"Prompt format {resolved or 'unknown'}"
-    return f"{prefix}: {info.prompt_instruction}"
+    return f"{prefix}: {info.prompt_instruction}{thinking_suffix}"
 
 
 def _dataset_description(
@@ -340,6 +351,8 @@ def load_dataset_record(
         "lm_style": metadata.get("lm_style"),
         "prompt_format_requested": metadata.get("prompt_format_requested"),
         "prompt_format_resolved": metadata.get("prompt_format_resolved"),
+        "thinking_mode_requested": metadata.get("thinking_mode_requested"),
+        "thinking_mode_resolved": metadata.get("thinking_mode_resolved"),
     }
     row["chat_format"] = _prompt_format_text(row, info)
     for source_name, out_name in COUNT_COLUMNS:
@@ -537,6 +550,8 @@ def write_summary_files(rows: list[dict[str, Any]], out_dir: Path) -> None:
         "model_id",
         "prompt_format_requested",
         "prompt_format_resolved",
+        "thinking_mode_requested",
+        "thinking_mode_resolved",
         "timestamp",
         "sample_note",
         "lcb_native_pass_at_1",

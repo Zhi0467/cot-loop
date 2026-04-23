@@ -1,6 +1,6 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-22 00:03 UTC
+Last updated: 2026-04-23 01:16 UTC
 
 Reference plan:
 - `docs/prompt-profile-rfm-steering-plan-2026-04-21.md`
@@ -64,6 +64,10 @@ Reference plan:
   - `LiveCodeBench-extra`: `0 / 2` prompt-majority positives so far, completion-tail fraction `0.0`
   - `TACO-hard`: `0 / 1` prompt-majority positives so far, but the first prompt already has completion-tail fraction `0.5`, one looped rollout, and one rollout that hit the full `30000` token cap
 - Do not revive cross-benchmark vector averaging or cosine-alignment claims until at least one more dataset clears the `10%` gate.
+- For future Qwen rollout-stat reruns, keep the prompt-surface provenance explicit:
+  - the March bundle was already thinking-on for `MATH-500`, `AIME`, `GPQA`, and `MMLU-Pro`;
+  - only the saved March `LiveCodeBench` row bypassed the Qwen chat template because it used raw `CodeQwenInstruct`;
+  - any new paired thinking comparison should therefore target `LiveCodeBench` under `--lm-style-override HFChatTemplate` with explicit `--thinking-mode on/off`, not a blind five-dataset redo.
 
 ### P1: Close The Repaired Detector Table
 

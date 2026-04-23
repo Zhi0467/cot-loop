@@ -44,7 +44,12 @@ from loop_probe.labeling import (
     first_ngram_loop_prefix_length,
     profile_target_name,
 )
-from loop_probe.prompt_format import VALID_PROMPT_FORMATS, resolve_prompt_format
+from loop_probe.prompt_format import (
+    VALID_PROMPT_FORMATS,
+    VALID_THINKING_MODES,
+    resolve_prompt_format,
+    resolve_thinking_mode,
+)
 from loop_probe.prompt_builder import build_math_prompt
 from loop_probe.rollout import resolve_sampling_defaults
 from loop_probe.types import DatasetSpec
@@ -150,6 +155,15 @@ def _parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--thinking-mode",
+        default="default",
+        choices=VALID_THINKING_MODES,
+        help=(
+            "Explicit thinking-mode control for chat-template prompts. "
+            "'default' preserves the tokenizer's native behavior."
+        ),
+    )
+    parser.add_argument(
         "--resume-lcb-records-checkpoint",
         default="",
         help=(
@@ -190,6 +204,19 @@ def _parse_statistics(raw: str) -> list[str]:
 def _parse_metadata_fields(raw: str) -> list[str] | None:
     fields = [part.strip() for part in raw.split(",") if part.strip()]
     return fields or None
+
+
+def _thinking_mode_metadata(
+    *,
+    requested: str,
+    resolved: str | None,
+) -> dict[str, object]:
+    if resolved is None:
+        return {}
+    return {
+        "thinking_mode_requested": requested,
+        "thinking_mode_resolved": resolved,
+    }
 
 
 def _slugify(value: str) -> str:
@@ -434,6 +461,7 @@ def _load_prompt_items(
                 "--prompt-format chat_template."
             )
         resolved_prompt_format = "raw"
+        resolved_thinking_mode = None
     else:
         if tokenizer is None:
             raise SystemExit(
@@ -441,6 +469,11 @@ def _load_prompt_items(
             )
         try:
             resolved_prompt_format = resolve_prompt_format(tokenizer, args.prompt_format)
+            resolved_thinking_mode = resolve_thinking_mode(
+                tokenizer,
+                prompt_format=resolved_prompt_format,
+                thinking_mode=args.thinking_mode,
+            )
         except ValueError as exc:
             raise SystemExit(str(exc)) from exc
     if excluded_prompts and args.task_kind != "livecodebench_codegen":
@@ -477,6 +510,7 @@ def _load_prompt_items(
                     tokenizer,
                     record.prompt,
                     prompt_format=resolved_prompt_format,
+                    thinking_mode=args.thinking_mode,
                 ),
                 gold_answer=gold_answer,
                 record_id=record.record_id,
@@ -490,6 +524,10 @@ def _load_prompt_items(
         return items, {
             "prompt_format_requested": args.prompt_format,
             "prompt_format_resolved": resolved_prompt_format,
+            **_thinking_mode_metadata(
+                requested=args.thinking_mode,
+                resolved=resolved_thinking_mode,
+            ),
             "record_id_field": record_id_field,
             "metadata_fields": metadata_fields,
             **({"row_filter": row_filter} if row_filter is not None else {}),
@@ -513,9 +551,10 @@ def _load_prompt_items(
                     starter_code=(
                         None
                         if record.metadata is None
-                        else str(record.metadata.get(args.starter_code_field, "") or "")
+                            else str(record.metadata.get(args.starter_code_field, "") or "")
                     ),
                     prompt_format=resolved_prompt_format,
+                    thinking_mode=args.thinking_mode,
                 ),
                 record_id=record.record_id,
                 source_split=record.source_split,
@@ -528,6 +567,10 @@ def _load_prompt_items(
         return items, {
             "prompt_format_requested": args.prompt_format,
             "prompt_format_resolved": resolved_prompt_format,
+            **_thinking_mode_metadata(
+                requested=args.thinking_mode,
+                resolved=resolved_thinking_mode,
+            ),
             "starter_code_field": args.starter_code_field or None,
             "record_id_field": record_id_field,
             "metadata_fields": metadata_fields,
@@ -548,6 +591,7 @@ def _load_prompt_items(
                     record.prompt,
                     options,
                     prompt_format=resolved_prompt_format,
+                    thinking_mode=args.thinking_mode,
                 ),
                 gold_answer=gold_letter,
                 record_id=record.record_id,
@@ -561,6 +605,10 @@ def _load_prompt_items(
         metadata = {
             "prompt_format_requested": args.prompt_format,
             "prompt_format_resolved": resolved_prompt_format,
+            **_thinking_mode_metadata(
+                requested=args.thinking_mode,
+                resolved=resolved_thinking_mode,
+            ),
             "shuffle_policy": {
                 "kind": "seed_xor_sample_id",
                 "base_seed": args.seed,
@@ -582,6 +630,7 @@ def _load_prompt_items(
                     record.prompt,
                     options,
                     prompt_format=resolved_prompt_format,
+                    thinking_mode=args.thinking_mode,
                 ),
                 gold_answer=gold_answer,
                 gold_index=gold_index,
@@ -596,6 +645,10 @@ def _load_prompt_items(
         return items, {
             "prompt_format_requested": args.prompt_format,
             "prompt_format_resolved": resolved_prompt_format,
+            **_thinking_mode_metadata(
+                requested=args.thinking_mode,
+                resolved=resolved_thinking_mode,
+            ),
         }, None
 
     benchmark, format_prompt = livecodebench_codegen.load_benchmark(
@@ -608,8 +661,31 @@ def _load_prompt_items(
         repo_path=args.livecodebench_repo,
         model_id=args.model_id,
         lm_style_override=args.lm_style_override,
+        thinking_mode=args.thinking_mode,
     )
     resolved_prompt_format = livecodebench_codegen.prompt_format_for_lm_style(lm_style)
+    resolved_thinking_mode = None
+    if resolved_prompt_format == "chat_template":
+        lcb_tokenizer = tokenizer
+        if lcb_tokenizer is None:
+            lcb_tokenizer = AutoTokenizer.from_pretrained(
+                args.model_id,
+                trust_remote_code=args.trust_remote_code,
+                use_fast=True,
+            )
+        try:
+            resolved_thinking_mode = resolve_thinking_mode(
+                lcb_tokenizer,
+                prompt_format=resolved_prompt_format,
+                thinking_mode=args.thinking_mode,
+            )
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from exc
+    elif args.thinking_mode != "default":
+        raise SystemExit(
+            "livecodebench_codegen thinking_mode requires a chat-template prompt "
+            "surface, for example --lm-style-override HFChatTemplate."
+        )
     prompt_rows = list(zip(benchmark, prompt_records, strict=True))
     excluded_count = 0
     if excluded_prompts:
@@ -638,6 +714,10 @@ def _load_prompt_items(
         "lm_style": lm_style,
         "prompt_format_requested": args.prompt_format,
         "prompt_format_resolved": resolved_prompt_format,
+        **_thinking_mode_metadata(
+            requested=args.thinking_mode,
+            resolved=resolved_thinking_mode,
+        ),
     }
     if excluded_prompts:
         metadata["exclude_prompt_jsonl"] = args.exclude_prompt_jsonl
