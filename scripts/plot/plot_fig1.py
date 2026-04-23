@@ -3,15 +3,15 @@
 
 Examples
   # Plot from three per-model metrics files
-  python scripts/plot_fig1.py \
+  python scripts/plot/plot_fig1.py \
     --metrics outputs/qwq32b_metrics.csv \
     --metrics outputs/openthinker3_7b_metrics.csv \
     --metrics outputs/openthinker3_1p5b_metrics.csv \
     --out outputs/fig1.png
 
   # Glob or directory inputs are also accepted (including rep suffixes)
-  python scripts/plot_fig1.py --metrics "outputs/*_metrics*.csv" --out outputs/fig1.png
-  python scripts/plot_fig1.py --metrics outputs --out outputs/fig1.png
+  python scripts/plot/plot_fig1.py --metrics "outputs/*_metrics*.csv" --out outputs/fig1.png
+  python scripts/plot/plot_fig1.py --metrics outputs --out outputs/fig1.png
 """
 
 import argparse

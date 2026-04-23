@@ -14,15 +14,15 @@ from typing import Any
 import numpy as np
 import torch
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from loop_probe.dataloader import ActivationDataset, read_manifest
-from loop_probe.labeling import prompt_profile_majority_tail_label
-from loop_probe.rfm import LaplaceRFM, LaplaceRFMConfig
-from loop_probe.stage_artifacts import (
+from probe.dataloader import ActivationDataset, read_manifest
+from probe.labeling import prompt_profile_majority_tail_label
+from probe.rfm import LaplaceRFM, LaplaceRFMConfig
+from steer.stage_artifacts import (
     build_rfm_vector_direction_bootstrap_record,
     build_rfm_vector_bundle_record,
     current_git_commit,
@@ -30,7 +30,7 @@ from loop_probe.stage_artifacts import (
     tensor_checksum_hex,
     write_stage_artifact_record,
 )
-from loop_probe.train_utils import evaluate_binary_metrics_from_scores
+from probe.train_utils import evaluate_binary_metrics_from_scores
 
 
 DEFAULT_SIGN_CONVENTION = "positive projection means higher predicted majority_s_0.5 risk"

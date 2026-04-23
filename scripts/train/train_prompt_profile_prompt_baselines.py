@@ -16,14 +16,14 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.tree import DecisionTreeClassifier
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "src"
 if str(SRC) not in __import__("sys").path:
     __import__("sys").path.insert(0, str(SRC))
 
-from loop_probe.labeling import prompt_profile_majority_tail_label
-from loop_probe.stage_artifacts import stable_json_sha256
-from loop_probe.train_utils import evaluate_binary_metrics_from_scores
+from probe.labeling import prompt_profile_majority_tail_label
+from steer.stage_artifacts import stable_json_sha256
+from probe.train_utils import evaluate_binary_metrics_from_scores
 
 
 FEATURE_SETS: dict[str, tuple[str, ...]] = {

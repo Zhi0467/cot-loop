@@ -15,26 +15,26 @@ from typing import Any
 import numpy as np
 import torch
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from loop_probe.dataloader import ActivationDataset, read_manifest, resolve_sample_shape
-from loop_probe.labeling import prompt_profile_majority_tail_label
-from loop_probe.prompt_profile_rfm_stage_registry import (
+from probe.dataloader import ActivationDataset, read_manifest, resolve_sample_shape
+from probe.labeling import prompt_profile_majority_tail_label
+from steer.prompt_profile_rfm_stage_registry import (
     active_stage_datasets,
     get_stage_dataset,
     validate_stage_dataset,
 )
-from loop_probe.rfm import LaplaceRFM, LaplaceRFMConfig
-from loop_probe.stage_artifacts import (
+from probe.rfm import LaplaceRFM, LaplaceRFMConfig
+from steer.stage_artifacts import (
     build_rfm_detector_run_record,
     current_git_commit,
     stable_json_sha256,
     write_stage_artifact_record,
 )
-from loop_probe.train_utils import evaluate_binary_metrics_from_scores, set_seed
+from probe.train_utils import evaluate_binary_metrics_from_scores, set_seed
 
 
 DEFAULT_MODEL_ID = "Qwen/Qwen3-1.7B"

@@ -25,19 +25,19 @@ from sklearn.metrics import (
     silhouette_score,
 )
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from loop_probe.adapters import (
+from probe.adapters import (
     livecodebench_codegen,
     math_freeform,
     multiple_choice_gpqa,
     multiple_choice_mmlupro,
 )
-from loop_probe.collector import LcbSampleRecord
-from loop_probe.types import DatasetSpec
+from probe.adapters.livecodebench_codegen import LcbSampleRecord
+from probe.types import DatasetSpec
 
 
 def parse_args() -> argparse.Namespace:
@@ -517,12 +517,8 @@ def build_correctness_lookup(
                         f"LiveCodeBench correctness for split '{split_name}', sample_id={sample_id}."
                     )
                 question_id = question_id_by_sample_id[int(sample_id)]
-                prompt_token_count = int(archive_row["prompt_token_count"])
-                effective_max_tokens = int(archive_row["effective_max_tokens"])
                 for rollout in archive_row["rollouts"]:
                     rollout_index = int(rollout["rollout_index"])
-                    token_count = int(rollout["length"])
-                    first_loop_prefix = rollout.get("first_loop_prefix_length")
                     records.append(
                         LcbSampleRecord(
                             question_id=question_id,
@@ -533,20 +529,7 @@ def build_correctness_lookup(
                                 model_id=model_id,
                                 lm_style_override=lm_style_override,
                             ),
-                            token_count=token_count,
-                            prompt_token_count=prompt_token_count,
-                            total_token_count=prompt_token_count + token_count,
-                            effective_max_tokens=effective_max_tokens,
-                            max_model_len=max_model_len_int,
-                            loop_flag=bool(int(rollout["loop_flag"])),
-                            max_length_hit=bool(int(rollout["cap_hit"])),
-                            finish_reason=str(rollout["finish_reason"]),
                             prompt_too_long=False,
-                            first_loop_prefix_length=(
-                                int(first_loop_prefix)
-                                if first_loop_prefix is not None
-                                else None
-                            ),
                         )
                     )
             _native_metrics, grading_by_record_key = livecodebench_codegen.evaluate_records(

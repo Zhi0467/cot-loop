@@ -14,13 +14,13 @@ import numpy as np
 import torch
 from sklearn.decomposition import PCA
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from loop_probe.adapters import multiple_choice_gpqa, multiple_choice_mmlupro
-from loop_probe.types import DatasetSpec
+from probe.adapters import multiple_choice_gpqa, multiple_choice_mmlupro
+from probe.types import DatasetSpec
 
 
 def parse_args() -> argparse.Namespace:

@@ -24,13 +24,15 @@ except ModuleNotFoundError as exc:
     MATPLOTLIB_IMPORT_ERROR = exc
 
 
-ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_OUT_DIR = ROOT / "outputs" / "prompt_profile_unified_report_20260409"
-DOC_OUT = ROOT / "docs" / "prompt-profile-unified-report-2026-04-09.md"
+ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_OUT_DIR = ROOT / "outputs" / "weeks" / "2026-W15" / "prompt_profile_unified_report_20260409"
+DOC_OUT = ROOT / "docs" / "weeks" / "2026-W15" / "prompt-profile-unified-report-2026-04-09.md"
 
 REGRESSION_SUMMARY_PATH = (
     ROOT
     / "outputs"
+    / "weeks"
+    / "2026-W14"
     / "prompt_profile_natural_regression_rerun_20260405"
     / "remote_summary"
     / "cross_dataset_summary.json"
@@ -38,36 +40,48 @@ REGRESSION_SUMMARY_PATH = (
 BINARY_SUMMARY_PATH = (
     ROOT
     / "outputs"
+    / "weeks"
+    / "2026-W14"
     / "prompt_profile_binary_capacity_controls_20260404"
     / "capacity_comparison_summary.json"
 )
 METADATA_AUDIT_PATH = (
     ROOT
     / "outputs"
+    / "weeks"
+    / "2026-W14"
     / "prompt_profile_metadata_audit_20260405"
     / "metadata_correlation_summary.json"
 )
 MECHANISM_SUMMARY_PATH = (
     ROOT
     / "outputs"
+    / "weeks"
+    / "2026-W15"
     / "prompt_profile_length_mechanism_20260409"
     / "mechanism_summary.json"
 )
 METADATA_MECHANISM_SUMMARY_PATH = (
     ROOT
     / "outputs"
+    / "weeks"
+    / "2026-W15"
     / "prompt_profile_metadata_mechanism_20260406"
     / "metadata_mechanism_summary.json"
 )
 REGRESSION_MODELS_CSV = (
     ROOT
     / "outputs"
+    / "weeks"
+    / "2026-W15"
     / "prompt_profile_length_mechanism_20260409"
     / "regression_model_metrics.csv"
 )
 PROMPT_BINS_CSV = (
     ROOT
     / "outputs"
+    / "weeks"
+    / "2026-W15"
     / "prompt_profile_length_mechanism_20260409"
     / "prompt_length_bins.csv"
 )
@@ -400,6 +414,7 @@ def build_markdown(
     binary_summary: dict[str, Any],
     best_prompt_only: dict[str, dict[str, float | str]],
 ) -> str:
+    out_rel = out_dir.relative_to(ROOT).as_posix()
     lines = [
         "# Unified Prompt-Profile Report",
         "",
@@ -423,9 +438,9 @@ def build_markdown(
         "",
         "## Main Artifact",
         "",
-        f"- Unified PDF: `outputs/{out_dir.name}/prompt_profile_unified_report_20260409.pdf`",
-        f"- Unified TeX: `outputs/{out_dir.name}/prompt_profile_unified_report_20260409.tex`",
-        f"- Figures: `outputs/{out_dir.name}/figures/`",
+        f"- Unified PDF: `{out_rel}/prompt_profile_unified_report_20260409.pdf`",
+        f"- Unified TeX: `{out_rel}/prompt_profile_unified_report_20260409.tex`",
+        f"- Figures: `{out_rel}/figures/`",
         "",
         "## Current Read",
         "",
@@ -799,13 +814,13 @@ Dataset & Best regression prompt-only cue & Best classification prompt-only cue 
 
 \section*{{Artifacts}}
 \begin{{itemize}}[leftmargin=1.5em]
-\item unified bundle: \texttt{{outputs/prompt\_profile\_unified\_report\_20260409/}}
+\item unified bundle: \texttt{{outputs/weeks/2026-W15/prompt\_profile\_unified\_report\_20260409/}}
 \item source notes behind this synthesis:
   \begin{{itemize}}[leftmargin=1.5em]
-  \item \texttt{{docs/prompt-profile-combined-audit-2026-04-05.md}}
-  \item \texttt{{docs/prompt-profile-binary-capacity-controls-2026-04-04.md}}
-  \item \texttt{{docs/prompt-profile-natural-regression-rerun-2026-04-05.md}}
-  \item \texttt{{docs/prompt-profile-length-mechanism-2026-04-09.md}}
+  \item \texttt{{docs/weeks/2026-W14/prompt-profile-combined-audit-2026-04-05.md}}
+  \item \texttt{{docs/weeks/2026-W14/prompt-profile-binary-capacity-controls-2026-04-04.md}}
+  \item \texttt{{docs/weeks/2026-W14/prompt-profile-natural-regression-rerun-2026-04-05.md}}
+  \item \texttt{{docs/weeks/2026-W15/prompt-profile-length-mechanism-2026-04-09.md}}
   \end{{itemize}}
 \end{{itemize}}
 

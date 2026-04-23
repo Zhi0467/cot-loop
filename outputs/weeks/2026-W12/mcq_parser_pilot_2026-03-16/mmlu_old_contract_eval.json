@@ -1,0 +1,262 @@
+{
+  "input_jsonl": "projects/cot-loop-detection/outputs/weeks/2026-W12/mcq_contract_audit_2026-03-16/mmlu_current_contract.jsonl",
+  "rows": 80,
+  "finish_reason_counts": {
+    "length": 30,
+    "stop": 50
+  },
+  "structured_mode_counts": {
+    "boxed_letter": 10,
+    "answer_field": 38
+  },
+  "legacy_strict": {
+    "parsed": 33,
+    "correct": 9,
+    "stop_parsed": 33,
+    "stop_correct": 9,
+    "length_parsed": 0,
+    "length_correct": 0,
+    "prompt_count": 8,
+    "sample0_correct_fraction": 0.125,
+    "prompt_any_correct_fraction": 0.25,
+    "prompt_majority_correct_fraction": 0.125,
+    "prompt_mean_rollout_accuracy": 0.11249999999999999,
+    "parse_fraction": 0.4125,
+    "correct_fraction": 0.1125
+  },
+  "json_only": {
+    "parsed": 0,
+    "correct": 0,
+    "stop_parsed": 0,
+    "stop_correct": 0,
+    "length_parsed": 0,
+    "length_correct": 0,
+    "prompt_count": 8,
+    "sample0_correct_fraction": 0.0,
+    "prompt_any_correct_fraction": 0.0,
+    "prompt_majority_correct_fraction": 0.0,
+    "prompt_mean_rollout_accuracy": 0.0,
+    "parse_fraction": 0.0,
+    "correct_fraction": 0.0
+  },
+  "terminal_structured": {
+    "parsed": 48,
+    "correct": 16,
+    "stop_parsed": 48,
+    "stop_correct": 16,
+    "length_parsed": 0,
+    "length_correct": 0,
+    "prompt_count": 8,
+    "sample0_correct_fraction": 0.125,
+    "prompt_any_correct_fraction": 0.625,
+    "prompt_majority_correct_fraction": 0.125,
+    "prompt_mean_rollout_accuracy": 0.2,
+    "parse_fraction": 0.6,
+    "correct_fraction": 0.2
+  },
+  "structured_only_over_json_examples": [
+    {
+      "sample_id": 0,
+      "generation_index": 6,
+      "finish_reason": "stop",
+      "gold_candidates": [
+        "I"
+      ],
+      "prediction": "I",
+      "mode": "boxed_letter",
+      "tail_lines": [
+        "---",
+        "### **Conclusion:**",
+        "Only **Option I** provides a coherent and logically consistent set of words that align with the structure and intent of advertising regulations.",
+        "---",
+        "**Answer:**",
+        "$$",
+        "\\boxed{I}",
+        "$$"
+      ]
+    },
+    {
+      "sample_id": 0,
+      "generation_index": 8,
+      "finish_reason": "stop",
+      "gold_candidates": [
+        "I"
+      ],
+      "prediction": "I",
+      "mode": "boxed_letter",
+      "tail_lines": [
+        "- Third blank: **Fear** \u2013 correct (unnecessary fear)",
+        "- Fourth blank: **Trivial** \u2013 correct (adverts must not cause trivial offense)",
+        "This option fits all parts of the sentence logically and aligns with the intended meaning of advertising regulations.",
+        "---",
+        "### Final Answer:",
+        "$$",
+        "\\boxed{I}",
+        "$$"
+      ]
+    },
+    {
+      "sample_id": 1,
+      "generation_index": 3,
+      "finish_reason": "stop",
+      "gold_candidates": [
+        "F"
+      ],
+      "prediction": "F",
+      "mode": "boxed_letter",
+      "tail_lines": [
+        "- **Option J:** *Stakeholder, Care and Skill, Diligence*",
+        "- Incorrect: The first blank is \"Stakeholder,\" which is a broader group, and the question seems to imply a **primary stakeholder** rather than a **broader group**.",
+        "---",
+        "### **Conclusion:**",
+        "The most accurate and contextually appropriate answer is:",
+        "$$",
+        "\\boxed{\\text{F}}",
+        "$$"
+      ]
+    },
+    {
+      "sample_id": 2,
+      "generation_index": 4,
+      "finish_reason": "stop",
+      "gold_candidates": [
+        "J"
+      ],
+      "prediction": "J",
+      "mode": "boxed_letter",
+      "tail_lines": [
+        "- **Involvement** (second blank, key issue)",
+        "- **Remuneration** (third blank, second issue)",
+        "- **Compensation** (fourth blank, the package)",
+        "---",
+        "### **Final Answer**",
+        "$$",
+        "\\boxed{J}",
+        "$$"
+      ]
+    },
+    {
+      "sample_id": 6,
+      "generation_index": 0,
+      "finish_reason": "stop",
+      "gold_candidates": [
+        "D"
+      ],
+      "prediction": "D",
+      "mode": "answer_field",
+      "tail_lines": [
+        "Alternatively, maybe the two dimensions are \"customer participation\" and \"environmental acquisition.\" But that's not in the options.",
+        "Wait, the answer choices include D: Customer participation and environmental relationship. So that's the one.",
+        "Therefore, the answer is D.",
+        "</think>",
+        "The question asks about the two dimensions used by Pine and Gilmore (1999) to classify four distinct realms of experience. These realms are based on how customers engage with both their own participation and the external environment. The key idea is that the experience is shaped by two factors: **customer participation** (how actively the customer is involved in the process) and **environmental relationship** (the relationship between the customer and the external environment, such as the company or its ecosystem).",
+        "The answer choices include **D: Customer participation and environmental relationship**, which directly aligns with this conceptual framework. Other options, such as **J: Customer acquisition and environmental relationship**, suggest a focus on acquisition rather than participation, which is not the core dimension of the model.",
+        "**Answer:**",
+        "Answer: D"
+      ]
+    }
+  ],
+  "structured_only_over_legacy_examples": [
+    {
+      "sample_id": 0,
+      "generation_index": 6,
+      "finish_reason": "stop",
+      "gold_candidates": [
+        "I"
+      ],
+      "prediction": "I",
+      "mode": "boxed_letter",
+      "tail_lines": [
+        "---",
+        "### **Conclusion:**",
+        "Only **Option I** provides a coherent and logically consistent set of words that align with the structure and intent of advertising regulations.",
+        "---",
+        "**Answer:**",
+        "$$",
+        "\\boxed{I}",
+        "$$"
+      ]
+    },
+    {
+      "sample_id": 0,
+      "generation_index": 8,
+      "finish_reason": "stop",
+      "gold_candidates": [
+        "I"
+      ],
+      "prediction": "I",
+      "mode": "boxed_letter",
+      "tail_lines": [
+        "- Third blank: **Fear** \u2013 correct (unnecessary fear)",
+        "- Fourth blank: **Trivial** \u2013 correct (adverts must not cause trivial offense)",
+        "This option fits all parts of the sentence logically and aligns with the intended meaning of advertising regulations.",
+        "---",
+        "### Final Answer:",
+        "$$",
+        "\\boxed{I}",
+        "$$"
+      ]
+    },
+    {
+      "sample_id": 1,
+      "generation_index": 3,
+      "finish_reason": "stop",
+      "gold_candidates": [
+        "F"
+      ],
+      "prediction": "F",
+      "mode": "boxed_letter",
+      "tail_lines": [
+        "- **Option J:** *Stakeholder, Care and Skill, Diligence*",
+        "- Incorrect: The first blank is \"Stakeholder,\" which is a broader group, and the question seems to imply a **primary stakeholder** rather than a **broader group**.",
+        "---",
+        "### **Conclusion:**",
+        "The most accurate and contextually appropriate answer is:",
+        "$$",
+        "\\boxed{\\text{F}}",
+        "$$"
+      ]
+    },
+    {
+      "sample_id": 2,
+      "generation_index": 4,
+      "finish_reason": "stop",
+      "gold_candidates": [
+        "J"
+      ],
+      "prediction": "J",
+      "mode": "boxed_letter",
+      "tail_lines": [
+        "- **Involvement** (second blank, key issue)",
+        "- **Remuneration** (third blank, second issue)",
+        "- **Compensation** (fourth blank, the package)",
+        "---",
+        "### **Final Answer**",
+        "$$",
+        "\\boxed{J}",
+        "$$"
+      ]
+    },
+    {
+      "sample_id": 6,
+      "generation_index": 2,
+      "finish_reason": "stop",
+      "gold_candidates": [
+        "D"
+      ],
+      "prediction": "D",
+      "mode": "answer_field",
+      "tail_lines": [
+        "Wait, I think the correct answer is D. Because in their work, they might have considered customer participation as one dimension and environmental relationship as the other.",
+        "So, the answer is D.",
+        "</think>",
+        "The question asks about the two dimensions used by Pine and Gilmore (1999) to classify four distinct realms of experience. These dimensions are central to understanding how customers interact with both their environment and their own participation in the process. Pine and Gilmore's framework emphasizes the interplay between the customer's **participation** in the experience and the **relationship** between the customer and the environment.",
+        "The key insight is that the **customer's participation** (how actively they engage with the experience) and the **environmental relationship** (how the customer interacts with the external environment or context) are the two primary dimensions. These dimensions help categorize the experience into four distinct realms, such as:",
+        "- Customer participation and environmental relationship (as in option D).",
+        "---",
+        "**Answer: D. Customer participation and environmental relationship.**"
+      ]
+    }
+  ],
+  "structured_length_correct_examples": []
+}

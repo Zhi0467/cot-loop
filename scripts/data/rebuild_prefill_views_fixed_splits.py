@@ -14,26 +14,27 @@ import zlib
 
 import torch
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SRC = os.path.join(ROOT, "src")
 if SRC not in sys.path:
     sys.path.insert(0, SRC)
-if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+SCRIPTS_DIR = os.path.join(ROOT, "scripts")
+if SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, SCRIPTS_DIR)
 
-from loop_probe.prefill import (
+from probe.prefill import (
     FEATURE_POOLING_CHOICES,
     extract_prefill_features_multi,
     load_prefill_model_and_tokenizer,
 )
-from loop_probe.labeling import PROMPT_PROFILE_TARGET_CHOICES
-from loop_probe.serialization import save_split_shards, write_manifest
-from loop_probe.adapters import (
+from probe.labeling import PROMPT_PROFILE_TARGET_CHOICES
+from probe.serialization import save_split_shards, write_manifest
+from probe.adapters import (
     livecodebench_codegen,
     multiple_choice_gpqa,
     multiple_choice_mmlupro,
 )
-from loop_probe.types import SampleRecord
+from probe.types import SampleRecord
 from utils import build_prompt
 
 FEATURE_KEY_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+$")

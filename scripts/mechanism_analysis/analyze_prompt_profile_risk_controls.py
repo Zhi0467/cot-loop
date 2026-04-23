@@ -19,20 +19,20 @@ from sklearn.metrics import average_precision_score, roc_auc_score
 from sklearn.preprocessing import StandardScaler
 from torch.utils.data import DataLoader
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from loop_probe.configs import ProbeConfig, build_probe_model
-from loop_probe.dataloader import (
+from probe.configs import ProbeConfig, build_probe_model
+from probe.dataloader import (
     ActivationDataset,
     read_manifest,
     resolve_input_dim,
     resolve_sample_shape,
     resolve_split_info,
 )
-from loop_probe.train_utils import (
+from probe.train_utils import (
     choose_device,
     probe_scores_and_predictions,
     resolve_classifier_layer,

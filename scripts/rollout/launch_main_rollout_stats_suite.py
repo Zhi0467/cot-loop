@@ -9,12 +9,12 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SRC = os.path.join(ROOT, "src")
 if SRC not in sys.path:
     sys.path.insert(0, SRC)
 
-from loop_probe.main_rollout_stats_suite import (  # noqa: E402
+from probe.main_rollout_stats_suite import (  # noqa: E402
     MainRolloutSuiteConfig,
     build_collect_env,
     suite_dataset_keys,
@@ -50,7 +50,7 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--slurm-script",
-        default=os.path.join(ROOT, "slurm", "run_collect_model_stats.sbatch"),
+        default=os.path.join(ROOT, "slurm", "rollout", "run_collect_model_stats.sbatch"),
         help="Collector sbatch wrapper to invoke.",
     )
     parser.add_argument(

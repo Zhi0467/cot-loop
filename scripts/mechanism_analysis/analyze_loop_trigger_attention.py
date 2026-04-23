@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import gzip
 import json
 import math
 import os
@@ -22,12 +21,13 @@ from transformers.models.qwen3.modeling_qwen3 import (
     repeat_kv,
 )
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SRC = os.path.join(ROOT, "src")
 if SRC not in sys.path:
     sys.path.insert(0, SRC)
 
-from loop_probe.labeling import find_ngram_loop_trigger
+from probe.bundle_io import bundle_paths, iter_bundle_rows
+from probe.labeling import find_ngram_loop_trigger
 
 
 DEFAULT_ARCHIVE_ROOTS = {
@@ -68,10 +68,8 @@ def _parse_args() -> argparse.Namespace:
         default=",".join(DEFAULT_ARCHIVE_ROOTS),
         help=(
             "Comma-separated default dataset keys or explicit archive "
-            "directories/files. Explicit paths may point to "
-            "prompt_rollout_archive.jsonl(.gz), __rollout_archive.jsonl(.gz), "
-            "or the aggregate rollout-stats JSON that owns a matching "
-            "__rollout_archive.jsonl.gz sidecar."
+            "directories/files. Explicit paths may point to a "
+            "rollout_bundle.v1 <base>.jsonl.gz or its sidecar <base>.json."
         ),
     )
     parser.add_argument("--loop-n", type=int, default=30)
@@ -117,61 +115,41 @@ def _resolve_device(device_arg: str) -> torch.device:
 
 def _iter_archive_rows(root: Path):
     path = _resolve_archive_path(root)
-    opener = gzip.open if path.suffix == ".gz" else open
-    mode = "rt" if path.suffix == ".gz" else "r"
-    with opener(path, mode, encoding="utf-8") as handle:
-        for line in handle:
-            yield json.loads(line)
+    yield from iter_bundle_rows(path)
 
 
 def _resolve_archive_path(root: Path) -> Path:
+    """Resolve ``root`` to a ``<base>.jsonl.gz`` bundle.
+
+    ``root`` may be the bundle itself, its ``<base>.json`` sidecar, or a
+    directory that contains exactly one such pair.
+    """
     if root.is_file():
+        if root.name.endswith(".jsonl.gz"):
+            return root
         if root.suffix == ".json":
-            stem = root.stem
-            candidates: list[Path] = []
-            if "__preexisting_" in stem:
-                prefix, archived_tail = stem.split("__preexisting_", 1)
-                candidates.append(
-                    root.with_name(
-                        f"{prefix}__rollout_archive.jsonl__preexisting_{archived_tail}.gz"
-                    )
-                )
-            candidates.append(root.with_name(f"{stem}__rollout_archive.jsonl.gz"))
-            if stem.endswith("__lcb_records"):
-                candidates.append(
-                    root.with_name(
-                        f"{stem[:-len('__lcb_records')]}__rollout_archive.jsonl.gz"
-                    )
-                )
-            for candidate in candidates:
-                if candidate.is_file():
-                    return candidate
+            _sidecar, bundle = bundle_paths(root)
+            bundle_path = Path(bundle)
+            if bundle_path.is_file():
+                return bundle_path
             raise SystemExit(
-                "No rollout archive sidecar found for aggregate stats file "
-                f"{root}."
+                f"No rollout_bundle.v1 bundle found next to sidecar {root}."
             )
-        return root
-
-    prompt_profile_candidates = [
-        root / "diagnostics" / "prompt_rollout_archive.jsonl",
-        root / "diagnostics" / "prompt_rollout_archive.jsonl.gz",
-        root / "prompt_rollout_archive.jsonl",
-        root / "prompt_rollout_archive.jsonl.gz",
-    ]
-    for candidate in prompt_profile_candidates:
-        if candidate.is_file():
-            return candidate
-
-    rollout_sidecars = sorted(root.glob("*__rollout_archive.jsonl.gz"))
-    if len(rollout_sidecars) == 1:
-        return rollout_sidecars[0]
-    if len(rollout_sidecars) > 1:
         raise SystemExit(
-            "Multiple rollout sidecars found under "
-            f"{root}; pass the specific file path instead."
+            f"Unsupported archive file {root}; expected <base>.jsonl.gz or "
+            "<base>.json."
         )
 
-    raise SystemExit(f"No rollout archive found under {root}.")
+    bundles = sorted(root.glob("*.jsonl.gz"))
+    bundles = [b for b in bundles if not b.name.endswith("__preexisting.jsonl.gz")]
+    if len(bundles) == 1:
+        return bundles[0]
+    if len(bundles) > 1:
+        raise SystemExit(
+            f"Multiple rollout bundles found under {root}; pass the specific "
+            "<base>.jsonl.gz path instead."
+        )
+    raise SystemExit(f"No rollout bundle found under {root}.")
 
 
 def _completion_token_ids_from_rollout(rollout: dict[str, Any], tokenizer) -> list[int]:
@@ -737,7 +715,7 @@ def main() -> None:
         raise SystemExit("--shard-index must satisfy 0 <= shard-index < num-shards.")
     if "qwen3" not in args.model_id.lower():
         raise SystemExit(
-            "scripts/analyze_loop_trigger_attention.py currently supports only "
+            "scripts/mechanism_analysis/analyze_loop_trigger_attention.py currently supports only "
             "Qwen3 checkpoints because the attention wrapper depends on "
             "Qwen3-specific internals."
         )

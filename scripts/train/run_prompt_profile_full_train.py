@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS_DIR = ROOT / "scripts"
 DEFAULT_OUT_ROOT = ROOT / "outputs" / "full_train"
 
@@ -594,7 +594,7 @@ def build_dataset_cmd(
 ) -> list[str]:
     cmd = [
         args.python_bin,
-        str(SCRIPTS_DIR / "build_probe_dataset.py"),
+        str(SCRIPTS_DIR / "data" / "build_probe_dataset.py"),
         "--train-dataset",
         spec.dataset,
         "--test-dataset",
@@ -677,7 +677,7 @@ def train_probe_cmd(
     view_args = BINARY_VIEW_ARGS if target_kind == "binary" else REGRESSION_VIEW_ARGS
     cmd = [
         args.python_bin,
-        str(SCRIPTS_DIR / "train_probe.py"),
+        str(SCRIPTS_DIR / "train" / "train_probe.py"),
         "--data-dir",
         str(data_dir),
         "--out-dir",
@@ -734,7 +734,7 @@ def relabel_cmd(
 ) -> list[str]:
     return [
         args.python_bin,
-        str(SCRIPTS_DIR / "relabel_prompt_profile_dataset.py"),
+        str(SCRIPTS_DIR / "data" / "relabel_prompt_profile_dataset.py"),
         "--source-dir",
         str(source_dir),
         "--out-dir",
@@ -763,7 +763,7 @@ def regression_relabel_cmd(
 ) -> list[str]:
     return [
         args.python_bin,
-        str(SCRIPTS_DIR / "relabel_prompt_profile_dataset.py"),
+        str(SCRIPTS_DIR / "data" / "relabel_prompt_profile_dataset.py"),
         "--source-dir",
         str(source_dir),
         "--out-dir",
@@ -788,7 +788,7 @@ def summary_cmd(
 ) -> list[str]:
     cmd = [
         args.python_bin,
-        str(SCRIPTS_DIR / "summarize_prompt_profile_full_train.py"),
+        str(SCRIPTS_DIR / "report_generation" / "summarize_prompt_profile_full_train.py"),
         "--out-root",
         str(out_root),
         "--summary-dir",

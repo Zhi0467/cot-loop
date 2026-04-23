@@ -4,22 +4,28 @@ This directory contains SLURM workflows for the CoT loop detector project.
 
 ## Scripts
 
-- `run_vllm_generate.sbatch`: Generate trajectories used for loop-label collection and detector analysis.
-- `analyze_prefill_stability.sbatch`: Prefill-loop sanity check and stability checks with greedy rollouts.
-- `run_probe_train_e2e.sbatch`: End-to-end probe pipeline for the canonical stacked prefill dataset (build + probe training, including optional multi-seed runs).
-- `run_prompt_profile_full_train.sbatch`: 2-GPU wrapper for the locked `mean_relative_length` + `majority_s_0.5` full-train path, reusing the saved March prompt-profile archives and writing the standardized `outputs/full_train/` ledger.
-- `run_prompt_profile_balanced_regression_retrain.sbatch`: 2-GPU wrapper for rerunning only the regression head on the balanced-train / natural-test prompt subset already defined by the saved `majority_s_0.5` data.
-- `run_prompt_profile_binary_retrain.sbatch`: 1-GPU wrapper for rerunning only the balanced `majority_s_0.5` binary probes from an existing locked full-train output root, with explicit MLP-width/depth overrides.
-- `run_prompt_profile_projection.sbatch`: One-GPU prompt-profile visualization path (build + prompt-level projection export, with optional render when `matplotlib` is available).
-- `run_k5_threeview_dataset.sbatch`: Historical multi-view dataset build for the k=5 / max_tokens=15000 ablation study.
-- `run_k5_threeview_ablation.sbatch`: Historical MLP sweep over the k=5 three-view ablation dataset.
+- `rollout/run_vllm_generate.sbatch`: Generate trajectories used for loop-label collection and detector analysis.
+- `rollout/run_collect_model_stats.sbatch`: Collect rollout-statistics bundles.
+- `train/run_probe_train_e2e.sbatch`: End-to-end probe pipeline for the canonical stacked prefill dataset.
+- `train/run_prompt_profile_full_train.sbatch`: 2-GPU wrapper for the locked `mean_relative_length` + `majority_s_0.5` full-train path.
+- `train/run_prompt_profile_balanced_regression_retrain.sbatch`: 2-GPU wrapper for the balanced-regression rerun.
+- `train/run_prompt_profile_binary_retrain.sbatch`: 1-GPU wrapper for the balanced `majority_s_0.5` binary rerun.
+- `train/run_prompt_profile_natural_regression_rerun.sbatch`: Natural regression rerun wrapper.
+- `train/run_prompt_profile_rfm.sbatch`: Prompt-profile RFM training wrapper.
+- `train/run_k5_threeview_dataset.sbatch`: Historical multi-view dataset build for the k=5 / max_tokens=15000 ablation study.
+- `train/run_k5_threeview_ablation.sbatch`: Historical MLP sweep over the k=5 three-view ablation dataset.
+- `mechanism_analysis/analyze_prefill_stability.sbatch`: Prefill-loop sanity check and stability checks with greedy rollouts.
+- `mechanism_analysis/run_loop_trigger_attention_full.sbatch`: Full loop-trigger attention analysis.
+- `mechanism_analysis/run_prompt_profile_length_mechanism_audit.sbatch`: Prompt-profile length mechanism audit.
+- `mechanism_analysis/run_prompt_profile_projection.sbatch`: One-GPU prompt-profile visualization path.
+- `steer/run_prompt_profile_rfm_steering.sbatch`: Prompt-profile RFM steering wrapper.
 
 ## Detector E2E Defaults
 
-`run_probe_train_e2e.sbatch` defaults to:
+`train/run_probe_train_e2e.sbatch` defaults to:
 - `MODEL_PRESET=openthinker3_1p5b`
 - `#SBATCH --gres=gpu:8` (job requests 8 GPUs by default)
-- rollout `tp/dp` comes from `src/loop_probe/configs.py` preset defaults
+- rollout `tp/dp` comes from `src/probe/configs.py` preset defaults
 - optional rollout concurrency override: `MAX_NUM_SEQS=...`
 - explicit rollout/runtime overrides: `MODEL_ID=...`, `TEMPERATURE=...`, `TP=...`, `DP=...`, `MAX_MODEL_LEN=...`, `MAX_NUM_BATCHED_TOKENS=...`
 - LiveCodeBench prompt inputs: `LIVECODEBENCH_REPO=...`, `RELEASE_VERSION=release_v6`, optional `LM_STYLE_OVERRIDE=...`
@@ -47,7 +53,7 @@ This directory contains SLURM workflows for the CoT loop detector project.
 
 Submit with defaults:
 ```bash
-sbatch slurm/run_probe_train_e2e.sbatch
+sbatch slurm/train/run_probe_train_e2e.sbatch
 ```
 
 When multiple seeds are used (default: `0 1 2`), the script also writes:
@@ -59,7 +65,7 @@ Example: build the default stacked dataset and train an ensemble over all layers
 ```bash
 FEATURE_POOLING=last_token_all_layers_stack \
 TRAIN_EXTRA_ARGS="--classifier-mode ensemble" \
-sbatch slurm/run_probe_train_e2e.sbatch
+sbatch slurm/train/run_probe_train_e2e.sbatch
 ```
 
 Example: run the prompt-level `p_loop` GPQA-style path with per-layer ensemble averaging:
@@ -75,7 +81,7 @@ TEST_CONFIG=gpqa_diamond \
 PROMPT_FIELD=Question \
 TRAIN_EXTRA_ARGS="--classifier-mode ensemble" \
 SCORE_RULE=mean_prob \
-sbatch slurm/run_probe_train_e2e.sbatch
+sbatch slurm/train/run_probe_train_e2e.sbatch
 ```
 
 Example: run the prompt-level `s_0.9` tail-rate GPQA-style path with per-layer ensemble averaging:
@@ -92,7 +98,7 @@ TEST_CONFIG=gpqa_diamond \
 PROMPT_FIELD=Question \
 TRAIN_EXTRA_ARGS="--classifier-mode ensemble" \
 SCORE_RULE=mean_prob \
-sbatch slurm/run_probe_train_e2e.sbatch
+sbatch slurm/train/run_probe_train_e2e.sbatch
 ```
 
 Example: run the prompt-majority `majority_s_0.5` GPQA-style path with per-layer majority vote:
@@ -110,7 +116,7 @@ TEST_CONFIG=gpqa_diamond \
 PROMPT_FIELD=Question \
 TRAIN_EXTRA_ARGS="--classifier-mode ensemble" \
 SCORE_RULE=vote_fraction \
-sbatch slurm/run_probe_train_e2e.sbatch
+sbatch slurm/train/run_probe_train_e2e.sbatch
 ```
 
 Example: run the prompt-level mean-length-fraction regression path:
@@ -126,12 +132,12 @@ TEST_CONFIG=gpqa_diamond \
 PROMPT_FIELD=Question \
 TRAIN_EXTRA_ARGS="--classifier-mode last_layer --classifier-layer -1" \
 SCORE_RULE=mean_prob \
-sbatch slurm/run_probe_train_e2e.sbatch
+sbatch slurm/train/run_probe_train_e2e.sbatch
 ```
 
 ## Locked Full-Train Wrapper
 
-`run_prompt_profile_full_train.sbatch` defaults to:
+`train/run_prompt_profile_full_train.sbatch` defaults to:
 
 - `#SBATCH --gres=gpu:2`
 - `OUT_ROOT=outputs/full_train`
@@ -142,12 +148,12 @@ sbatch slurm/run_probe_train_e2e.sbatch
 Submit with defaults:
 ```bash
 CONDA_ENV=swe311 \
-sbatch slurm/run_prompt_profile_full_train.sbatch
+sbatch slurm/train/run_prompt_profile_full_train.sbatch
 ```
 
 ## Balanced Regression Retrain Wrapper
 
-`run_prompt_profile_balanced_regression_retrain.sbatch` defaults to:
+`train/run_prompt_profile_balanced_regression_retrain.sbatch` defaults to:
 
 - `#SBATCH --gres=gpu:2`
 - `SOURCE_ROOT=/data/scratch/${USER}/outputs/cot-loop-detection/full_train_locked_pair_20260404`
@@ -162,7 +168,7 @@ sbatch slurm/run_prompt_profile_full_train.sbatch
 Submit with defaults:
 ```bash
 CONDA_ENV=swe311 \
-sbatch slurm/run_prompt_profile_balanced_regression_retrain.sbatch
+sbatch slurm/train/run_prompt_profile_balanced_regression_retrain.sbatch
 ```
 
 Example width-only follow-up on the same balanced regression object:
@@ -171,12 +177,12 @@ CONDA_ENV=swe311 \
 MLP_HIDDEN_DIM=256 \
 MLP_DEPTH=1 \
 WEIGHT_DECAY=0.05 \
-sbatch slurm/run_prompt_profile_balanced_regression_retrain.sbatch
+sbatch slurm/train/run_prompt_profile_balanced_regression_retrain.sbatch
 ```
 
 ## Locked Binary Retrain Wrapper
 
-`run_prompt_profile_binary_retrain.sbatch` defaults to:
+`train/run_prompt_profile_binary_retrain.sbatch` defaults to:
 
 - `#SBATCH --gres=gpu:1`
 - `SOURCE_ROOT=/data/scratch/${USER}/outputs/cot-loop-detection/full_train_locked_pair_20260404`
@@ -193,12 +199,12 @@ sbatch slurm/run_prompt_profile_balanced_regression_retrain.sbatch
 Submit with defaults:
 ```bash
 CONDA_ENV=swe311 \
-sbatch slurm/run_prompt_profile_binary_retrain.sbatch
+sbatch slurm/train/run_prompt_profile_binary_retrain.sbatch
 ```
 
 ## Prompt-Level Projection Defaults
 
-`run_prompt_profile_projection.sbatch` defaults to:
+`mechanism_analysis/run_prompt_profile_projection.sbatch` defaults to:
 
 - `#SBATCH --gres=gpu:1`
 - prompt-profile build only (no probe training)
@@ -230,23 +236,23 @@ MAX_NUM_BATCHED_TOKENS=1024 \
 OUT_DATA_DIR=outputs/prompt_profile_projection_gpqa/data \
 OUT_PROJECTION_DIR=outputs/prompt_profile_projection_gpqa \
 FIGURE_LABEL=GPQA \
-sbatch slurm/run_prompt_profile_projection.sbatch
+sbatch slurm/mechanism_analysis/run_prompt_profile_projection.sbatch
 ```
 
 ## Optional Trajectory Generation
 
-Use `run_vllm_generate.sbatch` to produce labeled rollouts for detector benchmarking:
+Use `rollout/run_vllm_generate.sbatch` to produce labeled rollouts for detector benchmarking:
 ```bash
-sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-7B,TP=1,DP=8,NUM_REPETITION=1,METRICS_OUT=outputs/openthinker3_7b_metrics.rep1.csv \
-    slurm/run_vllm_generate.sbatch
+sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-7B,TP=1,DP=8,NUM_REPETITION=1,METRICS_OUT=outputs/undated/openthinker3_7b_metrics.rep1.csv \
+    slurm/rollout/run_vllm_generate.sbatch
 ```
 
 To force a specific vLLM cache root:
 ```bash
 VLLM_CACHE_ROOT=/data/users/zhiwang/cache/vllm \
-sbatch slurm/run_vllm_generate.sbatch
+sbatch slurm/rollout/run_vllm_generate.sbatch
 ```
 
-For same-source train/test splitting in `run_probe_train_e2e.sbatch`, when both `TRAIN_*` and `TEST_*` refer to the same dataset and split:
+For same-source train/test splitting in `train/run_probe_train_e2e.sbatch`, when both `TRAIN_*` and `TEST_*` refer to the same dataset and split:
 - if both `TRAIN_MAX_SAMPLES` and `TEST_MAX_SAMPLES` are set, the builder creates exact disjoint subsets of those sizes;
 - otherwise it uses a random ratio split (`SPLIT_RATIO`) and then applies any provided caps.

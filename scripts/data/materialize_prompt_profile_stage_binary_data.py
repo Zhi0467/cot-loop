@@ -13,19 +13,19 @@ from typing import Any
 
 import torch
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from loop_probe.dataloader import ActivationDataset, read_manifest, resolve_sample_shape
-from loop_probe.labeling import prompt_profile_majority_tail_label
-from loop_probe.prompt_profile_rfm_stage_registry import (
+from probe.dataloader import ActivationDataset, read_manifest, resolve_sample_shape
+from probe.labeling import prompt_profile_majority_tail_label
+from steer.prompt_profile_rfm_stage_registry import (
     active_stage_datasets,
     get_stage_dataset,
     validate_stage_dataset,
 )
-from loop_probe.stage_artifacts import stable_json_sha256
+from steer.stage_artifacts import stable_json_sha256
 
 
 DEFAULT_STAGE_LABEL = "majority_s_0.5"

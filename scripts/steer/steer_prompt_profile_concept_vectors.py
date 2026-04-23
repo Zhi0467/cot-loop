@@ -17,30 +17,30 @@ from typing import Any
 import numpy as np
 import torch
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from loop_probe.adapters import (
+from probe.adapters import (
     livecodebench_codegen,
     math_freeform,
     multiple_choice_gpqa,
     multiple_choice_mmlupro,
 )
-from loop_probe.collector import LcbSampleRecord
-from loop_probe.labeling import first_ngram_loop_prefix_length
-from loop_probe.rollout import resolve_sampling_defaults
-from loop_probe.stage_artifacts import (
+from probe.adapters.livecodebench_codegen import LcbSampleRecord
+from probe.labeling import first_ngram_loop_prefix_length
+from probe.rollout import resolve_sampling_defaults
+from steer.stage_artifacts import (
     build_steering_run_record,
     current_git_commit,
     stable_json_sha256,
     tensor_checksum_hex,
     write_stage_artifact_record,
 )
-from loop_probe.types import DatasetSpec
+from probe.types import DatasetSpec
 
 DEFAULT_T = 0.3
 DEFAULT_EPSILON = 0.2
@@ -1250,16 +1250,7 @@ def _run_condition_seed(
                                     question_id=item.question_id or "",
                                     generation_index=0,
                                     code_output="",
-                                    token_count=0,
-                                    prompt_token_count=prompt_len,
-                                    total_token_count=prompt_len,
-                                    effective_max_tokens=effective_max_tokens,
-                                    max_model_len=max_model_len,
-                                    loop_flag=False,
-                                    max_length_hit=False,
-                                    finish_reason="prompt_too_long",
                                     prompt_too_long=True,
-                                    first_loop_prefix_length=None,
                                 )
                             )
                         continue
@@ -1372,16 +1363,7 @@ def _run_condition_seed(
                                         if hasattr(model.config, "_name_or_path")
                                         else model.name_or_path,
                                     ),
-                                    token_count=token_count,
-                                    prompt_token_count=prompt_len,
-                                    total_token_count=total_token_count,
-                                    effective_max_tokens=effective_max_tokens,
-                                    max_model_len=max_model_len,
-                                    loop_flag=loop_flag,
-                                    max_length_hit=max_length_hit,
-                                    finish_reason=finish_reason,
                                     prompt_too_long=False,
-                                    first_loop_prefix_length=first_loop_prefix,
                                 )
                             )
                         else:

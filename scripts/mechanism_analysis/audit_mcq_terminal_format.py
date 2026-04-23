@@ -13,15 +13,15 @@ from typing import Iterable
 
 from transformers import AutoTokenizer
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SRC = os.path.join(ROOT, "src")
 if SRC not in sys.path:
     sys.path.insert(0, SRC)
 
-from loop_probe.adapters import multiple_choice_gpqa, multiple_choice_mmlupro
-from loop_probe.adapters._common import extract_answer_letter_from_last_lines
-from loop_probe.rollout import resolve_sampling_defaults
-from loop_probe.types import DatasetSpec
+from probe.adapters import multiple_choice_gpqa, multiple_choice_mmlupro
+from probe.adapters._common import extract_answer_letter_from_last_lines
+from probe.rollout import resolve_sampling_defaults
+from probe.types import DatasetSpec
 
 
 _ANSWER_FIELD_RE = re.compile(

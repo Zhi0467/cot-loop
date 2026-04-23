@@ -5,8 +5,13 @@ import argparse
 import csv
 import json
 import os
+import sys
 from collections import defaultdict
 from typing import Dict, Optional, Tuple
+
+SCRIPTS_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, SCRIPTS_DIR)
 
 from transformers import AutoTokenizer
 from utils import _math_verify, has_ngram_loop

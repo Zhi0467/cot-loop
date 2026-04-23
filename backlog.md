@@ -3,30 +3,49 @@
 Last updated: 2026-04-23 19:50 UTC
 
 Reference docs:
-- `docs/main-four-dataset-rollout-rebuild-2026-04-23.md`
-- `docs/prompt-profile-rfm-steering-summary-2026-04-23.md`
-- `docs/prompt-profile-rfm-artifact-schema-2026-04-21.md`
-- `docs/understand-where-loop-and-max-length-come-from.md`
+- `docs/weeks/2026-W17/main-four-dataset-rollout-rebuild-2026-04-23.md`
+- `docs/weeks/2026-W17/prompt-profile-rfm-third-stage-steering-plan.md`
+- `docs/weeks/2026-W17/prompt-profile-rfm-artifact-schema-2026-04-21.md`
+- `docs/weeks/2026-W14/understand-where-loop-and-max-length-come-from.md`
 
-## Steering summary from the 2026-04-23 thread
+## Third-stage steering backlog
 
-- `LiveCodeBench` stays the first steering benchmark.
-- The active steering claim is now two matched paths, not one mixed path:
-  - thinking `on`: stats -> prompt-level materialization -> RFM -> vector export -> steering
-  - thinking `off`: the same chain
-- Do not use cross-mode rows as stage evidence.
-  - the earlier thinking-on steered rows used the older non-thinking/raw vector bundle, so those rows are runner receipts only
-- Keep the corrected steering contract:
-  - prefill-only
-  - all prompt tokens steered
-  - block-specific direction at each block
-  - both linear and spherical steering
-  - full decode budget
-- If the non-thinking path is still node-fragile, land the first clean mode-consistent row linear-first, then extend to spherical.
-- Keep transfer mode-local too.
-  - no mixed thinking-on / thinking-off average vector
-- Treat the current screen lane as prevalence scouting only.
-  - only promote a new dataset after a mode-tagged collector receipt on that same path still clears the `>= 10%` gate
+The steering backlog is now governed by one canonical doc:
+`docs/weeks/2026-W17/prompt-profile-rfm-third-stage-steering-plan.md`.
+
+Core rules:
+
+- Every scientific steering row must close one mode-local chain:
+  `stats -> prompt-level materialization -> probe/RFM training -> vector export -> steering`.
+- Thinking `on` and thinking `off` are separate objects. Do not use cross-mode
+  rows or mixed-mode averaged vectors as stage evidence.
+- The steering contract is fixed for the first real tables:
+  - prefill-only intervention;
+  - all prompt tokens steered;
+  - every block steered by its own block-specific vector;
+  - both linear and spherical conditions;
+  - full source-manifest decode budget, not the old `1024` pilot cap.
+- Dataset/mode admission into steering requires a rebuilt mode-local
+  `majority_s_0.5` positive rate of at least `10%`.
+- `LiveCodeBench` remains the first steering benchmark because it has the
+  cleanest grader and the least ambiguous code-generation evaluation path. The
+  new claim must use vectors trained from the rebuilt mode-local archives.
+
+Immediate steering TODOs after the rebuilt stats archives land:
+
+1. Materialize `LiveCodeBench` thinking-on and thinking-off prompt-profile
+   objects from the rebuilt archives.
+2. Train prompt-only, activation, and RFM detector tables on both mode-local
+   `LiveCodeBench` objects.
+3. Export thinking-on and thinking-off block-specific vector bundles plus
+   direction diagnostics.
+4. Run the seven-condition full-contract `LiveCodeBench` steering table in
+   thinking `on`.
+5. Run the seven-condition full-contract `LiveCodeBench` steering table in
+   thinking `off`.
+6. Promote `TACO-hard`, `MATH level-5`, and `Omni-MATH >= 7` path-by-path only
+   after their rebuilt mode-local materializations pass the gate and have
+   detector/vector receipts.
 
 ## Fixed current object
 
@@ -95,7 +114,7 @@ Reference docs:
 - Queue history that matters:
   - the old slice-based jobs `2850` through `2857` and `2863` / `2864` were canceled after Wangzhi tightened the size contract
   - the first corrected relaunch `2865` through `2874` failed immediately because the sbatch wrapper dropped `CONDA_ENV`
-  - `scripts/launch_main_rollout_stats_suite.py` now propagates `CONDA_ENV` / `CONDA_DEFAULT_ENV`
+  - `scripts/rollout/launch_main_rollout_stats_suite.py` now propagates `CONDA_ENV` / `CONDA_DEFAULT_ENV`
   - after Wangzhi pointed out that `LiveCodeBench-extra` is a strict subset of `LiveCodeBench`, I canceled its two live jobs (`2876`, `2881`) and removed it from the canonical suite definition
 - Live submitted suite:
   - `2875` `q3-main5r2b-livecodebench-on`
@@ -150,11 +169,11 @@ Reference docs:
 ## Retained reference surfaces
 
 - The earlier prompt-profile and trigger-attention surfaces from `main` still stand as reference objects even though they are not the active rollout-stat queue:
-  - unified prompt-profile report: `docs/prompt-profile-unified-report-2026-04-09.md`
-  - natural regression rerun: `docs/prompt-profile-natural-regression-rerun-2026-04-05.md`
-  - corrected OLMo degeneration-origin audit: `docs/olmo-degeneration-origin-audit-2026-04-04.md`
-  - binary capacity controls: `docs/prompt-profile-binary-capacity-controls-2026-04-04.md`
-  - full Qwen3 trigger-attention rerun: `docs/qwen3-loop-trigger-attention-2026-04-14.md`
+  - unified prompt-profile report: `docs/weeks/2026-W15/prompt-profile-unified-report-2026-04-09.md`
+  - natural regression rerun: `docs/weeks/2026-W14/prompt-profile-natural-regression-rerun-2026-04-05.md`
+  - corrected OLMo degeneration-origin audit: `docs/weeks/2026-W14/olmo-degeneration-origin-audit-2026-04-04.md`
+  - binary capacity controls: `docs/weeks/2026-W14/prompt-profile-binary-capacity-controls-2026-04-04.md`
+  - full Qwen3 trigger-attention rerun: `docs/weeks/2026-W16/qwen3-loop-trigger-attention-2026-04-14.md`
 - Keep the earlier reporting caveats explicit when those older surfaces are cited again:
   - the trigger-attention replay still needs a matched non-loop control slice
   - the fixed-budget full-train prompt-profile surface still has constant `effective_budget`, so "metadata baseline" there effectively means prompt-length-only unless a stronger prompt-shape control is added

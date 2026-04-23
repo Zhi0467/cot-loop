@@ -1,0 +1,481 @@
+from __future__ import annotations
+
+import json
+import os
+import re
+import sys
+from collections import defaultdict
+from contextlib import contextmanager
+from dataclasses import dataclass
+from datetime import datetime
+from functools import lru_cache
+from types import SimpleNamespace
+from typing import Any
+
+from ..prompt_format import build_chat_template_prompt, tokenizer_has_chat_template
+
+
+@dataclass(frozen=True)
+class LcbSampleRecord:
+    """Minimal per-rollout record passed into ``evaluate_records``.
+
+    Only the fields the LiveCodeBench native grader actually reads live here.
+    Downstream callers that need richer metadata should carry their own
+    bookkeeping alongside.
+    """
+
+    question_id: str
+    generation_index: int
+    code_output: str
+    prompt_too_long: bool = False
+
+_LCB_DATASET_REPO = "livecodebench/code_generation_lite"
+_HF_CHAT_TEMPLATE_STYLE = "HFChatTemplate"
+_LCB_RELEASE_FILES = {
+    "release_v1": ["test.jsonl"],
+    "release_v2": ["test.jsonl", "test2.jsonl"],
+    "release_v3": ["test.jsonl", "test2.jsonl", "test3.jsonl"],
+    "release_v4": ["test.jsonl", "test2.jsonl", "test3.jsonl", "test4.jsonl"],
+    "release_v5": ["test.jsonl", "test2.jsonl", "test3.jsonl", "test4.jsonl", "test5.jsonl"],
+    "release_v6": [
+        "test.jsonl",
+        "test2.jsonl",
+        "test3.jsonl",
+        "test4.jsonl",
+        "test5.jsonl",
+        "test6.jsonl",
+    ],
+    "release_latest": [
+        "test.jsonl",
+        "test2.jsonl",
+        "test3.jsonl",
+        "test4.jsonl",
+        "test5.jsonl",
+        "test6.jsonl",
+    ],
+}
+
+
+def _require_repo_path(repo_path: str) -> None:
+    if not repo_path:
+        raise SystemExit("--livecodebench-repo is required for livecodebench_codegen.")
+    if not os.path.isdir(repo_path):
+        raise SystemExit(f"LiveCodeBench repo path does not exist: {repo_path}")
+    if not os.path.isdir(os.path.join(repo_path, "lcb_runner")):
+        raise SystemExit(
+            f"LiveCodeBench repo path must contain lcb_runner/: {repo_path}"
+        )
+
+
+def _ensure_repo_on_path(repo_path: str) -> None:
+    _require_repo_path(repo_path)
+    if repo_path not in sys.path:
+        sys.path.insert(0, repo_path)
+
+
+@contextmanager
+def _repo_cwd(repo_path: str):
+    _require_repo_path(repo_path)
+    prev_cwd = os.getcwd()
+    os.chdir(repo_path)
+    try:
+        yield
+    finally:
+        os.chdir(prev_cwd)
+
+
+def _import_lcb_symbols(repo_path: str) -> dict[str, Any]:
+    _ensure_repo_on_path(repo_path)
+    with _repo_cwd(repo_path):
+        try:
+            from lcb_runner.evaluation import extract_instance_results
+            from lcb_runner.benchmarks.code_generation import CodeGenerationProblem
+            from lcb_runner.lm_styles import LMStyle
+            from lcb_runner.prompts import format_prompt_generation
+            from lcb_runner.prompts.code_generation import (
+                PromptConstants,
+                get_generic_question_template_answer,
+            )
+            from lcb_runner.runner.scenario_router import (
+                get_metrics,
+                sort_and_extract_save_results,
+            )
+            from lcb_runner.utils.extraction_utils import extract_code
+            from lcb_runner.utils.scenarios import Scenario
+        except Exception as exc:
+            raise ImportError(
+                "Failed to import LiveCodeBench helpers from the provided checkout."
+            ) from exc
+
+    return {
+        "extract_instance_results": extract_instance_results,
+        "CodeGenerationProblem": CodeGenerationProblem,
+        "LMStyle": LMStyle,
+        "format_prompt_generation": format_prompt_generation,
+        "PromptConstants": PromptConstants,
+        "get_generic_question_template_answer": get_generic_question_template_answer,
+        "get_metrics": get_metrics,
+        "sort_and_extract_save_results": sort_and_extract_save_results,
+        "extract_code": extract_code,
+        "Scenario": Scenario,
+    }
+
+
+def build_lcb_args(release_version: str, repo_path: str) -> SimpleNamespace:
+    symbols = _import_lcb_symbols(repo_path)
+    scenario = symbols["Scenario"].codegeneration
+    num_process_evaluate = max(
+        1,
+        int(os.environ.get("LCB_NUM_PROCESS_EVALUATE", "1")),
+    )
+    timeout = max(
+        1,
+        int(float(os.environ.get("LCB_EVAL_TIMEOUT_SEC", "5"))),
+    )
+    return SimpleNamespace(
+        scenario=scenario,
+        release_version=release_version,
+        not_fast=False,
+        start_date=None,
+        end_date=None,
+        num_process_evaluate=num_process_evaluate,
+        timeout=timeout,
+    )
+
+
+def _release_files(release_version: str) -> list[str]:
+    if release_version in _LCB_RELEASE_FILES:
+        return list(_LCB_RELEASE_FILES[release_version])
+
+    single = re.fullmatch(r"v([1-6])", release_version)
+    if single:
+        idx = int(single.group(1))
+        return [f"test{idx}.jsonl" if idx != 1 else "test.jsonl"]
+
+    pair = re.fullmatch(r"v([1-6])_v([1-6])", release_version)
+    if pair:
+        start = int(pair.group(1))
+        end = int(pair.group(2))
+        if start > end:
+            raise ValueError(
+                f"LiveCodeBench release range must be ordered, got {release_version!r}."
+            )
+        return [
+            f"test{idx}.jsonl" if idx != 1 else "test.jsonl"
+            for idx in range(start, end + 1)
+        ]
+
+    raise ValueError(f"Unsupported LiveCodeBench release_version {release_version!r}.")
+
+
+def _load_codegen_benchmark(
+    repo_path: str,
+    release_version: str,
+    *,
+    start_date: str | None = None,
+    end_date: str | None = None,
+):
+    symbols = _import_lcb_symbols(repo_path)
+    try:
+        from huggingface_hub import hf_hub_download
+    except Exception as exc:
+        raise ImportError(
+            "Failed to import huggingface_hub for LiveCodeBench dataset downloads."
+        ) from exc
+
+    benchmark = []
+    problem_cls = symbols["CodeGenerationProblem"]
+    for filename in _release_files(release_version):
+        path = hf_hub_download(_LCB_DATASET_REPO, filename, repo_type="dataset")
+        with open(path, encoding="utf-8") as handle:
+            for line in handle:
+                benchmark.append(problem_cls(**json.loads(line)))
+
+    if start_date is not None:
+        lower = datetime.strptime(start_date, "%Y-%m-%d")
+        benchmark = [row for row in benchmark if lower <= row.contest_date]
+    if end_date is not None:
+        upper = datetime.strptime(end_date, "%Y-%m-%d")
+        benchmark = [row for row in benchmark if row.contest_date <= upper]
+
+    benchmark = sorted(benchmark, key=lambda row: row.question_id)
+    return benchmark, symbols["format_prompt_generation"]
+
+
+@lru_cache(maxsize=None)
+def _infer_default_lm_style(model_id: str, repo_path: str = ""):
+    symbols = _import_lcb_symbols(repo_path)
+    lm_style_cls = symbols["LMStyle"]
+    model_id_lower = model_id.lower()
+    model_basename = os.path.basename(model_id.rstrip("/")).lower()
+    if model_id_lower.startswith("qwen/") or model_basename.startswith("qwen"):
+        return lm_style_cls.CodeQwenInstruct
+    if "olmo" in model_id_lower:
+        tokenizer = _load_tokenizer(model_id)
+        if tokenizer_has_chat_template(tokenizer):
+            return _HF_CHAT_TEMPLATE_STYLE
+        return lm_style_cls.GenericBase
+    raise ValueError(
+        "No default LiveCodeBench LM style mapping is defined for "
+        f"model_id={model_id!r}. Pass --lm-style-override with a repo-supported "
+        "LMStyle. LiveCodeBench's own docs require adding new model families to "
+        "lcb_runner/lm_styles.py and prompt formatting support before treating a "
+        "new model family as benchmark-comparable."
+    )
+
+
+def _get_lm_style(model_id: str, override: str | None = None, repo_path: str = ""):
+    symbols = _import_lcb_symbols(repo_path)
+    lm_style_cls = symbols["LMStyle"]
+    override_normalized = override.strip() if override else ""
+    if override_normalized.lower() == _HF_CHAT_TEMPLATE_STYLE.lower():
+        return _HF_CHAT_TEMPLATE_STYLE
+    if override:
+        try:
+            return lm_style_cls(override)
+        except ValueError:
+            if hasattr(lm_style_cls, override):
+                return getattr(lm_style_cls, override)
+            raise
+    return _infer_default_lm_style(model_id, repo_path=repo_path)
+
+
+@lru_cache(maxsize=None)
+def _load_tokenizer(model_id: str):
+    try:
+        from transformers import AutoTokenizer
+    except Exception as exc:
+        raise ImportError(
+            "Failed to import transformers.AutoTokenizer for LiveCodeBench prompt building."
+        ) from exc
+    return AutoTokenizer.from_pretrained(
+        model_id,
+        trust_remote_code=True,
+    )
+
+
+def _build_hf_chat_template_prompt(
+    instance,
+    *,
+    tokenizer,
+    symbols: dict[str, Any],
+    thinking_mode: str,
+) -> str:
+    user_content = symbols["get_generic_question_template_answer"](instance)
+    messages = [
+        {
+            "role": "system",
+            "content": symbols["PromptConstants"].SYSTEM_MESSAGE_GENERIC,
+        },
+        {
+            "role": "user",
+            "content": user_content,
+        },
+    ]
+    return build_chat_template_prompt(
+        tokenizer,
+        messages,
+        thinking_mode=thinking_mode,
+    )
+
+
+def _normalize_metric_value(value: Any) -> Any:
+    if value is None or isinstance(value, (str, bool)):
+        return value
+    if isinstance(value, int):
+        return int(value)
+    if isinstance(value, float):
+        return float(value)
+    if isinstance(value, dict):
+        return {
+            str(key): _normalize_metric_value(nested_value)
+            for key, nested_value in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [_normalize_metric_value(item) for item in value]
+    if hasattr(value, "tolist"):
+        try:
+            return _normalize_metric_value(value.tolist())
+        except Exception:
+            pass
+    if hasattr(value, "item"):
+        try:
+            return _normalize_metric_value(value.item())
+        except Exception:
+            pass
+    return str(value)
+
+
+def preflight(repo_path: str, release_version: str) -> None:
+    _load_codegen_benchmark(repo_path, release_version)
+
+
+def load_benchmark(
+    repo_path: str,
+    release_version: str,
+):
+    return _load_codegen_benchmark(repo_path, release_version)
+
+
+def prompt_format_for_lm_style(lm_style: str) -> str:
+    return "chat_template" if lm_style == _HF_CHAT_TEMPLATE_STYLE else "raw"
+
+
+def build_prompts(
+    benchmark,
+    format_prompt,
+    *,
+    repo_path: str,
+    model_id: str,
+    lm_style_override: str | None = None,
+    max_samples: int | None = None,
+    thinking_mode: str = "default",
+) -> tuple[list[tuple[str, str]], str]:
+    lm_style = _get_lm_style(
+        model_id,
+        override=lm_style_override,
+        repo_path=repo_path,
+    )
+    symbols = _import_lcb_symbols(repo_path)
+    tokenizer = _load_tokenizer(model_id) if lm_style == _HF_CHAT_TEMPLATE_STYLE else None
+    prompt_records: list[tuple[str, str]] = []
+    selected = benchmark if max_samples is None else benchmark[:max_samples]
+    with _repo_cwd(repo_path):
+        for instance in selected:
+            if lm_style == _HF_CHAT_TEMPLATE_STYLE:
+                prompt = _build_hf_chat_template_prompt(
+                    instance,
+                    tokenizer=tokenizer,
+                    symbols=symbols,
+                    thinking_mode=thinking_mode,
+                )
+            else:
+                prompt = format_prompt(instance, lm_style)
+            if not isinstance(prompt, str):
+                raise SystemExit(
+                    "LiveCodeBench prompt builder returned a non-string prompt. "
+                    "Use an --lm-style-override that produces raw string prompts."
+                )
+            prompt_records.append((str(instance.question_id), prompt))
+    return prompt_records, (
+        lm_style if isinstance(lm_style, str) else lm_style.value
+    )
+
+
+def extract_code_output(
+    response_text: str,
+    *,
+    repo_path: str,
+    model_id: str,
+    lm_style_override: str | None = None,
+) -> str:
+    symbols = _import_lcb_symbols(repo_path)
+    lm_style = _get_lm_style(
+        model_id,
+        override=lm_style_override,
+        repo_path=repo_path,
+    )
+    with _repo_cwd(repo_path):
+        if lm_style == _HF_CHAT_TEMPLATE_STYLE:
+            extracted = symbols["extract_code"](
+                response_text,
+                symbols["LMStyle"].CodeQwenInstruct,
+            )
+            if not extracted:
+                extracted = symbols["extract_code"](
+                    response_text,
+                    symbols["LMStyle"].GenericBase,
+                )
+        else:
+            extracted = symbols["extract_code"](response_text, lm_style)
+    return "" if extracted is None else str(extracted)
+
+
+def evaluate_records(
+    benchmark,
+    records: list[LcbSampleRecord],
+    *,
+    repo_path: str,
+    release_version: str,
+) -> tuple[dict[str, Any], dict[tuple[str, int], bool]]:
+    symbols = _import_lcb_symbols(repo_path)
+    args_ns = build_lcb_args(release_version, repo_path)
+
+    records_by_question_id: dict[str, list[LcbSampleRecord]] = defaultdict(list)
+    prompt_too_long_question_ids: set[str] = set()
+    for record in records:
+        if record.prompt_too_long:
+            prompt_too_long_question_ids.add(record.question_id)
+            continue
+        records_by_question_id[record.question_id].append(record)
+
+    missing_question_ids = [
+        str(instance.question_id)
+        for instance in benchmark
+        if str(instance.question_id) not in records_by_question_id
+        and str(instance.question_id) not in prompt_too_long_question_ids
+    ]
+    if missing_question_ids:
+        raise RuntimeError(
+            "Missing LiveCodeBench records for non-skipped question_id(s): "
+            f"{missing_question_ids[:10]}"
+        )
+
+    selected_benchmark = []
+    record_keys_by_instance: list[list[tuple[str, int]]] = []
+    save_results = []
+    for instance in benchmark:
+        question_id = str(instance.question_id)
+        if question_id not in records_by_question_id:
+            continue
+        instance_records = sorted(
+            records_by_question_id[question_id],
+            key=lambda record: record.generation_index,
+        )
+        outputs = [record.code_output for record in instance_records]
+        selected_benchmark.append(instance)
+        record_keys_by_instance.append(
+            [
+                (record.question_id, record.generation_index)
+                for record in instance_records
+            ]
+        )
+        save_results.append(instance.insert_output(outputs, outputs))
+
+    if not selected_benchmark:
+        return {}, {}
+
+    with _repo_cwd(repo_path):
+        save_results, combined_results = symbols["sort_and_extract_save_results"](
+            symbols["Scenario"].codegeneration,
+            save_results,
+        )
+        metrics = symbols["get_metrics"](
+            symbols["Scenario"].codegeneration,
+            args_ns,
+            selected_benchmark,
+            combined_results,
+        )
+        graded = symbols["extract_instance_results"](metrics[1])
+
+    if len(graded) != len(record_keys_by_instance):
+        raise RuntimeError(
+            "LiveCodeBench returned a grade list with a different instance count "
+            f"({len(graded)} vs {len(record_keys_by_instance)})."
+        )
+
+    grading_by_record_key: dict[tuple[str, int], bool] = {}
+    for record_keys, instance_grades in zip(record_keys_by_instance, graded):
+        if len(instance_grades) != len(record_keys):
+            raise RuntimeError(
+                "LiveCodeBench returned a different number of per-sample grades than "
+                f"generated outputs ({len(instance_grades)} vs {len(record_keys)})."
+            )
+        for record_key, passed in zip(record_keys, instance_grades):
+            grading_by_record_key[record_key] = bool(passed)
+
+    native_metrics = {
+        str(name): _normalize_metric_value(value)
+        for name, value in metrics[0].items()
+    }
+    return native_metrics, grading_by_record_key

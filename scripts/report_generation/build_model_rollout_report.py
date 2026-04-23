@@ -197,16 +197,15 @@ def _normalize_local_dataset_id(value: Any) -> Any:
     return value
 
 
-def _is_stats_json(path: Path) -> bool:
-    return path.suffix == ".json" and not path.name.endswith("__lcb_records.json")
-
-
 def _load_stats_payloads(stats_dir: Path) -> list[tuple[Path, dict[str, Any]]]:
     payloads: list[tuple[Path, dict[str, Any]]] = []
     for path in sorted(stats_dir.glob("*.json")):
-        if not _is_stats_json(path):
+        if path.suffix != ".json":
             continue
-        payload = json.loads(path.read_text())
+        try:
+            payload = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
         if isinstance(payload, dict) and isinstance(payload.get("metadata"), dict):
             payloads.append((path, payload))
     if not payloads:

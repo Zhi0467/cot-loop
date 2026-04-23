@@ -6,7 +6,7 @@ Expected multi-seed layout:
   <run_dir>/seed_1/metrics.jsonl
   ...
 
-Each metrics JSONL row is produced by scripts/train_probe.py and includes:
+Each metrics JSONL row is produced by scripts/train/train_probe.py and includes:
   epoch, train_loss, train_accuracy, train_macro_f1, train_roc_auc,
   accuracy, macro_f1, roc_auc
 """

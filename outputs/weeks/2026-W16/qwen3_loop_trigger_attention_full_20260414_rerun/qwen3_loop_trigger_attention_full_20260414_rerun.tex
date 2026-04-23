@@ -1,0 +1,281 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+
+\title{Qwen3 Loop-Trigger Attention: Trigger End vs Trigger Start}
+\author{}
+\date{2026-04-15}
+
+\begin{document}
+\maketitle
+
+\section*{Object}
+
+This note compares the two query positions that matter for the current question on the same saved March 22--23 Qwen3-1.7B instruct prompt-profile rows:
+
+\begin{itemize}
+  \item \texttt{trigger\_end}: the final token of the twentieth repeated $30$-gram
+  \item \texttt{trigger\_start}: the token immediately before that twentieth repeated copy begins
+\end{itemize}
+
+This report uses \texttt{trigger\_start} only for the token right before the final repeated copy begins.
+
+Everything else is held fixed:
+
+\begin{itemize}
+  \item model: \texttt{Qwen/Qwen3-1.7B}
+  \item loop definition: \texttt{n=30}, \texttt{k=20}
+  \item selection rule: recomputed trigger prefix must exactly match saved \texttt{first\_loop\_prefix\_length}
+  \item selected rows: \texttt{811 / 820} replayable loop rows
+  \item dataset counts: \texttt{GPQA 121}, \texttt{AIME 30}, \texttt{MATH-500 68}, \texttt{MMLU-Pro 130}, \texttt{LiveCodeBench 462}
+  \item total prefix lengths: median \texttt{9846}, \texttt{p95 = 22321}, max \texttt{28830}
+\end{itemize}
+
+There is still no extra mid-prefix truncation inside any run. Each forward pass sees the full prompt plus the completion prefix through the saved first loop trigger.
+
+\section*{Reconstruction Boundary}
+
+The March prompt-profile archives preserve exact \texttt{prompt\_token\_ids}, but they do not preserve exact \texttt{completion\_token\_ids}. For those older rows, the replay path still retokenizes saved \texttt{completion\_text}.
+
+\begin{center}
+\small
+\begin{tabular}{lrrrrr}
+\toprule
+Dataset & Rollouts & Loop rows & Exact length & +1 hidden stop & Trigger-prefix match \\
+\midrule
+GPQA & 792 & 124 & 46 / 792 & 749 / 792 & 121 / 124 \\
+AIME & 240 & 31 & 38 / 240 & 234 / 240 & 30 / 31 \\
+MATH-500 & 2000 & 68 & 38 / 2000 & 1991 / 2000 & 68 / 68 \\
+MMLU-Pro & 3200 & 130 & 34 / 3200 & 3191 / 3200 & 130 / 130 \\
+LiveCodeBench & 3200 & 467 & 356 / 3200 & 3168 / 3200 & 462 / 467 \\
+\midrule
+Overall & 9432 & 820 & 512 / 9432 & 9333 / 9432 & 811 / 820 \\
+\bottomrule
+\end{tabular}
+\normalsize
+\end{center}
+
+So the replay boundary is still: exact prompt IDs, approximate completion IDs on these old archives, and exact trigger-prefix recovery on \texttt{811 / 820} loop rows.
+
+\section*{Measurement Definition}
+
+For each selected row:
+
+\begin{enumerate}
+  \item Recompute the loop trigger with \texttt{find\_ngram\_loop\_trigger(..., n=30, k=20)}.
+  \item Keep only rows whose recomputed \texttt{first\_loop\_prefix} matches the saved \texttt{first\_loop\_prefix\_length}.
+  \item Replay the model on \texttt{prompt\_token\_ids + completion\_token\_ids[:first\_loop\_prefix\_length]}.
+  \item Apply an explicit causal mask inside the probe wrapper so keys with \texttt{key\_position > query\_position} are forced to zero.
+\end{enumerate}
+
+The two reported query positions are:
+
+\begin{itemize}
+  \item \texttt{trigger\_end = prompt\_len + trigger\_end}
+  \item \texttt{trigger\_start = prompt\_len + trigger\_start - 1}
+\end{itemize}
+
+Key positions are partitioned into disjoint bins:
+
+\begin{itemize}
+  \item \texttt{prompt}
+  \item \texttt{previous\_loop}
+  \item \texttt{current\_trigger}
+  \item \texttt{other\_completion}
+\end{itemize}
+
+\texttt{recent\_nonloop} is still tracked as a diagnostic subset: the previous $256$ completion positions outside the loop bins. But on the collaborator-facing surface here, \texttt{other\_completion} includes that recent window, so the plotted lines and the main tables stay on a full prefix decomposition.
+
+\texttt{last\_previous\_loop} is still tracked as a subset of \texttt{previous\_loop}, but it is not plotted as a separate mass line here.
+
+There is no separate self bin. The query token contributes to the region it belongs to. At \texttt{trigger\_start}, \texttt{current\_trigger} is exactly zero because the full trigger span is in the future.
+
+Summary statistics are:
+
+\begin{itemize}
+  \item \texttt{mean\_*\_mass}: summed attention mass on that bin, averaged across heads, then across selected rows
+  \item \texttt{top1\_fraction\_*}: fraction of heads whose argmax lands in that bin
+\end{itemize}
+
+\section*{Layer-by-Layer Progression}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{attention_mass_by_layer_comparison.pdf}
+\caption{Row-weighted overall attention-mass progression from layer 0 to layer 27 for the two reported query positions. \texttt{Other\_completion} is the full residual completion mass outside the loop bins, including the recent non-loop window.}
+\end{figure}
+
+\texttt{attention\_mass\_by\_layer\_comparison.pdf} plots row-weighted overall bin mass from layer $0$ to layer $27$ for the two reported query positions. The plotted lines are:
+
+\begin{itemize}
+  \item \texttt{trigger\_end}: \texttt{prompt}, \texttt{previous\_loop}, \texttt{current\_trigger}, and \texttt{other\_completion}
+  \item \texttt{trigger\_start}: \texttt{prompt}, \texttt{previous\_loop}, and \texttt{other\_completion}
+\end{itemize}
+
+Main read from the curves:
+
+\begin{itemize}
+  \item \texttt{trigger\_end}: previous-loop mass rises early, peaks at layer $6$ (\texttt{0.193}), and then falls as the final layer becomes prompt-dominant; by layer $27$, \texttt{current\_trigger} (\texttt{0.176}) is still larger than \texttt{other\_completion} (\texttt{0.154}).
+  \item \texttt{trigger\_start}: \texttt{current\_trigger} is identically \texttt{0}, previous-loop mass peaks later at layer $16$ (\texttt{0.211}), and the strongest competition there is between \texttt{prompt} (\texttt{0.260}) and \texttt{other\_completion} (\texttt{0.530}).
+\end{itemize}
+
+So the two views differ materially. Moving the query one token earlier removes \texttt{current\_trigger}, raises final-layer previous-loop mass, and still leaves most of the non-prompt mass in the residual \texttt{other\_completion} bin.
+
+\section*{Final-Layer Overall Comparison}
+
+The final-layer summary is layer $27$ for both reported objects.
+
+\begin{center}
+\scriptsize
+\begin{tabular}{lrrrrrrrr}
+\toprule
+Query & Prev-loop & Prompt & Current-trigger & Other-completion & Top-1 prev & Top-1 prompt & Top-1 current & Top-1 other \\
+\midrule
+\texttt{trigger\_end} & 0.031 & 0.639 & 0.176 & 0.154 & 0.0003 & 0.874 & 0.114 & 0.011 \\
+\texttt{trigger\_start} & 0.069 & 0.634 & 0.000 & 0.298 & 0.027 & 0.872 & 0.000 & 0.100 \\
+\bottomrule
+\end{tabular}
+\normalsize
+\end{center}
+
+This comparison says two separate things:
+
+\begin{itemize}
+  \item moving from \texttt{trigger\_end} to \texttt{trigger\_start} removes \texttt{current\_trigger} entirely, raises final-layer previous-loop mass from \texttt{0.031} to \texttt{0.069}, and raises residual completion mass from \texttt{0.154} to \texttt{0.298};
+  \item prompt tokens remain the dominant late-layer target in both views.
+\end{itemize}
+
+\section*{Length-Adjusted Final-Layer Read}
+
+Raw mass alone is not enough for the collaborator-facing conclusion, because the four bins have very different lengths on the accessible prefix.
+
+For each query definition and bin, let \texttt{token\_share} be the row-weighted mean fraction of accessible positions that lie in that bin, and define \texttt{enrichment = mean\_mass / token\_share}. Then \texttt{enrichment = 1} is the length-matched uniform-attention baseline. Values above \texttt{1} mean the region gets more mass than its size alone would predict; values below \texttt{1} mean it gets less.
+
+\begin{center}
+\scriptsize
+\begin{tabular}{lrrrr}
+\toprule
+Query & Prompt share & Prev-loop share & Current-trigger share & Other-completion share \\
+\midrule
+\texttt{trigger\_end} & 0.051 & 0.069 & 0.004 & 0.876 \\
+\texttt{trigger\_start} & 0.051 & 0.069 & 0.000 & 0.879 \\
+\bottomrule
+\end{tabular}
+\normalsize
+\end{center}
+
+\begin{center}
+\scriptsize
+\begin{tabular}{lrrrr}
+\toprule
+Query & Prompt enrich. & Prev-loop enrich. & Current-trigger enrich. & Other-completion enrich. \\
+\midrule
+\texttt{trigger\_end} & 12.57x & 0.46x & 42.62x & 0.18x \\
+\texttt{trigger\_start} & 12.41x & 0.99x & 0.00x & 0.34x \\
+\bottomrule
+\end{tabular}
+\normalsize
+\end{center}
+
+This changes the interpretation in an important way:
+
+\begin{itemize}
+  \item \texttt{other\_completion} has large raw mass mainly because it covers about \texttt{88--91\%} of the visible prefix; after length adjustment it is under-attended in both views.
+  \item \texttt{prompt} is the only region that stays strongly over-attended in the final layer in both views.
+  \item \texttt{previous\_loop} is below the uniform baseline at \texttt{trigger\_end}, and only about at the baseline overall at \texttt{trigger\_start}.
+\end{itemize}
+
+Because the bin boundaries are fixed once the query position is fixed, the token shares do not vary by layer. So the length-adjusted curves have the same peak layers as the mass curves; only the vertical scale changes. On that size-adjusted read:
+
+\begin{itemize}
+  \item \texttt{trigger\_end} previous-loop enrichment still peaks at layer $6$, now at \texttt{2.80x};
+  \item \texttt{trigger\_start} previous-loop enrichment still peaks at layer $16$, now at \texttt{3.03x}.
+\end{itemize}
+
+\section*{Trigger-Start By Dataset}
+
+For the \texttt{trigger\_start} object, \texttt{current\_trigger} is zero on every dataset by construction, so the dataset-level table only reports the remaining bins.
+
+\begin{center}
+\scriptsize
+\begin{tabular}{lrrrrrrr}
+\toprule
+Dataset & Rows & Prev-loop & Prompt & Other-completion & Top-1 prev & Top-1 prompt & Top-1 other \\
+\midrule
+GPQA & 121 & 0.045 & 0.648 & 0.307 & 0.011 & 0.872 & 0.117 \\
+AIME & 30 & 0.107 & 0.628 & 0.266 & 0.050 & 0.869 & 0.081 \\
+MATH-500 & 68 & 0.082 & 0.619 & 0.299 & 0.035 & 0.837 & 0.128 \\
+MMLU-Pro & 130 & 0.032 & 0.643 & 0.326 & 0.005 & 0.909 & 0.086 \\
+LiveCodeBench & 462 & 0.081 & 0.630 & 0.289 & 0.035 & 0.868 & 0.097 \\
+\midrule
+Overall row-weighted & 811 & 0.069 & 0.634 & 0.298 & 0.027 & 0.872 & 0.100 \\
+\bottomrule
+\end{tabular}
+\normalsize
+\end{center}
+
+Dataset-level scientific read:
+
+\begin{itemize}
+  \item \texttt{AIME} shows the strongest final-layer previous-loop mass (\texttt{0.107}).
+  \item \texttt{MATH-500} and \texttt{LiveCodeBench} are next strongest at about \texttt{0.08}.
+  \item \texttt{MMLU-Pro} is the weakest on this object (\texttt{0.032} prev-loop mass, \texttt{0.005} top-1 prev-loop).
+  \item Every dataset still stays prompt-dominant in the final layer: prompt mass is \texttt{0.619--0.648}, while \texttt{other\_completion} ranges from \texttt{0.266} to \texttt{0.326}.
+\end{itemize}
+
+The size-adjusted \texttt{trigger\_start} previous-loop read is heterogeneous by dataset:
+
+\begin{itemize}
+  \item \texttt{AIME}: \texttt{2.16x}
+  \item \texttt{LiveCodeBench}: \texttt{1.64x}
+  \item \texttt{MATH-500}: \texttt{1.12x}
+  \item \texttt{GPQA}: \texttt{0.39x}
+  \item \texttt{MMLU-Pro}: \texttt{0.31x}
+\end{itemize}
+
+So the overall \texttt{trigger\_start} previous-loop enrichment near \texttt{1.0x} is hiding real spread across datasets rather than proving a uniform mechanism.
+
+\section*{Conclusion}
+
+The raw-mass read is still true but incomplete:
+
+\begin{itemize}
+  \item the pre-trigger object does show nontrivial attention to previous loops:
+    final-layer previous-loop mass \texttt{0.069}, final-layer top-1 previous-loop \texttt{0.027}, and overall previous-loop peak at layer $16$ with mass \texttt{0.211};
+  \item but the final layer is still mostly prompt-focused rather than previous-loop-focused:
+    final-layer prompt mass \texttt{0.634}, final-layer residual completion mass \texttt{0.298}, and final-layer top-1 prompt \texttt{0.872}.
+\end{itemize}
+
+The length-adjusted read is sharper:
+
+\begin{itemize}
+  \item \texttt{prompt} is still the truly concentrated final-layer target in both views (\texttt{12.57x} at \texttt{trigger\_end}, \texttt{12.41x} at \texttt{trigger\_start});
+  \item \texttt{other\_completion} is not a preferred target per token; its large raw mass mostly comes from covering almost the whole prefix;
+  \item \texttt{previous\_loop} is not dominant in the final layer overall: it is below baseline at \texttt{trigger\_end} and only about baseline overall at \texttt{trigger\_start}, even though its mid-stack signal becomes clearly super-baseline and some datasets exceed baseline at \texttt{trigger\_start}.
+\end{itemize}
+
+So the strongest honest statement is not ``Qwen3 is paying mostly to prompt + other completions rather than previous loops,'' because that bundles together one strongly over-attended region (\texttt{prompt}) with one strongly under-attended region (\texttt{other\_completion}). The stronger-supported statement is:
+
+\begin{quote}
+At the token immediately before the twentieth repeated copy begins, the final layer is still mostly prompt-focused, while previous-loop evidence is present and peaks in the middle of the stack.
+\end{quote}
+
+\section*{Artifact Bundle}
+
+Updated raw/report artifacts now live under:
+
+\begin{itemize}
+  \item \texttt{outputs/weeks/2026-W16/qwen3\_loop\_trigger\_attention\_full\_20260414\_rerun/attention\_length\_adjusted\_overall.csv}
+  \item \texttt{outputs/weeks/2026-W16/qwen3\_loop\_trigger\_attention\_full\_20260414\_rerun/attention\_length\_adjusted\_by\_dataset.csv}
+  \item \texttt{outputs/weeks/2026-W16/qwen3\_loop\_trigger\_attention\_full\_20260414\_rerun/attention\_length\_adjusted\_by\_layer.csv}
+  \item \texttt{outputs/weeks/2026-W16/qwen3\_loop\_trigger\_attention\_pre\_trigger\_start\_20260414/} (\texttt{trigger\_start} bundle)
+\end{itemize}
+
+\end{document}

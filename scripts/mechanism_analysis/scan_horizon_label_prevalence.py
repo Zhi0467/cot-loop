@@ -11,16 +11,19 @@ import random
 import sys
 from collections import defaultdict
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SRC = os.path.join(ROOT, "src")
 if SRC not in sys.path:
     sys.path.insert(0, SRC)
+SCRIPTS_DIR = os.path.join(ROOT, "scripts")
+if SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, SCRIPTS_DIR)
 
 from transformers import AutoTokenizer
 
-from loop_probe.configs import get_rollout_config, preset_choices
-from loop_probe.labeling import first_ngram_loop_prefix_length
-from loop_probe.rollout import generate_rollout_token_ids
+from probe.configs import get_rollout_config, preset_choices
+from probe.labeling import first_ngram_loop_prefix_length
+from probe.rollout import generate_rollout_token_ids
 from utils import build_prompt
 
 

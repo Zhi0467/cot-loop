@@ -14,7 +14,7 @@ from typing import Any
 import matplotlib.pyplot as plt
 
 
-DEFAULT_STATS_DIR = Path("outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/json")
+DEFAULT_STATS_DIR = Path("outputs/undated/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/json")
 FIGURES_DIRNAME = "figures"
 EXPECTED_STATS_CONTRACT_VERSION = "rollout_stats_v2"
 

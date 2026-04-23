@@ -1,94 +1,97 @@
 # Docs Index
 
-Last updated: 2026-04-23 19:50 UTC
+Last updated: 2026-04-23 23:19 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
 - Keep each doc header dated in UTC when it is created or updated.
+- Use `artifacts-by-week.md` when you need the docs and top-level output bundles grouped by ISO week.
+- Dated docs live under `weeks/<ISO-week>/`; durable undated specs live under `standing/`.
 
 Core docs:
+- Weekly docs/output artifact map: artifacts-by-week.md
+- Standing TODO index: standing/README.md
+- Current standing TODOs: standing/todos-2026-W17.md
 - Project roadmap: ../roadmap.md
 - Open experiment ledger / next runs: ../backlog.md
-- Main rollout rebuild note: main-four-dataset-rollout-rebuild-2026-04-23.md
-- Degeneracy-origin rollout-stat plan: ../understand-where-loop-and-max-length-come-from.md
-- Prompt-profile implementation path: prompt-profile-probe.md
-- Prompt-profile evaluation contract: prompt-profile-eval-contract.md
-- Prompt-profile risk-screen decision: prompt-profile-risk-screen-2026-03-30.md
-- Prompt-profile plain-language note: prompt-profile-plain-language-2026-03-30.md
-- Prompt-profile full-train plan: prompt-profile-full-train-plan-2026-04-02.md
-- Prompt-profile RFM + steering stage plan: prompt-profile-rfm-steering-plan-2026-04-21.md
-- Prompt-profile RFM steering summary: prompt-profile-rfm-steering-summary-2026-04-23.md
-- Prompt-profile RFM + steering mode-consistent stage note: prompt-profile-rfm-mode-consistent-stage-2026-04-23.md
-- Prompt-profile RFM + steering grounded stage note: prompt-profile-rfm-steering-grounded-stage-2026-04-23.md
-- Prompt-profile RFM artifact schema: prompt-profile-rfm-artifact-schema-2026-04-21.md
-- LiveCodeBench repaired stage report: livecodebench-repaired-stage-report-2026-04-21.md
-- Prompt-profile natural-regression rerun note: prompt-profile-natural-regression-rerun-2026-04-05.md
-- Prompt-profile unified report note: prompt-profile-unified-report-2026-04-09.md
-- Prompt-profile combined audit note: prompt-profile-combined-audit-2026-04-05.md
-- Prompt-profile metadata-mechanism note: prompt-profile-metadata-mechanism-2026-04-06.md
-- Prompt-profile length-mechanism note: prompt-profile-length-mechanism-2026-04-09.md
-- Prompt-profile corrected balanced-regression note: prompt-profile-balanced-regression-corrected-2026-04-04.md
-- Prompt-profile combined April surface report: prompt-profile-full-surface-update-2026-04-04.md
-- OLMo degeneration-origin audit report: olmo-degeneration-origin-audit-2026-04-04.md
-- OLMo2 1B fifty-prompt rerun report: olmo2-1b-fifty-prompt-rerun-2026-04-05.md
-- OLMo and Qwen combined degeneration-origin report: olmo-qwen-degeneration-origin-combined-2026-04-09.md
-- Prompt-profile full-train result note: prompt-profile-full-train-results-2026-04-04.md
-- Prompt-profile binary retrain note: prompt-profile-binary-retrain-h256d2-2026-04-04.md
-- Prompt-profile binary capacity-controls note: prompt-profile-binary-capacity-controls-2026-04-04.md
-- Thread reset / new-thread handoff: thread-reset-2026-03-25.md
-- Prompt-profile projection/export path: prompt-profile-projection.md
-- Prefill-activation visualization note: prefill-activation-visualization.md
-- Loop / max-length definitions appendix: understand-where-loop-and-max-length-come-from.md
+- Main rollout rebuild note: weeks/2026-W17/main-four-dataset-rollout-rebuild-2026-04-23.md
+- Degeneracy-origin rollout-stat plan: weeks/2026-W14/understand-where-loop-and-max-length-come-from.md
+- Prompt-profile implementation path: weeks/2026-W14/prompt-profile-probe.md
+- Prompt-profile evaluation contract: weeks/2026-W13/prompt-profile-eval-contract.md
+- Prompt-profile risk-screen decision: weeks/2026-W14/prompt-profile-risk-screen-2026-03-30.md
+- Prompt-profile plain-language note: weeks/2026-W14/prompt-profile-plain-language-2026-03-30.md
+- Prompt-profile full-train plan: weeks/2026-W14/prompt-profile-full-train-plan-2026-04-02.md
+- Prompt-profile RFM third-stage steering grand plan: weeks/2026-W17/prompt-profile-rfm-third-stage-steering-plan.md
+- Prompt-profile RFM artifact schema: weeks/2026-W17/prompt-profile-rfm-artifact-schema-2026-04-21.md
+- LiveCodeBench repaired stage report: weeks/2026-W17/livecodebench-repaired-stage-report-2026-04-21.md
+- Prompt-profile natural-regression rerun note: weeks/2026-W14/prompt-profile-natural-regression-rerun-2026-04-05.md
+- Prompt-profile unified report note: weeks/2026-W15/prompt-profile-unified-report-2026-04-09.md
+- Prompt-profile combined audit note: weeks/2026-W14/prompt-profile-combined-audit-2026-04-05.md
+- Prompt-profile metadata-mechanism note: weeks/2026-W15/prompt-profile-metadata-mechanism-2026-04-06.md
+- Prompt-profile length-mechanism note: weeks/2026-W15/prompt-profile-length-mechanism-2026-04-09.md
+- Prompt-profile corrected balanced-regression note: weeks/2026-W14/prompt-profile-balanced-regression-corrected-2026-04-04.md
+- Prompt-profile combined April surface report: weeks/2026-W14/prompt-profile-full-surface-update-2026-04-04.md
+- OLMo degeneration-origin audit report: weeks/2026-W14/olmo-degeneration-origin-audit-2026-04-04.md
+- OLMo2 1B fifty-prompt rerun report: weeks/2026-W14/olmo2-1b-fifty-prompt-rerun-2026-04-05.md
+- OLMo and Qwen combined degeneration-origin report: weeks/2026-W15/olmo-qwen-degeneration-origin-combined-2026-04-09.md
+- Prompt-profile full-train result note: weeks/2026-W14/prompt-profile-full-train-results-2026-04-04.md
+- Prompt-profile binary retrain note: weeks/2026-W14/prompt-profile-binary-retrain-h256d2-2026-04-04.md
+- Prompt-profile binary capacity-controls note: weeks/2026-W14/prompt-profile-binary-capacity-controls-2026-04-04.md
+- Thread reset / new-thread handoff: weeks/2026-W13/thread-reset-2026-03-25.md
+- Prompt-profile projection/export path: weeks/2026-W12/prompt-profile-projection.md
+- Prefill-activation visualization note: weeks/2026-W12/prefill-activation-visualization.md
+- Loop / max-length definitions appendix: weeks/2026-W14/understand-where-loop-and-max-length-come-from.md
+- Rollout bundle v1 schema: reference/rollout-bundle-v1-schema.md
 
 Key outputs:
-- Common-policy rollout report PDF: ../outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/qwen3_1p7b_cross_dataset_rollout_report.pdf
-- Prompt-majority control note PDF: ../outputs/prompt_majority_05_all_datasets_recommendation_20260321/prompt_majority_05_all_datasets_recommendation.pdf
-- `p_loop` objective note PDF: ../outputs/p_loop_objective_recommendation_20260322/p_loop_objective_recommendation.pdf
-- Two-head recommendation PDF: ../outputs/two_head_prompt_profile_recommendation_20260322/two_head_prompt_profile_recommendation.pdf
-- Build-recipe PDF: ../outputs/prompt_profile_build_recipe_20260323/prompt_profile_build_recipe.pdf
-- Prompt-profile risk-control bundle: ../outputs/prompt_profile_risk_controls_20260330/
-- Plain-language objective PDF: ../outputs/prompt_profile_plain_language_20260330/prompt_profile_plain_language_20260330.pdf
-- Full-train plan PDF: ../outputs/prompt_profile_full_train_plan_20260402/prompt_profile_full_train_plan_20260402.pdf
-- Mode-consistent stage note PDF: ../outputs/prompt_profile_rfm_mode_consistent_stage_20260423/prompt_profile_rfm_mode_consistent_stage_20260423.pdf
-- Grounded stage note PDF: ../outputs/prompt_profile_rfm_stage_grounded_plan_20260423/prompt_profile_rfm_stage_grounded_plan_20260423.pdf
-- Natural-regression rerun bundle: ../outputs/prompt_profile_natural_regression_rerun_20260405/
-- Natural-regression rerun PDF: ../outputs/prompt_profile_natural_regression_rerun_20260405/prompt_profile_natural_regression_rerun_20260405.pdf
-- Prompt-profile unified report bundle: ../outputs/prompt_profile_unified_report_20260409/
-- Prompt-profile unified report PDF: ../outputs/prompt_profile_unified_report_20260409/prompt_profile_unified_report_20260409.pdf
-- LiveCodeBench repaired stage report bundle: ../outputs/livecodebench_repaired_stage_report_apr21/
-- LiveCodeBench repaired stage report PDF: ../outputs/livecodebench_repaired_stage_report_apr21/livecodebench_repaired_stage_report_apr21.pdf
-- Prompt-profile combined audit bundle: ../outputs/prompt_profile_combined_audit_20260405/
-- Prompt-profile combined audit PDF: ../outputs/prompt_profile_combined_audit_20260405/prompt_profile_combined_audit_20260405.pdf
-- Prompt-profile metadata audit bundle: ../outputs/prompt_profile_metadata_audit_20260405/
-- Prompt-profile metadata-mechanism bundle: ../outputs/prompt_profile_metadata_mechanism_20260406/
-- Prompt-profile metadata-mechanism PDF: ../outputs/prompt_profile_metadata_mechanism_20260406/prompt_profile_metadata_mechanism_20260406.pdf
-- Prompt-profile length-mechanism bundle: ../outputs/prompt_profile_length_mechanism_20260409/
-- Prompt-profile length-mechanism PDF: ../outputs/prompt_profile_length_mechanism_20260409/prompt_profile_length_mechanism_20260409.pdf
-- Corrected balanced-regression bundle: ../outputs/prompt_profile_balanced_regression_corrected_20260404/
-- Corrected balanced-regression PDF: ../outputs/prompt_profile_balanced_regression_corrected_20260404/prompt_profile_balanced_regression_corrected_20260404.pdf
-- Full-train result bundle: ../outputs/prompt_profile_full_train_locked_pair_20260404/
-- Full-train result PDF: ../outputs/prompt_profile_full_train_locked_pair_20260404/prompt_profile_full_train_locked_pair_20260404.pdf
-- Combined April surface bundle: ../outputs/prompt_profile_full_surface_update_20260404/
-- Combined April surface PDF: ../outputs/prompt_profile_full_surface_update_20260404/prompt_profile_full_surface_update_20260404.pdf
-- OLMo degeneration-origin audit bundle: ../outputs/olmo_degeneration_origin_audit_20260404/
-- OLMo degeneration-origin audit PDF: ../outputs/olmo_degeneration_origin_audit_20260404/olmo_degeneration_origin_audit_20260404.pdf
-- OLMo2 1B fifty-prompt rerun bundle: ../outputs/olmo2_1b_fifty_prompt_rerun_20260405/
-- OLMo2 1B fifty-prompt rerun PDF: ../outputs/olmo2_1b_fifty_prompt_rerun_20260405/olmo2_1b_fifty_prompt_rerun_20260405.pdf
-- OLMo2 1B progression figure bundle: ../outputs/olmo2_1b_progression_bound50_20260406/
-- OLMo2 1B progression PDF: ../outputs/olmo2_1b_progression_bound50_20260406/olmo2_1b_progression_bound50.pdf
-- Qwen base raw finished summary bundle: ../outputs/qwen3_1p7b_base_raw_control_finished_20260409/
-- OLMo and Qwen combined bundle: ../outputs/olmo_qwen_degeneration_combined_20260409/
-- OLMo and Qwen combined PDF: ../outputs/olmo_qwen_degeneration_combined_20260409/olmo_qwen_degeneration_combined_20260409.pdf
-- Binary retrain result bundle: ../outputs/prompt_profile_binary_retrain_h256d2_20260404/
-- Binary retrain result PDF: ../outputs/prompt_profile_binary_retrain_h256d2_20260404/prompt_profile_binary_retrain_h256d2_20260404.pdf
-- Binary capacity-controls bundle: ../outputs/prompt_profile_binary_capacity_controls_20260404/
-- Binary capacity-controls PDF: ../outputs/prompt_profile_binary_capacity_controls_20260404/prompt_profile_binary_capacity_controls_20260404.pdf
-- Consolidated earlier findings PDF: ../outputs/pr2_experiment_findings_consolidated_pdf/pr2_experiment_findings_consolidated.pdf
-- Rollout-statistics module audit PDF: ../outputs/rollout_stats_module_audit/rollout_stats_module_audit.pdf
-- Detailed reopened-round summary PDF: ../outputs/prefill_rounds_1_to_12_detailed_summary/prefill_rounds_1_to_12_detailed_summary.pdf
+- Common-policy rollout report PDF: outputs/undated/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/qwen3_1p7b_cross_dataset_rollout_report.pdf
+- Prompt-majority control note PDF: outputs/weeks/2026-W12/prompt_majority_05_all_datasets_recommendation_20260321/prompt_majority_05_all_datasets_recommendation.pdf
+- `p_loop` objective note PDF: outputs/weeks/2026-W12/p_loop_objective_recommendation_20260322/p_loop_objective_recommendation.pdf
+- Two-head recommendation PDF: outputs/weeks/2026-W12/two_head_prompt_profile_recommendation_20260322/two_head_prompt_profile_recommendation.pdf
+- Build-recipe PDF: outputs/weeks/2026-W13/prompt_profile_build_recipe_20260323/prompt_profile_build_recipe.pdf
+- Prompt-profile risk-control bundle: outputs/weeks/2026-W14/prompt_profile_risk_controls_20260330/
+- Plain-language objective PDF: outputs/weeks/2026-W14/prompt_profile_plain_language_20260330/prompt_profile_plain_language_20260330.pdf
+- Full-train plan PDF: outputs/weeks/2026-W14/prompt_profile_full_train_plan_20260402/prompt_profile_full_train_plan_20260402.pdf
+- Mode-consistent stage note PDF: outputs/weeks/2026-W17/prompt_profile_rfm_mode_consistent_stage_20260423/prompt_profile_rfm_mode_consistent_stage_20260423.pdf
+- Grounded stage note PDF: outputs/weeks/2026-W17/prompt_profile_rfm_stage_grounded_plan_20260423/prompt_profile_rfm_stage_grounded_plan_20260423.pdf
+- Natural-regression rerun bundle: outputs/weeks/2026-W14/prompt_profile_natural_regression_rerun_20260405/
+- Natural-regression rerun PDF: outputs/weeks/2026-W14/prompt_profile_natural_regression_rerun_20260405/prompt_profile_natural_regression_rerun_20260405.pdf
+- Prompt-profile unified report bundle: outputs/weeks/2026-W15/prompt_profile_unified_report_20260409/
+- Prompt-profile unified report PDF: outputs/weeks/2026-W15/prompt_profile_unified_report_20260409/prompt_profile_unified_report_20260409.pdf
+- LiveCodeBench repaired stage report bundle: outputs/weeks/2026-W17/livecodebench_repaired_stage_report_apr21/
+- LiveCodeBench repaired stage report PDF: outputs/weeks/2026-W17/livecodebench_repaired_stage_report_apr21/livecodebench_repaired_stage_report_apr21.pdf
+- Prompt-profile combined audit bundle: outputs/weeks/2026-W14/prompt_profile_combined_audit_20260405/
+- Prompt-profile combined audit PDF: outputs/weeks/2026-W14/prompt_profile_combined_audit_20260405/prompt_profile_combined_audit_20260405.pdf
+- Prompt-profile metadata audit bundle: outputs/weeks/2026-W14/prompt_profile_metadata_audit_20260405/
+- Prompt-profile metadata-mechanism bundle: outputs/weeks/2026-W15/prompt_profile_metadata_mechanism_20260406/
+- Prompt-profile metadata-mechanism PDF: outputs/weeks/2026-W15/prompt_profile_metadata_mechanism_20260406/prompt_profile_metadata_mechanism_20260406.pdf
+- Prompt-profile length-mechanism bundle: outputs/weeks/2026-W15/prompt_profile_length_mechanism_20260409/
+- Prompt-profile length-mechanism PDF: outputs/weeks/2026-W15/prompt_profile_length_mechanism_20260409/prompt_profile_length_mechanism_20260409.pdf
+- Corrected balanced-regression bundle: outputs/weeks/2026-W14/prompt_profile_balanced_regression_corrected_20260404/
+- Corrected balanced-regression PDF: outputs/weeks/2026-W14/prompt_profile_balanced_regression_corrected_20260404/prompt_profile_balanced_regression_corrected_20260404.pdf
+- Full-train result bundle: outputs/weeks/2026-W14/prompt_profile_full_train_locked_pair_20260404/
+- Full-train result PDF: outputs/weeks/2026-W14/prompt_profile_full_train_locked_pair_20260404/prompt_profile_full_train_locked_pair_20260404.pdf
+- Combined April surface bundle: outputs/weeks/2026-W14/prompt_profile_full_surface_update_20260404/
+- Combined April surface PDF: outputs/weeks/2026-W14/prompt_profile_full_surface_update_20260404/prompt_profile_full_surface_update_20260404.pdf
+- OLMo degeneration-origin audit bundle: outputs/weeks/2026-W14/olmo_degeneration_origin_audit_20260404/
+- OLMo degeneration-origin audit PDF: outputs/weeks/2026-W14/olmo_degeneration_origin_audit_20260404/olmo_degeneration_origin_audit_20260404.pdf
+- OLMo2 1B fifty-prompt rerun bundle: outputs/weeks/2026-W14/olmo2_1b_fifty_prompt_rerun_20260405/
+- OLMo2 1B fifty-prompt rerun PDF: outputs/weeks/2026-W14/olmo2_1b_fifty_prompt_rerun_20260405/olmo2_1b_fifty_prompt_rerun_20260405.pdf
+- OLMo2 1B progression figure bundle: outputs/weeks/2026-W15/olmo2_1b_progression_bound50_20260406/
+- OLMo2 1B progression PDF: outputs/weeks/2026-W15/olmo2_1b_progression_bound50_20260406/olmo2_1b_progression_bound50.pdf
+- Qwen base raw finished summary bundle: outputs/weeks/2026-W15/qwen3_1p7b_base_raw_control_finished_20260409/
+- OLMo and Qwen combined bundle: outputs/weeks/2026-W15/olmo_qwen_degeneration_combined_20260409/
+- OLMo and Qwen combined PDF: outputs/weeks/2026-W15/olmo_qwen_degeneration_combined_20260409/olmo_qwen_degeneration_combined_20260409.pdf
+- Binary retrain result bundle: outputs/weeks/2026-W14/prompt_profile_binary_retrain_h256d2_20260404/
+- Binary retrain result PDF: outputs/weeks/2026-W14/prompt_profile_binary_retrain_h256d2_20260404/prompt_profile_binary_retrain_h256d2_20260404.pdf
+- Binary capacity-controls bundle: outputs/weeks/2026-W14/prompt_profile_binary_capacity_controls_20260404/
+- Binary capacity-controls PDF: outputs/weeks/2026-W14/prompt_profile_binary_capacity_controls_20260404/prompt_profile_binary_capacity_controls_20260404.pdf
+- Consolidated earlier findings PDF: outputs/undated/pr2_experiment_findings_consolidated_pdf/pr2_experiment_findings_consolidated.pdf
+- Rollout-statistics module audit PDF: outputs/undated/rollout_stats_module_audit/rollout_stats_module_audit.pdf
+- Detailed reopened-round summary PDF: outputs/undated/prefill_rounds_1_to_12_detailed_summary/prefill_rounds_1_to_12_detailed_summary.pdf
 
 Current live status:
-- `main-four-dataset-rollout-rebuild-2026-04-23.md` is now the live rollout-stat status surface:
+- `weeks/2026-W17/main-four-dataset-rollout-rebuild-2026-04-23.md` is now the live rollout-stat status surface:
   - it replaces the narrower March-repair / LiveCodeBench-only rerun framing for the current task;
   - it now fixes the canonical dataset set to `LiveCodeBench`, `TACO-hard`, `MATH level-5`, and `Omni-MATH >= 7`;
   - it records the corrected full-or-`1000` size policy:
@@ -105,28 +108,15 @@ Current live status:
   - it records that the local `data/omni_math_ge7_screen_300.jsonl` file is now only a historical screen artifact, while the active stats suite reads the full HF `Omni-MATH >= 7` slice;
   - it records the archive-level smoke receipt proving that prompt text, token ids, rollout text, completion token ids, and row metadata are all preserved for later reuse;
   - it points at the live suite output root `../outputs/model_stats/main_five_dataset_rebuild_full_or_1k_20260423/` and the remote run root `/data/scratch/murphy/outputs/cot-loop-detection/main_five_dataset_rebuild_full_or_1k_20260423/`; those path names are historical, but the active manifest and queue now only cover jobs `2875`, `2877`, `2878`, `2879`, `2880`, `2882`, `2883`, and `2884`.
-- `prompt-profile-rfm-steering-grounded-stage-2026-04-23.md` is now the live status surface for this stage:
-  - it keeps the repaired `LiveCodeBench` object fixed at fit-train / val / test `280 / 128 / 160` with positives `140 / 35 / 54`;
-  - it separates finished evidence, live evidence, and blocked evidence instead of treating the whole stage as one undifferentiated status blob;
-  - it records that only two full-contract thinking-on rows are finished so far:
-    - `no_steer`: `2 / 160` `pass@1`, loop fraction `0.65625`
-    - `plus_v_linear`: `2 / 160` `pass@1`, loop fraction `0.6125`
-  - it records that the remaining five full-contract thinking-on rows are still running:
-    - `2804`, `2810`, `2811`, `2815`, `2816`
-  - it records that every attempted non-thinking row failed on the same dirty-slot CUDA OOM before first row, so the non-thinking lane is still infrastructure-blocked rather than scientifically read out;
-  - it updates the screening gate from a plan-only item to a live evidence surface:
-    - `LiveCodeBench-extra`: `255` profiled, positive rate `0.5529`
-    - `TACO-hard`: `213` profiled, positive rate `0.8075`
-    - `MATH level-5`: `180` profiled, positive rate `0.1389`
-    - `Omni-MATH >= 7`: `176 / 300`, positive rate `0.5867`
-  - it records that the explicit `LiveCodeBench` `HFChatTemplate` `thinking on/off` provenance pair is queued as `2829` / `2830`, but is not the main steering result;
-  - it also makes the repo/runtime drift explicit:
-    - local worktree state is ahead of the published draft PR `#11`;
-    - the positive-enrichment screen is currently running with home-backed caches because `/data` is effectively full.
-- `prompt-profile-rfm-steering-plan-2026-04-21.md` remains the design document for why this stage exists and what it is trying to prove.
-- The new note `livecodebench-repaired-stage-report-2026-04-21.md` is still the shortest collaborator-facing artifact for "finish LiveCodeBench" on the repaired detector/vector object:
+- `weeks/2026-W17/prompt-profile-rfm-third-stage-steering-plan.md` is now the only active steering-stage plan:
+  - it compresses the older April 21 design note, April 23 grounded status note, mode-consistency correction, and short summary into one document;
+  - it fixes the grand schema as mode-local `stats -> prompt-level materialization -> probe/RFM training -> vector export -> steering` for each `(dataset, thinking mode)` path;
+  - it records the corrected steering contract: prefill-only, all prompt tokens, every block steered by its own block-specific vector, both linear and spherical conditions, and the full source-manifest decode budget rather than a `1024` pilot cap;
+  - it demotes cross-mode rows, last-token pilots, `32`-prompt pilots, canceled queue fragments, and `LiveCodeBench-extra` to historical/debugging status rather than stage evidence;
+  - it keeps `weeks/2026-W17/prompt-profile-rfm-artifact-schema-2026-04-21.md` as the schema reference and treats `weeks/2026-W17/livecodebench-repaired-stage-report-2026-04-21.md` as an old detector/pilot artifact, not a steering-plan input.
+- The new note `weeks/2026-W17/livecodebench-repaired-stage-report-2026-04-21.md` is still the shortest collaborator-facing artifact for "finish LiveCodeBench" on the repaired detector/vector object:
   - it freezes the repaired `LiveCodeBench` prompt object, detector comparison, direction-stability read, and first larger steering control table in one place;
-  - it points at the report bundle `../outputs/livecodebench_repaired_stage_report_apr21/`, which now carries:
+  - it points at the report bundle `outputs/weeks/2026-W17/livecodebench_repaired_stage_report_apr21/`, which now carries:
     - `livecodebench_repaired_stage_report_apr21.pdf`
     - `livecodebench_stage_summary.json`
     - detector, direction-stability, and steering figures;
@@ -134,17 +124,17 @@ Current live status:
     - detector side: RFM is competitive but not a clean activation-MLP win;
     - direction side: the exported bundle is stable enough to study causally;
     - steering side: the first larger `32`-prompt spherical control table is negative, with all steered conditions worse than baseline on loop fraction.
-- The combined audit `prompt-profile-combined-audit-2026-04-05.md` is still the whole-surface prompt-profile bundle:
+- The combined audit `weeks/2026-W14/prompt-profile-combined-audit-2026-04-05.md` is still the whole-surface prompt-profile bundle:
   - it keeps the canonical natural regression rerun, the current balanced-binary default, the cheap prompt-stat audit, and the Athena code audit in one place;
   - it narrows the honest claim: the current reports establish lift over a 1D prompt-length baseline on some surfaces, not yet lift over strong prompt-only controls in general.
-- The unified report `prompt-profile-unified-report-2026-04-09.md` remains the main collaborator-facing prompt-profile summary:
+- The unified report `weeks/2026-W15/prompt-profile-unified-report-2026-04-09.md` remains the main collaborator-facing prompt-profile summary:
   - regression stays natural-split / natural-sampler;
   - binary stays balanced-train / natural-test;
   - the new RFM stage is an add-on to that surface, not a replacement for it.
-- The new note `prompt-profile-length-mechanism-2026-04-09.md` is the direct plain-English answer to the narrower question "why does prompt length predict completion length at all?":
+- The new note `weeks/2026-W15/prompt-profile-length-mechanism-2026-04-09.md` is the direct plain-English answer to the narrower question "why does prompt length predict completion length at all?":
   - on `AIME`, `MATH-500`, `MMLU-Pro`, and much of `LiveCodeBench`, prompt length mostly works as a rough workload proxy;
   - `GPQA` is the important exception where raw length is weak and prompt structure matters more;
-  - the note is backed by a new `2`-GPU audit bundle under `../outputs/prompt_profile_length_mechanism_20260409/` plus an attached Athena plain-English read.
+  - the note is backed by a new `2`-GPU audit bundle under `outputs/weeks/2026-W15/prompt_profile_length_mechanism_20260409/` plus an attached Athena plain-English read.
 - The stronger prompt-shape / residualized-control question is still open, but it is no longer the immediate next execution surface:
   - first land the RFM detector-plus-steering stage on the frozen binary `majority_s_0.5` object;
   - then use residualized or matched prompt-shape analysis if the activation-lift claim still needs to move beyond the current prompt-visible baselines.
@@ -152,35 +142,35 @@ Current live status:
 - The objective selector is now fixed explicitly: choose the target by held-out predictability on the target itself, not by the downstream `top 20%` loop-enrichment slice.
 - Under that criterion, `mean_relative_length` is the strongest current regression target and `majority_s_0.5` is the strongest finished binary label surface, and Wangzhi locked that pair for the first full-train pass.
 - `p_loop` still wins the old bucket diagnostic for concentrating looping prompts, but that is no longer treated as proof that it should be the main training objective.
-- The note `prompt-profile-risk-screen-2026-03-30.md` is now the technical decision surface for this predictability-first correction.
-- The note `prompt-profile-plain-language-2026-03-30.md` is the collaborator-facing explanation of the same correction in plain words.
-- The repo-root note `../understand-where-loop-and-max-length-come-from.md` is now the working degeneration-origin note on the older rollout-statistics module:
+- The note `weeks/2026-W14/prompt-profile-risk-screen-2026-03-30.md` is now the technical decision surface for this predictability-first correction.
+- The note `weeks/2026-W14/prompt-profile-plain-language-2026-03-30.md` is the collaborator-facing explanation of the same correction in plain words.
+- The note `weeks/2026-W14/understand-where-loop-and-max-length-come-from.md` is now the working degeneration-origin note on the older rollout-statistics module:
   - it now opens with a current status snapshot;
   - it carries both the OLMo execution history and the finished same-family Qwen base control;
   - older April 4 and April 6 live-checkpoint sections are preserved in-place but explicitly sit behind the now-finished Qwen surface;
   - use it when you want the full chronological path, not just the cleaned stage conclusion.
-- The docs note `understand-where-loop-and-max-length-come-from.md` is only the background definitions appendix for saved `loop`, prompt-profile `cap_hit` / `p_cap`, rollout-stat `max_length_hit`, and `majority_s_0.5`.
+- The docs note `docs/weeks/2026-W14/understand-where-loop-and-max-length-come-from.md` is only the background definitions appendix for saved `loop`, prompt-profile `cap_hit` / `p_cap`, rollout-stat `max_length_hit`, and `majority_s_0.5`.
 - The trigger-attention line is no longer the active GitHub blocker surface:
   - upstream PR `#10` is already merged;
   - the merged note is still useful background on prompt-dominant late-layer attention plus a mid-stack previous-loop signal;
   - it should not be used as validation for the new RFM steering stage.
-- The new note `olmo-degeneration-origin-audit-2026-04-04.md` is the collaborator-facing OLMo audit surface for that thread:
+- The new note `weeks/2026-W14/olmo-degeneration-origin-audit-2026-04-04.md` is the collaborator-facing OLMo audit surface for that thread:
   - it consolidates the repaired OLMo3 `MMLU-Pro` / `LiveCodeBench` rows plus the bounded OLMo2 `1B` ladder;
   - it is the right artifact to cite when the question is "what survived the audit?" rather than "what commands were run?"
-- The newer note `olmo2-1b-fifty-prompt-rerun-2026-04-05.md` is the larger OLMo2 follow-up:
+- The newer note `weeks/2026-W14/olmo2-1b-fifty-prompt-rerun-2026-04-05.md` is the larger OLMo2 follow-up:
   - it scales the OLMo2 ladder from `8` to `50` prompts per dataset under the same corrected contract;
   - it replaces the older `8`-prompt fallback as the right stage-conclusion surface for this ladder;
   - it keeps the main base-versus-later split, but it also shows the later-stage story is not uniformly clean or monotone;
   - it is now the right artifact to cite when the question is "what survived once the slice stopped being a pilot?"
 - The OLMo2 rerun now has the explicit visualization surface Wangzhi asked for:
-  - the line-chart progression figures plus the within-stage Sankey/alluvial view live in `../outputs/olmo2_1b_progression_bound50_20260406/`
+  - the line-chart progression figures plus the within-stage Sankey/alluvial view live in `outputs/weeks/2026-W15/olmo2_1b_progression_bound50_20260406/`
   - those figures are generated from the saved stage JSONs, not copied by hand from Slack tables.
 - The Qwen same-family control is now a finished five-dataset object rather than one durable row plus liveness receipts:
-  - the reference object is still `../outputs/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/`
+  - the reference object is still `outputs/undated/qwen3_1p7b_rollout_stats_v2_temp0p2_gen10/`
   - the base checkpoint still has to run at `32768`, not `40960`, because `Qwen/Qwen3-1.7B-Base` advertises the shorter limit and vLLM rejects the instruct horizon without an unsafe override
   - the old Qwen v2 `LiveCodeBench` row used raw strings from LiveCodeBench's `format_prompt_generation` under `CodeQwenInstruct`; the base control uses `GenericBase`, so that row is same dataset / sampler rather than a literal same-LM-style replay
   - the tiny base `LiveCodeBench` style probe still says that wrapper caveat is real but not sufficient to explain the weak base `LiveCodeBench` behavior by itself: both `GenericBase` and `CodeQwenInstruct` looped to the cap on the same `2` prompts with `pass@1 = 0`
-  - the finished base rows are now all on disk and summarized in `olmo-qwen-degeneration-origin-combined-2026-04-09.md`
+  - the finished base rows are now all on disk and summarized in `weeks/2026-W15/olmo-qwen-degeneration-origin-combined-2026-04-09.md`
   - the durable claim comes from the finished base rows themselves, which are heavily degenerate on all five datasets; the saved instruct-side v2 rows are now presented only as rough reference context because prompt pools and rollout counts differ
 - The locked pair now has both the execution note and the finished first-run result note on disk.
 - The older `h256 d2` binary retrain note is still on disk, but it is now intermediate only:
@@ -205,17 +195,17 @@ Current live status:
   - it bundles natural regression, balanced binary, the cheap prompt-stat audit, and Athena's codebase-level reasoning in one place;
   - it makes the baseline caveat explicit: the old "metadata baseline" is only prompt length on this fixed-budget surface;
   - it points to the next honest follow-up as a stronger prompt-shape baseline and residualized evaluation rather than another same-object rerun.
-- The newer note `prompt-profile-metadata-mechanism-2026-04-06.md` is now the right citation when the question is specifically "why are the metadata predictors strong?":
+- The newer note `weeks/2026-W15/prompt-profile-metadata-mechanism-2026-04-06.md` is now the right citation when the question is specifically "why are the metadata predictors strong?":
   - it makes the target geometry explicit: `mean_relative_length` is normalized completion length and `majority_s_0.5` is largely a thresholded version of that same object;
   - it separates genuine prompt-family structure from tiny-prevalence artifacts, especially the fragile `MMLU-Pro` newline-count row;
   - it narrows the next decisive follow-up to a residualized conditional-lift audit on the natural regression head, not another binary-only mechanism read.
 - The corrected balanced-regression note is now side-analysis provenance only:
   - it still explains the earlier count drop and the balanced-sampler detour
   - it should not be cited as the default regression training object anymore
-- The run surface is now executable rather than purely documentary: `scripts/run_prompt_profile_full_train.py` is the canonical launcher, and `scripts/summarize_prompt_profile_full_train.py` is the canonical post-run ledger for the locked pair plus metadata controls.
+- The run surface is now executable rather than purely documentary: `scripts/train/run_prompt_profile_full_train.py` is the canonical launcher, and `scripts/report_generation/summarize_prompt_profile_full_train.py` is the canonical post-run ledger for the locked pair plus metadata controls.
 - The first locked full-train pass is now complete. The repo-facing result is split cleanly:
   - regression `mean_relative_length`: ensemble beats `last_layer`, but the train-fit prompt-length baseline still wins on `AIME`, `MATH-500`, and `MMLU-Pro`;
   - binary `majority_s_0.5`: ensemble `PR-AUC` beats the prompt-length baseline on all five datasets, with the clearest finished wins on `AIME`, `LiveCodeBench`, and `MMLU-Pro`.
-- The reset note `thread-reset-2026-03-25.md` is now the correct restart surface for Slack follow-up. It captures the collaborator's recent corrections, the proved-vs-unproved ledger, and the exact next work order.
+- The reset note `weeks/2026-W13/thread-reset-2026-03-25.md` is now the correct restart surface for Slack follow-up. It captures the collaborator's recent corrections, the proved-vs-unproved ledger, and the exact next work order.
 - `roadmap.md` is the chronological experiment log; `backlog.md` now carries the post-run interpretation object under the corrected selection rule.
 - `LiveCodeBench` is no longer pending, but its recovered projection artifact still lacks prompt-level accuracy.

@@ -8,12 +8,12 @@ import json
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from loop_probe.prompt_profile_rfm_stage_registry import stage_registry_payload
+from steer.prompt_profile_rfm_stage_registry import stage_registry_payload
 
 
 def parse_args() -> argparse.Namespace:

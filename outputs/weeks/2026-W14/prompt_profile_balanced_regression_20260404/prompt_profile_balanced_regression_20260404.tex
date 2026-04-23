@@ -1,0 +1,182 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{hyperref}
+
+\title{Balanced Prompt-Profile Regression Rerun}
+\author{}
+\date{2026-04-04 UTC}
+
+\begin{document}
+\maketitle
+
+\section{Object}
+
+This note covers the missing balanced-only regression object for the prompt-profile line:
+\texttt{mean\_relative\_length} rerun on the exact prompt IDs from the saved balanced
+\texttt{majority\_s\_0.5} binary split.
+
+\begin{itemize}
+\item Train split: balanced on the binary \texttt{majority\_s\_0.5} label.
+\item Test split: natural.
+\item Important nuance: the regression target itself is not ``balanced.'' The balancing applies only to which prompt IDs are included, because the rerun reuses the binary split and relabels those same prompts with \texttt{mean\_relative\_length}.
+\item Prompt surface: same locked April prompt-profile setup (\texttt{Qwen/Qwen3-1.7B}, prompt-prefill stacked all-layer last-token activations, \texttt{temperature=0.2}, \texttt{num\_generations=4}, \texttt{max\_tokens=30000}).
+\item Probe family: default \texttt{mlp} preset, so hidden width \texttt{128}, depth \texttt{1}, dropout \texttt{0.1}, seeds \texttt{0,1,2}.
+\item Views: \texttt{ensemble} = one MLP per layer with \texttt{mean\_prob} aggregation; \texttt{last\_layer} = one MLP on the final-layer slice.
+\item Frozen checkpoint rule: \texttt{best\_loss}.
+\item Primary regression read: \texttt{top\_20p\_capture}. Secondary calibration read: \texttt{RMSE}. \texttt{Spearman} stays diagnostic only.
+\end{itemize}
+
+Metadata baseline in this note means a train-fit linear regressor on prompt-only features.
+Because \texttt{effective\_max\_tokens} is fixed at \texttt{30000}, prompt length is the only
+nontrivial metadata baseline.
+
+\section{Subset Sizes}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lrrrr}
+\toprule
+Dataset & Train prompts & Train positives & Test prompts & Test positives \\
+\midrule
+GPQA & 18 & 9 & 40 & 2 \\
+AIME & 48 & 24 & 12 & 7 \\
+MATH-500 & 44 & 22 & 100 & 4 \\
+MMLU-Pro & 14 & 7 & 160 & 2 \\
+LiveCodeBench & 350 & 175 & 160 & 54 \\
+\bottomrule
+\end{tabular}
+\caption{Prompt counts inherited from the saved balanced \texttt{majority\_s\_0.5} binary split.}
+\end{table}
+
+The small train sets on GPQA and especially MMLU-Pro still matter for interpretation.
+
+\section{Metric Definitions}
+
+\begin{itemize}
+\item \texttt{top\_10p\_capture} / \texttt{top\_20p\_capture}: sort held-out prompts by predicted \texttt{mean\_relative\_length}, keep the top 10\% or 20\%, and divide the sum of actual \texttt{mean\_relative\_length} on those prompts by the total held-out actual \texttt{mean\_relative\_length} mass.
+\item \texttt{RMSE}: pointwise error on aligned held-out prompts.
+\item \texttt{Spearman}: monotone-order diagnostic on aligned held-out prompts. It is not the headline metric.
+\end{itemize}
+
+\section{Main Read}
+
+\begin{itemize}
+\item Screening (\texttt{top\_20p\_capture}): ensemble is the best single global regression surface on this balanced rerun. Cross-dataset mean \texttt{top\_20p\_capture} is \texttt{0.344} for ensemble, \texttt{0.262} for prompt length, and \texttt{0.257} for last-layer.
+\item On \texttt{top\_20p\_capture}, ensemble beats last-layer on \texttt{4 / 5} and beats prompt length on \texttt{4 / 5}. The only non-win against prompt length is AIME.
+\item Calibration (\texttt{RMSE}): the picture is different. Cross-dataset mean \texttt{RMSE} is \texttt{0.191} for last-layer, \texttt{0.205} for ensemble, and \texttt{0.265} for prompt length.
+\item Diagnostic ordering (\texttt{Spearman}): ensemble stays much stronger than last-layer on every dataset and beats prompt length on \texttt{4 / 5}.
+\end{itemize}
+
+So the balanced rerun sharpens the same split that was already emerging earlier:
+if the regression lane is used as a screening score, keep the ensemble.
+If the regression lane is used as calibrated point prediction, last-layer is still
+competitive and sometimes better.
+
+\section{Results}
+
+\subsection*{\texttt{top\_10p\_capture} at \texttt{best\_loss}}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+Dataset & Prompt length & Last-layer & Ensemble \\
+\midrule
+GPQA & 0.081 & 0.109 & 0.143 \\
+AIME & 0.223 & 0.221 & 0.204 \\
+MATH-500 & 0.151 & 0.128 & 0.191 \\
+MMLU-Pro & 0.169 & 0.084 & 0.284 \\
+LiveCodeBench & 0.137 & 0.156 & 0.169 \\
+\bottomrule
+\end{tabular}
+\caption{Held-out \texttt{top\_10p\_capture}. Cross-dataset means: ensemble \texttt{0.198}, prompt length \texttt{0.152}, last-layer \texttt{0.140}.}
+\end{table}
+
+\subsection*{\texttt{top\_20p\_capture} at \texttt{best\_loss}}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+Dataset & Prompt length & Last-layer & Ensemble \\
+\midrule
+GPQA & 0.177 & 0.220 $\pm$ 0.047 & 0.296 $\pm$ 0.033 \\
+AIME & 0.306 & 0.321 $\pm$ 0.020 & 0.305 $\pm$ 0.017 \\
+MATH-500 & 0.290 & 0.234 $\pm$ 0.097 & 0.346 $\pm$ 0.016 \\
+MMLU-Pro & 0.292 & 0.200 $\pm$ 0.051 & 0.436 $\pm$ 0.016 \\
+LiveCodeBench & 0.248 & 0.308 $\pm$ 0.008 & 0.336 $\pm$ 0.007 \\
+\bottomrule
+\end{tabular}
+\caption{Held-out \texttt{top\_20p\_capture}. This is the main screening metric for the regression lane.}
+\end{table}
+
+\subsection*{\texttt{RMSE} at \texttt{best\_loss}}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+Dataset & Prompt length & Last-layer & Ensemble \\
+\midrule
+GPQA & 0.244 & 0.170 $\pm$ 0.005 & 0.188 $\pm$ 0.009 \\
+AIME & 0.176 & 0.189 $\pm$ 0.004 & 0.183 $\pm$ 0.006 \\
+MATH-500 & 0.253 & 0.182 $\pm$ 0.017 & 0.227 $\pm$ 0.025 \\
+MMLU-Pro & 0.359 & 0.168 $\pm$ 0.010 & 0.191 $\pm$ 0.013 \\
+LiveCodeBench & 0.291 & 0.246 $\pm$ 0.005 & 0.236 $\pm$ 0.009 \\
+\bottomrule
+\end{tabular}
+\caption{Held-out \texttt{RMSE}. Calibration remains a more mixed story than capture.}
+\end{table}
+
+\subsection*{\texttt{Spearman} at \texttt{best\_loss}}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+Dataset & Prompt length & Last-layer & Ensemble \\
+\midrule
+GPQA & -0.116 & 0.127 $\pm$ 0.109 & 0.541 $\pm$ 0.088 \\
+AIME & 0.676 & 0.483 $\pm$ 0.138 & 0.639 $\pm$ 0.090 \\
+MATH-500 & 0.461 & 0.258 $\pm$ 0.403 & 0.744 $\pm$ 0.011 \\
+MMLU-Pro & 0.392 & 0.116 $\pm$ 0.159 & 0.580 $\pm$ 0.053 \\
+LiveCodeBench & 0.405 & 0.778 $\pm$ 0.005 & 0.806 $\pm$ 0.007 \\
+\bottomrule
+\end{tabular}
+\caption{Held-out \texttt{Spearman}. This stays diagnostic only.}
+\end{table}
+
+\section{Interpretation}
+
+\begin{itemize}
+\item GPQA: the balanced rerun still strongly favors ensemble for screening, but last-layer has lower RMSE.
+\item AIME: this remains the awkward dataset. Screening is effectively a tie between prompt length and last-layer, and prompt length still has the best RMSE.
+\item MATH-500: ensemble clearly wins on capture, while last-layer clearly wins on RMSE.
+\item MMLU-Pro: ensemble is the strongest screening surface by a wide margin, while last-layer still has lower RMSE.
+\item LiveCodeBench: ensemble wins on both screening and RMSE, but last-layer is much closer than on GPQA or MMLU-Pro.
+\end{itemize}
+
+\section{Recommendation}
+
+\begin{itemize}
+\item If \texttt{mean\_relative\_length} stays in the project as a screening score for catching degenerate or long rollouts, use the ensemble view and report \texttt{top\_20p\_capture} first.
+\item If the regression lane is intended as calibrated point prediction, the honest story is mixed, and last-layer remains strong enough that it should not be dismissed from this balanced rerun.
+\item AIME is still the dataset preventing a clean global ``ensemble beats prompt length everywhere'' claim on the balanced regression object.
+\end{itemize}
+
+\section{Artifacts}
+
+\begin{itemize}
+\item Copied summary ledger: \texttt{outputs/prompt\_profile\_balanced\_regression\_20260404/remote\_summary/}
+\item Markdown note: \texttt{docs/weeks/2026-W14/prompt-profile-balanced-regression-2026-04-04.md}
+\end{itemize}
+
+\end{document}

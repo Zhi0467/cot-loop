@@ -9,8 +9,8 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-COMMON_PATH = os.path.join(ROOT, "src", "loop_probe", "adapters", "_common.py")
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+COMMON_PATH = os.path.join(ROOT, "src", "probe", "adapters", "_common.py")
 
 
 def _parse_args() -> argparse.Namespace:
@@ -22,7 +22,7 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _load_common_module():
-    spec = importlib.util.spec_from_file_location("loop_probe_mc_common", COMMON_PATH)
+    spec = importlib.util.spec_from_file_location("probe_mc_common", COMMON_PATH)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"Failed to load parser helpers from {COMMON_PATH}.")
     module = importlib.util.module_from_spec(spec)

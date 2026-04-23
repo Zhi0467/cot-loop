@@ -10,8 +10,8 @@ SRC = os.path.join(ROOT, "src")
 if SRC not in sys.path:
     sys.path.insert(0, SRC)
 
-from loop_probe.labeling import has_ngram_loop
-from loop_probe.prompt_format import format_user_prompt
+from probe.labeling import has_ngram_loop
+from probe.prompt_format import format_user_prompt
 
 _MATH_VERIFY_CONFIGS: Optional[Tuple[List[Any], List[Any]]] = None
 

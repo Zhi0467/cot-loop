@@ -15,14 +15,17 @@ from dataclasses import asdict
 
 import torch
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SRC = os.path.join(ROOT, "src")
 if SRC not in sys.path:
     sys.path.insert(0, SRC)
+SCRIPTS_DIR = os.path.join(ROOT, "scripts")
+if SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, SCRIPTS_DIR)
 
-from loop_probe.configs import get_rollout_config, preset_choices
-from loop_probe.hf_data import load_prompt_records, specs_equal, split_records
-from loop_probe.labeling import (
+from probe.configs import get_rollout_config, preset_choices
+from probe.hf_data import load_prompt_records, specs_equal, split_records
+from probe.labeling import (
     LABEL_TARGET_CHOICES,
     PROMPT_PROFILE_TARGET_CHOICES,
     aggregate_prompt_profile,
@@ -31,19 +34,19 @@ from loop_probe.labeling import (
     profile_target_name,
     profile_target_value,
 )
-from loop_probe.adapters import (
+from probe.adapters import (
     livecodebench_codegen,
     multiple_choice_gpqa,
     multiple_choice_mmlupro,
 )
-from loop_probe.prefill import (
+from probe.prefill import (
     FEATURE_POOLING_CHOICES,
     extract_prefill_features_multi,
     load_prefill_model_and_tokenizer,
 )
-from loop_probe.rollout import generate_grouped_rollouts, generate_rollout_token_ids
-from loop_probe.serialization import save_split_shards, write_manifest
-from loop_probe.types import DatasetSpec, SampleRecord
+from probe.rollout import generate_grouped_rollouts, generate_rollout_token_ids
+from probe.serialization import save_split_shards, write_manifest
+from probe.types import DatasetSpec, SampleRecord
 from utils import build_prompt
 
 DEFAULT_TEST_DATASET = "data/aime_2024_2025.jsonl"
@@ -2109,13 +2112,13 @@ def main() -> None:
         ),
         "prompt_template": {
             "source": (
-            "loop_probe.adapters.multiple_choice_gpqa.build_mcq_prompt"
+            "probe.adapters.multiple_choice_gpqa.build_mcq_prompt"
             if args.task_kind == "multiple_choice_gpqa"
             else (
-                "loop_probe.adapters.multiple_choice_mmlupro.build_mcq_prompt"
+                "probe.adapters.multiple_choice_mmlupro.build_mcq_prompt"
                 if args.task_kind == "multiple_choice_mmlupro"
                 else (
-                    "loop_probe.adapters.livecodebench_codegen.build_prompts"
+                    "probe.adapters.livecodebench_codegen.build_prompts"
                     if args.task_kind == "livecodebench_codegen"
                     else "utils.build_prompt"
                 )

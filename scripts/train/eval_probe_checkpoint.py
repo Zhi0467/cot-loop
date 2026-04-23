@@ -11,25 +11,25 @@ from typing import Any
 
 import torch
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SRC = os.path.join(ROOT, "src")
 if SRC not in sys.path:
     sys.path.insert(0, SRC)
 
-from loop_probe.configs import ProbeConfig, build_probe_model, get_probe_config, probe_preset_choices
-from loop_probe.dataloader import (
+from probe.configs import ProbeConfig, build_probe_model, get_probe_config, probe_preset_choices
+from probe.dataloader import (
     make_dataloader,
     read_manifest,
     resolve_input_dim,
     resolve_sample_shape,
     resolve_split_info,
 )
-from loop_probe.train_utils import (
+from probe.train_utils import (
     choose_device,
     evaluate_probe_outputs,
     resolve_classifier_layer,
 )
-from loop_probe.stage_artifacts import stable_json_sha256
+from steer.stage_artifacts import stable_json_sha256
 
 
 def _parse_args() -> argparse.Namespace:

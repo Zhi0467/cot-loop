@@ -12,14 +12,14 @@ import sys
 
 import torch
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SRC = os.path.join(ROOT, "src")
 if SRC not in sys.path:
     sys.path.insert(0, SRC)
 
-from loop_probe.dataloader import ActivationDataset, read_manifest, resolve_feature_key
-from loop_probe.labeling import cap_hit_from_finish_reason
-from loop_probe.serialization import save_split_shards, write_manifest
+from probe.dataloader import ActivationDataset, read_manifest, resolve_feature_key
+from probe.labeling import cap_hit_from_finish_reason
+from probe.serialization import save_split_shards, write_manifest
 
 TARGET_KIND_CHOICES = ("binary", "probability", "regression")
 BALANCE_CHOICES = ("none", "downsample")

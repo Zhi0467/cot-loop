@@ -38,6 +38,6 @@ Notes:
 
 ## Custom Local JSONL Datasets
 
-For non-default JSONL files, include the prompt field referenced by `--prompt-field` in `scripts/build_probe_dataset.py`.
+For non-default JSONL files, include the prompt field referenced by `--prompt-field` in `scripts/data/build_probe_dataset.py`.
 
 To keep backward compatibility with existing command defaults, local datasets that do not use `question` should be paired with an explicit `--prompt-field` and `--test-dataset` when used with defaults.

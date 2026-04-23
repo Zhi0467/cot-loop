@@ -4,15 +4,15 @@
 Examples (sbatch)
   # QwQ-32B (TP=8, 8 GPUs)
   sbatch --export=ALL,MODEL_ID=Qwen/QwQ-32B,TP=8,DP=1,NUM_REPETITION=1,METRICS_OUT=outputs/qwq32b_metrics.rep1.csv \
-    slurm/run_vllm_generate.sbatch
+    slurm/rollout/run_vllm_generate.sbatch
 
   # OpenThinker3-7B (DP=8, 8 GPUs)
-  sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-7B,TP=1,DP=8,NUM_REPETITION=1,METRICS_OUT=outputs/openthinker3_7b_metrics.rep1.csv \
-    slurm/run_vllm_generate.sbatch
+  sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-7B,TP=1,DP=8,NUM_REPETITION=1,METRICS_OUT=outputs/undated/openthinker3_7b_metrics.rep1.csv \
+    slurm/rollout/run_vllm_generate.sbatch
 
   # OpenThinker3-1.5B (DP=8, 8 GPUs)
-  sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-1.5B,TP=1,DP=8,NUM_REPETITION=1,METRICS_OUT=outputs/openthinker3_1p5b_metrics.rep1.csv \
-    slurm/run_vllm_generate.sbatch
+  sbatch --export=ALL,MODEL_ID=open-thoughts/OpenThinker3-1.5B,TP=1,DP=8,NUM_REPETITION=1,METRICS_OUT=outputs/undated/openthinker3_1p5b_metrics.rep1.csv \
+    slurm/rollout/run_vllm_generate.sbatch
 """
 
 import argparse
@@ -25,15 +25,18 @@ import time
 from collections import defaultdict
 from typing import Dict, Tuple
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SRC = os.path.join(ROOT, "src")
 if SRC not in sys.path:
     sys.path.insert(0, SRC)
+SCRIPTS_DIR = os.path.join(ROOT, "scripts")
+if SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, SCRIPTS_DIR)
 
 from transformers import AutoTokenizer
 from vllm import LLM, SamplingParams
 
-from loop_probe.rollout import resolve_sampling_defaults
+from probe.rollout import resolve_sampling_defaults
 from utils import (
     _math_verify,
     add_repetition_suffix,

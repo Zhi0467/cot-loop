@@ -22,14 +22,14 @@ from torch.nn import functional as F
 from torch.utils.data import DataLoader, Dataset
 from transformers import AutoTokenizer
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SRC = os.path.join(ROOT, "src")
 if SRC not in sys.path:
     sys.path.insert(0, SRC)
 
-from loop_probe.configs import build_probe_model, get_probe_config, probe_preset_choices
-from loop_probe.dataloader import ActivationDataset, read_manifest, resolve_feature_key
-from loop_probe.train_utils import (
+from probe.configs import build_probe_model, get_probe_config, probe_preset_choices
+from probe.dataloader import ActivationDataset, read_manifest, resolve_feature_key
+from probe.train_utils import (
     choose_device,
     evaluate_probe_outputs,
     probe_scores_and_predictions,

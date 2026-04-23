@@ -34,7 +34,7 @@ echo "WANDB_API_KEY=your_key_here" > .env
 Extract per-prompt prefill activations, run rollouts with vLLM, and label each rollout with the loop detector:
 
 ```bash
-python scripts/build_probe_dataset.py \
+python scripts/data/build_probe_dataset.py \
   --train-dataset HuggingFaceH4/MATH-500 \
   --train-split test \
   --prompt-field problem \
@@ -44,12 +44,12 @@ python scripts/build_probe_dataset.py \
 
 If `--test-dataset` is omitted, the test split defaults to the local `data/aime_2024_2025.jsonl` file (which expects `question` / `answer` fields). For a deterministic random split from a single dataset, pass identical train/test specs plus `--split-ratio`.
 
-The default feature view is `last_token_all_layers_stack_final`: for each prompt, the last-prompt-token residual vector from every transformer block, stacked into `[num_layers, hidden]`. Other views (concat, mean, tail-64 strided, window deltas) are defined in `src/loop_probe/prefill.py`.
+The default feature view is `last_token_all_layers_stack_final`: for each prompt, the last-prompt-token residual vector from every transformer block, stacked into `[num_layers, hidden]`. Other views (concat, mean, tail-64 strided, window deltas) are defined in `src/probe/prefill.py`.
 
 For prompt-level aggregate targets over repeated rollouts (`p_loop`, `p_cap`, `mean_relative_length`, or binary `majority_s_0.5`), build with:
 
 ```bash
-python scripts/build_probe_dataset.py \
+python scripts/data/build_probe_dataset.py \
   --train-dataset <dataset-or-jsonl> --train-split <split> --prompt-field <field> \
   --model-preset openthinker3_1p5b \
   --target-kind probability --profile-target p_loop --num-generations 10 \
@@ -59,7 +59,7 @@ python scripts/build_probe_dataset.py \
 ### 2. Train a probe
 
 ```bash
-python scripts/train_probe.py \
+python scripts/train/train_probe.py \
   --data-dir outputs/probe_data/my_run \
   --out-dir outputs/probe_runs/run1 \
   --probe-preset mlp \
@@ -74,7 +74,7 @@ Class imbalance is handled automatically via a `pos_weight` term in BCE-with-log
 ### 3. Evaluate a saved checkpoint on another split or dataset
 
 ```bash
-python scripts/eval_probe_checkpoint.py \
+python scripts/train/eval_probe_checkpoint.py \
   --checkpoint outputs/probe_runs/run1/best.pt \
   --data-dir outputs/probe_data/other_eval \
   --split test
@@ -83,7 +83,7 @@ python scripts/eval_probe_checkpoint.py \
 ### 4. Run the end-to-end probe pipeline on SLURM
 
 ```bash
-sbatch slurm/run_probe_train_e2e.sbatch
+sbatch slurm/train/run_probe_train_e2e.sbatch
 ```
 
 Override the defaults with environment variables: `MODEL_PRESET`, `TRAIN_DATASET`, `TRAIN_SPLIT`, `PROMPT_FIELD`, `PROBE_PRESET`, `MAX_NUM_SEQS`, `COMPLETION_BATCH_SIZE`, etc. See `slurm/README.md` for the full set.
@@ -93,30 +93,30 @@ Override the defaults with environment variables: `MODEL_PRESET`, `TRAIN_DATASET
 To (re)collect the paired `thinking on` / `thinking off` rollout-stats bundle on the canonical four-dataset `Qwen/Qwen3-1.7B` surface:
 
 ```bash
-python scripts/launch_main_rollout_stats_suite.py \
+python scripts/rollout/launch_main_rollout_stats_suite.py \
   --output-root outputs/model_stats/main_rollout_stats_rebuild \
   --thinking-modes on,off --submit
 ```
 
-The suite definition (model, sampling config, per-dataset contracts) lives in `src/loop_probe/main_rollout_stats_suite.py`. Per-prompt archives preserve prompt text, prompt token ids, rollout completion text, completion token ids, and raw row metadata so the same rollouts can drive later prompt-profile relabeling, probe training, and mechanism analysis.
+The suite definition (model, sampling config, per-dataset contracts) lives in `src/probe/main_rollout_stats_suite.py`. Per-prompt archives preserve prompt text, prompt token ids, rollout completion text, completion token ids, and raw row metadata so the same rollouts can drive later prompt-profile relabeling, probe training, and mechanism analysis.
 
 For standalone single-model rollout generation and loop-metric summaries on one dataset:
 
 ```bash
-python scripts/run_vllm_generate.py \
+python scripts/rollout/run_vllm_generate.py \
   --model-id Qwen/QwQ-32B \
   --data data/aime_2024_2025.jsonl \
   --metrics-out outputs/qwq32b_metrics.csv \
   --tp 8
 
-python scripts/compute_metrics.py \
+python scripts/rollout/compute_metrics.py \
   --generations path/to.jsonl \
   --out outputs/metrics.csv
 ```
 
 ## Model presets
 
-Presets live in `src/loop_probe/configs.py` and can be overridden on the CLI (`--temperature`, `--max-tokens`, `--tp`, `--dp`, `--max-num-seqs`, …) or skipped entirely with `--model-id`.
+Presets live in `src/probe/configs.py` and can be overridden on the CLI (`--temperature`, `--max-tokens`, `--tp`, `--dp`, `--max-num-seqs`, …) or skipped entirely with `--model-id`.
 
 | Preset | Model | TP | DP | Temperature | Max tokens |
 |---|---|---|---|---|---|
@@ -133,7 +133,7 @@ The rollout-stats suite pins its own contract (`Qwen/Qwen3-1.7B`, `temperature=0
 - **Cap hit (prompt-profile)**: the generation reaches `effective_max_tokens` on the generation side only.
 - **Prompt-level aggregates**: `p_loop`, `p_cap`, `mean_relative_length`, and the binary `majority_s_0.5` threshold on per-rollout relative length, each computed from repeated rollouts over the same prompt.
 
-These are defined precisely in `docs/understand-where-loop-and-max-length-come-from.md`.
+These are defined precisely in `docs/weeks/2026-W14/understand-where-loop-and-max-length-come-from.md`.
 
 ## Outputs
 
@@ -158,36 +158,43 @@ Multi-seed SLURM summaries:
 
 Rollout-stats suite:
 
-- one collector JSON per `(dataset, thinking_mode)` run plus a `suite_manifest.json` under the chosen `--output-root`
-- paired archive sidecars (`__prompt_profile.jsonl`, `__prompt_rollout_archive.jsonl`) for downstream relabeling
+- one `rollout_bundle.v1` pair per `(dataset, thinking_mode)` run under the chosen `--output-root`:
+  - `<base>.jsonl.gz` carries every prompt's full replay (prompt text + token ids, per-rollout completion text + token ids + flags + grading)
+  - `<base>.json` is the small sidecar with run metadata, aggregate counts / metrics, and `lcb_native_metrics` when applicable
+- plus a `suite_manifest.json` next to the bundles. See [`docs/reference/rollout-bundle-v1-schema.md`](docs/reference/rollout-bundle-v1-schema.md) for the canonical row shape.
 
 ## Repository structure
 
 ```
 cot-loop/
-├── src/loop_probe/               # Core library (no CLI)
-│   ├── configs.py                # Model presets
-│   ├── hf_data.py                # Dataset loading
-│   ├── prompt_builder.py         # Single source of truth for chat prompts
-│   ├── prefill.py                # Prefill activation extraction + feature views
-│   ├── rollout.py                # vLLM trajectory generation
-│   ├── labeling.py               # Loop / cap-hit detection and prompt-level aggregation
-│   ├── serialization.py          # Shard and manifest I/O
-│   ├── dataloader.py             # PyTorch dataset / dataloader
-│   ├── probes/                   # Probe architectures (linear, MLP, layerwise ensemble)
-│   ├── train_utils.py            # Training utilities
-│   ├── collector.py              # Repaired v2 rollout-statistics collector
-│   ├── main_rollout_stats_suite.py  # Canonical paired thinking on/off four-dataset suite
-│   └── adapters/                 # Per-benchmark rollout adapters (MATH, GPQA, MMLU-Pro, LiveCodeBench, TACO)
-├── scripts/                      # CLI entry points
-│   ├── build_probe_dataset.py
-│   ├── train_probe.py
-│   ├── eval_probe_checkpoint.py
-│   ├── launch_main_rollout_stats_suite.py
-│   ├── run_vllm_generate.py
-│   ├── compute_metrics.py
-│   └── ...                       # analysis, plotting, aggregation utilities
-├── slurm/                        # SLURM batch scripts
+├── src/
+│   ├── probe/                    # Probe, rollout, data, and training library code
+│   │   ├── configs.py            # Model/probe presets
+│   │   ├── hf_data.py            # Dataset loading
+│   │   ├── prompt_builder.py     # Single source of truth for chat prompts
+│   │   ├── prefill.py            # Prefill activation extraction + feature views
+│   │   ├── rollout.py            # vLLM trajectory generation
+│   │   ├── labeling.py           # Loop / cap-hit detection and prompt aggregation
+│   │   ├── bundle_io.py          # rollout_bundle.v1 read/write helpers
+│   │   ├── collector.py          # Repaired v2 rollout-statistics collector
+│   │   ├── main_rollout_stats_suite.py
+│   │   ├── adapters/             # Benchmark adapters
+│   │   └── probes/               # Probe architectures
+│   └── steer/                    # Steering-stage registry and artifact helpers
+├── scripts/                      # CLI entry points (grouped by pipeline stage)
+│   ├── utils.py                  # shared helpers (build_prompt, has_ngram_loop, ...)
+│   ├── data/                     # dataset assembly, prompt-profile materialization, relabel
+│   ├── rollout/                  # vLLM generation, rollout-stats collection, metrics
+│   ├── train/                    # probe / RFM training, eval, multi-seed aggregation
+│   ├── report_generation/        # cross-dataset / per-model / prompt-profile reports
+│   ├── mechanism_analysis/       # analyze_*, audit_*, projections, attention analysis
+│   ├── steer/                    # concept-vector steering + RFM stage registry
+│   └── plot/                     # plot_* and render_* figures
+├── slurm/                        # SLURM batch scripts grouped by pipeline stage
+│   ├── rollout/
+│   ├── train/
+│   ├── mechanism_analysis/
+│   └── steer/
 ├── data/                         # Local datasets (see data/README.md for the JSONL schema)
 ├── docs/                         # Design notes and reports
 └── outputs/                      # Generated artifacts
@@ -203,8 +210,8 @@ cot-loop/
 
 ## Further reading
 
-- `docs/understand-where-loop-and-max-length-come-from.md` — precise definitions of the loop, cap, and max-length events.
-- `docs/main-four-dataset-rollout-rebuild-2026-04-23.md` — the current canonical rollout-stats rebuild contract.
-- `docs/prompt-profile-eval-contract.md` — locked evaluation contract for the prompt-profile probe targets.
-- `docs/prompt-profile-unified-report-2026-04-09.md` — unified prompt-profile report across regression, binary, and mechanism surfaces.
-- `src/loop_probe/README.md` — module-level documentation for the probe library.
+- `docs/weeks/2026-W14/understand-where-loop-and-max-length-come-from.md` — precise definitions of the loop, cap, and max-length events.
+- `docs/weeks/2026-W17/main-four-dataset-rollout-rebuild-2026-04-23.md` — the current canonical rollout-stats rebuild contract.
+- `docs/weeks/2026-W13/prompt-profile-eval-contract.md` — locked evaluation contract for the prompt-profile probe targets.
+- `docs/weeks/2026-W15/prompt-profile-unified-report-2026-04-09.md` — unified prompt-profile report across regression, binary, and mechanism surfaces.
+- `src/probe/README.md` — module-level documentation for the probe library.

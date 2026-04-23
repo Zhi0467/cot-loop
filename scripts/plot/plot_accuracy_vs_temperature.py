@@ -2,9 +2,9 @@
 """Plot accuracy vs. temperature using rep1/rep2/rep3 metrics in outputs/.
 
 Example:
-uv run python scripts/plot_accuracy_vs_temperature.py \
+uv run python scripts/plot/plot_accuracy_vs_temperature.py \
     --model-id open-thoughts/OpenThinker3-7B \
-    --out outputs/accuracy_vs_temperature_7b.png
+    --out outputs/undated/accuracy_vs_temperature_7b.png
 """
 
 import argparse
