@@ -4,8 +4,8 @@
 This repository builds a chain-of-thought (CoT) failure predictor from configurable activation views plus the paired rollout-statistics line that explains where degenerate rollouts come from. The active execution object is now the corrected four-dataset rollout-stat rebuild documented in `docs/main-four-dataset-rollout-rebuild-2026-04-23.md`: `LiveCodeBench`, `TACO-hard`, `MATH level-5`, and `Omni-MATH >= 7`, each collected with explicit thinking `on` / `off` surfaces and reusable prompt-rollout archives for later prompt-profile relabeling, probe training, and steering. The sizing rule is no longer the earlier `800`-prompt slice: use the full dataset when it is under `1000`, otherwise use `1000`. The older March-repair, LiveCodeBench-only rerun, and mistaken `LiveCodeBench-extra` branch are historical debugging context, not the current stage contract. Before launching work, read `roadmap.md`, `backlog.md`, `docs/main-four-dataset-rollout-rebuild-2026-04-23.md`, `docs/prompt-profile-eval-contract.md`, and `understand-where-loop-and-max-length-come-from.md`.
 
 ## Project Structure & Module Organization
-- `src/loop_probe/`: Core library for prompt loading, prefill extraction, rollout generation, loop labeling, probe architectures, and training utilities.
-- `scripts/`: CLI entry points for data/building, probe training, analysis, and plotting.
+- `src/loop_probe/`: Core library for prompt loading, prefill extraction, rollout generation, loop labeling, probe architectures, and training utilities. `main_rollout_stats_suite.py` holds the canonical four-dataset paired thinking `on` / `off` rebuild contract; `collector.py` is the repaired v2 rollout-statistics path it drives.
+- `scripts/`: CLI entry points for data/building, probe training, analysis, and plotting. `launch_main_rollout_stats_suite.py` is the active sbatch wrapper for the rebuild and propagates `CONDA_ENV` / `CONDA_DEFAULT_ENV` plus `THINKING_MODE` into submitted jobs.
 - `data/`: Local datasets and documentation. `data/README.md` defines the expected JSONL schema for non-HF local files.
 - `slurm/`: SLURM batch scripts for probe pipeline, generation, and prefill-stability experiments.
 - `outputs/`: Generated artifacts (prefill shards, checkpoints, metrics CSVs, figures).
@@ -29,9 +29,12 @@ This repository builds a chain-of-thought (CoT) failure predictor from configura
   `python scripts/train_probe.py --data-dir outputs/probe_data --out-dir outputs/probe_runs/run1 --probe-preset mlp --classifier-mode ensemble --score-rule mean_prob --wandb-project cot-loop-probe`.
 - Run probe end-to-end on SLURM:
   `sbatch slurm/run_probe_train_e2e.sbatch`.
-- Generate rollout data for labeling/analysis (optional):
+- Launch the current canonical four-dataset rollout-stats rebuild (paired thinking on/off, `Qwen/Qwen3-1.7B`):
+  `python scripts/launch_main_rollout_stats_suite.py --output-root outputs/model_stats/main_rollout_stats_rebuild --thinking-modes on,off --submit`.
+  The suite definition (model, sampling config, per-dataset contracts) lives in `src/loop_probe/main_rollout_stats_suite.py`; do not redefine sampling or the dataset list ad hoc.
+- Generate rollout data for older standalone labeling/analysis (not used by the current rebuild):
   `python scripts/run_vllm_generate.py --model-id Qwen/QwQ-32B --data data/aime_2024_2025.jsonl --metrics-out outputs/qwq32b_metrics.csv --tp 8`.
-- Run on SLURM for generation:
+- Run on SLURM for that older generation path:
   `sbatch slurm/run_vllm_generate.sbatch`.
 - Summarize loop metrics from generations:
   `python scripts/compute_metrics.py --generations path/to.jsonl --out outputs/metrics.csv`.

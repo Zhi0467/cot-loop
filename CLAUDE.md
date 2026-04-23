@@ -9,7 +9,9 @@ Research repo for predicting chain-of-thought (CoT) loop / max-length failures f
 1. **Probe line** — train classifiers/regressors on prompt-prefill activations to predict loop risk.
 2. **Rollout-statistics line** — measure how often looping / cap-hitting actually occurs across benchmark families under a common decode policy.
 
-Before making non-trivial changes, read `roadmap.md`, `backlog.md`, `docs/prompt-profile-eval-contract.md`, and `understand-where-loop-and-max-length-come-from.md`. These hold the current split/target decisions (regression on `mean_relative_length`, binary `majority_s_0.5`) and the locked prompt-profile eval contract — do not redefine metrics or splits ad hoc.
+The active execution object on the rollout-statistics line is the paired thinking `on` / `off` four-dataset rebuild described in `docs/main-four-dataset-rollout-rebuild-2026-04-23.md`: `LiveCodeBench`, `TACO-hard`, `MATH level-5`, and `Omni-MATH >= 7`, each collected twice under a shared `Qwen/Qwen3-1.7B` contract with reusable prompt-rollout archives. The sizing rule is full dataset when it is under `1000`, otherwise `1000`. Earlier March repairs, the `LiveCodeBench`-only reruns, and the mistaken `LiveCodeBench-extra` lane are historical debugging context — do not treat them as the current stage contract.
+
+Before making non-trivial changes, read `roadmap.md`, `backlog.md`, `docs/main-four-dataset-rollout-rebuild-2026-04-23.md`, `docs/prompt-profile-eval-contract.md`, and `understand-where-loop-and-max-length-come-from.md`. These hold the current suite contract, the current split/target decisions (regression on `mean_relative_length`, binary `majority_s_0.5`), and the locked prompt-profile eval contract — do not redefine metrics, splits, or the rebuild dataset list ad hoc.
 
 ## Environment
 
@@ -50,7 +52,15 @@ sbatch slurm/run_probe_train_e2e.sbatch
 ```
 Override knobs via env vars (`MODEL_PRESET`, `TRAIN_DATASET`, `TRAIN_SPLIT`, `PROMPT_FIELD`, `PROBE_PRESET`, `MAX_NUM_SEQS`, `COMPLETION_BATCH_SIZE`, …). See `slurm/README.md` for the full set.
 
-Rollout generation and loop-metric summary (standalone, not used by the probe path):
+Paired four-dataset rollout-stats rebuild (current canonical surface):
+```
+python scripts/launch_main_rollout_stats_suite.py \
+  --output-root outputs/model_stats/main_rollout_stats_rebuild \
+  --thinking-modes on,off --submit
+```
+The suite definition lives in `src/loop_probe/main_rollout_stats_suite.py` (shared `Qwen/Qwen3-1.7B` contract, `temperature=0.2`, `num_generations=10`, `max_tokens=81920`, `max_model_len=40960`, `max_num_seqs=10`, `max_num_batched_tokens=4096`). The launcher forwards `CONDA_ENV` / `CONDA_DEFAULT_ENV` into every submitted job and passes `THINKING_MODE` through explicitly — do not re-reintroduce ad-hoc thinking flags. `LiveCodeBench-extra` is intentionally removed; it is a strict subset of the `release_v6` `LiveCodeBench` run.
+
+Rollout generation and loop-metric summary (standalone, not used by the current rebuild or the probe path):
 ```
 python scripts/run_vllm_generate.py --model-id Qwen/QwQ-32B --data data/aime_2024_2025.jsonl --metrics-out outputs/qwq32b_metrics.csv --tp 8
 python scripts/compute_metrics.py --generations path/to.jsonl --out outputs/metrics.csv
@@ -85,9 +95,11 @@ The current headline probe surface is **ensemble, `h256 d1`, on the balanced-bin
 
 `src/loop_probe/adapters/` holds per-benchmark rollout adapters (MATH free-form, GPQA MC, MMLU-Pro MC, LiveCodeBench codegen). When adding a dataset family, add an adapter here rather than branching inside the collector — the rollout-statistics reports rely on consistent adapter output.
 
-### Collector
+### Collector and rollout-stats suite
 
 `collector.py` is the repaired v2 rollout-statistics path. Cross-dataset reports (`scripts/build_cross_dataset_rollout_report.py`, `scripts/build_model_rollout_report.py`) consume its output. If you touch the rollout schema, both the collector contract and those report builders need to stay in sync.
+
+`src/loop_probe/main_rollout_stats_suite.py` is the canonical four-dataset suite scaffold that the current rebuild uses (paired thinking `on` / `off`, shared sampling config, reusable prompt-rollout archives). `scripts/launch_main_rollout_stats_suite.py` is the sbatch wrapper. The archive reuse contract is load-bearing downstream: every finished JSON must preserve `record_id`, full prompt text, `prompt_token_ids`, rollout `completion_text`, `completion_token_ids`, and raw `record_metadata` so the same rollouts can drive later prompt-profile relabeling, probe training, and steering without re-running the GPU work. Two runtime corrections are now baked into the suite and must stay that way: the TACO native grader returns top-level callables directly (it does not rebind them as `Solution` methods), and `BAAI/TACO` is loaded via the HF parquet surface `hf://datasets/BAAI/TACO/ALL/<split>-*.parquet`, not the retired `TACO.py` dataset script.
 
 ### Scripts vs library
 

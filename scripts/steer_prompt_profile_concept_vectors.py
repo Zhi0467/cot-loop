@@ -965,16 +965,35 @@ def _generate_finish_reason(
     max_new_tokens: int,
     eos_token_id: int | list[int] | None,
 ) -> str:
-    eos_ids: set[int] = set()
-    if isinstance(eos_token_id, int):
-        eos_ids.add(eos_token_id)
-    elif isinstance(eos_token_id, list):
-        eos_ids.update(int(value) for value in eos_token_id)
+    eos_ids = _eos_token_ids(eos_token_id)
     if any(token_id in eos_ids for token_id in generated_ids):
         return "eos"
     if len(generated_ids) >= max_new_tokens:
         return "length"
     return "stop"
+
+
+def _eos_token_ids(eos_token_id: int | list[int] | None) -> set[int]:
+    eos_ids: set[int] = set()
+    if isinstance(eos_token_id, int):
+        eos_ids.add(eos_token_id)
+    elif isinstance(eos_token_id, list):
+        eos_ids.update(int(value) for value in eos_token_id)
+    return eos_ids
+
+
+def _trim_generated_ids(
+    generated_ids: list[int],
+    *,
+    eos_token_id: int | list[int] | None,
+) -> list[int]:
+    eos_ids = _eos_token_ids(eos_token_id)
+    if not eos_ids:
+        return generated_ids
+    for idx, token_id in enumerate(generated_ids):
+        if token_id in eos_ids:
+            return generated_ids[: idx + 1]
+    return generated_ids
 
 
 def _effective_max_tokens(prompt_len: int, *, max_new_tokens: int, max_model_len: int) -> int:
@@ -1249,115 +1268,129 @@ def _run_condition_seed(
                 if not valid_items:
                     continue
 
-                encoded = tokenizer(
-                    [item.prompt for item, _, _ in valid_items],
-                    return_tensors="pt",
-                    padding=True,
-                )
-                input_ids = encoded["input_ids"].to(model.device)
-                attention_mask = encoded["attention_mask"].to(model.device)
-                padded_prompt_len = int(input_ids.size(1))
-                generation_kwargs = {
-                    "input_ids": input_ids,
-                    "attention_mask": attention_mask,
-                    "max_new_tokens": max_new_tokens,
-                    "do_sample": do_sample,
-                    "temperature": temperature if do_sample else None,
-                    "top_p": top_p,
-                    "top_k": top_k,
-                    "pad_token_id": tokenizer.pad_token_id,
-                    "eos_token_id": eos_token_id,
-                    "use_cache": True,
-                }
-                generation_kwargs = {
-                    key: value
-                    for key, value in generation_kwargs.items()
-                    if value is not None
-                }
-                outputs = model.generate(**generation_kwargs)
-                if outputs.size(0) != len(valid_items):
-                    raise RuntimeError(
-                        f"Expected {len(valid_items)} generated rows, got {outputs.size(0)}."
+                grouped_items: dict[int, list[tuple[SteeringPromptItem, int, int]]] = {}
+                for item, prompt_len, effective_max_tokens in valid_items:
+                    grouped_items.setdefault(effective_max_tokens, []).append(
+                        (item, prompt_len, effective_max_tokens)
                     )
 
-                for row_idx, (item, prompt_len, effective_max_tokens) in enumerate(valid_items):
-                    generated_ids = outputs[row_idx, padded_prompt_len:].tolist()
-                    response_text = tokenizer.decode(
-                        generated_ids,
-                        skip_special_tokens=True,
+                # Group by effective budget so batched padding never reduces the
+                # true per-prompt context room below the enforced generation cap.
+                for group_max_new_tokens, budget_items in grouped_items.items():
+                    encoded = tokenizer(
+                        [item.prompt for item, _, _ in budget_items],
+                        add_special_tokens=False,
+                        return_tensors="pt",
+                        padding=True,
                     )
-                    finish_reason = _generate_finish_reason(
-                        generated_ids,
-                        max_new_tokens=max_new_tokens,
-                        eos_token_id=eos_token_id,
-                    )
-                    first_loop_prefix = first_ngram_loop_prefix_length(
-                        generated_ids,
-                        n=30,
-                        k=20,
-                    )
-                    loop_flag = first_loop_prefix is not None
-                    token_count = len(generated_ids)
-                    total_token_count = prompt_len + token_count
-                    max_length_hit = _hit_max_model_len(
-                        prompt_len=prompt_len,
-                        token_count=token_count,
-                        finish_reason=finish_reason,
-                        max_model_len=max_model_len,
-                    )
-                    row = {
-                        "sample_id": item.sample_id,
-                        "condition_name": condition_name,
-                        "seed": seed,
-                        "prompt_too_long": False,
-                        "prompt_token_count": prompt_len,
-                        "effective_max_tokens": effective_max_tokens,
-                        "token_count": token_count,
-                        "total_token_count": total_token_count,
-                        "budget_fraction": (
-                            float(token_count) / float(effective_max_tokens)
-                            if effective_max_tokens > 0
-                            else 0.0
-                        ),
-                        "loop_flag": loop_flag,
-                        "max_length_hit": max_length_hit,
-                        "first_loop_prefix_length": first_loop_prefix,
-                        "finish_reason": finish_reason,
-                        "response_text": response_text,
-                        "correct": None,
-                        "question_id": item.question_id,
+                    input_ids = encoded["input_ids"].to(model.device)
+                    attention_mask = encoded["attention_mask"].to(model.device)
+                    padded_prompt_len = int(input_ids.size(1))
+                    generation_kwargs = {
+                        "input_ids": input_ids,
+                        "attention_mask": attention_mask,
+                        "max_new_tokens": group_max_new_tokens,
+                        "do_sample": do_sample,
+                        "temperature": temperature if do_sample else None,
+                        "top_p": top_p,
+                        "top_k": top_k,
+                        "pad_token_id": tokenizer.pad_token_id,
+                        "eos_token_id": eos_token_id,
+                        "use_cache": True,
                     }
-                    if task_kind == "livecodebench_codegen":
-                        lcb_records.append(
-                            LcbSampleRecord(
-                                question_id=item.question_id or "",
-                                generation_index=0,
-                                code_output=livecodebench_codegen.extract_code_output(
-                                    response_text,
-                                    repo_path=livecodebench_repo,
-                                    model_id=model.config._name_or_path
-                                    if hasattr(model.config, "_name_or_path")
-                                    else model.name_or_path,
-                                ),
-                                token_count=token_count,
-                                prompt_token_count=prompt_len,
-                                total_token_count=total_token_count,
-                                effective_max_tokens=effective_max_tokens,
-                                max_model_len=max_model_len,
-                                loop_flag=loop_flag,
-                                max_length_hit=max_length_hit,
-                                finish_reason=finish_reason,
-                                prompt_too_long=False,
-                                first_loop_prefix_length=first_loop_prefix,
+                    generation_kwargs = {
+                        key: value
+                        for key, value in generation_kwargs.items()
+                        if value is not None
+                    }
+                    outputs = model.generate(**generation_kwargs)
+                    if outputs.size(0) != len(budget_items):
+                        raise RuntimeError(
+                            f"Expected {len(budget_items)} generated rows, got {outputs.size(0)}."
+                        )
+
+                    for row_idx, (item, prompt_len, effective_max_tokens) in enumerate(budget_items):
+                        generated_ids = outputs[row_idx, padded_prompt_len:].tolist()
+                        generated_ids = _trim_generated_ids(
+                            generated_ids,
+                            eos_token_id=eos_token_id,
+                        )
+                        response_text = tokenizer.decode(
+                            generated_ids,
+                            skip_special_tokens=True,
+                        )
+                        finish_reason = _generate_finish_reason(
+                            generated_ids,
+                            max_new_tokens=effective_max_tokens,
+                            eos_token_id=eos_token_id,
+                        )
+                        first_loop_prefix = first_ngram_loop_prefix_length(
+                            generated_ids,
+                            n=30,
+                            k=20,
+                        )
+                        loop_flag = first_loop_prefix is not None
+                        token_count = len(generated_ids)
+                        total_token_count = prompt_len + token_count
+                        max_length_hit = _hit_max_model_len(
+                            prompt_len=prompt_len,
+                            token_count=token_count,
+                            finish_reason=finish_reason,
+                            max_model_len=max_model_len,
+                        )
+                        row = {
+                            "sample_id": item.sample_id,
+                            "condition_name": condition_name,
+                            "seed": seed,
+                            "prompt_too_long": False,
+                            "prompt_token_count": prompt_len,
+                            "effective_max_tokens": effective_max_tokens,
+                            "token_count": token_count,
+                            "total_token_count": total_token_count,
+                            "budget_fraction": (
+                                float(token_count) / float(effective_max_tokens)
+                                if effective_max_tokens > 0
+                                else 0.0
+                            ),
+                            "loop_flag": loop_flag,
+                            "max_length_hit": max_length_hit,
+                            "first_loop_prefix_length": first_loop_prefix,
+                            "finish_reason": finish_reason,
+                            "response_text": response_text,
+                            "correct": None,
+                            "question_id": item.question_id,
+                        }
+                        if task_kind == "livecodebench_codegen":
+                            lcb_records.append(
+                                LcbSampleRecord(
+                                    question_id=item.question_id or "",
+                                    generation_index=0,
+                                    code_output=livecodebench_codegen.extract_code_output(
+                                        response_text,
+                                        repo_path=livecodebench_repo,
+                                        model_id=model.config._name_or_path
+                                        if hasattr(model.config, "_name_or_path")
+                                        else model.name_or_path,
+                                    ),
+                                    token_count=token_count,
+                                    prompt_token_count=prompt_len,
+                                    total_token_count=total_token_count,
+                                    effective_max_tokens=effective_max_tokens,
+                                    max_model_len=max_model_len,
+                                    loop_flag=loop_flag,
+                                    max_length_hit=max_length_hit,
+                                    finish_reason=finish_reason,
+                                    prompt_too_long=False,
+                                    first_loop_prefix_length=first_loop_prefix,
+                                )
                             )
-                        )
-                    else:
-                        row["correct"] = _task_specific_correct(
-                            task_kind=task_kind,
-                            response_text=response_text,
-                            item=item,
-                        )
-                    rows.append(row)
+                        else:
+                            row["correct"] = _task_specific_correct(
+                                task_kind=task_kind,
+                                response_text=response_text,
+                                item=item,
+                            )
+                        rows.append(row)
     finally:
         if controller is not None:
             controller.remove()
