@@ -1,0 +1,82 @@
+[
+  {
+    "checkpoint_rule": "best_loss",
+    "mean_accuracy": 0.7125,
+    "mean_macro_f1": 0.5896902663666899,
+    "mean_positive_f1": 0.36786700780285386,
+    "mean_pr_auc": 0.5965903518260179,
+    "mean_roc_auc": 0.7614721639878873,
+    "model": "linear_ensemble",
+    "num_seeds": 3
+  },
+  {
+    "checkpoint_rule": "best_rank",
+    "mean_accuracy": 0.6145833333333334,
+    "mean_macro_f1": 0.5473596528331282,
+    "mean_positive_f1": 0.495945825536844,
+    "mean_pr_auc": 0.5698386358813492,
+    "mean_roc_auc": 0.7474668064290705,
+    "model": "linear_ensemble",
+    "num_seeds": 3
+  },
+  {
+    "checkpoint_rule": "best_loss",
+    "mean_accuracy": 0.525,
+    "mean_macro_f1": 0.45775209500936276,
+    "mean_positive_f1": 0.3083702329416615,
+    "mean_pr_auc": 0.4162726776219598,
+    "mean_roc_auc": 0.548625669694852,
+    "model": "linear_last_layer",
+    "num_seeds": 3
+  },
+  {
+    "checkpoint_rule": "best_rank",
+    "mean_accuracy": 0.525,
+    "mean_macro_f1": 0.45775209500936276,
+    "mean_positive_f1": 0.3083702329416615,
+    "mean_pr_auc": 0.4162726776219598,
+    "mean_roc_auc": 0.548625669694852,
+    "model": "linear_last_layer",
+    "num_seeds": 3
+  },
+  {
+    "checkpoint_rule": "best_loss",
+    "mean_accuracy": 0.6166666666666667,
+    "mean_macro_f1": 0.6010580475351269,
+    "mean_positive_f1": 0.6252451252451253,
+    "mean_pr_auc": 0.6745474326300975,
+    "mean_roc_auc": 0.8375844397856976,
+    "model": "mlp256d1_ensemble",
+    "num_seeds": 3
+  },
+  {
+    "checkpoint_rule": "best_rank",
+    "mean_accuracy": 0.7208333333333333,
+    "mean_macro_f1": 0.7158382326190024,
+    "mean_positive_f1": 0.6885758899605979,
+    "mean_pr_auc": 0.6637235922086463,
+    "mean_roc_auc": 0.8457663638481249,
+    "model": "mlp256d1_ensemble",
+    "num_seeds": 3
+  },
+  {
+    "checkpoint_rule": "best_loss",
+    "mean_accuracy": 0.75,
+    "mean_macro_f1": 0.7410054136841829,
+    "mean_positive_f1": 0.6943876852332354,
+    "mean_pr_auc": 0.7147126215317966,
+    "mean_roc_auc": 0.8488819007686933,
+    "model": "mlp256d1_last_layer",
+    "num_seeds": 3
+  },
+  {
+    "checkpoint_rule": "best_rank",
+    "mean_accuracy": 0.6124999999999999,
+    "mean_macro_f1": 0.5357872102124333,
+    "mean_positive_f1": 0.4867232763915865,
+    "mean_pr_auc": 0.7055072342958472,
+    "mean_roc_auc": 0.843524341952015,
+    "model": "mlp256d1_last_layer",
+    "num_seeds": 3
+  }
+]

@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 import re
 from collections.abc import Iterable
+from typing import Any
+
+from datasets import load_dataset
 
 _ANSWER_LINE_PATTERN = re.compile(r"^Answer: ([A-Z])$")
 _ANSWER_PREFIX_PATTERN = re.compile(r"^(?:final\s+)?answer\s*[:：]\s*", re.IGNORECASE)
@@ -49,6 +53,155 @@ def load_local_rows(path: str) -> list[dict[str, object]]:
                 continue
             rows.append(json.loads(line))
     return rows
+
+
+def load_rows_from_dataset(
+    dataset: str,
+    *,
+    config: str | None,
+    split: str,
+) -> list[dict[str, object]]:
+    def _load_hf_parquet_rows() -> list[dict[str, object]]:
+        base = f"hf://datasets/{dataset}/"
+        if config:
+            base = f"{base}{config}/"
+        ds = load_dataset(
+            "parquet",
+            data_files={split: f"{base}{split}-*.parquet"},
+            split=split,
+        )
+        return list(ds)
+
+    lower = dataset.lower()
+    if lower.endswith(".parquet"):
+        ds = load_dataset(
+            "parquet",
+            data_files={split: dataset},
+            split=split,
+        )
+        return list(ds)
+    if lower.endswith(".arrow"):
+        ds = load_dataset(
+            "arrow",
+            data_files={split: dataset},
+            split=split,
+        )
+        return list(ds)
+    if os.path.isfile(dataset):
+        return load_local_rows(dataset)
+    if dataset == "BAAI/TACO":
+        return _load_hf_parquet_rows()
+    try:
+        ds = load_dataset(dataset, config, split=split)
+        return list(ds)
+    except RuntimeError as exc:
+        if "Dataset scripts are no longer supported" not in str(exc):
+            raise
+        try:
+            return _load_hf_parquet_rows()
+        except Exception as parquet_exc:
+            raise RuntimeError(
+                f"Dataset '{dataset}' could not be loaded via the retired script path "
+                "or the HF parquet fallback."
+            ) from parquet_exc
+
+
+def parse_row_filter_json(raw: str | None) -> dict[str, dict[str, object]] | None:
+    text = (raw or "").strip()
+    if not text:
+        return None
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"Invalid --row-filter-json payload: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise SystemExit("--row-filter-json must decode to a JSON object.")
+    normalized: dict[str, dict[str, object]] = {}
+    for key in ("field_in", "field_ge", "field_le"):
+        value = payload.get(key)
+        if value is None:
+            continue
+        if not isinstance(value, dict):
+            raise SystemExit(f"--row-filter-json.{key} must be an object.")
+        normalized[key] = value
+    return normalized or None
+
+
+def row_matches_filter(
+    row: dict[str, object],
+    row_filter: dict[str, dict[str, object]] | None,
+) -> bool:
+    if not row_filter:
+        return True
+
+    field_in = row_filter.get("field_in", {})
+    for field, allowed_values in field_in.items():
+        if not isinstance(field, str) or not field:
+            raise SystemExit("--row-filter-json.field_in keys must be non-empty strings.")
+        if not isinstance(allowed_values, list) or not allowed_values:
+            raise SystemExit(
+                f"--row-filter-json.field_in[{field!r}] must be a non-empty list."
+            )
+        value = row.get(field)
+        if value is None:
+            return False
+        if isinstance(value, list):
+            value_texts = {str(item).strip() for item in value}
+            allowed_texts = {str(item).strip() for item in allowed_values}
+            if not (value_texts & allowed_texts):
+                return False
+        else:
+            if str(value).strip() not in {str(item).strip() for item in allowed_values}:
+                return False
+
+    for key, comparator in (("field_ge", lambda actual, bound: actual >= bound), ("field_le", lambda actual, bound: actual <= bound)):
+        fields = row_filter.get(key, {})
+        for field, bound in fields.items():
+            if not isinstance(field, str) or not field:
+                raise SystemExit(f"--row-filter-json.{key} keys must be non-empty strings.")
+            try:
+                bound_value = float(bound)
+            except Exception as exc:
+                raise SystemExit(
+                    f"--row-filter-json.{key}[{field!r}] must be numeric."
+                ) from exc
+            value = row.get(field)
+            try:
+                actual_value = float(value)
+            except Exception:
+                return False
+            if not comparator(actual_value, bound_value):
+                return False
+    return True
+
+
+def collect_row_metadata(
+    row: dict[str, object],
+    *,
+    metadata_fields: Iterable[str] | None,
+) -> dict[str, object] | None:
+    if metadata_fields is None:
+        return None
+    metadata: dict[str, object] = {}
+    for field in metadata_fields:
+        key = str(field).strip()
+        if not key:
+            continue
+        if key in row:
+            metadata[key] = _jsonable(row[key])
+    return metadata or None
+
+
+def _jsonable(value: object) -> object:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, list):
+        return [_jsonable(item) for item in value]
+    if isinstance(value, tuple):
+        return [_jsonable(item) for item in value]
+    if isinstance(value, dict):
+        return {str(key): _jsonable(item) for key, item in value.items()}
+    return str(value)
 
 
 def extract_answer_letter_from_last_lines(

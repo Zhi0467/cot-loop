@@ -225,6 +225,17 @@ def _dataset_sample_note(
     return info.sample_note
 
 
+def _thinking_mode_suffix(row: dict[str, Any]) -> str:
+    resolved = row.get("thinking_mode_resolved")
+    if resolved == "on":
+        return " Thinking mode was explicitly on."
+    if resolved == "off":
+        return " Thinking mode was explicitly off."
+    if resolved == "default":
+        return " Native template thinking behavior was left at its default."
+    return ""
+
+
 def load_dataset_record(stats_dir: Path, info: DatasetInfo) -> dict[str, Any]:
     path = stats_dir / info.filename
     if not path.exists():
@@ -291,7 +302,12 @@ def load_dataset_record(stats_dir: Path, info: DatasetInfo) -> dict[str, Any]:
         "seed": metadata.get("seed"),
         "release_version": metadata.get("release_version"),
         "lm_style": metadata.get("lm_style"),
+        "prompt_format_requested": metadata.get("prompt_format_requested"),
+        "prompt_format_resolved": metadata.get("prompt_format_resolved"),
+        "thinking_mode_requested": metadata.get("thinking_mode_requested"),
+        "thinking_mode_resolved": metadata.get("thinking_mode_resolved"),
     }
+    row["chat_format"] = info.chat_format + _thinking_mode_suffix(row)
     for source_name, out_name in COUNT_COLUMNS:
         row[out_name] = counts.get(source_name)
     for source_name, out_name in METRIC_COLUMNS:
@@ -486,6 +502,10 @@ def write_summary_files(rows: list[dict[str, Any]], out_dir: Path) -> None:
         "dataset_config",
         "split",
         "model_id",
+        "prompt_format_requested",
+        "prompt_format_resolved",
+        "thinking_mode_requested",
+        "thinking_mode_resolved",
         "timestamp",
         "sample_note",
         "lcb_native_pass_at_1",

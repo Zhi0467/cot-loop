@@ -1,0 +1,150 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+\begin{document}
+
+{\Large \textbf{Prompt-profile RFM steering grounded stage note}}\\
+Generated: 2026-04-23 02:20 UTC
+
+\section*{Exact current object}
+The active benchmark-local stage is still the repaired \texttt{LiveCodeBench} prompt-level \texttt{majority\_s\_0.5} object. The source train pool has \texttt{640} prompts. The detector fit-train / validation / test split is \texttt{280 / 128 / 160} with positives \texttt{140 / 35 / 54}. The steering evaluation contract is now the corrected full test split rather than the old pilot: full decode budget \texttt{30000}, prefill-only, all prompt tokens steered at every selected block, and block-specific linear plus spherical conditions.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrr}
+\toprule
+Split & Prompt count & Positive count \\
+\midrule
+Source train pool & 640 & -- \\
+Fit-train & 280 & 140 \\
+Validation & 128 & 35 \\
+Test & 160 & 54 \\
+\bottomrule
+\end{tabular}
+\caption{Repaired LiveCodeBench stage object.}
+\end{table}
+
+\section*{What is already proved}
+The detector/vector lane is already real enough to treat as finished stage evidence. The repaired detector row is RFM layer \texttt{27} with validation \texttt{PR-AUC 0.6555}, test \texttt{PR-AUC 0.7055}, and test \texttt{ROC-AUC 0.8590}. That is clearly above prompt-only and activation-linear baselines on the same repaired object, while activation \texttt{h256 d1} MLP last-layer remains tied or slightly ahead depending on checkpoint rule. The exported vector bundle is also stable enough to use causally: all \texttt{28} layers clear mean bootstrap cosine \texttt{>= 0.781}, with late layers \texttt{23} to \texttt{26} the most coherent.
+
+Only two rows are scientifically finished on the current full-contract thinking-on steering table:
+
+\begin{table}[h]
+\centering
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{0.23\textwidth}rrrrr}
+\toprule
+Condition & Pass@1 & Loop frac & Over-half frac & Avg len & Median len \\
+\midrule
+\texttt{no\_steer} & 0.0125 & 0.65625 & 0.6375 & 17921.375 & 18199.5 \\
+\texttt{plus\_v\_linear} & 0.0125 & 0.6125 & 0.6000 & 17453.1875 & 17201.0 \\
+\bottomrule
+\end{tabularx}
+\caption{Finished full-contract thinking-on rows on the repaired 160-prompt test split.}
+\end{table}
+
+This is a real receipt, but it is not yet a finished steering table. The current evidence is only that \texttt{plus\_v\_linear} looks modestly better than the thinking-on baseline on loop fraction while leaving accuracy unchanged.
+
+\section*{What is live but unfinished}
+The remaining five rows of the corrected full-contract thinking-on table are still running on \texttt{wth-gpu-01}:
+\begin{itemize}
+\item \texttt{2804} - \texttt{minus\_v\_linear}
+\item \texttt{2810} - \texttt{random\_linear}
+\item \texttt{2811} - \texttt{minus\_v\_spherical}
+\item \texttt{2815} - \texttt{plus\_v\_spherical}
+\item \texttt{2816} - \texttt{random\_spherical}
+\end{itemize}
+
+The stage-0.5 screening gate is also materially beyond the speculative phase:
+
+\begin{table}[h]
+\centering
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{0.30\textwidth}rrrrr>{\raggedright\arraybackslash}p{0.12\textwidth}}
+\toprule
+Candidate & Profiled & Positives & Positive rate & Tail frac & Loop frac & Status \\
+\midrule
+\texttt{LiveCodeBench-extra} & 255 & 141 & 0.5529 & 0.5765 & 0.3029 & running \\
+\texttt{TACO-hard} & 213 & 172 & 0.8075 & 0.8263 & 0.3779 & running \\
+\texttt{MATH level-5} & 180 & 25 & 0.1389 & 0.2069 & 0.0833 & running \\
+\texttt{Omni-MATH >= 7} & 0 & 0 & 0.0000 & -- & -- & dep-pending \\
+\bottomrule
+\end{tabularx}
+\caption{Current positive-enrichment screening checkpoints.}
+\end{table}
+
+Current read: \texttt{LiveCodeBench-extra} and \texttt{TACO-hard} are already clearly above the \texttt{>= 10\%} promotion gate, and \texttt{MATH level-5} is now plausibly above it on a much larger slice than the earlier tiny checkpoint. The explicit \texttt{HFChatTemplate} \texttt{thinking on/off} provenance pair for \texttt{LiveCodeBench} is queued as jobs \texttt{2829} and \texttt{2830}, but it is not the immediate blocker for the benchmark-local steering table.
+
+\section*{What is blocked}
+There is still no scientific non-thinking steering read. Every attempted non-thinking \texttt{LiveCodeBench} launch died before first row:
+\begin{itemize}
+\item \texttt{2821} - \texttt{no\_steer}
+\item \texttt{2822} - \texttt{minus\_v\_linear}
+\item \texttt{2823} - \texttt{plus\_v\_linear}
+\item \texttt{2825} - \texttt{no\_steer} retry
+\item \texttt{2826} - \texttt{random\_linear} retry
+\end{itemize}
+
+All five failed on the same dirty-slot CUDA OOM shape on the only GPU node, so the blocker is slot geometry rather than model behavior. The next non-thinking action should therefore be to wait for a genuinely clean slot, rerun the narrow serial linear table first, and only extend to spherical once at least one non-thinking row has landed.
+
+\section*{Repo reality}
+The repo surface is split too. The local project branch is still \texttt{task/1776752262-rfm-stage0}. The local worktree head before this grounded-note patch was \texttt{a255ff1}, while the published GitHub surface is still draft PR \texttt{\#11} at head \texttt{5a521d1} with one unresolved non-outdated review thread. So the published PR is behind the actual local stage state. There is also a real runtime debt: \texttt{/data} is effectively full, so the positive-enrichment screen is currently running with home-backed caches under \texttt{/home/murphy/.cache/cot-loop-positive-screening/...} rather than the normal scratch-backed path.
+
+\section*{Grounded execution order}
+\textbf{P0: Finish what is already in flight}
+\begin{enumerate}
+\item finish the seven-row thinking-on \texttt{LiveCodeBench} steering table on the repaired \texttt{160 / 54} test object;
+\item finish the current \texttt{300}-prompt screening runs for \texttt{LiveCodeBench-extra}, \texttt{TACO-hard}, \texttt{MATH level-5}, and \texttt{Omni-MATH >= 7};
+\item let the queued \texttt{HFChatTemplate} \texttt{thinking on/off} provenance pair run when resources open.
+\end{enumerate}
+
+\textbf{P1: Unblock the non-thinking comparison the right way}
+\begin{enumerate}
+\item stop burning retries while the node is still contaminated;
+\item once a clean slot exists, rerun the narrow non-thinking linear table first;
+\item treat ``first row lands'' as the real gate, because before that the lane is infrastructure rather than science.
+\end{enumerate}
+
+\textbf{P2: Promote the first new screened-in dataset(s)}
+\begin{enumerate}
+\item promote only candidates whose final repaired prompt-majority train positive rate stays \texttt{>= 10\%};
+\item keep exact prompt/provenance sidecars as part of the admission receipt;
+\item preserve exact prompt-text disjointness for \texttt{LiveCodeBench-extra}.
+\end{enumerate}
+
+Planned promotion order after the current screen finishes:
+\begin{enumerate}
+\item \texttt{LiveCodeBench-extra}
+\item \texttt{TACO-hard}
+\item \texttt{MATH level-5} if the final \texttt{300}-prompt pass stays above the gate
+\item \texttt{Omni-MATH >= 7} after the dependency chain completes
+\end{enumerate}
+
+\textbf{P3: Expand the vector pool only after promotion receipts exist}
+\begin{enumerate}
+\item materialize the repaired \texttt{majority\_s\_0.5} object;
+\item train the benchmark-local RFM detector;
+\item export block-specific vectors;
+\item run the same bootstrap direction-stability diagnostics;
+\item only then add that dataset to any cross-benchmark vector pool.
+\end{enumerate}
+
+\textbf{P4: Average-vector transfer stays later}
+
+Do not reopen the averaged external ``verbose vector'' test until at least two non-\texttt{LiveCodeBench} benchmark-local bundles have passed the screen, been materialized, exported stable directions, and produced readable benchmark-local receipts.
+
+\section*{Bottom line}
+The April 21 plan was directionally right, but the grounded stage is now sharper. The immediate work is not ``do more steering'' in the abstract. It is:
+\begin{itemize}
+\item finish the seven-row thinking-on table;
+\item stop treating the non-thinking lane as a science result before the first row exists;
+\item finish the 300-prompt screening gate and promote the first new dataset(s) from receipts rather than guesses;
+\item only then reopen cross-benchmark vector pooling and transfer.
+\end{itemize}
+
+\end{document}

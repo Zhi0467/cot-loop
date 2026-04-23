@@ -1,0 +1,33 @@
+{
+  "archive_source_root": "/data/scratch/murphy/outputs/cot-loop-detection",
+  "datasets": [
+    {
+      "active_stage": true,
+      "archive_data_dir": "/data/scratch/murphy/outputs/cot-loop-detection/livecodebench_mean_relative_from_archive_20260323",
+      "archive_relpath": "livecodebench_mean_relative_from_archive_20260323",
+      "display_name": "LiveCodeBench",
+      "feature_key": "last_token_all_layers_stack_final",
+      "key": "livecodebench",
+      "min_screened_positive_rate": 0.1,
+      "passes_positive_rate_screen": true,
+      "prompt_field": "problem",
+      "sample_shape": [
+        28,
+        2048
+      ],
+      "screening_notes": "Passes the >=10% repaired train positive-rate gate on the current majority_s_0.5 stage object.",
+      "screening_positive_rate": 0.3333333333333333,
+      "screening_train_count": 420,
+      "screening_train_positive_count": 140,
+      "source_target_name": "mean_relative_length",
+      "stage_label_name": "majority_s_0.5",
+      "test_count": 160,
+      "test_prompt_ids_sha256": "c07a4318c49a8b30d5d7f2d69e7c6b359b3eddc0c52f5a59cbeafa4a09f7110e",
+      "test_prompt_text_sha256": "a26c5ca70aaa3e5f416c4b0e70524e0ffc2353af357ecde8dc27487d3d1d068a",
+      "train_count": 640,
+      "train_prompt_ids_sha256": "71291f7596ffd566f6f913f272e0c309e9d19a3c186e4969c5124b5f290f57de",
+      "train_prompt_text_sha256": "aff770a20adcf388158e5f3bfed90898718a1c19c1cf3959dcdbf8aa41aeb08a"
+    }
+  ],
+  "schema_name": "prompt_profile_rfm_stage.v1"
+}

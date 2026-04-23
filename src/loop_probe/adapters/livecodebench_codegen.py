@@ -11,7 +11,7 @@ from functools import lru_cache
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
-from ..prompt_format import tokenizer_has_chat_template
+from ..prompt_format import build_chat_template_prompt, tokenizer_has_chat_template
 
 if TYPE_CHECKING:
     from ..collector import LcbSampleRecord
@@ -241,7 +241,13 @@ def _load_tokenizer(model_id: str):
     )
 
 
-def _build_hf_chat_template_prompt(instance, *, tokenizer, symbols: dict[str, Any]) -> str:
+def _build_hf_chat_template_prompt(
+    instance,
+    *,
+    tokenizer,
+    symbols: dict[str, Any],
+    thinking_mode: str,
+) -> str:
     user_content = symbols["get_generic_question_template_answer"](instance)
     messages = [
         {
@@ -253,10 +259,10 @@ def _build_hf_chat_template_prompt(instance, *, tokenizer, symbols: dict[str, An
             "content": user_content,
         },
     ]
-    return tokenizer.apply_chat_template(
+    return build_chat_template_prompt(
+        tokenizer,
         messages,
-        tokenize=False,
-        add_generation_prompt=True,
+        thinking_mode=thinking_mode,
     )
 
 
@@ -310,6 +316,7 @@ def build_prompts(
     model_id: str,
     lm_style_override: str | None = None,
     max_samples: int | None = None,
+    thinking_mode: str = "default",
 ) -> tuple[list[tuple[str, str]], str]:
     lm_style = _get_lm_style(
         model_id,
@@ -327,6 +334,7 @@ def build_prompts(
                     instance,
                     tokenizer=tokenizer,
                     symbols=symbols,
+                    thinking_mode=thinking_mode,
                 )
             else:
                 prompt = format_prompt(instance, lm_style)

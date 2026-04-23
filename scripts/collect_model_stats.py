@@ -26,11 +26,14 @@ if SRC not in sys.path:
 from transformers import AutoTokenizer
 
 from loop_probe.adapters import (
+    codegen_ungraded,
     livecodebench_codegen,
     math_freeform,
     multiple_choice_gpqa,
     multiple_choice_mmlupro,
+    taco_codegen,
 )
+from loop_probe.adapters._common import parse_row_filter_json
 from loop_probe.collector import (
     ALL_STATISTICS,
     CollectorConfig,
@@ -41,10 +44,16 @@ from loop_probe.collector import (
 )
 from loop_probe.configs import RolloutConfig
 from loop_probe.labeling import (
+    aggregate_prompt_profile,
     find_ngram_loop_trigger,
-    first_ngram_loop_prefix_length,
+    profile_target_name,
 )
-from loop_probe.prompt_format import VALID_PROMPT_FORMATS, resolve_prompt_format
+from loop_probe.prompt_format import (
+    VALID_PROMPT_FORMATS,
+    VALID_THINKING_MODES,
+    resolve_prompt_format,
+    resolve_thinking_mode,
+)
 from loop_probe.prompt_builder import build_math_prompt
 from loop_probe.rollout import resolve_sampling_defaults
 from loop_probe.types import DatasetSpec
@@ -52,11 +61,15 @@ from utils import get_visible_devices, suppress_sem_unlink_errors
 
 TASK_CHOICES = (
     "math_freeform",
+    "codegen_ungraded",
+    "taco_codegen",
     "multiple_choice_gpqa",
     "multiple_choice_mmlupro",
     "livecodebench_codegen",
 )
 STATS_CONTRACT_VERSION = "rollout_stats_v2"
+PROMPT_PROFILE_ARCHIVE_SCHEMA = "prompt_rollout_archive.v2"
+PROMPT_PROFILE_SUMMARY_SCHEMA = "prompt_profile_summary.v1"
 
 
 @dataclass(frozen=True)
@@ -66,6 +79,21 @@ class PromptWorkItem:
     gold_answer: str | None = None
     gold_index: int | None = None
     question_id: str | None = None
+    record_id: str | None = None
+    source_split: str | None = None
+    prompt_style: str | None = None
+    choices: tuple[str, ...] | None = None
+    record_metadata: dict[str, object] | None = None
+
+
+@dataclass(frozen=True)
+class ExclusionArchive:
+    prompts: frozenset[str]
+    sample_ids: frozenset[int]
+
+    @property
+    def has_any(self) -> bool:
+        return bool(self.prompts or self.sample_ids)
 
 
 def _parse_args() -> argparse.Namespace:
@@ -77,6 +105,30 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--max-samples", type=int, default=None)
     parser.add_argument("--question-field", default="question")
     parser.add_argument("--answer-field", default="answer")
+    parser.add_argument("--starter-code-field", default="starter_code")
+    parser.add_argument("--record-id-field", default="")
+    parser.add_argument(
+        "--metadata-fields",
+        default="",
+        help="Comma-separated raw dataset fields to preserve in the prompt archive.",
+    )
+    parser.add_argument(
+        "--row-filter-json",
+        default="",
+        help=(
+            "Optional JSON object describing row filters before max-sample truncation, "
+            "for example '{\"field_in\": {\"difficulty\": [\"HARD\", \"VERY_HARD\"]}}'."
+        ),
+    )
+    parser.add_argument(
+        "--exclude-prompt-jsonl",
+        default="",
+        help=(
+            "Optional JSONL archive with top-level 'prompt' and/or 'sample_id' fields. "
+            "Matching prompts or archived sample indices are excluded before max-sample "
+            "truncation. Intended for disjoint follow-up screens or curated benchmark subsets."
+        ),
+    )
     parser.add_argument("--model-id", default="Qwen/Qwen3-1.7B")
     parser.add_argument("--temperature", type=float, default=0.2)
     parser.add_argument("--top-p", type=float, default=None)
@@ -97,6 +149,12 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--loop-n", type=int, default=30)
     parser.add_argument("--loop-k", type=int, default=20)
+    parser.add_argument(
+        "--profile-tail-threshold",
+        type=float,
+        default=0.5,
+        help="Prompt-level tail threshold used for majority_s_t screening summaries.",
+    )
     parser.add_argument("--out", default="")
     parser.add_argument("--livecodebench-repo", default="")
     parser.add_argument("--release-version", default="release_v6")
@@ -109,6 +167,15 @@ def _parse_args() -> argparse.Namespace:
             "How to serialize non-LiveCodeBench prompts before generation. "
             "'auto' uses the tokenizer chat template when available and falls "
             "back to raw plain text otherwise."
+        ),
+    )
+    parser.add_argument(
+        "--thinking-mode",
+        default="default",
+        choices=VALID_THINKING_MODES,
+        help=(
+            "Explicit thinking-mode control for chat-template prompts. "
+            "'default' preserves the tokenizer's native behavior."
         ),
     )
     parser.add_argument(
@@ -149,11 +216,60 @@ def _parse_statistics(raw: str) -> list[str]:
     return stats
 
 
+def _parse_metadata_fields(raw: str) -> list[str] | None:
+    fields = [part.strip() for part in raw.split(",") if part.strip()]
+    return fields or None
+
+
+def _thinking_mode_metadata(
+    *,
+    requested: str,
+    resolved: str | None,
+) -> dict[str, object]:
+    if resolved is None:
+        return {}
+    return {
+        "thinking_mode_requested": requested,
+        "thinking_mode_resolved": resolved,
+    }
+
+
 def _slugify(value: str) -> str:
     text = value.strip()
     if not text:
         return "default"
     return re.sub(r"[^A-Za-z0-9._-]+", "_", text).strip("_") or "default"
+
+
+def _load_excluded_prompts(path: str | None) -> ExclusionArchive:
+    source = (path or "").strip()
+    if not source:
+        return ExclusionArchive(prompts=frozenset(), sample_ids=frozenset())
+    if not os.path.exists(source):
+        raise SystemExit(f"--exclude-prompt-jsonl path does not exist: {source}")
+    prompts: set[str] = set()
+    sample_ids: set[int] = set()
+    with open(source, "r", encoding="utf-8") as handle:
+        for lineno, line in enumerate(handle, start=1):
+            text = line.strip()
+            if not text:
+                continue
+            try:
+                payload = json.loads(text)
+            except json.JSONDecodeError as exc:
+                raise SystemExit(
+                    f"Invalid JSON in --exclude-prompt-jsonl at line {lineno}: {exc}"
+                ) from exc
+            prompt = payload.get("prompt")
+            if isinstance(prompt, str):
+                prompts.add(prompt)
+            sample_id = payload.get("sample_id")
+            if isinstance(sample_id, int) and sample_id >= 0:
+                sample_ids.add(int(sample_id))
+    return ExclusionArchive(
+        prompts=frozenset(prompts),
+        sample_ids=frozenset(sample_ids),
+    )
 
 
 def _derive_output_path(args: argparse.Namespace) -> str:
@@ -172,12 +288,27 @@ def _lcb_records_checkpoint_path(out_path: str) -> str:
     return f"{base}__lcb_records{ext or '.json'}"
 
 
+def _prompt_profile_path(out_path: str) -> str:
+    base, _ext = os.path.splitext(out_path)
+    return f"{base}__prompt_profile.jsonl"
+
+
 def _prompt_rollout_archive_path(out_path: str) -> str:
+    base, _ext = os.path.splitext(out_path)
+    return f"{base}__prompt_rollout_archive.jsonl"
+
+
+def _progress_path(out_path: str) -> str:
+    base, _ext = os.path.splitext(out_path)
+    return f"{base}__progress.json"
+
+
+def _prompt_rollout_replay_path(out_path: str) -> str:
     base, _ = os.path.splitext(out_path)
     return f"{base}__rollout_archive.jsonl.gz"
 
 
-def _prompt_rollout_archive_path_for_lcb_checkpoint(checkpoint_path: str) -> str:
+def _prompt_rollout_replay_path_for_lcb_checkpoint(checkpoint_path: str) -> str:
     base, _ = os.path.splitext(checkpoint_path)
     suffix = "__lcb_records"
     archived_suffix = f"{suffix}__preexisting_"
@@ -217,16 +348,19 @@ def _prepare_output_paths(
     out_path: str,
     *,
     preserve_lcb_checkpoint_path: str | None = None,
-    preserve_prompt_rollout_archive_path: str | None = None,
+    preserve_prompt_rollout_replay_path: str | None = None,
 ) -> None:
     _archive_preexisting_output(out_path)
-    prompt_rollout_archive_path = _prompt_rollout_archive_path(out_path)
+    _archive_preexisting_output(_prompt_profile_path(out_path))
+    _archive_preexisting_output(_prompt_rollout_archive_path(out_path))
+    _archive_preexisting_output(_progress_path(out_path))
+    prompt_rollout_replay_path = _prompt_rollout_replay_path(out_path)
     if not (
-        preserve_prompt_rollout_archive_path
-        and os.path.abspath(prompt_rollout_archive_path)
-        == os.path.abspath(preserve_prompt_rollout_archive_path)
+        preserve_prompt_rollout_replay_path
+        and os.path.abspath(prompt_rollout_replay_path)
+        == os.path.abspath(preserve_prompt_rollout_replay_path)
     ):
-        _archive_preexisting_output(prompt_rollout_archive_path)
+        _archive_preexisting_output(prompt_rollout_replay_path)
     if args.task_kind == "livecodebench_codegen":
         checkpoint_path = _lcb_records_checkpoint_path(out_path)
         if preserve_lcb_checkpoint_path and os.path.abspath(
@@ -314,6 +448,8 @@ def _run_dependency_preflight(
 
     if args.task_kind == "math_freeform":
         math_freeform.preflight()
+    elif args.task_kind == "taco_codegen":
+        taco_codegen.preflight()
     elif args.task_kind == "livecodebench_codegen":
         try:
             livecodebench_codegen.preflight(
@@ -339,6 +475,8 @@ def _build_rollout_config(args: argparse.Namespace) -> RolloutConfig:
         raise SystemExit("--loop-n must be >= 1.")
     if args.loop_k < 2:
         raise SystemExit("--loop-k must be >= 2.")
+    if not (0.0 < args.profile_tail_threshold <= 1.0):
+        raise SystemExit("--profile-tail-threshold must be in (0, 1].")
     if args.num_generations < 1:
         raise SystemExit("--num-generations must be >= 1.")
     if args.top_p is not None and not (0.0 < args.top_p <= 1.0):
@@ -367,6 +505,7 @@ def _load_prompt_items(
     args: argparse.Namespace,
     tokenizer: Any | None,
 ) -> tuple[list[PromptWorkItem], dict[str, object], Any]:
+    exclusion_archive = _load_excluded_prompts(args.exclude_prompt_jsonl)
     if args.task_kind == "livecodebench_codegen":
         if args.prompt_format == "chat_template":
             raise SystemExit(
@@ -374,6 +513,7 @@ def _load_prompt_items(
                 "--prompt-format chat_template."
             )
         resolved_prompt_format = "raw"
+        resolved_thinking_mode = None
     else:
         if tokenizer is None:
             raise SystemExit(
@@ -381,8 +521,18 @@ def _load_prompt_items(
             )
         try:
             resolved_prompt_format = resolve_prompt_format(tokenizer, args.prompt_format)
+            resolved_thinking_mode = resolve_thinking_mode(
+                tokenizer,
+                prompt_format=resolved_prompt_format,
+                thinking_mode=args.thinking_mode,
+            )
         except ValueError as exc:
             raise SystemExit(str(exc)) from exc
+    if exclusion_archive.has_any and args.task_kind != "livecodebench_codegen":
+        raise SystemExit(
+            "--exclude-prompt-jsonl is currently only supported for "
+            "livecodebench_codegen."
+        )
 
     spec = DatasetSpec(
         dataset=args.dataset,
@@ -390,6 +540,9 @@ def _load_prompt_items(
         split=args.split,
         max_samples=args.max_samples,
     )
+    metadata_fields = _parse_metadata_fields(args.metadata_fields)
+    row_filter = parse_row_filter_json(args.row_filter_json)
+    record_id_field = args.record_id_field.strip() or None
 
     if args.task_kind == "math_freeform":
         if tokenizer is None:
@@ -398,6 +551,9 @@ def _load_prompt_items(
             spec,
             question_field=args.question_field,
             answer_field=args.answer_field,
+            record_id_field=record_id_field,
+            metadata_fields=metadata_fields,
+            row_filter=row_filter,
         )
         items = [
             PromptWorkItem(
@@ -406,14 +562,115 @@ def _load_prompt_items(
                     tokenizer,
                     record.prompt,
                     prompt_format=resolved_prompt_format,
+                    thinking_mode=args.thinking_mode,
                 ),
                 gold_answer=gold_answer,
+                record_id=record.record_id,
+                source_split=record.source_split,
+                prompt_style=record.prompt_style,
+                choices=record.choices,
+                record_metadata=record.metadata,
             )
             for record, gold_answer in samples
         ]
         return items, {
             "prompt_format_requested": args.prompt_format,
             "prompt_format_resolved": resolved_prompt_format,
+            **_thinking_mode_metadata(
+                requested=args.thinking_mode,
+                resolved=resolved_thinking_mode,
+            ),
+            "record_id_field": record_id_field,
+            "metadata_fields": metadata_fields,
+            **({"row_filter": row_filter} if row_filter is not None else {}),
+        }, None
+
+    if args.task_kind == "codegen_ungraded":
+        samples = codegen_ungraded.load_samples(
+            spec,
+            question_field=args.question_field,
+            starter_code_field=args.starter_code_field or None,
+            record_id_field=record_id_field,
+            metadata_fields=metadata_fields,
+            row_filter=row_filter,
+        )
+        items = [
+            PromptWorkItem(
+                sample_id=record.sample_id,
+                prompt=codegen_ungraded.build_codegen_prompt(
+                    tokenizer,
+                    record.prompt,
+                    starter_code=(
+                        None
+                        if record.metadata is None
+                            else str(record.metadata.get(args.starter_code_field, "") or "")
+                    ),
+                    prompt_format=resolved_prompt_format,
+                    thinking_mode=args.thinking_mode,
+                ),
+                record_id=record.record_id,
+                source_split=record.source_split,
+                prompt_style=record.prompt_style,
+                choices=record.choices,
+                record_metadata=record.metadata,
+            )
+            for record in samples
+        ]
+        return items, {
+            "prompt_format_requested": args.prompt_format,
+            "prompt_format_resolved": resolved_prompt_format,
+            **_thinking_mode_metadata(
+                requested=args.thinking_mode,
+                resolved=resolved_thinking_mode,
+            ),
+            "starter_code_field": args.starter_code_field or None,
+            "record_id_field": record_id_field,
+            "metadata_fields": metadata_fields,
+            **({"row_filter": row_filter} if row_filter is not None else {}),
+        }, None
+
+    if args.task_kind == "taco_codegen":
+        samples = taco_codegen.load_samples(
+            spec,
+            question_field=args.question_field,
+            starter_code_field=args.starter_code_field or None,
+            record_id_field=record_id_field,
+            metadata_fields=metadata_fields,
+            row_filter=row_filter,
+        )
+        items = [
+            PromptWorkItem(
+                sample_id=record.sample_id,
+                prompt=taco_codegen.build_codegen_prompt(
+                    tokenizer,
+                    record.prompt,
+                    starter_code=(
+                        None
+                        if record.metadata is None
+                            else str(record.metadata.get(args.starter_code_field, "") or "")
+                    ),
+                    prompt_format=resolved_prompt_format,
+                    thinking_mode=args.thinking_mode,
+                ),
+                record_id=record.record_id,
+                source_split=record.source_split,
+                prompt_style=record.prompt_style,
+                choices=record.choices,
+                record_metadata=record.metadata,
+            )
+            for record in samples
+        ]
+        return items, {
+            "prompt_format_requested": args.prompt_format,
+            "prompt_format_resolved": resolved_prompt_format,
+            **_thinking_mode_metadata(
+                requested=args.thinking_mode,
+                resolved=resolved_thinking_mode,
+            ),
+            "starter_code_field": args.starter_code_field or None,
+            "record_id_field": record_id_field,
+            "metadata_fields": metadata_fields,
+            **({"row_filter": row_filter} if row_filter is not None else {}),
         }, None
 
     if args.task_kind == "multiple_choice_gpqa":
@@ -430,14 +687,24 @@ def _load_prompt_items(
                     record.prompt,
                     options,
                     prompt_format=resolved_prompt_format,
+                    thinking_mode=args.thinking_mode,
                 ),
                 gold_answer=gold_letter,
+                record_id=record.record_id,
+                source_split=record.source_split,
+                prompt_style=record.prompt_style,
+                choices=record.choices,
+                record_metadata=record.metadata,
             )
             for record, options, gold_letter in samples
         ]
         metadata = {
             "prompt_format_requested": args.prompt_format,
             "prompt_format_resolved": resolved_prompt_format,
+            **_thinking_mode_metadata(
+                requested=args.thinking_mode,
+                resolved=resolved_thinking_mode,
+            ),
             "shuffle_policy": {
                 "kind": "seed_xor_sample_id",
                 "base_seed": args.seed,
@@ -459,15 +726,25 @@ def _load_prompt_items(
                     record.prompt,
                     options,
                     prompt_format=resolved_prompt_format,
+                    thinking_mode=args.thinking_mode,
                 ),
                 gold_answer=gold_answer,
                 gold_index=gold_index,
+                record_id=record.record_id,
+                source_split=record.source_split,
+                prompt_style=record.prompt_style,
+                choices=record.choices,
+                record_metadata=record.metadata,
             )
             for record, options, gold_answer, gold_index in samples
         ]
         return items, {
             "prompt_format_requested": args.prompt_format,
             "prompt_format_resolved": resolved_prompt_format,
+            **_thinking_mode_metadata(
+                requested=args.thinking_mode,
+                resolved=resolved_thinking_mode,
+            ),
         }, None
 
     benchmark, format_prompt = livecodebench_codegen.load_benchmark(
@@ -480,48 +757,102 @@ def _load_prompt_items(
         repo_path=args.livecodebench_repo,
         model_id=args.model_id,
         lm_style_override=args.lm_style_override,
-        max_samples=args.max_samples,
+        thinking_mode=args.thinking_mode,
     )
     resolved_prompt_format = livecodebench_codegen.prompt_format_for_lm_style(lm_style)
-    selected_benchmark = benchmark if args.max_samples is None else benchmark[: args.max_samples]
+    resolved_thinking_mode = None
+    if resolved_prompt_format == "chat_template":
+        lcb_tokenizer = tokenizer
+        if lcb_tokenizer is None:
+            lcb_tokenizer = AutoTokenizer.from_pretrained(
+                args.model_id,
+                trust_remote_code=args.trust_remote_code,
+                use_fast=True,
+            )
+        try:
+            resolved_thinking_mode = resolve_thinking_mode(
+                lcb_tokenizer,
+                prompt_format=resolved_prompt_format,
+                thinking_mode=args.thinking_mode,
+            )
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from exc
+    elif args.thinking_mode != "default":
+        raise SystemExit(
+            "livecodebench_codegen thinking_mode requires a chat-template prompt "
+            "surface, for example --lm-style-override HFChatTemplate."
+        )
+    prompt_rows = list(zip(benchmark, prompt_records, strict=True))
+    excluded_count = 0
+    if exclusion_archive.has_any:
+        filtered_rows = [
+            (instance, record)
+            for original_idx, (instance, record) in enumerate(prompt_rows)
+            if record[1] not in exclusion_archive.prompts
+            and original_idx not in exclusion_archive.sample_ids
+        ]
+        excluded_count = len(prompt_rows) - len(filtered_rows)
+        prompt_rows = filtered_rows
+    if args.max_samples is not None:
+        prompt_rows = prompt_rows[: args.max_samples]
+    selected_benchmark = [instance for instance, _record in prompt_rows]
     items = [
         PromptWorkItem(
             sample_id=idx,
-            prompt=prompt,
-            question_id=question_id,
+            prompt=record[1],
+            question_id=record[0],
+            record_id=record[0],
+            source_split=args.split,
+            prompt_style="livecodebench_codegen",
         )
-        for idx, (question_id, prompt) in enumerate(prompt_records)
+        for idx, (_instance, record) in enumerate(prompt_rows)
     ]
-    return items, {
+    metadata = {
         "lm_style": lm_style,
         "prompt_format_requested": args.prompt_format,
         "prompt_format_resolved": resolved_prompt_format,
-    }, selected_benchmark
+        **_thinking_mode_metadata(
+            requested=args.thinking_mode,
+            resolved=resolved_thinking_mode,
+        ),
+    }
+    if exclusion_archive.has_any:
+        metadata["exclude_prompt_jsonl"] = args.exclude_prompt_jsonl
+        metadata["excluded_prompt_count"] = int(excluded_count)
+        metadata["excluded_archive_prompt_count"] = int(len(exclusion_archive.prompts))
+        metadata["excluded_archive_sample_id_count"] = int(
+            len(exclusion_archive.sample_ids)
+        )
+    return items, metadata, selected_benchmark
+
+
+def _grade_qa_response(
+    *,
+    task_kind: str,
+    item: PromptWorkItem,
+    response_text: str,
+) -> bool:
+    if task_kind == "math_freeform":
+        return math_freeform.grade(response_text, item.gold_answer or "")
+    elif task_kind == "multiple_choice_gpqa":
+        return multiple_choice_gpqa.grade(response_text, item.gold_answer or "")
+    elif task_kind == "multiple_choice_mmlupro":
+        return multiple_choice_mmlupro.grade(
+            response_text,
+            item.gold_answer or "",
+            item.gold_index,
+        )
+    raise ValueError(f"Unsupported QA task_kind '{task_kind}'.")
 
 
 def _update_qa_stats(
     agg: WorkerAggregator,
     *,
-    task_kind: str,
-    item: PromptWorkItem,
-    response_text: str,
+    correct: bool,
     token_count: int,
     loop_flag: bool,
     max_length_hit: bool,
 ) -> None:
-    if task_kind == "math_freeform":
-        correct = math_freeform.grade(response_text, item.gold_answer or "")
-    elif task_kind == "multiple_choice_gpqa":
-        correct = multiple_choice_gpqa.grade(response_text, item.gold_answer or "")
-    elif task_kind == "multiple_choice_mmlupro":
-        correct = multiple_choice_mmlupro.grade(
-            response_text,
-            item.gold_answer or "",
-            item.gold_index,
-        )
-    else:
-        raise ValueError(f"Unsupported QA task_kind '{task_kind}'.")
-
     agg.num_graded += 1
     if correct:
         agg.num_correct += 1
@@ -537,12 +868,291 @@ def _update_qa_stats(
         agg.wrong_length_sum += token_count
 
 
+def _sanitize_jsonable(value: object) -> object:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, list):
+        return [_sanitize_jsonable(item) for item in value]
+    if isinstance(value, tuple):
+        return [_sanitize_jsonable(item) for item in value]
+    if isinstance(value, dict):
+        return {str(key): _sanitize_jsonable(item) for key, item in value.items()}
+    return str(value)
+
+
+def _median(values: list[int]) -> float | None:
+    if not values:
+        return None
+    ordered = sorted(int(value) for value in values)
+    mid = len(ordered) // 2
+    if len(ordered) % 2 == 1:
+        return float(ordered[mid])
+    return (float(ordered[mid - 1]) + float(ordered[mid])) / 2.0
+
+
+def _build_prompt_profile_rows(
+    item: PromptWorkItem,
+    *,
+    prompt: str,
+    prompt_token_ids: list[int],
+    effective_max_tokens: int,
+    prompt_rollout_rows: list[dict[str, object]],
+    profile: dict[str, object],
+    target_name: str,
+    target_value: int,
+) -> tuple[dict[str, object], dict[str, object]]:
+    record_metadata = (
+        _sanitize_jsonable(item.record_metadata)
+        if item.record_metadata is not None
+        else None
+    )
+    summary_row = {
+        "schema_name": PROMPT_PROFILE_SUMMARY_SCHEMA,
+        "split": item.source_split,
+        "sample_id": int(item.sample_id),
+        "record_id": item.record_id,
+        "question_id": item.question_id,
+        "prompt_style": item.prompt_style,
+        "choices": list(item.choices) if item.choices is not None else None,
+        "prompt_token_count": int(len(prompt_token_ids)),
+        "effective_max_tokens": int(effective_max_tokens),
+        "target_kind": "binary",
+        "target_name": target_name,
+        "target_value": int(target_value),
+        target_name: int(target_value),
+        "p_cap": float(profile["p_cap"]),
+        "p_loop": float(profile["p_loop"]),
+        "loop_budget_share": float(profile["loop_budget_share"]),
+        "mu_log_rel": float(profile["mu_log_rel"]),
+        "mean_length": float(profile["mean_length"]),
+        "mean_relative_length": float(profile["mean_relative_length"]),
+        "tail_threshold": float(profile["tail_threshold"]),
+        "tail_hit_count": int(profile["tail_hit_count"]),
+        "majority_tail": int(profile["majority_tail"]),
+        "num_rollouts": int(profile["num_rollouts"]),
+        "lengths": profile["lengths"],
+        "relative_lengths": profile["relative_lengths"],
+        "cap_hits": profile["cap_hits"],
+        "loop_flags": profile["loop_flags"],
+        "tail_hits": profile["tail_hits"],
+        "first_loop_prefix_lengths": profile["first_loop_prefix_lengths"],
+        "finish_reasons": [row["finish_reason"] for row in prompt_rollout_rows],
+        "correct_flags": [row.get("correct") for row in prompt_rollout_rows],
+        "record_metadata": record_metadata,
+    }
+    archive_row = {
+        "schema_name": PROMPT_PROFILE_ARCHIVE_SCHEMA,
+        "split": item.source_split,
+        "sample_id": int(item.sample_id),
+        "record_id": item.record_id,
+        "question_id": item.question_id,
+        "prompt_style": item.prompt_style,
+        "choices": list(item.choices) if item.choices is not None else None,
+        "prompt": prompt,
+        "prompt_token_ids": list(prompt_token_ids),
+        "prompt_token_count": int(len(prompt_token_ids)),
+        "effective_max_tokens": int(effective_max_tokens),
+        "target_kind": "binary",
+        "target_name": target_name,
+        "target_value": int(target_value),
+        target_name: int(target_value),
+        "p_cap": float(profile["p_cap"]),
+        "p_loop": float(profile["p_loop"]),
+        "loop_budget_share": float(profile["loop_budget_share"]),
+        "mu_log_rel": float(profile["mu_log_rel"]),
+        "mean_length": float(profile["mean_length"]),
+        "mean_relative_length": float(profile["mean_relative_length"]),
+        "tail_threshold": float(profile["tail_threshold"]),
+        "tail_hit_count": int(profile["tail_hit_count"]),
+        "majority_tail": int(profile["majority_tail"]),
+        "num_rollouts": int(profile["num_rollouts"]),
+        "rollouts": prompt_rollout_rows,
+        "record_metadata": record_metadata,
+    }
+    return summary_row, archive_row
+
+
+def _build_prompt_too_long_rows(
+    item: PromptWorkItem,
+    *,
+    prompt: str,
+    prompt_token_ids: list[int],
+    effective_max_tokens: int,
+    target_name: str,
+) -> tuple[dict[str, object], dict[str, object]]:
+    record_metadata = (
+        _sanitize_jsonable(item.record_metadata)
+        if item.record_metadata is not None
+        else None
+    )
+    common = {
+        "split": item.source_split,
+        "sample_id": int(item.sample_id),
+        "record_id": item.record_id,
+        "question_id": item.question_id,
+        "prompt_style": item.prompt_style,
+        "choices": list(item.choices) if item.choices is not None else None,
+        "prompt_token_count": int(len(prompt_token_ids)),
+        "effective_max_tokens": int(effective_max_tokens),
+        "target_kind": "binary",
+        "target_name": target_name,
+        "target_value": None,
+        target_name: None,
+        "num_rollouts": 0,
+        "prompt_too_long": True,
+        "record_metadata": record_metadata,
+    }
+    summary_row = {
+        "schema_name": PROMPT_PROFILE_SUMMARY_SCHEMA,
+        **common,
+        "finish_reasons": [],
+        "correct_flags": [],
+    }
+    archive_row = {
+        "schema_name": PROMPT_PROFILE_ARCHIVE_SCHEMA,
+        **common,
+        "prompt": prompt,
+        "prompt_token_ids": list(prompt_token_ids),
+        "rollouts": [],
+    }
+    return summary_row, archive_row
+
+
+def _write_jsonl_rows(path: str, rows: list[dict[str, object]]) -> None:
+    out_dir = os.path.dirname(path)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
+def _append_jsonl_row(path: str, row: dict[str, object]) -> None:
+    out_dir = os.path.dirname(path)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
+    with open(path, "a", encoding="utf-8") as handle:
+        handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
+def _prompt_profile_summary(
+    rows: list[dict[str, object]],
+    *,
+    tail_threshold: float,
+) -> dict[str, object]:
+    profiled_rows = [
+        row for row in rows if not bool(row.get("prompt_too_long")) and int(row.get("num_rollouts", 0)) > 0
+    ]
+    rollout_lengths: list[int] = []
+    prompt_lengths = [int(row["prompt_token_count"]) for row in rows if isinstance(row.get("prompt_token_count"), int)]
+    total_tail_hits = 0
+    total_rollouts = 0
+    positive_count = 0
+    for row in profiled_rows:
+        positive_count += int(row.get("majority_tail", 0))
+        total_tail_hits += int(row.get("tail_hit_count", 0))
+        total_rollouts += int(row.get("num_rollouts", 0))
+        rollout_lengths.extend(int(length) for length in row.get("lengths", []))
+    profiled_prompt_count = len(profiled_rows)
+    return {
+        "schema_name": PROMPT_PROFILE_SUMMARY_SCHEMA,
+        "tail_threshold": float(tail_threshold),
+        "target_name": profile_target_name("majority_tail", tail_threshold=tail_threshold),
+        "prompt_count_total": len(rows),
+        "prompt_count_profiled": profiled_prompt_count,
+        "prompt_count_too_long": int(sum(bool(row.get("prompt_too_long")) for row in rows)),
+        "prompt_positive_count": positive_count,
+        "prompt_positive_rate": (
+            float(positive_count) / float(profiled_prompt_count)
+            if profiled_prompt_count
+            else None
+        ),
+        "completion_tail_fraction": (
+            float(total_tail_hits) / float(total_rollouts)
+            if total_rollouts
+            else None
+        ),
+        "avg_generation_length": (
+            float(sum(rollout_lengths)) / float(len(rollout_lengths))
+            if rollout_lengths
+            else None
+        ),
+        "median_generation_length": _median(rollout_lengths),
+        "avg_prompt_token_count": (
+            float(sum(prompt_lengths)) / float(len(prompt_lengths))
+            if prompt_lengths
+            else None
+        ),
+        "median_prompt_token_count": _median(prompt_lengths),
+    }
+
+
+def _write_progress_checkpoint(
+    agg: WorkerAggregator,
+    collector_cfg: CollectorConfig,
+    *,
+    tail_threshold: float,
+    out_path: str,
+) -> str:
+    prompt_profile_summary = _prompt_profile_summary(
+        agg.prompt_profile_rows,
+        tail_threshold=tail_threshold,
+    )
+    metrics = compute_metrics(agg, collector_cfg.statistics)
+    payload = {
+        "status": "in_progress",
+        "metadata": {
+            "task_kind": collector_cfg.task_kind,
+            "model_id": collector_cfg.rollout_cfg.model_id,
+            "seed": collector_cfg.seed,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            **(collector_cfg.progress_metadata or {}),
+            "prompt_profile_summary": prompt_profile_summary,
+            "prompt_profile_file": os.path.basename(_prompt_profile_path(out_path)),
+            "prompt_rollout_archive_file": os.path.basename(_prompt_rollout_archive_path(out_path)),
+            "prompt_rollout_archive_schema": PROMPT_PROFILE_ARCHIVE_SCHEMA,
+        },
+        "counts": {
+            "num_samples": agg.num_samples_seen,
+            "num_generated": agg.num_generated,
+            "num_graded": agg.num_graded,
+            "num_correct": agg.num_correct,
+            "num_wrong": agg.num_wrong,
+            "num_looped": agg.num_looped,
+            "num_max_length_hits": agg.num_max_length_hits,
+            "num_prompt_too_long": agg.num_prompt_too_long,
+            "num_looped_and_max_length_hit": agg.num_looped_and_max_length_hit,
+            "num_correct_and_looped": agg.num_correct_and_looped,
+            "num_correct_and_max_length_hit": agg.num_correct_and_max_length_hit,
+            "num_correct_and_looped_and_max_length_hit": (
+                agg.num_correct_and_looped_and_max_length_hit
+            ),
+            "num_prompt_profiled": int(prompt_profile_summary["prompt_count_profiled"]),
+            "num_prompt_majority_tail_positive": int(
+                prompt_profile_summary["prompt_positive_count"]
+            ),
+        },
+        "metrics": {
+            **metrics,
+            "majority_s_0.5_positive_rate": prompt_profile_summary["prompt_positive_rate"],
+            "completion_tail_fraction": prompt_profile_summary["completion_tail_fraction"],
+            "median_generation_length": prompt_profile_summary["median_generation_length"],
+        },
+    }
+    path = _progress_path(out_path)
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2)
+    return path
+
+
 def _collect_worker_stats(
     items: list[PromptWorkItem],
     collector_cfg: CollectorConfig,
     *,
     loop_n: int,
     loop_k: int,
+    tail_threshold: float,
+    progress_out_path: str | None = None,
     rank: int = 0,
 ) -> WorkerAggregator:
     try:
@@ -555,6 +1165,7 @@ def _collect_worker_stats(
     agg = WorkerAggregator()
     if not items:
         return agg
+    target_name = profile_target_name("majority_tail", tail_threshold=tail_threshold)
 
     rollout_cfg = collector_cfg.rollout_cfg
     if rollout_cfg.max_num_seqs is not None and rollout_cfg.max_num_seqs < 1:
@@ -639,11 +1250,29 @@ def _collect_worker_stats(
             effective_max = _effective_max_tokens(prompt_len, rollout_cfg)
             if effective_max < 1:
                 agg.num_prompt_too_long += 1
+                profile_row, archive_row = _build_prompt_too_long_rows(
+                    item,
+                    prompt=item.prompt,
+                    prompt_token_ids=[int(tok) for tok in input_ids],
+                    effective_max_tokens=effective_max,
+                    target_name=target_name,
+                )
+                agg.prompt_profile_rows.append(profile_row)
+                agg.prompt_rollout_archive_rows.append(archive_row)
+                if progress_out_path:
+                    _append_jsonl_row(_prompt_profile_path(progress_out_path), profile_row)
+                    _append_jsonl_row(_prompt_rollout_archive_path(progress_out_path), archive_row)
+                    _write_progress_checkpoint(
+                        agg,
+                        collector_cfg,
+                        tail_threshold=tail_threshold,
+                        out_path=progress_out_path,
+                    )
                 agg.prompt_rollout_records.append(
                     {
                         "sample_id": int(item.sample_id),
                         "prompt": item.prompt,
-                        "prompt_token_ids": list(input_ids),
+                        "prompt_token_ids": [int(tok) for tok in input_ids],
                         "prompt_token_count": int(prompt_len),
                         "effective_max_tokens": int(effective_max),
                         "gold_answer": item.gold_answer,
@@ -677,7 +1306,10 @@ def _collect_worker_stats(
                         )
                     )
                 continue
-            valid_items.append((item, list(input_ids), prompt_len, effective_max))
+            valid_items.append((item, [int(tok) for tok in input_ids], prompt_len, effective_max))
+            valid_items.append(
+                (item, [int(tok) for tok in input_ids], prompt_len, effective_max)
+            )
 
         if valid_items:
             for item, prompt_token_ids, prompt_len, effective_max in valid_items:
@@ -702,13 +1334,16 @@ def _collect_worker_stats(
                         f"{rollout_cfg.num_generations} output(s) per prompt, got "
                         f"{len(output.outputs)}."
                     )
+                prompt_rollout_rows: list[dict[str, object]] = []
                 prompt_rollouts: list[dict[str, Any]] = []
+                prompt_rollout_rows: list[dict[str, object]] = []
                 for generation_index, sample in enumerate(output.outputs):
                     text = str(getattr(sample, "text", ""))
                     token_ids = getattr(sample, "token_ids", None)
                     if not token_ids:
                         token_ids = tokenizer.encode(text, add_special_tokens=False)
-                    token_ids = list(token_ids)
+                    token_ids = [int(token_id) for token_id in token_ids]
+                    token_ids = [int(token_id) for token_id in token_ids]
                     token_count = len(token_ids)
                     total_token_count = _total_token_count(prompt_len, token_count)
                     finish_reason = _normalize_finish_reason(
@@ -763,7 +1398,7 @@ def _collect_worker_stats(
                             ),
                         }
                     )
-
+                    correct_flag: int | None = None
                     if collector_cfg.task_kind == "livecodebench_codegen":
                         agg.lcb_sample_records.append(
                             LcbSampleRecord(
@@ -787,16 +1422,79 @@ def _collect_worker_stats(
                                 first_loop_prefix_length=first_loop_prefix,
                             )
                         )
-                    else:
-                        _update_qa_stats(
-                            agg,
+                    elif collector_cfg.task_kind in {
+                        "math_freeform",
+                        "multiple_choice_gpqa",
+                        "multiple_choice_mmlupro",
+                    }:
+                        correct = _grade_qa_response(
                             task_kind=collector_cfg.task_kind,
                             item=item,
                             response_text=text,
+                        )
+                        correct_flag = int(correct)
+                        _update_qa_stats(
+                            agg,
+                            correct=correct,
                             token_count=token_count,
                             loop_flag=loop_flag,
                             max_length_hit=max_length_hit,
                         )
+                    prompt_rollout_row = {
+                        "rollout_index": int(generation_index),
+                        "completion_text": text,
+                        "completion_token_ids": token_ids,
+                        "finish_reason": finish_reason,
+                        "length": int(token_count),
+                        "relative_length": (
+                            float(token_count) / float(effective_max)
+                            if effective_max > 0
+                            else None
+                        ),
+                        "cap_hit": int(max_length_hit),
+                        "loop_flag": int(loop_flag),
+                        "tail_hit": int(
+                            effective_max > 0
+                            and (float(token_count) / float(effective_max)) >= float(tail_threshold)
+                        ),
+                        "first_loop_prefix_length": first_loop_prefix,
+                        "correct": correct_flag,
+                    }
+                    if collector_cfg.task_kind == "livecodebench_codegen":
+                        prompt_rollout_row["question_id"] = item.question_id
+                    prompt_rollout_rows.append(prompt_rollout_row)
+
+                profile = aggregate_prompt_profile(
+                    [row["completion_token_ids"] for row in prompt_rollout_rows],
+                    effective_max_tokens=effective_max,
+                    loop_n=loop_n,
+                    loop_k=loop_k,
+                    tail_threshold=tail_threshold,
+                    finish_reasons=[str(row["finish_reason"]) for row in prompt_rollout_rows],
+                )
+                prompt_profile_row, archive_row = _build_prompt_profile_rows(
+                    item,
+                    prompt=item.prompt,
+                    prompt_token_ids=prompt_token_ids,
+                    effective_max_tokens=effective_max,
+                    prompt_rollout_rows=prompt_rollout_rows,
+                    profile=profile,
+                    target_name=target_name,
+                    target_value=int(profile["majority_tail"]),
+                )
+                agg.prompt_profile_rows.append(prompt_profile_row)
+                agg.prompt_rollout_archive_rows.append(archive_row)
+                if progress_out_path:
+                    _append_jsonl_row(_prompt_profile_path(progress_out_path), prompt_profile_row)
+                    _append_jsonl_row(_prompt_rollout_archive_path(progress_out_path), archive_row)
+                    _write_progress_checkpoint(
+                        agg,
+                        collector_cfg,
+                        tail_threshold=tail_threshold,
+                        out_path=progress_out_path,
+                    )
+                    if collector_cfg.task_kind == "livecodebench_codegen":
+                        _write_lcb_records_checkpoint(agg, progress_out_path)
 
                 agg.prompt_rollout_records.append(
                     {
@@ -837,6 +1535,7 @@ def _worker_main(
     collector_cfg: CollectorConfig,
     loop_n: int,
     loop_k: int,
+    tail_threshold: float,
     out_queue,
 ) -> None:
     suppress_sem_unlink_errors()
@@ -851,6 +1550,7 @@ def _worker_main(
             collector_cfg,
             loop_n=loop_n,
             loop_k=loop_k,
+            tail_threshold=tail_threshold,
             rank=rank,
         )
         _spill_prompt_rollout_records(
@@ -938,6 +1638,8 @@ def _run_collection(
     *,
     loop_n: int,
     loop_k: int,
+    tail_threshold: float,
+    progress_out_path: str | None = None,
 ) -> WorkerAggregator:
     if collector_cfg.rollout_cfg.dp == 1:
         return _collect_worker_stats(
@@ -945,6 +1647,8 @@ def _run_collection(
             collector_cfg,
             loop_n=loop_n,
             loop_k=loop_k,
+            tail_threshold=tail_threshold,
+            progress_out_path=progress_out_path,
         )
 
     devices = get_visible_devices()
@@ -968,6 +1672,7 @@ def _run_collection(
                 collector_cfg,
                 loop_n,
                 loop_k,
+                tail_threshold,
                 out_queue,
             ),
         )
@@ -1139,7 +1844,7 @@ def _apply_lcb_grades(
     *,
     repo_path: str,
     release_version: str,
-) -> dict[str, Any]:
+) -> tuple[dict[str, Any], dict[tuple[str, int], bool]]:
     native_metrics, grading_by_record_key = livecodebench_codegen.evaluate_records(
         benchmark,
         agg.lcb_sample_records,
@@ -1186,7 +1891,107 @@ def _apply_lcb_grades(
         else:
             agg.num_wrong += 1
             agg.wrong_length_sum += record.token_count
-    return native_metrics
+    return native_metrics, grading_by_record_key
+
+
+def _annotate_lcb_prompt_rows_with_grades(
+    agg: WorkerAggregator,
+    *,
+    grading_by_record_key: dict[tuple[str, int], bool],
+) -> None:
+    for row in agg.prompt_rollout_archive_rows:
+        question_id = row.get("question_id")
+        rollouts = row.get("rollouts")
+        if not isinstance(question_id, str) or not isinstance(rollouts, list):
+            continue
+        correct_flags: list[int | None] = []
+        for rollout in rollouts:
+            if not isinstance(rollout, dict):
+                correct_flags.append(None)
+                continue
+            rollout_index = int(rollout.get("rollout_index", len(correct_flags)))
+            passed = grading_by_record_key.get((question_id, rollout_index))
+            rollout["correct"] = None if passed is None else int(bool(passed))
+            correct_flags.append(rollout["correct"])
+        row["correct_flags"] = correct_flags
+
+    by_question_id = {
+        str(row.get("question_id")): row for row in agg.prompt_rollout_archive_rows if isinstance(row, dict)
+    }
+    for row in agg.prompt_profile_rows:
+        question_id = row.get("question_id")
+        if not isinstance(question_id, str):
+            continue
+        archive_row = by_question_id.get(question_id)
+        if not isinstance(archive_row, dict):
+            continue
+        correct_flags = archive_row.get("correct_flags")
+        row["correct_flags"] = correct_flags
+
+
+def _apply_taco_grades(
+    agg: WorkerAggregator,
+) -> tuple[dict[str, object], dict[tuple[int, int], bool]]:
+    native_metrics, grading_by_record_key = taco_codegen.evaluate_prompt_archive_rows(
+        agg.prompt_rollout_archive_rows,
+    )
+    agg.num_graded = 0
+    agg.num_correct = 0
+    agg.num_wrong = 0
+    agg.correct_length_sum = 0
+    agg.wrong_length_sum = 0
+    agg.num_correct_and_looped = 0
+    agg.num_correct_and_max_length_hit = 0
+    agg.num_correct_and_looped_and_max_length_hit = 0
+
+    for row in agg.prompt_rollout_archive_rows:
+        sample_id = row.get("sample_id")
+        rollouts = row.get("rollouts")
+        if not isinstance(sample_id, int) or not isinstance(rollouts, list):
+            continue
+        correct_flags: list[int | None] = []
+        for rollout in rollouts:
+            if not isinstance(rollout, dict):
+                correct_flags.append(None)
+                continue
+            rollout_index = int(rollout.get("rollout_index", len(correct_flags)))
+            passed = grading_by_record_key.get((sample_id, rollout_index))
+            rollout["correct"] = None if passed is None else int(bool(passed))
+            correct_flags.append(rollout["correct"])
+            if passed is None:
+                continue
+            agg.num_graded += 1
+            token_count = int(rollout.get("length", 0))
+            loop_flag = bool(int(rollout.get("loop_flag", 0)))
+            max_length_hit = bool(int(rollout.get("cap_hit", 0)))
+            if passed:
+                agg.num_correct += 1
+                agg.correct_length_sum += token_count
+                if loop_flag:
+                    agg.num_correct_and_looped += 1
+                if max_length_hit:
+                    agg.num_correct_and_max_length_hit += 1
+                if loop_flag and max_length_hit:
+                    agg.num_correct_and_looped_and_max_length_hit += 1
+            else:
+                agg.num_wrong += 1
+                agg.wrong_length_sum += token_count
+        row["correct_flags"] = correct_flags
+
+    by_sample_id = {
+        int(row.get("sample_id")): row
+        for row in agg.prompt_rollout_archive_rows
+        if isinstance(row, dict) and isinstance(row.get("sample_id"), int)
+    }
+    for row in agg.prompt_profile_rows:
+        sample_id = row.get("sample_id")
+        if not isinstance(sample_id, int):
+            continue
+        archive_row = by_sample_id.get(sample_id)
+        if not isinstance(archive_row, dict):
+            continue
+        row["correct_flags"] = archive_row.get("correct_flags")
+    return native_metrics, grading_by_record_key
 
 
 def _write_lcb_records_checkpoint(agg: WorkerAggregator, out_path: str) -> str:
@@ -1209,7 +2014,7 @@ def _write_lcb_records_checkpoint(agg: WorkerAggregator, out_path: str) -> str:
 def _write_prompt_rollout_archive(agg: WorkerAggregator, out_path: str) -> str:
     if not agg.prompt_rollout_records and not agg.prompt_rollout_part_paths:
         return ""
-    archive_path = _prompt_rollout_archive_path(out_path)
+    archive_path = _prompt_rollout_replay_path(out_path)
     archive_dir = os.path.dirname(archive_path)
     if archive_dir:
         os.makedirs(archive_dir, exist_ok=True)
@@ -1238,7 +2043,7 @@ def _restore_prompt_rollout_archive_for_resume(
     if not os.path.isfile(archive_path):
         return ""
 
-    destination_path = _prompt_rollout_archive_path(out_path)
+    destination_path = _prompt_rollout_replay_path(out_path)
     if os.path.abspath(archive_path) == os.path.abspath(destination_path):
         return archive_path
 
@@ -1255,6 +2060,11 @@ def _restore_prompt_rollout_archive_for_resume(
 
 
 def _prompt_token_summary(agg: WorkerAggregator) -> dict[str, float | int | None]:
+    prompt_lengths = [
+        int(row["prompt_token_count"])
+        for row in agg.prompt_profile_rows
+        if isinstance(row, dict) and isinstance(row.get("prompt_token_count"), int)
+    ]
     avg_prompt_length = (
         float(agg.prompt_length_sum) / float(agg.num_samples_seen)
         if agg.num_samples_seen
@@ -1262,6 +2072,7 @@ def _prompt_token_summary(agg: WorkerAggregator) -> dict[str, float | int | None
     )
     return {
         "avg_prompt_token_count": avg_prompt_length,
+        "median_prompt_token_count": _median(prompt_lengths),
         "min_prompt_token_count": agg.prompt_length_min,
         "max_prompt_token_count": agg.prompt_length_max,
     }
@@ -1271,7 +2082,7 @@ def main() -> None:
     args = _parse_args()
     resume_lcb_checkpoint = args.resume_lcb_records_checkpoint.strip()
     resume_prompt_rollout_archive = (
-        _prompt_rollout_archive_path_for_lcb_checkpoint(resume_lcb_checkpoint)
+        _prompt_rollout_replay_path_for_lcb_checkpoint(resume_lcb_checkpoint)
         if resume_lcb_checkpoint
         else ""
     )
@@ -1292,7 +2103,7 @@ def main() -> None:
         args,
         out_path,
         preserve_lcb_checkpoint_path=resume_lcb_checkpoint or None,
-        preserve_prompt_rollout_archive_path=resume_prompt_rollout_archive or None,
+        preserve_prompt_rollout_replay_path=resume_prompt_rollout_archive or None,
     )
 
     tokenizer = None
@@ -1316,6 +2127,33 @@ def main() -> None:
         livecodebench_repo=args.livecodebench_repo or None,
         release_version=args.release_version,
         lm_style_override=args.lm_style_override,
+        progress_metadata={
+            "dataset": args.dataset,
+            "config": args.dataset_config,
+            "split": args.split,
+            "generation_config": {
+                **rollout_cfg.to_dict(),
+                "top_p": resolve_sampling_defaults(
+                    rollout_cfg.model_id,
+                    top_p=rollout_cfg.top_p,
+                    top_k=rollout_cfg.top_k,
+                )[0],
+                "top_k": resolve_sampling_defaults(
+                    rollout_cfg.model_id,
+                    top_p=rollout_cfg.top_p,
+                    top_k=rollout_cfg.top_k,
+                )[1],
+            },
+            "statistics": statistics,
+            "loop_detector": {"n": args.loop_n, "k": args.loop_k},
+            **({"max_samples": args.max_samples} if args.max_samples is not None else {}),
+            **(
+                {"release_version": args.release_version}
+                if args.task_kind == "livecodebench_codegen"
+                else {}
+            ),
+            **task_metadata,
+        },
     )
 
     if resume_lcb_checkpoint:
@@ -1340,27 +2178,52 @@ def main() -> None:
             collector_cfg,
             loop_n=args.loop_n,
             loop_k=args.loop_k,
+            tail_threshold=args.profile_tail_threshold,
+            progress_out_path=out_path,
         )
 
-    prompt_rollout_archive_path = _write_prompt_rollout_archive(agg, out_path)
-    if not prompt_rollout_archive_path and resume_prompt_rollout_archive:
-        prompt_rollout_archive_path = _restore_prompt_rollout_archive_for_resume(
+    prompt_rollout_replay_path = _write_prompt_rollout_archive(agg, out_path)
+    if not prompt_rollout_replay_path and resume_prompt_rollout_archive:
+        prompt_rollout_replay_path = _restore_prompt_rollout_archive_for_resume(
             resume_prompt_rollout_archive,
             out_path,
         )
 
     lcb_native_metrics: dict[str, Any] = {}
+    taco_native_metrics: dict[str, object] = {}
     if args.task_kind == "livecodebench_codegen":
         if not resume_lcb_checkpoint:
             _write_lcb_records_checkpoint(agg, out_path)
-        lcb_native_metrics = _apply_lcb_grades(
+        lcb_native_metrics, grading_by_record_key = _apply_lcb_grades(
             agg,
             lcb_benchmark,
             repo_path=args.livecodebench_repo,
             release_version=args.release_version,
         )
+        _annotate_lcb_prompt_rows_with_grades(
+            agg,
+            grading_by_record_key=grading_by_record_key,
+        )
+    elif args.task_kind == "taco_codegen":
+        taco_native_metrics, _grading_by_record_key = _apply_taco_grades(agg)
+    agg.prompt_profile_rows.sort(key=lambda row: int(row.get("sample_id", -1)))
+    agg.prompt_rollout_archive_rows.sort(key=lambda row: int(row.get("sample_id", -1)))
 
     metrics = compute_metrics(agg, statistics)
+    prompt_profile_summary = _prompt_profile_summary(
+        agg.prompt_profile_rows,
+        tail_threshold=args.profile_tail_threshold,
+    )
+    prompt_profile_relpath = (
+        os.path.basename(_prompt_profile_path(out_path))
+        if agg.prompt_profile_rows
+        else None
+    )
+    prompt_rollout_archive_relpath = (
+        os.path.basename(_prompt_rollout_archive_path(out_path))
+        if agg.prompt_rollout_archive_rows
+        else None
+    )
     resolved_generation_config = rollout_cfg.to_dict()
     resolved_top_p, resolved_top_k = resolve_sampling_defaults(
         rollout_cfg.model_id,
@@ -1383,6 +2246,14 @@ def main() -> None:
             "statistics": statistics,
             "loop_detector": {"n": args.loop_n, "k": args.loop_k},
             "prompt_token_summary": _prompt_token_summary(agg),
+            "prompt_profile_summary": prompt_profile_summary,
+            "prompt_profile_file": prompt_profile_relpath,
+            "prompt_rollout_archive_file": prompt_rollout_archive_relpath,
+            "prompt_rollout_archive_schema": (
+                PROMPT_PROFILE_ARCHIVE_SCHEMA
+                if prompt_rollout_archive_relpath is not None
+                else None
+            ),
             "timestamp": datetime.now(timezone.utc).isoformat(),
             **({"max_samples": args.max_samples} if args.max_samples is not None else {}),
             **(
@@ -1392,11 +2263,11 @@ def main() -> None:
             ),
             **(
                 {
-                    "prompt_rollout_archive_file": os.path.basename(
-                        prompt_rollout_archive_path
+                    "rollout_replay_archive_file": os.path.basename(
+                        prompt_rollout_replay_path
                     )
                 }
-                if prompt_rollout_archive_path
+                if prompt_rollout_replay_path
                 else {}
             ),
             **task_metadata,
@@ -1419,12 +2290,34 @@ def main() -> None:
         },
         "metrics": metrics,
     }
+    payload["counts"]["num_prompt_profiled"] = int(prompt_profile_summary["prompt_count_profiled"])
+    payload["counts"]["num_prompt_majority_tail_positive"] = int(
+        prompt_profile_summary["prompt_positive_count"]
+    )
+    payload["metrics"]["majority_s_0.5_positive_rate"] = prompt_profile_summary[
+        "prompt_positive_rate"
+    ]
+    payload["metrics"]["completion_tail_fraction"] = prompt_profile_summary[
+        "completion_tail_fraction"
+    ]
+    payload["metrics"]["median_generation_length"] = prompt_profile_summary[
+        "median_generation_length"
+    ]
     if lcb_native_metrics:
         payload["metadata"]["lcb_native_metrics"] = lcb_native_metrics
+    if taco_native_metrics:
+        payload["metadata"]["taco_native_metrics"] = taco_native_metrics
 
     out_dir = os.path.dirname(out_path)
     if out_dir:
         os.makedirs(out_dir, exist_ok=True)
+    if agg.prompt_profile_rows:
+        _write_jsonl_rows(_prompt_profile_path(out_path), agg.prompt_profile_rows)
+    if agg.prompt_rollout_archive_rows:
+        _write_jsonl_rows(
+            _prompt_rollout_archive_path(out_path),
+            agg.prompt_rollout_archive_rows,
+        )
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2)
     print(f"Wrote model stats to {out_path}", flush=True)

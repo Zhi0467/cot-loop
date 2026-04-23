@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-04-09 22:55 UTC
+Last updated: 2026-04-23 18:25 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -9,12 +9,18 @@ Purpose:
 Core docs:
 - Project roadmap: ../roadmap.md
 - Open experiment ledger / next runs: ../backlog.md
+- Main rollout rebuild note: main-four-dataset-rollout-rebuild-2026-04-23.md
 - Degeneracy-origin rollout-stat plan: ../understand-where-loop-and-max-length-come-from.md
 - Prompt-profile implementation path: prompt-profile-probe.md
 - Prompt-profile evaluation contract: prompt-profile-eval-contract.md
 - Prompt-profile risk-screen decision: prompt-profile-risk-screen-2026-03-30.md
 - Prompt-profile plain-language note: prompt-profile-plain-language-2026-03-30.md
 - Prompt-profile full-train plan: prompt-profile-full-train-plan-2026-04-02.md
+- Prompt-profile RFM + steering stage plan: prompt-profile-rfm-steering-plan-2026-04-21.md
+- Prompt-profile RFM + steering mode-consistent stage note: prompt-profile-rfm-mode-consistent-stage-2026-04-23.md
+- Prompt-profile RFM + steering grounded stage note: prompt-profile-rfm-steering-grounded-stage-2026-04-23.md
+- Prompt-profile RFM artifact schema: prompt-profile-rfm-artifact-schema-2026-04-21.md
+- LiveCodeBench repaired stage report: livecodebench-repaired-stage-report-2026-04-21.md
 - Prompt-profile natural-regression rerun note: prompt-profile-natural-regression-rerun-2026-04-05.md
 - Prompt-profile unified report note: prompt-profile-unified-report-2026-04-09.md
 - Prompt-profile combined audit note: prompt-profile-combined-audit-2026-04-05.md
@@ -42,10 +48,14 @@ Key outputs:
 - Prompt-profile risk-control bundle: ../outputs/prompt_profile_risk_controls_20260330/
 - Plain-language objective PDF: ../outputs/prompt_profile_plain_language_20260330/prompt_profile_plain_language_20260330.pdf
 - Full-train plan PDF: ../outputs/prompt_profile_full_train_plan_20260402/prompt_profile_full_train_plan_20260402.pdf
+- Mode-consistent stage note PDF: ../outputs/prompt_profile_rfm_mode_consistent_stage_20260423/prompt_profile_rfm_mode_consistent_stage_20260423.pdf
+- Grounded stage note PDF: ../outputs/prompt_profile_rfm_stage_grounded_plan_20260423/prompt_profile_rfm_stage_grounded_plan_20260423.pdf
 - Natural-regression rerun bundle: ../outputs/prompt_profile_natural_regression_rerun_20260405/
 - Natural-regression rerun PDF: ../outputs/prompt_profile_natural_regression_rerun_20260405/prompt_profile_natural_regression_rerun_20260405.pdf
 - Prompt-profile unified report bundle: ../outputs/prompt_profile_unified_report_20260409/
 - Prompt-profile unified report PDF: ../outputs/prompt_profile_unified_report_20260409/prompt_profile_unified_report_20260409.pdf
+- LiveCodeBench repaired stage report bundle: ../outputs/livecodebench_repaired_stage_report_apr21/
+- LiveCodeBench repaired stage report PDF: ../outputs/livecodebench_repaired_stage_report_apr21/livecodebench_repaired_stage_report_apr21.pdf
 - Prompt-profile combined audit bundle: ../outputs/prompt_profile_combined_audit_20260405/
 - Prompt-profile combined audit PDF: ../outputs/prompt_profile_combined_audit_20260405/prompt_profile_combined_audit_20260405.pdf
 - Prompt-profile metadata audit bundle: ../outputs/prompt_profile_metadata_audit_20260405/
@@ -77,16 +87,66 @@ Key outputs:
 - Detailed reopened-round summary PDF: ../outputs/prefill_rounds_1_to_12_detailed_summary/prefill_rounds_1_to_12_detailed_summary.pdf
 
 Current live status:
+- `main-four-dataset-rollout-rebuild-2026-04-23.md` is now the live rollout-stat status surface:
+  - it replaces the narrower March-repair / LiveCodeBench-only rerun framing for the current task;
+  - it now fixes the canonical dataset set to `LiveCodeBench`, `TACO-hard`, `MATH level-5`, and `Omni-MATH >= 7`;
+  - it records the corrected full-or-`1000` size policy:
+    - `LiveCodeBench` full `1055`
+    - `TACO-hard` `1000 / 5536`
+    - `MATH level-5` `1000 / 2304`
+    - `Omni-MATH >= 7` full `916`
+  - it records the two runtime fixes that made the suite runnable again:
+    - TACO native grading had to stop rebinding top-level functions as methods;
+    - `BAAI/TACO` now loads through the HF parquet surface because the old `TACO.py` dataset-script path is retired under the current `datasets` library;
+  - it records the new queue/env corrections that made the current queue honest:
+    - `LiveCodeBench-extra` was explicitly dropped after Wangzhi pointed out it is a strict subset of `LiveCodeBench`, and jobs `2876` / `2881` were canceled;
+    - the launcher now propagates `CONDA_ENV`, which is why the corrected relaunch lives while `2865` through `2874` died immediately;
+  - it records that the local `data/omni_math_ge7_screen_300.jsonl` file is now only a historical screen artifact, while the active stats suite reads the full HF `Omni-MATH >= 7` slice;
+  - it records the archive-level smoke receipt proving that prompt text, token ids, rollout text, completion token ids, and row metadata are all preserved for later reuse;
+  - it points at the live suite output root `../outputs/model_stats/main_five_dataset_rebuild_full_or_1k_20260423/` and the remote run root `/data/scratch/murphy/outputs/cot-loop-detection/main_five_dataset_rebuild_full_or_1k_20260423/`; those path names are historical, but the active manifest and queue now only cover jobs `2875`, `2877`, `2878`, `2879`, `2880`, `2882`, `2883`, and `2884`.
+- `prompt-profile-rfm-steering-grounded-stage-2026-04-23.md` is now the live status surface for this stage:
+  - it keeps the repaired `LiveCodeBench` object fixed at fit-train / val / test `280 / 128 / 160` with positives `140 / 35 / 54`;
+  - it separates finished evidence, live evidence, and blocked evidence instead of treating the whole stage as one undifferentiated status blob;
+  - it records that only two full-contract thinking-on rows are finished so far:
+    - `no_steer`: `2 / 160` `pass@1`, loop fraction `0.65625`
+    - `plus_v_linear`: `2 / 160` `pass@1`, loop fraction `0.6125`
+  - it records that the remaining five full-contract thinking-on rows are still running:
+    - `2804`, `2810`, `2811`, `2815`, `2816`
+  - it records that every attempted non-thinking row failed on the same dirty-slot CUDA OOM before first row, so the non-thinking lane is still infrastructure-blocked rather than scientifically read out;
+  - it updates the screening gate from a plan-only item to a live evidence surface:
+    - `LiveCodeBench-extra`: `255` profiled, positive rate `0.5529`
+    - `TACO-hard`: `213` profiled, positive rate `0.8075`
+    - `MATH level-5`: `180` profiled, positive rate `0.1389`
+    - `Omni-MATH >= 7`: `176 / 300`, positive rate `0.5867`
+  - it records that the explicit `LiveCodeBench` `HFChatTemplate` `thinking on/off` provenance pair is queued as `2829` / `2830`, but is not the main steering result;
+  - it also makes the repo/runtime drift explicit:
+    - local worktree state is ahead of the published draft PR `#11`;
+    - the positive-enrichment screen is currently running with home-backed caches because `/data` is effectively full.
+- `prompt-profile-rfm-steering-plan-2026-04-21.md` remains the design document for why this stage exists and what it is trying to prove.
+- The new note `livecodebench-repaired-stage-report-2026-04-21.md` is still the shortest collaborator-facing artifact for "finish LiveCodeBench" on the repaired detector/vector object:
+  - it freezes the repaired `LiveCodeBench` prompt object, detector comparison, direction-stability read, and first larger steering control table in one place;
+  - it points at the report bundle `../outputs/livecodebench_repaired_stage_report_apr21/`, which now carries:
+    - `livecodebench_repaired_stage_report_apr21.pdf`
+    - `livecodebench_stage_summary.json`
+    - detector, direction-stability, and steering figures;
+  - its scientific read is narrower than the full stage plan:
+    - detector side: RFM is competitive but not a clean activation-MLP win;
+    - direction side: the exported bundle is stable enough to study causally;
+    - steering side: the first larger `32`-prompt spherical control table is negative, with all steered conditions worse than baseline on loop fraction.
 - The combined audit `prompt-profile-combined-audit-2026-04-05.md` is still the whole-surface prompt-profile bundle:
   - it keeps the canonical natural regression rerun, the current balanced-binary default, the cheap prompt-stat audit, and the Athena code audit in one place;
   - it narrows the honest claim: the current reports establish lift over a 1D prompt-length baseline on some surfaces, not yet lift over strong prompt-only controls in general.
+- The unified report `prompt-profile-unified-report-2026-04-09.md` remains the main collaborator-facing prompt-profile summary:
+  - regression stays natural-split / natural-sampler;
+  - binary stays balanced-train / natural-test;
+  - the new RFM stage is an add-on to that surface, not a replacement for it.
 - The new note `prompt-profile-length-mechanism-2026-04-09.md` is the direct plain-English answer to the narrower question "why does prompt length predict completion length at all?":
   - on `AIME`, `MATH-500`, `MMLU-Pro`, and much of `LiveCodeBench`, prompt length mostly works as a rough workload proxy;
   - `GPQA` is the important exception where raw length is weak and prompt structure matters more;
   - the note is backed by a new `2`-GPU audit bundle under `../outputs/prompt_profile_length_mechanism_20260409/` plus an attached Athena plain-English read.
-- The next honest prompt-profile step is now a residualized conditional-lift audit on the natural regression head rather than another same-object rerun:
-  - keep the new length-mechanism note as the explanation of the prompt-length baseline;
-  - if the activation claim needs to move forward, evaluate activation lift over stronger prompt-shape controls or inside matched prompt-shape strata.
+- The stronger prompt-shape / residualized-control question is still open, but it is no longer the immediate next execution surface:
+  - first land the RFM detector-plus-steering stage on the frozen binary `majority_s_0.5` object;
+  - then use residualized or matched prompt-shape analysis if the activation-lift claim still needs to move beyond the current prompt-visible baselines.
 - The current prompt-level predictor task is "predict terminal rollout statistics from prompt-prefill activations under one fixed model and decode policy," not "force everything into one binary loop label."
 - The objective selector is now fixed explicitly: choose the target by held-out predictability on the target itself, not by the downstream `top 20%` loop-enrichment slice.
 - Under that criterion, `mean_relative_length` is the strongest current regression target and `majority_s_0.5` is the strongest finished binary label surface, and Wangzhi locked that pair for the first full-train pass.
@@ -99,6 +159,10 @@ Current live status:
   - older April 4 and April 6 live-checkpoint sections are preserved in-place but explicitly sit behind the now-finished Qwen surface;
   - use it when you want the full chronological path, not just the cleaned stage conclusion.
 - The docs note `understand-where-loop-and-max-length-come-from.md` is only the background definitions appendix for saved `loop`, prompt-profile `cap_hit` / `p_cap`, rollout-stat `max_length_hit`, and `majority_s_0.5`.
+- The trigger-attention line is no longer the active GitHub blocker surface:
+  - upstream PR `#10` is already merged;
+  - the merged note is still useful background on prompt-dominant late-layer attention plus a mid-stack previous-loop signal;
+  - it should not be used as validation for the new RFM steering stage.
 - The new note `olmo-degeneration-origin-audit-2026-04-04.md` is the collaborator-facing OLMo audit surface for that thread:
   - it consolidates the repaired OLMo3 `MMLU-Pro` / `LiveCodeBench` rows plus the bounded OLMo2 `1B` ladder;
   - it is the right artifact to cite when the question is "what survived the audit?" rather than "what commands were run?"

@@ -1,0 +1,2142 @@
+{
+  "benchmark": "livecodebench",
+  "best_layers": [
+    {
+      "artifact_record_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/artifacts/layer_27_detector_record.json",
+      "bandwidth": 100.0,
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/checkpoints/layer_27_best.pt",
+      "decision_threshold": 0.9888858795166016,
+      "iteration": 0,
+      "layer": 27,
+      "score_sign": 1.0,
+      "test_accuracy": 0.69375,
+      "test_bootstrap": {
+        "accuracy": {
+          "high": 0.7625,
+          "low": 0.6309375,
+          "mean": 0.69296875
+        },
+        "macro_f1": {
+          "high": 0.5927718231334539,
+          "low": 0.4524610235776332,
+          "mean": 0.5166554773779651
+        },
+        "positive_f1": {
+          "high": 0.3584086609207484,
+          "low": 0.09962765957446809,
+          "mean": 0.22561666532824745
+        },
+        "positive_precision": {
+          "high": 1.0,
+          "low": 0.4542929292929293,
+          "mean": 0.7993021423021424
+        },
+        "positive_recall": {
+          "high": 0.22453792837889874,
+          "low": 0.0543446088794926,
+          "mean": 0.13309500160055976
+        },
+        "pr_auc": {
+          "high": 0.8468708338520742,
+          "low": 0.5684283183273713,
+          "mean": 0.7296888501464153
+        },
+        "roc_auc": {
+          "high": 0.9168609706085292,
+          "low": 0.8038328936688311,
+          "mean": 0.8605393200818238
+        }
+      },
+      "test_macro_f1": 0.5157803718115002,
+      "test_num_positive": 54,
+      "test_num_samples": 160,
+      "test_positive_f1": 0.2222222222222222,
+      "test_positive_precision": 0.7777777777777778,
+      "test_positive_recall": 0.12962962962962962,
+      "test_pr_auc": 0.705475934750686,
+      "test_prevalence": 0.3375,
+      "test_roc_auc": 0.8590146750524109,
+      "train_accuracy": 1.0,
+      "train_macro_f1": 1.0,
+      "train_num_positive": 140,
+      "train_num_samples": 280,
+      "train_positive_f1": 1.0,
+      "train_positive_precision": 1.0,
+      "train_positive_recall": 1.0,
+      "train_pr_auc": 1.0,
+      "train_prevalence": 0.5,
+      "train_roc_auc": 1.0,
+      "val_accuracy": 0.75,
+      "val_macro_f1": 0.5055528730082086,
+      "val_num_positive": 35,
+      "val_num_samples": 128,
+      "val_positive_f1": 0.15789473684210525,
+      "val_positive_precision": 1.0,
+      "val_positive_recall": 0.08571428571428572,
+      "val_pr_auc": 0.6554922225876096,
+      "val_prevalence": 0.2734375,
+      "val_roc_auc": 0.8193548387096774
+    },
+    {
+      "artifact_record_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/artifacts/layer_17_detector_record.json",
+      "bandwidth": 100.0,
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/checkpoints/layer_17_best.pt",
+      "decision_threshold": 0.99713134765625,
+      "iteration": 0,
+      "layer": 17,
+      "score_sign": 1.0,
+      "test_accuracy": 0.675,
+      "test_bootstrap": {
+        "accuracy": {
+          "high": 0.7375,
+          "low": 0.59375,
+          "mean": 0.67234375
+        },
+        "macro_f1": {
+          "high": 0.49228416938797553,
+          "low": 0.3916349809885932,
+          "mean": 0.43524439031052503
+        },
+        "positive_f1": {
+          "high": 0.1515734265734266,
+          "low": 0.0,
+          "mean": 0.07013482779932013
+        },
+        "positive_precision": {
+          "high": 1.0,
+          "low": 0.0,
+          "mean": 0.93
+        },
+        "positive_recall": {
+          "high": 0.08200136612021858,
+          "low": 0.0,
+          "mean": 0.036782228032118794
+        },
+        "pr_auc": {
+          "high": 0.8631246874616395,
+          "low": 0.6515401731357525,
+          "mean": 0.7679319863791467
+        },
+        "roc_auc": {
+          "high": 0.9196442436154109,
+          "low": 0.8084009354268193,
+          "mean": 0.8721481255382997
+        }
+      },
+      "test_macro_f1": 0.4372294372294372,
+      "test_num_positive": 54,
+      "test_num_samples": 160,
+      "test_positive_f1": 0.07142857142857142,
+      "test_positive_precision": 1.0,
+      "test_positive_recall": 0.037037037037037035,
+      "test_pr_auc": 0.7586835275415642,
+      "test_prevalence": 0.3375,
+      "test_roc_auc": 0.8698462613556953,
+      "train_accuracy": 1.0,
+      "train_macro_f1": 1.0,
+      "train_num_positive": 140,
+      "train_num_samples": 280,
+      "train_positive_f1": 1.0,
+      "train_positive_precision": 1.0,
+      "train_positive_recall": 1.0,
+      "train_pr_auc": 0.9999999999999998,
+      "train_prevalence": 0.5,
+      "train_roc_auc": 1.0,
+      "val_accuracy": 0.75,
+      "val_macro_f1": 0.5055528730082086,
+      "val_num_positive": 35,
+      "val_num_samples": 128,
+      "val_positive_f1": 0.15789473684210525,
+      "val_positive_precision": 1.0,
+      "val_positive_recall": 0.08571428571428572,
+      "val_pr_auc": 0.6364720365925096,
+      "val_prevalence": 0.2734375,
+      "val_roc_auc": 0.8046082949308755
+    },
+    {
+      "artifact_record_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/artifacts/layer_16_detector_record.json",
+      "bandwidth": 100.0,
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/checkpoints/layer_16_best.pt",
+      "decision_threshold": 0.9967234134674072,
+      "iteration": 0,
+      "layer": 16,
+      "score_sign": 1.0,
+      "test_accuracy": 0.675,
+      "test_bootstrap": {
+        "accuracy": {
+          "high": 0.7439062500000001,
+          "low": 0.6059375,
+          "mean": 0.6730625
+        },
+        "macro_f1": {
+          "high": 0.5140651342156537,
+          "low": 0.39618403596698115,
+          "mean": 0.4507002281814894
+        },
+        "positive_f1": {
+          "high": 0.2143831168831169,
+          "low": 0.0,
+          "mean": 0.10190511308855328
+        },
+        "positive_precision": {
+          "high": 1.0,
+          "low": 0.0,
+          "mean": 0.7500119047619047
+        },
+        "positive_recall": {
+          "high": 0.12286184210526316,
+          "low": 0.0,
+          "mean": 0.05541274804088623
+        },
+        "pr_auc": {
+          "high": 0.8551130627923084,
+          "low": 0.5785272337058296,
+          "mean": 0.7213707909884076
+        },
+        "roc_auc": {
+          "high": 0.9125026807292584,
+          "low": 0.797829850789172,
+          "mean": 0.8558908289830576
+        }
+      },
+      "test_macro_f1": 0.45248749670966043,
+      "test_num_positive": 54,
+      "test_num_samples": 160,
+      "test_positive_f1": 0.10344827586206896,
+      "test_positive_precision": 0.75,
+      "test_positive_recall": 0.05555555555555555,
+      "test_pr_auc": 0.7047853533619195,
+      "test_prevalence": 0.3375,
+      "test_roc_auc": 0.8563941299790356,
+      "train_accuracy": 1.0,
+      "train_macro_f1": 1.0,
+      "train_num_positive": 140,
+      "train_num_samples": 280,
+      "train_positive_f1": 1.0,
+      "train_positive_precision": 1.0,
+      "train_positive_recall": 1.0,
+      "train_pr_auc": 0.9999999999999999,
+      "train_prevalence": 0.5,
+      "train_roc_auc": 0.9999999999999999,
+      "val_accuracy": 0.75,
+      "val_macro_f1": 0.5055528730082086,
+      "val_num_positive": 35,
+      "val_num_samples": 128,
+      "val_positive_f1": 0.15789473684210525,
+      "val_positive_precision": 1.0,
+      "val_positive_recall": 0.08571428571428572,
+      "val_pr_auc": 0.6266849578374756,
+      "val_prevalence": 0.2734375,
+      "val_roc_auc": 0.7935483870967741
+    },
+    {
+      "artifact_record_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/artifacts/layer_18_detector_record.json",
+      "bandwidth": 100.0,
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/checkpoints/layer_18_best.pt",
+      "decision_threshold": 0.9975507259368896,
+      "iteration": 0,
+      "layer": 18,
+      "score_sign": 1.0,
+      "test_accuracy": 0.69375,
+      "test_bootstrap": {
+        "accuracy": {
+          "high": 0.775,
+          "low": 0.63109375,
+          "mean": 0.6961250000000001
+        },
+        "macro_f1": {
+          "high": 0.5705658263305322,
+          "low": 0.4198131351019573,
+          "mean": 0.48765883145532934
+        },
+        "positive_f1": {
+          "high": 0.3001923076923077,
+          "low": 0.038409090909090914,
+          "mean": 0.16164191330857341
+        },
+        "positive_precision": {
+          "high": 1.0,
+          "low": 1.0,
+          "mean": 0.985
+        },
+        "positive_recall": {
+          "high": 0.17660427807486634,
+          "low": 0.01958061002178649,
+          "mean": 0.08931735441206388
+        },
+        "pr_auc": {
+          "high": 0.8666237123641282,
+          "low": 0.597482214274692,
+          "mean": 0.7585188574207158
+        },
+        "roc_auc": {
+          "high": 0.9162390765098555,
+          "low": 0.8035383962958526,
+          "mean": 0.8663680631727378
+        }
+      },
+      "test_macro_f1": 0.4908760309110981,
+      "test_num_positive": 54,
+      "test_num_samples": 160,
+      "test_positive_f1": 0.1694915254237288,
+      "test_positive_precision": 1.0,
+      "test_positive_recall": 0.09259259259259259,
+      "test_pr_auc": 0.7621255988803193,
+      "test_prevalence": 0.3375,
+      "test_roc_auc": 0.8674004192872118,
+      "train_accuracy": 1.0,
+      "train_macro_f1": 1.0,
+      "train_num_positive": 140,
+      "train_num_samples": 280,
+      "train_positive_f1": 1.0,
+      "train_positive_precision": 1.0,
+      "train_positive_recall": 1.0,
+      "train_pr_auc": 0.9999999999999999,
+      "train_prevalence": 0.5,
+      "train_roc_auc": 1.0,
+      "val_accuracy": 0.7421875,
+      "val_macro_f1": 0.4787115883006294,
+      "val_num_positive": 35,
+      "val_num_samples": 128,
+      "val_positive_f1": 0.10810810810810811,
+      "val_positive_precision": 1.0,
+      "val_positive_recall": 0.05714285714285714,
+      "val_pr_auc": 0.619641505794351,
+      "val_prevalence": 0.2734375,
+      "val_roc_auc": 0.8036866359447004
+    },
+    {
+      "artifact_record_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/artifacts/layer_22_detector_record.json",
+      "bandwidth": 100.0,
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/checkpoints/layer_22_best.pt",
+      "decision_threshold": 0.9986677169799805,
+      "iteration": 0,
+      "layer": 22,
+      "score_sign": 1.0,
+      "test_accuracy": 0.6625,
+      "test_bootstrap": {
+        "accuracy": {
+          "high": 0.7375,
+          "low": 0.58734375,
+          "mean": 0.6644374999999999
+        },
+        "macro_f1": {
+          "high": 0.4244604316546763,
+          "low": 0.3700164949737014,
+          "mean": 0.39887646377758484
+        },
+        "positive_f1": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "positive_precision": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "positive_recall": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "pr_auc": {
+          "high": 0.8553583515319734,
+          "low": 0.6806909747182539,
+          "mean": 0.7740722670531409
+        },
+        "roc_auc": {
+          "high": 0.9146105910401369,
+          "low": 0.8141671213008304,
+          "mean": 0.8665466678395094
+        }
+      },
+      "test_macro_f1": 0.39849624060150374,
+      "test_num_positive": 54,
+      "test_num_samples": 160,
+      "test_positive_f1": 0.0,
+      "test_positive_precision": 0.0,
+      "test_positive_recall": 0.0,
+      "test_pr_auc": 0.7732755446595805,
+      "test_prevalence": 0.3375,
+      "test_roc_auc": 0.8670510132774284,
+      "train_accuracy": 1.0,
+      "train_macro_f1": 1.0,
+      "train_num_positive": 140,
+      "train_num_samples": 280,
+      "train_positive_f1": 1.0,
+      "train_positive_precision": 1.0,
+      "train_positive_recall": 1.0,
+      "train_pr_auc": 0.9999999999999998,
+      "train_prevalence": 0.5,
+      "train_roc_auc": 1.0,
+      "val_accuracy": 0.7265625,
+      "val_macro_f1": 0.42081447963800905,
+      "val_num_positive": 35,
+      "val_num_samples": 128,
+      "val_positive_f1": 0.0,
+      "val_positive_precision": 0.0,
+      "val_positive_recall": 0.0,
+      "val_pr_auc": 0.6053507484418531,
+      "val_prevalence": 0.2734375,
+      "val_roc_auc": 0.8119815668202766
+    },
+    {
+      "artifact_record_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/artifacts/layer_13_detector_record.json",
+      "bandwidth": 100.0,
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/checkpoints/layer_13_best.pt",
+      "decision_threshold": 0.9917268753051758,
+      "iteration": 0,
+      "layer": 13,
+      "score_sign": 1.0,
+      "test_accuracy": 0.66875,
+      "test_bootstrap": {
+        "accuracy": {
+          "high": 0.73125,
+          "low": 0.6123437500000001,
+          "mean": 0.67015625
+        },
+        "macro_f1": {
+          "high": 0.4578653417086392,
+          "low": 0.38223938223938225,
+          "mean": 0.4173080515577615
+        },
+        "positive_f1": {
+          "high": 0.10580618212197171,
+          "low": 0.0,
+          "mean": 0.03396515566885148
+        },
+        "positive_precision": {
+          "high": 1.0,
+          "low": 0.0,
+          "mean": 0.635
+        },
+        "positive_recall": {
+          "high": 0.05586158192090402,
+          "low": 0.0,
+          "mean": 0.01756340667000539
+        },
+        "pr_auc": {
+          "high": 0.7660147406600777,
+          "low": 0.5274390739510233,
+          "mean": 0.6555138171329485
+        },
+        "roc_auc": {
+          "high": 0.8585080135709426,
+          "low": 0.7396435725972719,
+          "mean": 0.8048026647300578
+        }
+      },
+      "test_macro_f1": 0.4181818181818182,
+      "test_num_positive": 54,
+      "test_num_samples": 160,
+      "test_positive_f1": 0.03636363636363636,
+      "test_positive_precision": 1.0,
+      "test_positive_recall": 0.018518518518518517,
+      "test_pr_auc": 0.6445212389093572,
+      "test_prevalence": 0.3375,
+      "test_roc_auc": 0.8045073375262054,
+      "train_accuracy": 1.0,
+      "train_macro_f1": 1.0,
+      "train_num_positive": 140,
+      "train_num_samples": 280,
+      "train_positive_f1": 1.0,
+      "train_positive_precision": 1.0,
+      "train_positive_recall": 1.0,
+      "train_pr_auc": 0.9999999999999999,
+      "train_prevalence": 0.5,
+      "train_roc_auc": 1.0,
+      "val_accuracy": 0.7421875,
+      "val_macro_f1": 0.4787115883006294,
+      "val_num_positive": 35,
+      "val_num_samples": 128,
+      "val_positive_f1": 0.10810810810810811,
+      "val_positive_precision": 1.0,
+      "val_positive_recall": 0.05714285714285714,
+      "val_pr_auc": 0.5995230384909941,
+      "val_prevalence": 0.2734375,
+      "val_roc_auc": 0.7803379416282642
+    },
+    {
+      "artifact_record_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/artifacts/layer_15_detector_record.json",
+      "bandwidth": 100.0,
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/checkpoints/layer_15_best.pt",
+      "decision_threshold": 0.9961750507354736,
+      "iteration": 0,
+      "layer": 15,
+      "score_sign": 1.0,
+      "test_accuracy": 0.675,
+      "test_bootstrap": {
+        "accuracy": {
+          "high": 0.75625,
+          "low": 0.6123437500000001,
+          "mean": 0.6769062500000002
+        },
+        "macro_f1": {
+          "high": 0.5060034305317325,
+          "low": 0.39984996249062266,
+          "mean": 0.4492326094738677
+        },
+        "positive_f1": {
+          "high": 0.19047619047619047,
+          "low": 0.0,
+          "mean": 0.09582479310258965
+        },
+        "positive_precision": {
+          "high": 1.0,
+          "low": 0.0,
+          "mean": 0.7191111111111111
+        },
+        "positive_recall": {
+          "high": 0.10531015037593985,
+          "low": 0.0,
+          "mean": 0.05206268171135827
+        },
+        "pr_auc": {
+          "high": 0.8135050004134495,
+          "low": 0.5482781898573631,
+          "mean": 0.6956992407565425
+        },
+        "roc_auc": {
+          "high": 0.9037907903266946,
+          "low": 0.7820495106652501,
+          "mean": 0.847209958390986
+        }
+      },
+      "test_macro_f1": 0.45248749670966043,
+      "test_num_positive": 54,
+      "test_num_samples": 160,
+      "test_positive_f1": 0.10344827586206896,
+      "test_positive_precision": 0.75,
+      "test_positive_recall": 0.05555555555555555,
+      "test_pr_auc": 0.6890546503628617,
+      "test_prevalence": 0.3375,
+      "test_roc_auc": 0.8469601677148847,
+      "train_accuracy": 1.0,
+      "train_macro_f1": 1.0,
+      "train_num_positive": 140,
+      "train_num_samples": 280,
+      "train_positive_f1": 1.0,
+      "train_positive_precision": 1.0,
+      "train_positive_recall": 1.0,
+      "train_pr_auc": 0.9999999999999999,
+      "train_prevalence": 0.5,
+      "train_roc_auc": 1.0,
+      "val_accuracy": 0.7578125,
+      "val_macro_f1": 0.5311355311355311,
+      "val_num_positive": 35,
+      "val_num_samples": 128,
+      "val_positive_f1": 0.20512820512820512,
+      "val_positive_precision": 1.0,
+      "val_positive_recall": 0.11428571428571428,
+      "val_pr_auc": 0.5948278238942908,
+      "val_prevalence": 0.2734375,
+      "val_roc_auc": 0.7824884792626728
+    },
+    {
+      "artifact_record_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/artifacts/layer_25_detector_record.json",
+      "bandwidth": 100.0,
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/checkpoints/layer_25_best.pt",
+      "decision_threshold": 0.9989762306213379,
+      "iteration": 0,
+      "layer": 25,
+      "score_sign": 1.0,
+      "test_accuracy": 0.6625,
+      "test_bootstrap": {
+        "accuracy": {
+          "high": 0.7378125000000001,
+          "low": 0.59359375,
+          "mean": 0.6669375
+        },
+        "macro_f1": {
+          "high": 0.4245632065775951,
+          "low": 0.3724872626215841,
+          "mean": 0.39975704313747157
+        },
+        "positive_f1": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "positive_precision": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "positive_recall": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "pr_auc": {
+          "high": 0.8219916985274204,
+          "low": 0.6176637779331783,
+          "mean": 0.7294195355389945
+        },
+        "roc_auc": {
+          "high": 0.8961043864677024,
+          "low": 0.7911499842036847,
+          "mean": 0.844634720246005
+        }
+      },
+      "test_macro_f1": 0.39849624060150374,
+      "test_num_positive": 54,
+      "test_num_samples": 160,
+      "test_positive_f1": 0.0,
+      "test_positive_precision": 0.0,
+      "test_positive_recall": 0.0,
+      "test_pr_auc": 0.7330531081525437,
+      "test_prevalence": 0.3375,
+      "test_roc_auc": 0.8464360587002097,
+      "train_accuracy": 1.0,
+      "train_macro_f1": 1.0,
+      "train_num_positive": 140,
+      "train_num_samples": 280,
+      "train_positive_f1": 1.0,
+      "train_positive_precision": 1.0,
+      "train_positive_recall": 1.0,
+      "train_pr_auc": 1.0,
+      "train_prevalence": 0.5,
+      "train_roc_auc": 1.0,
+      "val_accuracy": 0.7265625,
+      "val_macro_f1": 0.42081447963800905,
+      "val_num_positive": 35,
+      "val_num_samples": 128,
+      "val_positive_f1": 0.0,
+      "val_positive_precision": 0.0,
+      "val_positive_recall": 0.0,
+      "val_pr_auc": 0.5944329652427829,
+      "val_prevalence": 0.2734375,
+      "val_roc_auc": 0.8122887864823349
+    },
+    {
+      "artifact_record_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/artifacts/layer_14_detector_record.json",
+      "bandwidth": 10.0,
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/checkpoints/layer_14_best.pt",
+      "decision_threshold": 0.9989146590232849,
+      "iteration": 0,
+      "layer": 14,
+      "score_sign": 1.0,
+      "test_accuracy": 0.6625,
+      "test_bootstrap": {
+        "accuracy": {
+          "high": 0.73125,
+          "low": 0.5810937500000001,
+          "mean": 0.6649687499999999
+        },
+        "macro_f1": {
+          "high": 0.4223826714801444,
+          "low": 0.36752619361315014,
+          "mean": 0.39907188581283376
+        },
+        "positive_f1": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "positive_precision": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "positive_recall": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "pr_auc": {
+          "high": 0.8069283390934943,
+          "low": 0.5134200630143032,
+          "mean": 0.6665708702000623
+        },
+        "roc_auc": {
+          "high": 0.8677560606060607,
+          "low": 0.7230357470777975,
+          "mean": 0.8061918707713036
+        }
+      },
+      "test_macro_f1": 0.39849624060150374,
+      "test_num_positive": 54,
+      "test_num_samples": 160,
+      "test_positive_f1": 0.0,
+      "test_positive_precision": 0.0,
+      "test_positive_recall": 0.0,
+      "test_pr_auc": 0.6612799743308361,
+      "test_prevalence": 0.3375,
+      "test_roc_auc": 0.8057302585604471,
+      "train_accuracy": 1.0,
+      "train_macro_f1": 1.0,
+      "train_num_positive": 140,
+      "train_num_samples": 280,
+      "train_positive_f1": 1.0,
+      "train_positive_precision": 1.0,
+      "train_positive_recall": 1.0,
+      "train_pr_auc": 0.9999999999999998,
+      "train_prevalence": 0.5,
+      "train_roc_auc": 1.0,
+      "val_accuracy": 0.7265625,
+      "val_macro_f1": 0.42081447963800905,
+      "val_num_positive": 35,
+      "val_num_samples": 128,
+      "val_positive_f1": 0.0,
+      "val_positive_precision": 0.0,
+      "val_positive_recall": 0.0,
+      "val_pr_auc": 0.5927156684111377,
+      "val_prevalence": 0.2734375,
+      "val_roc_auc": 0.7824884792626727
+    },
+    {
+      "artifact_record_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/artifacts/layer_24_detector_record.json",
+      "bandwidth": 100.0,
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/checkpoints/layer_24_best.pt",
+      "decision_threshold": 0.9988889098167419,
+      "iteration": 0,
+      "layer": 24,
+      "score_sign": 1.0,
+      "test_accuracy": 0.6625,
+      "test_bootstrap": {
+        "accuracy": {
+          "high": 0.7315625,
+          "low": 0.58734375,
+          "mean": 0.66240625
+        },
+        "macro_f1": {
+          "high": 0.4224861871304168,
+          "low": 0.3700164949737014,
+          "mean": 0.3981126532280982
+        },
+        "positive_f1": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "positive_precision": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "positive_recall": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "pr_auc": {
+          "high": 0.8563286297873203,
+          "low": 0.6484609458157473,
+          "mean": 0.7674665320427418
+        },
+        "roc_auc": {
+          "high": 0.9173084369891491,
+          "low": 0.80094713005206,
+          "mean": 0.8637697953821305
+        }
+      },
+      "test_macro_f1": 0.39849624060150374,
+      "test_num_positive": 54,
+      "test_num_samples": 160,
+      "test_positive_f1": 0.0,
+      "test_positive_precision": 0.0,
+      "test_positive_recall": 0.0,
+      "test_pr_auc": 0.7585832744643063,
+      "test_prevalence": 0.3375,
+      "test_roc_auc": 0.8590146750524108,
+      "train_accuracy": 1.0,
+      "train_macro_f1": 1.0,
+      "train_num_positive": 140,
+      "train_num_samples": 280,
+      "train_positive_f1": 1.0,
+      "train_positive_precision": 1.0,
+      "train_positive_recall": 1.0,
+      "train_pr_auc": 0.9999999999999998,
+      "train_prevalence": 0.5,
+      "train_roc_auc": 1.0,
+      "val_accuracy": 0.7265625,
+      "val_macro_f1": 0.42081447963800905,
+      "val_num_positive": 35,
+      "val_num_samples": 128,
+      "val_positive_f1": 0.0,
+      "val_positive_precision": 0.0,
+      "val_positive_recall": 0.0,
+      "val_pr_auc": 0.5912960016541904,
+      "val_prevalence": 0.2734375,
+      "val_roc_auc": 0.8150537634408602
+    },
+    {
+      "artifact_record_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/artifacts/layer_23_detector_record.json",
+      "bandwidth": 100.0,
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/checkpoints/layer_23_best.pt",
+      "decision_threshold": 0.9987870454788208,
+      "iteration": 0,
+      "layer": 23,
+      "score_sign": 1.0,
+      "test_accuracy": 0.6625,
+      "test_bootstrap": {
+        "accuracy": {
+          "high": 0.73140625,
+          "low": 0.59984375,
+          "mean": 0.66390625
+        },
+        "macro_f1": {
+          "high": 0.4224346154845077,
+          "low": 0.3749387254901961,
+          "mean": 0.398699605315619
+        },
+        "positive_f1": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "positive_precision": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "positive_recall": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "pr_auc": {
+          "high": 0.8644681199707246,
+          "low": 0.6542695942134485,
+          "mean": 0.7700943280818074
+        },
+        "roc_auc": {
+          "high": 0.9125778898200745,
+          "low": 0.8024671306625556,
+          "mean": 0.8633975873804548
+        }
+      },
+      "test_macro_f1": 0.39849624060150374,
+      "test_num_positive": 54,
+      "test_num_samples": 160,
+      "test_positive_f1": 0.0,
+      "test_positive_precision": 0.0,
+      "test_positive_recall": 0.0,
+      "test_pr_auc": 0.7702424609539218,
+      "test_prevalence": 0.3375,
+      "test_roc_auc": 0.8649545772187283,
+      "train_accuracy": 1.0,
+      "train_macro_f1": 1.0,
+      "train_num_positive": 140,
+      "train_num_samples": 280,
+      "train_positive_f1": 1.0,
+      "train_positive_precision": 1.0,
+      "train_positive_recall": 1.0,
+      "train_pr_auc": 1.0,
+      "train_prevalence": 0.5,
+      "train_roc_auc": 1.0,
+      "val_accuracy": 0.7265625,
+      "val_macro_f1": 0.42081447963800905,
+      "val_num_positive": 35,
+      "val_num_samples": 128,
+      "val_positive_f1": 0.0,
+      "val_positive_precision": 0.0,
+      "val_positive_recall": 0.0,
+      "val_pr_auc": 0.5901851801374789,
+      "val_prevalence": 0.2734375,
+      "val_roc_auc": 0.8089093701996928
+    },
+    {
+      "artifact_record_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/artifacts/layer_26_detector_record.json",
+      "bandwidth": 100.0,
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/checkpoints/layer_26_best.pt",
+      "decision_threshold": 0.9990228414535522,
+      "iteration": 0,
+      "layer": 26,
+      "score_sign": 1.0,
+      "test_accuracy": 0.6625,
+      "test_bootstrap": {
+        "accuracy": {
+          "high": 0.725,
+          "low": 0.58125,
+          "mean": 0.6591562500000001
+        },
+        "macro_f1": {
+          "high": 0.42028985507246375,
+          "low": 0.3675889328063241,
+          "mean": 0.397012993140544
+        },
+        "positive_f1": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "positive_precision": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "positive_recall": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "pr_auc": {
+          "high": 0.7937254632512971,
+          "low": 0.6031340583736667,
+          "mean": 0.7115733830976145
+        },
+        "roc_auc": {
+          "high": 0.8806894079175754,
+          "low": 0.7648799088189188,
+          "mean": 0.8312753950252803
+        }
+      },
+      "test_macro_f1": 0.39849624060150374,
+      "test_num_positive": 54,
+      "test_num_samples": 160,
+      "test_positive_f1": 0.0,
+      "test_positive_precision": 0.0,
+      "test_positive_recall": 0.0,
+      "test_pr_auc": 0.7044059619552128,
+      "test_prevalence": 0.3375,
+      "test_roc_auc": 0.8308874912648497,
+      "train_accuracy": 1.0,
+      "train_macro_f1": 1.0,
+      "train_num_positive": 140,
+      "train_num_samples": 280,
+      "train_positive_f1": 1.0,
+      "train_positive_precision": 1.0,
+      "train_positive_recall": 1.0,
+      "train_pr_auc": 0.9999999999999999,
+      "train_prevalence": 0.5,
+      "train_roc_auc": 1.0,
+      "val_accuracy": 0.7265625,
+      "val_macro_f1": 0.42081447963800905,
+      "val_num_positive": 35,
+      "val_num_samples": 128,
+      "val_positive_f1": 0.0,
+      "val_positive_precision": 0.0,
+      "val_positive_recall": 0.0,
+      "val_pr_auc": 0.5901077132622332,
+      "val_prevalence": 0.2734375,
+      "val_roc_auc": 0.8104454685099846
+    },
+    {
+      "artifact_record_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/artifacts/layer_20_detector_record.json",
+      "bandwidth": 100.0,
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/checkpoints/layer_20_best.pt",
+      "decision_threshold": 0.9981767535209656,
+      "iteration": 0,
+      "layer": 20,
+      "score_sign": 1.0,
+      "test_accuracy": 0.68125,
+      "test_bootstrap": {
+        "accuracy": {
+          "high": 0.7625,
+          "low": 0.6125,
+          "mean": 0.6783437499999999
+        },
+        "macro_f1": {
+          "high": 0.5176659153219637,
+          "low": 0.3939393939393939,
+          "mean": 0.4504230092786689
+        },
+        "positive_f1": {
+          "high": 0.21052631578947367,
+          "low": 0.0,
+          "mean": 0.09718566398054078
+        },
+        "positive_precision": {
+          "high": 1.0,
+          "low": 0.0,
+          "mean": 0.945
+        },
+        "positive_recall": {
+          "high": 0.11764705882352941,
+          "low": 0.0,
+          "mean": 0.0518312370925697
+        },
+        "pr_auc": {
+          "high": 0.8710362246979171,
+          "low": 0.6516744081868937,
+          "mean": 0.7671599590172593
+        },
+        "roc_auc": {
+          "high": 0.9140454545454545,
+          "low": 0.8120177788668355,
+          "mean": 0.8678221904805392
+        }
+      },
+      "test_macro_f1": 0.45567340404242546,
+      "test_num_positive": 54,
+      "test_num_samples": 160,
+      "test_positive_f1": 0.10526315789473684,
+      "test_positive_precision": 1.0,
+      "test_positive_recall": 0.05555555555555555,
+      "test_pr_auc": 0.7668493994053907,
+      "test_prevalence": 0.3375,
+      "test_roc_auc": 0.8686233403214536,
+      "train_accuracy": 1.0,
+      "train_macro_f1": 1.0,
+      "train_num_positive": 140,
+      "train_num_samples": 280,
+      "train_positive_f1": 1.0,
+      "train_positive_precision": 1.0,
+      "train_positive_recall": 1.0,
+      "train_pr_auc": 0.9999999999999998,
+      "train_prevalence": 0.5,
+      "train_roc_auc": 1.0,
+      "val_accuracy": 0.7421875,
+      "val_macro_f1": 0.4787115883006294,
+      "val_num_positive": 35,
+      "val_num_samples": 128,
+      "val_positive_f1": 0.10810810810810811,
+      "val_positive_precision": 1.0,
+      "val_positive_recall": 0.05714285714285714,
+      "val_pr_auc": 0.5895277860518283,
+      "val_prevalence": 0.2734375,
+      "val_roc_auc": 0.8003072196620583
+    },
+    {
+      "artifact_record_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/artifacts/layer_19_detector_record.json",
+      "bandwidth": 100.0,
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/checkpoints/layer_19_best.pt",
+      "decision_threshold": 0.9979372024536133,
+      "iteration": 0,
+      "layer": 19,
+      "score_sign": 1.0,
+      "test_accuracy": 0.675,
+      "test_bootstrap": {
+        "accuracy": {
+          "high": 0.7375,
+          "low": 0.59375,
+          "mean": 0.6741874999999999
+        },
+        "macro_f1": {
+          "high": 0.4841652820617093,
+          "low": 0.38223938223938225,
+          "mean": 0.4336690368817359
+        },
+        "positive_f1": {
+          "high": 0.16009836065573774,
+          "low": 0.0,
+          "mean": 0.06527700467631814
+        },
+        "positive_precision": {
+          "high": 1.0,
+          "low": 0.0,
+          "mean": 0.825
+        },
+        "positive_recall": {
+          "high": 0.08701475155279505,
+          "low": 0.0,
+          "mean": 0.03433622377820847
+        },
+        "pr_auc": {
+          "high": 0.8688914907724563,
+          "low": 0.6665831550624393,
+          "mean": 0.7765596952902877
+        },
+        "roc_auc": {
+          "high": 0.9263842667748917,
+          "low": 0.8105716266259747,
+          "mean": 0.8701506087841159
+        }
+      },
+      "test_macro_f1": 0.4372294372294372,
+      "test_num_positive": 54,
+      "test_num_samples": 160,
+      "test_positive_f1": 0.07142857142857142,
+      "test_positive_precision": 1.0,
+      "test_positive_recall": 0.037037037037037035,
+      "test_pr_auc": 0.7721134106300184,
+      "test_prevalence": 0.3375,
+      "test_roc_auc": 0.8694968553459119,
+      "train_accuracy": 1.0,
+      "train_macro_f1": 1.0,
+      "train_num_positive": 140,
+      "train_num_samples": 280,
+      "train_positive_f1": 1.0,
+      "train_positive_precision": 1.0,
+      "train_positive_recall": 1.0,
+      "train_pr_auc": 1.0,
+      "train_prevalence": 0.5,
+      "train_roc_auc": 1.0,
+      "val_accuracy": 0.7421875,
+      "val_macro_f1": 0.4787115883006294,
+      "val_num_positive": 35,
+      "val_num_samples": 128,
+      "val_positive_f1": 0.10810810810810811,
+      "val_positive_precision": 1.0,
+      "val_positive_recall": 0.05714285714285714,
+      "val_pr_auc": 0.5861148817063353,
+      "val_prevalence": 0.2734375,
+      "val_roc_auc": 0.7956989247311828
+    },
+    {
+      "artifact_record_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/artifacts/layer_21_detector_record.json",
+      "bandwidth": 100.0,
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/checkpoints/layer_21_best.pt",
+      "decision_threshold": 0.9985238313674927,
+      "iteration": 0,
+      "layer": 21,
+      "score_sign": 1.0,
+      "test_accuracy": 0.6625,
+      "test_bootstrap": {
+        "accuracy": {
+          "high": 0.73140625,
+          "low": 0.575,
+          "mean": 0.6647187500000001
+        },
+        "macro_f1": {
+          "high": 0.4224346154845077,
+          "low": 0.36507936507936506,
+          "mean": 0.3989548792620397
+        },
+        "positive_f1": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "positive_precision": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "positive_recall": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "pr_auc": {
+          "high": 0.8681960200208187,
+          "low": 0.6414827852563632,
+          "mean": 0.7687698156441324
+        },
+        "roc_auc": {
+          "high": 0.9183830620370067,
+          "low": 0.8017964067567412,
+          "mean": 0.8636944803240868
+        }
+      },
+      "test_macro_f1": 0.39849624060150374,
+      "test_num_positive": 54,
+      "test_num_samples": 160,
+      "test_positive_f1": 0.0,
+      "test_positive_precision": 0.0,
+      "test_positive_recall": 0.0,
+      "test_pr_auc": 0.772257111333553,
+      "test_prevalence": 0.3375,
+      "test_roc_auc": 0.8665269042627534,
+      "train_accuracy": 1.0,
+      "train_macro_f1": 1.0,
+      "train_num_positive": 140,
+      "train_num_samples": 280,
+      "train_positive_f1": 1.0,
+      "train_positive_precision": 1.0,
+      "train_positive_recall": 1.0,
+      "train_pr_auc": 1.0,
+      "train_prevalence": 0.5,
+      "train_roc_auc": 1.0,
+      "val_accuracy": 0.734375,
+      "val_macro_f1": 0.4505050505050505,
+      "val_num_positive": 35,
+      "val_num_samples": 128,
+      "val_positive_f1": 0.05555555555555555,
+      "val_positive_precision": 1.0,
+      "val_positive_recall": 0.02857142857142857,
+      "val_pr_auc": 0.5807183825177645,
+      "val_prevalence": 0.2734375,
+      "val_roc_auc": 0.7996927803379417
+    },
+    {
+      "artifact_record_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/artifacts/layer_12_detector_record.json",
+      "bandwidth": 100.0,
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/checkpoints/layer_12_best.pt",
+      "decision_threshold": 0.9899082183837891,
+      "iteration": 0,
+      "layer": 12,
+      "score_sign": 1.0,
+      "test_accuracy": 0.66875,
+      "test_bootstrap": {
+        "accuracy": {
+          "high": 0.7376562500000001,
+          "low": 0.60625,
+          "mean": 0.67303125
+        },
+        "macro_f1": {
+          "high": 0.5021659451659451,
+          "low": 0.38697318007662834,
+          "mean": 0.43459055513973527
+        },
+        "positive_f1": {
+          "high": 0.16675531914893618,
+          "low": 0.0,
+          "mean": 0.0680585753238096
+        },
+        "positive_precision": {
+          "high": 1.0,
+          "low": 0.0,
+          "mean": 0.6303511904761905
+        },
+        "positive_recall": {
+          "high": 0.09307862679955704,
+          "low": 0.0,
+          "mean": 0.03656884541040863
+        },
+        "pr_auc": {
+          "high": 0.7332527307230639,
+          "low": 0.4727753470119508,
+          "mean": 0.6131254416101499
+        },
+        "roc_auc": {
+          "high": 0.8540310813210228,
+          "low": 0.7141449427105642,
+          "mean": 0.7839510240939118
+        }
+      },
+      "test_macro_f1": 0.4343272630244814,
+      "test_num_positive": 54,
+      "test_num_samples": 160,
+      "test_positive_f1": 0.07017543859649122,
+      "test_positive_precision": 0.6666666666666666,
+      "test_positive_recall": 0.037037037037037035,
+      "test_pr_auc": 0.6114552768660221,
+      "test_prevalence": 0.3375,
+      "test_roc_auc": 0.7856394129979036,
+      "train_accuracy": 1.0,
+      "train_macro_f1": 1.0,
+      "train_num_positive": 140,
+      "train_num_samples": 280,
+      "train_positive_f1": 1.0,
+      "train_positive_precision": 1.0,
+      "train_positive_recall": 1.0,
+      "train_pr_auc": 1.0,
+      "train_prevalence": 0.5,
+      "train_roc_auc": 1.0,
+      "val_accuracy": 0.7421875,
+      "val_macro_f1": 0.4787115883006294,
+      "val_num_positive": 35,
+      "val_num_samples": 128,
+      "val_positive_f1": 0.10810810810810811,
+      "val_positive_precision": 1.0,
+      "val_positive_recall": 0.05714285714285714,
+      "val_pr_auc": 0.5556400458622144,
+      "val_prevalence": 0.2734375,
+      "val_roc_auc": 0.7748079877112135
+    },
+    {
+      "artifact_record_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/artifacts/layer_11_detector_record.json",
+      "bandwidth": 100.0,
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/checkpoints/layer_11_best.pt",
+      "decision_threshold": 0.9692230224609375,
+      "iteration": 1,
+      "layer": 11,
+      "score_sign": 1.0,
+      "test_accuracy": 0.69375,
+      "test_bootstrap": {
+        "accuracy": {
+          "high": 0.75625,
+          "low": 0.62484375,
+          "mean": 0.696
+        },
+        "macro_f1": {
+          "high": 0.6865476045684064,
+          "low": 0.5407730854802154,
+          "mean": 0.6118150974958323
+        },
+        "positive_f1": {
+          "high": 0.5454545454545454,
+          "low": 0.3011885576148267,
+          "mean": 0.4325678577845711
+        },
+        "positive_precision": {
+          "high": 0.7335483870967742,
+          "low": 0.3845588235294118,
+          "mean": 0.5696759351178154
+        },
+        "positive_recall": {
+          "high": 0.4716981132075472,
+          "low": 0.24510332434860738,
+          "mean": 0.3520882323441383
+        },
+        "pr_auc": {
+          "high": 0.7410918398250028,
+          "low": 0.4677311287020194,
+          "mean": 0.6015510028086685
+        },
+        "roc_auc": {
+          "high": 0.8292688935321675,
+          "low": 0.70128893491929,
+          "mean": 0.7681158994707505
+        }
+      },
+      "test_macro_f1": 0.6132405900054265,
+      "test_num_positive": 54,
+      "test_num_samples": 160,
+      "test_positive_f1": 0.4367816091954023,
+      "test_positive_precision": 0.5757575757575758,
+      "test_positive_recall": 0.35185185185185186,
+      "test_pr_auc": 0.6025287373456231,
+      "test_prevalence": 0.3375,
+      "test_roc_auc": 0.7692173305380853,
+      "train_accuracy": 1.0,
+      "train_macro_f1": 1.0,
+      "train_num_positive": 140,
+      "train_num_samples": 280,
+      "train_positive_f1": 1.0,
+      "train_positive_precision": 1.0,
+      "train_positive_recall": 1.0,
+      "train_pr_auc": 0.9999999999999999,
+      "train_prevalence": 0.5,
+      "train_roc_auc": 1.0,
+      "val_accuracy": 0.7265625,
+      "val_macro_f1": 0.5947535052012665,
+      "val_num_positive": 35,
+      "val_num_samples": 128,
+      "val_positive_f1": 0.36363636363636365,
+      "val_positive_precision": 0.5,
+      "val_positive_recall": 0.2857142857142857,
+      "val_pr_auc": 0.5339770657283668,
+      "val_prevalence": 0.2734375,
+      "val_roc_auc": 0.7631336405529954
+    },
+    {
+      "artifact_record_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/artifacts/layer_10_detector_record.json",
+      "bandwidth": 100.0,
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/checkpoints/layer_10_best.pt",
+      "decision_threshold": 0.902099609375,
+      "iteration": 4,
+      "layer": 10,
+      "score_sign": 1.0,
+      "test_accuracy": 0.70625,
+      "test_bootstrap": {
+        "accuracy": {
+          "high": 0.78125,
+          "low": 0.63125,
+          "mean": 0.7034999999999999
+        },
+        "macro_f1": {
+          "high": 0.7440022849304652,
+          "low": 0.5997771883483652,
+          "mean": 0.6708713919829455
+        },
+        "positive_f1": {
+          "high": 0.6612934975869952,
+          "low": 0.4672236382516756,
+          "mean": 0.5692088722610925
+        },
+        "positive_precision": {
+          "high": 0.6733231707317074,
+          "low": 0.45445632798573976,
+          "mean": 0.5555562321384775
+        },
+        "positive_recall": {
+          "high": 0.7194976076555024,
+          "low": 0.47428593848085376,
+          "mean": 0.5875916073090152
+        },
+        "pr_auc": {
+          "high": 0.6472912973935196,
+          "low": 0.4363793235871775,
+          "mean": 0.5377595780331997
+        },
+        "roc_auc": {
+          "high": 0.8007558259790402,
+          "low": 0.6392727272727272,
+          "mean": 0.7178954962277884
+        }
+      },
+      "test_macro_f1": 0.6758480969007286,
+      "test_num_positive": 54,
+      "test_num_samples": 160,
+      "test_positive_f1": 0.5765765765765766,
+      "test_positive_precision": 0.5614035087719298,
+      "test_positive_recall": 0.5925925925925926,
+      "test_pr_auc": 0.5281905125778923,
+      "test_prevalence": 0.3375,
+      "test_roc_auc": 0.7185534591194968,
+      "train_accuracy": 1.0,
+      "train_macro_f1": 1.0,
+      "train_num_positive": 140,
+      "train_num_samples": 280,
+      "train_positive_f1": 1.0,
+      "train_positive_precision": 1.0,
+      "train_positive_recall": 1.0,
+      "train_pr_auc": 0.9999999999999999,
+      "train_prevalence": 0.5,
+      "train_roc_auc": 1.0,
+      "val_accuracy": 0.7265625,
+      "val_macro_f1": 0.6646455573021932,
+      "val_num_positive": 35,
+      "val_num_samples": 128,
+      "val_positive_f1": 0.5205479452054794,
+      "val_positive_precision": 0.5,
+      "val_positive_recall": 0.5428571428571428,
+      "val_pr_auc": 0.5039106602426803,
+      "val_prevalence": 0.2734375,
+      "val_roc_auc": 0.738863287250384
+    },
+    {
+      "artifact_record_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/artifacts/layer_09_detector_record.json",
+      "bandwidth": 10.0,
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/checkpoints/layer_09_best.pt",
+      "decision_threshold": 0.9969344139099121,
+      "iteration": 0,
+      "layer": 9,
+      "score_sign": 1.0,
+      "test_accuracy": 0.68125,
+      "test_bootstrap": {
+        "accuracy": {
+          "high": 0.7439062500000001,
+          "low": 0.6125,
+          "mean": 0.68171875
+        },
+        "macro_f1": {
+          "high": 0.5176180105745228,
+          "low": 0.40066023640543813,
+          "mean": 0.45677741696728275
+        },
+        "positive_f1": {
+          "high": 0.20717868338558,
+          "low": 0.0,
+          "mean": 0.10787698766491062
+        },
+        "positive_precision": {
+          "high": 1.0,
+          "low": 0.0,
+          "mean": 0.96
+        },
+        "positive_recall": {
+          "high": 0.11556122448979596,
+          "low": 0.0,
+          "mean": 0.0579025524553191
+        },
+        "pr_auc": {
+          "high": 0.7436051136642556,
+          "low": 0.5059990043547049,
+          "mean": 0.625520864361772
+        },
+        "roc_auc": {
+          "high": 0.8420075824369601,
+          "low": 0.7242874313186815,
+          "mean": 0.7847742955037986
+        }
+      },
+      "test_macro_f1": 0.45567340404242546,
+      "test_num_positive": 54,
+      "test_num_samples": 160,
+      "test_positive_f1": 0.10526315789473684,
+      "test_positive_precision": 1.0,
+      "test_positive_recall": 0.05555555555555555,
+      "test_pr_auc": 0.6179175052244021,
+      "test_prevalence": 0.3375,
+      "test_roc_auc": 0.7840670859538783,
+      "train_accuracy": 1.0,
+      "train_macro_f1": 1.0,
+      "train_num_positive": 140,
+      "train_num_samples": 280,
+      "train_positive_f1": 1.0,
+      "train_positive_precision": 1.0,
+      "train_positive_recall": 1.0,
+      "train_pr_auc": 0.9999999999999998,
+      "train_prevalence": 0.5,
+      "train_roc_auc": 1.0,
+      "val_accuracy": 0.734375,
+      "val_macro_f1": 0.4505050505050505,
+      "val_num_positive": 35,
+      "val_num_samples": 128,
+      "val_positive_f1": 0.05555555555555555,
+      "val_positive_precision": 1.0,
+      "val_positive_recall": 0.02857142857142857,
+      "val_pr_auc": 0.4685993948890215,
+      "val_prevalence": 0.2734375,
+      "val_roc_auc": 0.7268817204301076
+    },
+    {
+      "artifact_record_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/artifacts/layer_08_detector_record.json",
+      "bandwidth": 1.0,
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/checkpoints/layer_08_best.pt",
+      "decision_threshold": 0.998996376991272,
+      "iteration": 0,
+      "layer": 8,
+      "score_sign": 1.0,
+      "test_accuracy": 0.6625,
+      "test_bootstrap": {
+        "accuracy": {
+          "high": 0.73125,
+          "low": 0.58734375,
+          "mean": 0.66240625
+        },
+        "macro_f1": {
+          "high": 0.4223826714801444,
+          "low": 0.3700164949737014,
+          "mean": 0.39814864996965754
+        },
+        "positive_f1": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "positive_precision": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "positive_recall": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "pr_auc": {
+          "high": 0.5774091308037823,
+          "low": 0.3324127126529338,
+          "mean": 0.45048160568623424
+        },
+        "roc_auc": {
+          "high": 0.7058254787204347,
+          "low": 0.53987637376094,
+          "mean": 0.6327580417163314
+        }
+      },
+      "test_macro_f1": 0.39849624060150374,
+      "test_num_positive": 54,
+      "test_num_samples": 160,
+      "test_positive_f1": 0.0,
+      "test_positive_precision": 0.0,
+      "test_positive_recall": 0.0,
+      "test_pr_auc": 0.4365605807327544,
+      "test_prevalence": 0.3375,
+      "test_roc_auc": 0.6345213137665967,
+      "train_accuracy": 1.0,
+      "train_macro_f1": 1.0,
+      "train_num_positive": 140,
+      "train_num_samples": 280,
+      "train_positive_f1": 1.0,
+      "train_positive_precision": 1.0,
+      "train_positive_recall": 1.0,
+      "train_pr_auc": 1.0,
+      "train_prevalence": 0.5,
+      "train_roc_auc": 1.0,
+      "val_accuracy": 0.7265625,
+      "val_macro_f1": 0.42081447963800905,
+      "val_num_positive": 35,
+      "val_num_samples": 128,
+      "val_positive_f1": 0.0,
+      "val_positive_precision": 0.0,
+      "val_positive_recall": 0.0,
+      "val_pr_auc": 0.4238174471017646,
+      "val_prevalence": 0.2734375,
+      "val_roc_auc": 0.6374807987711213
+    },
+    {
+      "artifact_record_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/artifacts/layer_05_detector_record.json",
+      "bandwidth": 10.0,
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/checkpoints/layer_05_best.pt",
+      "decision_threshold": 0.9926128387451172,
+      "iteration": 0,
+      "layer": 5,
+      "score_sign": 1.0,
+      "test_accuracy": 0.68125,
+      "test_bootstrap": {
+        "accuracy": {
+          "high": 0.75625,
+          "low": 0.59984375,
+          "mean": 0.6818437499999999
+        },
+        "macro_f1": {
+          "high": 0.5283040935672515,
+          "low": 0.3998161194433947,
+          "mean": 0.4584519670111935
+        },
+        "positive_f1": {
+          "high": 0.22599462365591402,
+          "low": 0.0,
+          "mean": 0.1115699121559794
+        },
+        "positive_precision": {
+          "high": 1.0,
+          "low": 0.0,
+          "mean": 0.965
+        },
+        "positive_recall": {
+          "high": 0.12739279588336194,
+          "low": 0.0,
+          "mean": 0.06002723711248208
+        },
+        "pr_auc": {
+          "high": 0.7937802042964915,
+          "low": 0.47400206258081223,
+          "mean": 0.6402316221819349
+        },
+        "roc_auc": {
+          "high": 0.865769866548742,
+          "low": 0.7202019450800915,
+          "mean": 0.790448045875977
+        }
+      },
+      "test_macro_f1": 0.45567340404242546,
+      "test_num_positive": 54,
+      "test_num_samples": 160,
+      "test_positive_f1": 0.10526315789473684,
+      "test_positive_precision": 1.0,
+      "test_positive_recall": 0.05555555555555555,
+      "test_pr_auc": 0.6251483428738379,
+      "test_prevalence": 0.3375,
+      "test_roc_auc": 0.7858141160027952,
+      "train_accuracy": 1.0,
+      "train_macro_f1": 1.0,
+      "train_num_positive": 140,
+      "train_num_samples": 280,
+      "train_positive_f1": 1.0,
+      "train_positive_precision": 1.0,
+      "train_positive_recall": 1.0,
+      "train_pr_auc": 0.9999999999999999,
+      "train_prevalence": 0.5,
+      "train_roc_auc": 1.0,
+      "val_accuracy": 0.734375,
+      "val_macro_f1": 0.4505050505050505,
+      "val_num_positive": 35,
+      "val_num_samples": 128,
+      "val_positive_f1": 0.05555555555555555,
+      "val_positive_precision": 1.0,
+      "val_positive_recall": 0.02857142857142857,
+      "val_pr_auc": 0.4113870877700125,
+      "val_prevalence": 0.2734375,
+      "val_roc_auc": 0.6119815668202765
+    },
+    {
+      "artifact_record_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/artifacts/layer_07_detector_record.json",
+      "bandwidth": 10.0,
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/checkpoints/layer_07_best.pt",
+      "decision_threshold": 0.9945335388183594,
+      "iteration": 0,
+      "layer": 7,
+      "score_sign": 1.0,
+      "test_accuracy": 0.66875,
+      "test_bootstrap": {
+        "accuracy": {
+          "high": 0.73125,
+          "low": 0.60609375,
+          "mean": 0.6681562500000001
+        },
+        "macro_f1": {
+          "high": 0.4701144781144782,
+          "low": 0.3798449612403101,
+          "mean": 0.4177947073318156
+        },
+        "positive_f1": {
+          "high": 0.12251275510204082,
+          "low": 0.0,
+          "mean": 0.03652452124467734
+        },
+        "positive_precision": {
+          "high": 1.0,
+          "low": 0.0,
+          "mean": 0.635
+        },
+        "positive_recall": {
+          "high": 0.0652536231884058,
+          "low": 0.0,
+          "mean": 0.018942803672478144
+        },
+        "pr_auc": {
+          "high": 0.745790644374108,
+          "low": 0.49502885894131915,
+          "mean": 0.62464028192508
+        },
+        "roc_auc": {
+          "high": 0.8504682012352265,
+          "low": 0.7125754029823013,
+          "mean": 0.779157811299641
+        }
+      },
+      "test_macro_f1": 0.4181818181818182,
+      "test_num_positive": 54,
+      "test_num_samples": 160,
+      "test_positive_f1": 0.03636363636363636,
+      "test_positive_precision": 1.0,
+      "test_positive_recall": 0.018518518518518517,
+      "test_pr_auc": 0.6095124106351917,
+      "test_prevalence": 0.3375,
+      "test_roc_auc": 0.7774283717679945,
+      "train_accuracy": 1.0,
+      "train_macro_f1": 1.0,
+      "train_num_positive": 140,
+      "train_num_samples": 280,
+      "train_positive_f1": 1.0,
+      "train_positive_precision": 1.0,
+      "train_positive_recall": 1.0,
+      "train_pr_auc": 1.0,
+      "train_prevalence": 0.5,
+      "train_roc_auc": 1.0,
+      "val_accuracy": 0.734375,
+      "val_macro_f1": 0.4505050505050505,
+      "val_num_positive": 35,
+      "val_num_samples": 128,
+      "val_positive_f1": 0.05555555555555555,
+      "val_positive_precision": 1.0,
+      "val_positive_recall": 0.02857142857142857,
+      "val_pr_auc": 0.38240327464665713,
+      "val_prevalence": 0.2734375,
+      "val_roc_auc": 0.6070660522273426
+    },
+    {
+      "artifact_record_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/artifacts/layer_06_detector_record.json",
+      "bandwidth": 1.0,
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/checkpoints/layer_06_best.pt",
+      "decision_threshold": 0.9989499449729919,
+      "iteration": 0,
+      "layer": 6,
+      "score_sign": 1.0,
+      "test_accuracy": 0.6625,
+      "test_bootstrap": {
+        "accuracy": {
+          "high": 0.74375,
+          "low": 0.575,
+          "mean": 0.6659062499999999
+        },
+        "macro_f1": {
+          "high": 0.4265232974910394,
+          "low": 0.36507936507936506,
+          "mean": 0.3993577359456999
+        },
+        "positive_f1": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "positive_precision": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "positive_recall": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "pr_auc": {
+          "high": 0.6208899528685485,
+          "low": 0.38854309226321615,
+          "mean": 0.5002766797662906
+        },
+        "roc_auc": {
+          "high": 0.774695937099137,
+          "low": 0.6087461477987421,
+          "mean": 0.6882457638703281
+        }
+      },
+      "test_macro_f1": 0.39849624060150374,
+      "test_num_positive": 54,
+      "test_num_samples": 160,
+      "test_positive_f1": 0.0,
+      "test_positive_precision": 0.0,
+      "test_positive_recall": 0.0,
+      "test_pr_auc": 0.4874509824491107,
+      "test_prevalence": 0.3375,
+      "test_roc_auc": 0.6881551362683439,
+      "train_accuracy": 1.0,
+      "train_macro_f1": 1.0,
+      "train_num_positive": 140,
+      "train_num_samples": 280,
+      "train_positive_f1": 1.0,
+      "train_positive_precision": 1.0,
+      "train_positive_recall": 1.0,
+      "train_pr_auc": 0.9999999999999998,
+      "train_prevalence": 0.5,
+      "train_roc_auc": 1.0,
+      "val_accuracy": 0.7265625,
+      "val_macro_f1": 0.42081447963800905,
+      "val_num_positive": 35,
+      "val_num_samples": 128,
+      "val_positive_f1": 0.0,
+      "val_positive_precision": 0.0,
+      "val_positive_recall": 0.0,
+      "val_pr_auc": 0.38123318896523384,
+      "val_prevalence": 0.2734375,
+      "val_roc_auc": 0.6313364055299538
+    },
+    {
+      "artifact_record_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/artifacts/layer_04_detector_record.json",
+      "bandwidth": 1.0,
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/checkpoints/layer_04_best.pt",
+      "decision_threshold": 0.998504638671875,
+      "iteration": 0,
+      "layer": 4,
+      "score_sign": 1.0,
+      "test_accuracy": 0.6625,
+      "test_bootstrap": {
+        "accuracy": {
+          "high": 0.7375,
+          "low": 0.58125,
+          "mean": 0.6565625
+        },
+        "macro_f1": {
+          "high": 0.4244604316546763,
+          "low": 0.3675889328063241,
+          "mean": 0.3960429905046448
+        },
+        "positive_f1": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "positive_precision": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "positive_recall": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "pr_auc": {
+          "high": 0.7070275453997008,
+          "low": 0.4721566411606699,
+          "mean": 0.5929790027534269
+        },
+        "roc_auc": {
+          "high": 0.8177901942441432,
+          "low": 0.64841804636027,
+          "mean": 0.7422702516255338
+        }
+      },
+      "test_macro_f1": 0.39849624060150374,
+      "test_num_positive": 54,
+      "test_num_samples": 160,
+      "test_positive_f1": 0.0,
+      "test_positive_precision": 0.0,
+      "test_positive_recall": 0.0,
+      "test_pr_auc": 0.5738489423589641,
+      "test_prevalence": 0.3375,
+      "test_roc_auc": 0.7393431167016074,
+      "train_accuracy": 1.0,
+      "train_macro_f1": 1.0,
+      "train_num_positive": 140,
+      "train_num_samples": 280,
+      "train_positive_f1": 1.0,
+      "train_positive_precision": 1.0,
+      "train_positive_recall": 1.0,
+      "train_pr_auc": 0.9999999999999999,
+      "train_prevalence": 0.5,
+      "train_roc_auc": 1.0,
+      "val_accuracy": 0.7265625,
+      "val_macro_f1": 0.42081447963800905,
+      "val_num_positive": 35,
+      "val_num_samples": 128,
+      "val_positive_f1": 0.0,
+      "val_positive_precision": 0.0,
+      "val_positive_recall": 0.0,
+      "val_pr_auc": 0.3777567786464013,
+      "val_prevalence": 0.2734375,
+      "val_roc_auc": 0.5705069124423964
+    },
+    {
+      "artifact_record_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/artifacts/layer_02_detector_record.json",
+      "bandwidth": 1.0,
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/checkpoints/layer_02_best.pt",
+      "decision_threshold": 0.9983417987823486,
+      "iteration": 0,
+      "layer": 2,
+      "score_sign": 1.0,
+      "test_accuracy": 0.6625,
+      "test_bootstrap": {
+        "accuracy": {
+          "high": 0.73140625,
+          "low": 0.5875,
+          "mean": 0.6575
+        },
+        "macro_f1": {
+          "high": 0.4224346154845077,
+          "low": 0.3700787401574803,
+          "mean": 0.39633134774714485
+        },
+        "positive_f1": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "positive_precision": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "positive_recall": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "pr_auc": {
+          "high": 0.682894533484683,
+          "low": 0.42365390791012264,
+          "mean": 0.5518210763349026
+        },
+        "roc_auc": {
+          "high": 0.7828756457104672,
+          "low": 0.626306991750388,
+          "mean": 0.7040992353022187
+        }
+      },
+      "test_macro_f1": 0.39849624060150374,
+      "test_num_positive": 54,
+      "test_num_samples": 160,
+      "test_positive_f1": 0.0,
+      "test_positive_precision": 0.0,
+      "test_positive_recall": 0.0,
+      "test_pr_auc": 0.5401269175215404,
+      "test_prevalence": 0.3375,
+      "test_roc_auc": 0.7066736547868623,
+      "train_accuracy": 1.0,
+      "train_macro_f1": 1.0,
+      "train_num_positive": 140,
+      "train_num_samples": 280,
+      "train_positive_f1": 1.0,
+      "train_positive_precision": 1.0,
+      "train_positive_recall": 1.0,
+      "train_pr_auc": 0.9999999999999999,
+      "train_prevalence": 0.5,
+      "train_roc_auc": 1.0,
+      "val_accuracy": 0.7265625,
+      "val_macro_f1": 0.42081447963800905,
+      "val_num_positive": 35,
+      "val_num_samples": 128,
+      "val_positive_f1": 0.0,
+      "val_positive_precision": 0.0,
+      "val_positive_recall": 0.0,
+      "val_pr_auc": 0.3666706600444376,
+      "val_prevalence": 0.2734375,
+      "val_roc_auc": 0.5514592933947772
+    },
+    {
+      "artifact_record_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/artifacts/layer_03_detector_record.json",
+      "bandwidth": 10.0,
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/checkpoints/layer_03_best.pt",
+      "decision_threshold": 0.9881591796875,
+      "iteration": 0,
+      "layer": 3,
+      "score_sign": 1.0,
+      "test_accuracy": 0.6625,
+      "test_bootstrap": {
+        "accuracy": {
+          "high": 0.7189062500000001,
+          "low": 0.59984375,
+          "mean": 0.66265625
+        },
+        "macro_f1": {
+          "high": 0.45488920685125217,
+          "low": 0.377431906614786,
+          "mean": 0.4133909614623953
+        },
+        "positive_f1": {
+          "high": 0.0984016393442623,
+          "low": 0.0,
+          "mean": 0.0315817570616316
+        },
+        "positive_precision": {
+          "high": 1.0,
+          "low": 0.0,
+          "mean": 0.41125
+        },
+        "positive_recall": {
+          "high": 0.05177032019704435,
+          "low": 0.0,
+          "mean": 0.01662260788123296
+        },
+        "pr_auc": {
+          "high": 0.7206177881135261,
+          "low": 0.4598622292503107,
+          "mean": 0.5875283161014425
+        },
+        "roc_auc": {
+          "high": 0.8167157262277952,
+          "low": 0.6688567028985507,
+          "mean": 0.7481114893948713
+        }
+      },
+      "test_macro_f1": 0.41558441558441556,
+      "test_num_positive": 54,
+      "test_num_samples": 160,
+      "test_positive_f1": 0.03571428571428571,
+      "test_positive_precision": 0.5,
+      "test_positive_recall": 0.018518518518518517,
+      "test_pr_auc": 0.5883952566602033,
+      "test_prevalence": 0.3375,
+      "test_roc_auc": 0.753319357092942,
+      "train_accuracy": 1.0,
+      "train_macro_f1": 1.0,
+      "train_num_positive": 140,
+      "train_num_samples": 280,
+      "train_positive_f1": 1.0,
+      "train_positive_precision": 1.0,
+      "train_positive_recall": 1.0,
+      "train_pr_auc": 1.0,
+      "train_prevalence": 0.5,
+      "train_roc_auc": 1.0,
+      "val_accuracy": 0.7421875,
+      "val_macro_f1": 0.4787115883006294,
+      "val_num_positive": 35,
+      "val_num_samples": 128,
+      "val_positive_f1": 0.10810810810810811,
+      "val_positive_precision": 1.0,
+      "val_positive_recall": 0.05714285714285714,
+      "val_pr_auc": 0.3661225411436034,
+      "val_prevalence": 0.2734375,
+      "val_roc_auc": 0.5560675883256528
+    },
+    {
+      "artifact_record_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/artifacts/layer_01_detector_record.json",
+      "bandwidth": 1.0,
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/checkpoints/layer_01_best.pt",
+      "decision_threshold": 0.9976828098297119,
+      "iteration": 0,
+      "layer": 1,
+      "score_sign": 1.0,
+      "test_accuracy": 0.65625,
+      "test_bootstrap": {
+        "accuracy": {
+          "high": 0.7375,
+          "low": 0.5875,
+          "mean": 0.66034375
+        },
+        "macro_f1": {
+          "high": 0.4244604316546763,
+          "low": 0.3700787401574803,
+          "mean": 0.3974215355360623
+        },
+        "positive_f1": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "positive_precision": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "positive_recall": {
+          "high": 0.0,
+          "low": 0.0,
+          "mean": 0.0
+        },
+        "pr_auc": {
+          "high": 0.6490756332684825,
+          "low": 0.38441238837911595,
+          "mean": 0.5084845099064309
+        },
+        "roc_auc": {
+          "high": 0.7650576416337285,
+          "low": 0.6116920176850056,
+          "mean": 0.6934574105911618
+        }
+      },
+      "test_macro_f1": 0.39622641509433965,
+      "test_num_positive": 54,
+      "test_num_samples": 160,
+      "test_positive_f1": 0.0,
+      "test_positive_precision": 0.0,
+      "test_positive_recall": 0.0,
+      "test_pr_auc": 0.500547616870602,
+      "test_prevalence": 0.3375,
+      "test_roc_auc": 0.695317959468903,
+      "train_accuracy": 1.0,
+      "train_macro_f1": 1.0,
+      "train_num_positive": 140,
+      "train_num_samples": 280,
+      "train_positive_f1": 1.0,
+      "train_positive_precision": 1.0,
+      "train_positive_recall": 1.0,
+      "train_pr_auc": 0.9999999999999998,
+      "train_prevalence": 0.5,
+      "train_roc_auc": 1.0,
+      "val_accuracy": 0.7265625,
+      "val_macro_f1": 0.42081447963800905,
+      "val_num_positive": 35,
+      "val_num_samples": 128,
+      "val_positive_f1": 0.0,
+      "val_positive_precision": 0.0,
+      "val_positive_recall": 0.0,
+      "val_pr_auc": 0.3634883909472728,
+      "val_prevalence": 0.2734375,
+      "val_roc_auc": 0.5597542242703533
+    },
+    {
+      "artifact_record_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/artifacts/layer_00_detector_record.json",
+      "bandwidth": 1.0,
+      "checkpoint_path": "/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/checkpoints/layer_00_best.pt",
+      "decision_threshold": 0.9925556182861328,
+      "iteration": 2,
+      "layer": 0,
+      "score_sign": 1.0,
+      "test_accuracy": 0.7,
+      "test_bootstrap": {
+        "accuracy": {
+          "high": 0.76265625,
+          "low": 0.63109375,
+          "mean": 0.7022499999999999
+        },
+        "macro_f1": {
+          "high": 0.6451248989380928,
+          "low": 0.48028673835125446,
+          "mean": 0.5675733947296393
+        },
+        "positive_f1": {
+          "high": 0.4640160183066362,
+          "low": 0.18446428571428572,
+          "mean": 0.3271359308316123
+        },
+        "positive_precision": {
+          "high": 0.8698849104859335,
+          "low": 0.42808441558441557,
+          "mean": 0.6617284017057808
+        },
+        "positive_recall": {
+          "high": 0.33351063829787236,
+          "low": 0.11101190476190476,
+          "mean": 0.22005826720486638
+        },
+        "pr_auc": {
+          "high": 0.6882852388723171,
+          "low": 0.4219348986385624,
+          "mean": 0.5433259476508357
+        },
+        "roc_auc": {
+          "high": 0.7918646918402777,
+          "low": 0.6259569832937346,
+          "mean": 0.7081577328360233
+        }
+      },
+      "test_macro_f1": 0.5698924731182795,
+      "test_num_positive": 54,
+      "test_num_samples": 160,
+      "test_positive_f1": 0.3333333333333333,
+      "test_positive_precision": 0.6666666666666666,
+      "test_positive_recall": 0.2222222222222222,
+      "test_pr_auc": 0.5309329363440642,
+      "test_prevalence": 0.3375,
+      "test_roc_auc": 0.7094689028651292,
+      "train_accuracy": 1.0,
+      "train_macro_f1": 1.0,
+      "train_num_positive": 140,
+      "train_num_samples": 280,
+      "train_positive_f1": 1.0,
+      "train_positive_precision": 1.0,
+      "train_positive_recall": 1.0,
+      "train_pr_auc": 0.9999999999999999,
+      "train_prevalence": 0.5,
+      "train_roc_auc": 1.0,
+      "val_accuracy": 0.6875,
+      "val_macro_f1": 0.48717948717948717,
+      "val_num_positive": 35,
+      "val_num_samples": 128,
+      "val_positive_f1": 0.16666666666666666,
+      "val_positive_precision": 0.3076923076923077,
+      "val_positive_recall": 0.11428571428571428,
+      "val_pr_auc": 0.3119494261266733,
+      "val_prevalence": 0.2734375,
+      "val_roc_auc": 0.5649769585253457
+    }
+  ],
+  "feature_key": "last_token_all_layers_stack_final",
+  "selection_rule": {
+    "selection_metric": "pr_auc",
+    "selection_split": "val",
+    "tie_breakers": [
+      "roc_auc",
+      "macro_f1"
+    ]
+  }
+}

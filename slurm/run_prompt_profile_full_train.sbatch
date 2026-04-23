@@ -84,11 +84,14 @@ link_archive() {
   echo "[prompt-profile-full-train] linked ${dataset} -> ${source_dir}"
 }
 
-link_archive "gpqa" "${ARCHIVE_SOURCE_ROOT}/gpqa_mean_relative_from_archive_20260322/data"
-link_archive "aime" "${ARCHIVE_SOURCE_ROOT}/aime_mean_relative_from_archive_20260322"
-link_archive "math500" "${ARCHIVE_SOURCE_ROOT}/math_mean_relative_from_archive_20260323"
-link_archive "mmlu_pro" "${ARCHIVE_SOURCE_ROOT}/mmlu_mean_relative_from_archive_20260323"
-link_archive "livecodebench" "${ARCHIVE_SOURCE_ROOT}/livecodebench_mean_relative_from_archive_20260323"
+while IFS=$'\t' read -r dataset_key archive_dir _active_stage; do
+  link_archive "${dataset_key}" "${archive_dir}"
+done < <(
+  "${PYTHON_BIN}" scripts/emit_prompt_profile_rfm_stage_registry.py \
+    --archive-source-root "${ARCHIVE_SOURCE_ROOT}" \
+    --include-excluded \
+    --format tsv
+)
 
 "${PYTHON_BIN}" scripts/run_prompt_profile_full_train.py \
   --stage regression \

@@ -1,0 +1,48 @@
+[
+  {
+    "feature_set_name": "prompt_length",
+    "hyperparameters": {
+      "C": 0.01
+    },
+    "model_name": "prompt_length",
+    "test_accuracy": 0.65625,
+    "test_macro_f1": 0.6461742591773552,
+    "test_positive_f1": 0.5864661654135338,
+    "test_pr_auc": 0.5770827207719686,
+    "test_prevalence": 0.3375,
+    "test_roc_auc": 0.7201257861635221,
+    "val_pr_auc": 0.32815992977776576,
+    "val_roc_auc": 0.5574500768049155
+  },
+  {
+    "feature_set_name": "prompt_shape",
+    "hyperparameters": {
+      "C": 0.1
+    },
+    "model_name": "prompt_shape_linear",
+    "test_accuracy": 0.65625,
+    "test_macro_f1": 0.6489968489489849,
+    "test_positive_f1": 0.5985401459854015,
+    "test_pr_auc": 0.5870992996245076,
+    "test_prevalence": 0.3375,
+    "test_roc_auc": 0.7290356394129979,
+    "val_pr_auc": 0.3217251435371317,
+    "val_roc_auc": 0.5526881720430107
+  },
+  {
+    "feature_set_name": "prompt_shape",
+    "hyperparameters": {
+      "max_depth": 5,
+      "min_samples_leaf": 8
+    },
+    "model_name": "prompt_shape_tree",
+    "test_accuracy": 0.5625,
+    "test_macro_f1": 0.5465587044534412,
+    "test_positive_f1": 0.46153846153846156,
+    "test_pr_auc": 0.37315813970918893,
+    "test_prevalence": 0.3375,
+    "test_roc_auc": 0.5751222921034242,
+    "val_pr_auc": 0.30917779520831973,
+    "val_roc_auc": 0.5734254992319509
+  }
+]

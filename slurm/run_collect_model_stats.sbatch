@@ -95,6 +95,11 @@ DATASET_CONFIG="${DATASET_CONFIG:-}"
 SPLIT="${SPLIT:-test}"
 QUESTION_FIELD="${QUESTION_FIELD:-}"
 ANSWER_FIELD="${ANSWER_FIELD:-}"
+STARTER_CODE_FIELD="${STARTER_CODE_FIELD:-}"
+RECORD_ID_FIELD="${RECORD_ID_FIELD:-}"
+METADATA_FIELDS="${METADATA_FIELDS:-}"
+ROW_FILTER_JSON="${ROW_FILTER_JSON:-}"
+EXCLUDE_PROMPT_JSONL="${EXCLUDE_PROMPT_JSONL:-}"
 MODEL_ID="${MODEL_ID:-Qwen/Qwen3-1.7B}"
 TEMPERATURE="${TEMPERATURE:-0.2}"
 TOP_P="${TOP_P:-}"
@@ -110,11 +115,14 @@ DTYPE="${DTYPE:-bfloat16}"
 SEED="${SEED:-0}"
 LOOP_N="${LOOP_N:-30}"
 LOOP_K="${LOOP_K:-20}"
+PROFILE_TAIL_THRESHOLD="${PROFILE_TAIL_THRESHOLD:-0.5}"
 MAX_NUM_SEQS="${MAX_NUM_SEQS:-}"
 MAX_NUM_BATCHED_TOKENS="${MAX_NUM_BATCHED_TOKENS:-}"
 RELEASE_VERSION="${RELEASE_VERSION:-release_v6}"
 LIVECODEBENCH_REPO="${LIVECODEBENCH_REPO:-}"
 LM_STYLE_OVERRIDE="${LM_STYLE_OVERRIDE:-}"
+PROMPT_FORMAT="${PROMPT_FORMAT:-}"
+THINKING_MODE="${THINKING_MODE:-}"
 OUT="${OUT:-}"
 EXTRA_ARGS="${EXTRA_ARGS:-}"
 
@@ -160,6 +168,7 @@ ARGS=(
   --seed "$SEED"
   --loop-n "$LOOP_N"
   --loop-k "$LOOP_K"
+  --profile-tail-threshold "$PROFILE_TAIL_THRESHOLD"
   --release-version "$RELEASE_VERSION"
 )
 
@@ -173,6 +182,26 @@ fi
 
 if [[ -n "${ANSWER_FIELD}" ]]; then
   ARGS+=(--answer-field "$ANSWER_FIELD")
+fi
+
+if [[ -n "${STARTER_CODE_FIELD}" ]]; then
+  ARGS+=(--starter-code-field "$STARTER_CODE_FIELD")
+fi
+
+if [[ -n "${RECORD_ID_FIELD}" ]]; then
+  ARGS+=(--record-id-field "$RECORD_ID_FIELD")
+fi
+
+if [[ -n "${METADATA_FIELDS}" ]]; then
+  ARGS+=(--metadata-fields "$METADATA_FIELDS")
+fi
+
+if [[ -n "${ROW_FILTER_JSON}" ]]; then
+  ARGS+=(--row-filter-json "$ROW_FILTER_JSON")
+fi
+
+if [[ -n "${EXCLUDE_PROMPT_JSONL}" ]]; then
+  ARGS+=(--exclude-prompt-jsonl "$EXCLUDE_PROMPT_JSONL")
 fi
 
 if [[ -n "${MAX_SAMPLES}" ]]; then
@@ -201,6 +230,14 @@ fi
 
 if [[ -n "${LM_STYLE_OVERRIDE}" ]]; then
   ARGS+=(--lm-style-override "$LM_STYLE_OVERRIDE")
+fi
+
+if [[ -n "${PROMPT_FORMAT}" ]]; then
+  ARGS+=(--prompt-format "$PROMPT_FORMAT")
+fi
+
+if [[ -n "${THINKING_MODE}" ]]; then
+  ARGS+=(--thinking-mode "$THINKING_MODE")
 fi
 
 if [[ -n "${OUT}" ]]; then

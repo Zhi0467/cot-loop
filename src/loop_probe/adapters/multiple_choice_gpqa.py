@@ -93,6 +93,7 @@ def build_mcq_prompt(
     options: list[str],
     *,
     prompt_format: str = "auto",
+    thinking_mode: str = "default",
 ) -> str:
     if len(options) != 4:
         raise ValueError(f"GPQA expects 4 options, got {len(options)}.")
@@ -106,7 +107,12 @@ def build_mcq_prompt(
         "On the final non-empty line, output only a JSON object of the form "
         '`{"answer": "X"}` where X is one of A, B, C, or D.'
     )
-    return format_user_prompt(tokenizer, user_msg, prompt_format=prompt_format)
+    return format_user_prompt(
+        tokenizer,
+        user_msg,
+        prompt_format=prompt_format,
+        thinking_mode=thinking_mode,
+    )
 
 
 def grade(response: str, gold_letter: str) -> bool:
