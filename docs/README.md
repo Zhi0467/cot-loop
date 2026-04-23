@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-04-23 19:50 UTC
+Last updated: 2026-04-23 23:28 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -16,10 +16,7 @@ Core docs:
 - Prompt-profile risk-screen decision: prompt-profile-risk-screen-2026-03-30.md
 - Prompt-profile plain-language note: prompt-profile-plain-language-2026-03-30.md
 - Prompt-profile full-train plan: prompt-profile-full-train-plan-2026-04-02.md
-- Prompt-profile RFM + steering stage plan: prompt-profile-rfm-steering-plan-2026-04-21.md
-- Prompt-profile RFM steering summary: prompt-profile-rfm-steering-summary-2026-04-23.md
-- Prompt-profile RFM + steering mode-consistent stage note: prompt-profile-rfm-mode-consistent-stage-2026-04-23.md
-- Prompt-profile RFM + steering grounded stage note: prompt-profile-rfm-steering-grounded-stage-2026-04-23.md
+- Prompt-profile RFM third-stage steering grand plan: prompt-profile-rfm-third-stage-steering-plan.md
 - Prompt-profile RFM artifact schema: prompt-profile-rfm-artifact-schema-2026-04-21.md
 - LiveCodeBench repaired stage report: livecodebench-repaired-stage-report-2026-04-21.md
 - Prompt-profile natural-regression rerun note: prompt-profile-natural-regression-rerun-2026-04-05.md
@@ -49,8 +46,6 @@ Key outputs:
 - Prompt-profile risk-control bundle: ../outputs/prompt_profile_risk_controls_20260330/
 - Plain-language objective PDF: ../outputs/prompt_profile_plain_language_20260330/prompt_profile_plain_language_20260330.pdf
 - Full-train plan PDF: ../outputs/prompt_profile_full_train_plan_20260402/prompt_profile_full_train_plan_20260402.pdf
-- Mode-consistent stage note PDF: ../outputs/prompt_profile_rfm_mode_consistent_stage_20260423/prompt_profile_rfm_mode_consistent_stage_20260423.pdf
-- Grounded stage note PDF: ../outputs/prompt_profile_rfm_stage_grounded_plan_20260423/prompt_profile_rfm_stage_grounded_plan_20260423.pdf
 - Natural-regression rerun bundle: ../outputs/prompt_profile_natural_regression_rerun_20260405/
 - Natural-regression rerun PDF: ../outputs/prompt_profile_natural_regression_rerun_20260405/prompt_profile_natural_regression_rerun_20260405.pdf
 - Prompt-profile unified report bundle: ../outputs/prompt_profile_unified_report_20260409/
@@ -86,10 +81,11 @@ Key outputs:
 - Consolidated earlier findings PDF: ../outputs/pr2_experiment_findings_consolidated_pdf/pr2_experiment_findings_consolidated.pdf
 - Rollout-statistics module audit PDF: ../outputs/rollout_stats_module_audit/rollout_stats_module_audit.pdf
 - Detailed reopened-round summary PDF: ../outputs/prefill_rounds_1_to_12_detailed_summary/prefill_rounds_1_to_12_detailed_summary.pdf
+- Third-stage steering grand-plan PDF: ../outputs/prompt_profile_rfm_third_stage_steering_plan_20260423/prompt_profile_rfm_third_stage_steering_plan_20260423.pdf
 
 Current live status:
 - `main-four-dataset-rollout-rebuild-2026-04-23.md` is now the live rollout-stat status surface:
-  - it replaces the narrower March-repair / LiveCodeBench-only rerun framing for the current task;
+  - it replaces the narrower LiveCodeBench-only rerun framing for the current task;
   - it now fixes the canonical dataset set to `LiveCodeBench`, `TACO-hard`, `MATH level-5`, and `Omni-MATH >= 7`;
   - it records the corrected full-or-`1000` size policy:
     - `LiveCodeBench` full `1055`
@@ -105,25 +101,12 @@ Current live status:
   - it records that the local `data/omni_math_ge7_screen_300.jsonl` file is now only a historical screen artifact, while the active stats suite reads the full HF `Omni-MATH >= 7` slice;
   - it records the archive-level smoke receipt proving that prompt text, token ids, rollout text, completion token ids, and row metadata are all preserved for later reuse;
   - it points at the live suite output root `../outputs/model_stats/main_five_dataset_rebuild_full_or_1k_20260423/` and the remote run root `/data/scratch/murphy/outputs/cot-loop-detection/main_five_dataset_rebuild_full_or_1k_20260423/`; those path names are historical, but the active manifest and queue now only cover jobs `2875`, `2877`, `2878`, `2879`, `2880`, `2882`, `2883`, and `2884`.
-- `prompt-profile-rfm-steering-grounded-stage-2026-04-23.md` is now the live status surface for this stage:
-  - it keeps the repaired `LiveCodeBench` object fixed at fit-train / val / test `280 / 128 / 160` with positives `140 / 35 / 54`;
-  - it separates finished evidence, live evidence, and blocked evidence instead of treating the whole stage as one undifferentiated status blob;
-  - it records that only two full-contract thinking-on rows are finished so far:
-    - `no_steer`: `2 / 160` `pass@1`, loop fraction `0.65625`
-    - `plus_v_linear`: `2 / 160` `pass@1`, loop fraction `0.6125`
-  - it records that the remaining five full-contract thinking-on rows are still running:
-    - `2804`, `2810`, `2811`, `2815`, `2816`
-  - it records that every attempted non-thinking row failed on the same dirty-slot CUDA OOM before first row, so the non-thinking lane is still infrastructure-blocked rather than scientifically read out;
-  - it updates the screening gate from a plan-only item to a live evidence surface:
-    - `LiveCodeBench-extra`: `255` profiled, positive rate `0.5529`
-    - `TACO-hard`: `213` profiled, positive rate `0.8075`
-    - `MATH level-5`: `180` profiled, positive rate `0.1389`
-    - `Omni-MATH >= 7`: `176 / 300`, positive rate `0.5867`
-  - it records that the explicit `LiveCodeBench` `HFChatTemplate` `thinking on/off` provenance pair is queued as `2829` / `2830`, but is not the main steering result;
-  - it also makes the repo/runtime drift explicit:
-    - local worktree state is ahead of the published draft PR `#11`;
-    - the positive-enrichment screen is currently running with home-backed caches because `/data` is effectively full.
-- `prompt-profile-rfm-steering-plan-2026-04-21.md` remains the design document for why this stage exists and what it is trying to prove.
+- `prompt-profile-rfm-third-stage-steering-plan.md` is now the only active steering-stage plan:
+  - it compresses the steering design, mode-consistency rule, execution order, and backlog into one document;
+  - it fixes the grand schema as mode-local `stats -> prompt-level materialization -> probe/RFM training -> vector export -> steering` for each `(dataset, thinking mode)` path;
+  - it records the corrected steering contract: prefill-only, all prompt tokens, every block steered by its own block-specific vector, both linear and spherical conditions, and the full source-manifest decode budget rather than a reduced pilot cap;
+  - it excludes cross-mode rows, last-token pilots, prompt-subset pilots, canceled queue fragments, and `LiveCodeBench-extra` from stage evidence;
+  - it keeps `prompt-profile-rfm-artifact-schema-2026-04-21.md` as the schema reference for detector, vector, and steering records.
 - The new note `livecodebench-repaired-stage-report-2026-04-21.md` is still the shortest collaborator-facing artifact for "finish LiveCodeBench" on the repaired detector/vector object:
   - it freezes the repaired `LiveCodeBench` prompt object, detector comparison, direction-stability read, and first larger steering control table in one place;
   - it points at the report bundle `../outputs/livecodebench_repaired_stage_report_apr21/`, which now carries:

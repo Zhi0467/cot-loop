@@ -1,0 +1,186 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.9in]{geometry}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.55em}
+\begin{document}
+
+{\Large \textbf{Prompt-Profile RFM Third-Stage Steering Grand Plan}}\\
+Generated: 2026-04-23 23:28 UTC\\
+Canonical repo note:\quad \texttt{docs/prompt-profile-rfm-third-stage-steering-plan.md}
+
+\section*{Object}
+The third-stage steering object is mode-local. A scientific row must close this
+full chain inside one \texttt{(dataset, thinking mode)} path:
+\begin{center}
+\begin{tabular}{c}
+\texttt{stats collection -> prompt-level materialization}\\
+\texttt{-> probe/RFM training -> vector export -> steering}
+\end{tabular}
+\end{center}
+Thinking-on and thinking-off
+are separate experimental objects. Cross-mode steering rows and mixed-mode
+average vectors are not evidence for this stage.
+
+\section*{Active Data Foundation}
+The active data foundation is the rebuilt four-dataset rollout-stat suite under
+\texttt{Qwen/Qwen3-1.7B}, with \texttt{temperature=0.2},
+\texttt{num\_generations=10}, and the max-token / max-model-length contract
+recorded in the collector manifests. Both thinking modes are collected for every
+dataset.
+
+\begin{center}
+\begin{tabular}{lrl}
+\toprule
+Dataset & Active size & Thinking modes \\
+\midrule
+\texttt{LiveCodeBench} & full \texttt{1055} & \texttt{on}, \texttt{off} \\
+\texttt{TACO-hard} & \texttt{1000 / 5536} & \texttt{on}, \texttt{off} \\
+\texttt{MATH level-5} & \texttt{1000 / 2304} & \texttt{on}, \texttt{off} \\
+\texttt{Omni-MATH >= 7} & full \texttt{916} & \texttt{on}, \texttt{off} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\texttt{LiveCodeBench-extra} is not a separate steering benchmark; it is a
+subset of \texttt{LiveCodeBench release\_v6}. The current stage starts from the
+new rebuilt mode-local archives, not from any earlier steering bundle.
+
+\section*{Pipeline}
+\textbf{P0: stats receipt.} Each archive must carry dataset/filter, thinking
+mode, prompt formatter, model/tokenizer revision where available, generation
+config, prompt ids, prompt text, prompt token ids, completion text and token ids,
+correctness where available, length metrics, loop flags, cap-hit flags, and raw
+row metadata.
+
+\textbf{P1: prompt-level materialization.} Recompute labels from the same
+mode-local archive. Required targets are \texttt{majority\_s\_0.5},
+\texttt{mean\_relative\_length}, \texttt{p\_loop}, and \texttt{p\_cap} when
+available. \texttt{majority\_s\_0.5} means strict-majority long-rollout risk
+under \texttt{relative\_length >= 0.5}; it is not a pure loop label.
+
+\textbf{P2: detector table.} For each admitted object, compare prompt-only
+baselines, activation-linear, activation-MLP, and layerwise RFM on the same
+mode-local splits. Primary detector metric is \texttt{PR-AUC}; \texttt{ROC-AUC}
+and threshold metrics are diagnostic.
+
+\textbf{P3: vector export.} Export one signed vector per transformer block from
+the mode-local RFM bundle. \texttt{+v\_l} is the higher-risk direction at block
+\texttt{l}; \texttt{-v\_l} is the anti-risk direction. Before interpreting
+steering, report vector hashes, sign rule, projection scores, bootstrap/seed
+cosine stability, and cross-layer cosine structure.
+
+\textbf{P4: steering.} Run steering only after the corresponding detector and
+vector receipts exist for the same \texttt{(dataset, thinking mode)} object.
+\texttt{LiveCodeBench} is first because the grader and code-generation
+evaluation path are the cleanest.
+
+\section*{Admission And Direction Gates}
+A dataset/mode is admitted into steering only if its mode-local train or
+fit-train object has at least \texttt{10\%} positives under
+\texttt{majority\_s\_0.5}. Sparse-positive objects remain diagnostic unless
+explicitly accepted.
+
+For direction quality, fewer than \texttt{20 / 28} layers clearing mean
+bootstrap cosine \texttt{>= 0.7} means the steering run may still be useful as
+infrastructure, but not as a stable-vector causal read without a caveat. If the
+selected detector layer is unstable, report it directly.
+
+\section*{Fixed Steering Contract}
+\begin{center}
+\begin{tabularx}{\textwidth}{lX}
+\toprule
+Field & Contract \\
+\midrule
+Timing & Prefill forward pass only \\
+Hook site & \texttt{prefill\_layer\_output\_all\_tokens} \\
+Token scope & Every prompt token, not only the last prompt token \\
+Block scope & Every block uses its own block-specific vector \texttt{v\_l} \\
+Linear strength & \texttt{epsilon = 0.2} \\
+Spherical strength & \texttt{t = 0.3} \\
+Decode budget & Full source-manifest budget; reduced caps are smoke-only \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+First-pass conditions:
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+Condition & Meaning \\
+\midrule
+\texttt{no\_steer} & matched baseline \\
+\texttt{minus\_v\_linear} & additive anti-risk direction \\
+\texttt{plus\_v\_linear} & additive sign-flip / risk direction \\
+\texttt{random\_linear} & additive random-direction control \\
+\texttt{minus\_v\_spherical} & norm-preserving anti-risk pole \\
+\texttt{plus\_v\_spherical} & norm-preserving sign-flip pole \\
+\texttt{random\_spherical} & norm-preserving random-direction control \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Do not add layer selection, probe gating, online controllers, or strength sweeps
+until the seven-condition table exists for the relevant mode-local object.
+
+\section*{Required Outputs}
+Each steering run must write a condition summary, prompt-level ledger, and a
+steering-run v1 record with prompt ids,
+prompt-id hash, vector artifact hash, thinking mode, hook site, \texttt{t},
+\texttt{epsilon}, generation config, grader version, git commit, and output
+root.
+
+Headline metrics are \texttt{pass@1}, accuracy delta vs \texttt{no\_steer},
+loop fraction, max-length-hit fraction, long-rollout fraction, average length,
+median length, and bootstrap intervals for key deltas when sample size supports
+them. Intervention diagnostics must include pre/post norm, spherical
+norm-preservation error, starting angle, realized angular movement, condition
+runtime, and timeout or cap-hit asymmetry.
+
+\section*{Execution Backlog}
+\begin{enumerate}
+\item Finish all eight rebuilt stats archives for the four datasets and two
+thinking modes.
+\item Materialize mode-local prompt-profile objects and admission-gate tables.
+\item Train the \texttt{LiveCodeBench} thinking-on and thinking-off detector
+surfaces from the rebuilt archives.
+\item Export the two \texttt{LiveCodeBench} mode-local vector bundles and
+direction diagnostics.
+\item Run the full seven-condition \texttt{LiveCodeBench} table in thinking
+\texttt{on}.
+\item Run the full seven-condition \texttt{LiveCodeBench} table in thinking
+\texttt{off}.
+\item Promote \texttt{TACO-hard}, \texttt{MATH level-5}, and
+\texttt{Omni-MATH >= 7} path-by-path only after their rebuilt mode-local
+materializations pass the gate and have detector/vector receipts.
+\item Open transfer only after at least two non-identical datasets inside the
+same thinking mode have admitted detector/vector bundles, direction diagnostics,
+and readable in-distribution steering receipts.
+\end{enumerate}
+
+\section*{Positive Claim Gate}
+A steering row can be called positive only when the matched \texttt{minus\_v}
+condition improves loop, cap-hit, or long-rollout metrics relative to
+\texttt{no\_steer}; beats the matched random control; is not matched by the
+sign-flip condition; does not incur an unacceptable accuracy drop; uses full
+held-out prompts and the full decode contract; and matches a mode-local,
+benchmark-local vector bundle by prompt ids and vector hashes.
+
+If those conditions fail, report the result as a negative steering read,
+implementation receipt, or diagnostic control, not as evidence that steering
+works.
+
+\section*{Exclusions}
+Do not use vector bundles outside the rebuilt mode-local path. Do not claim
+\texttt{LiveCodeBench-extra} as a separate benchmark. Do not call
+\texttt{majority\_s\_0.5} a pure loop label. Do not treat detector
+\texttt{PR-AUC} as a steering result. Do not treat reduced-cap, prompt-subset,
+or last-token-only rows as full-stage evidence. Do not mix thinking-on and
+thinking-off vectors in transfer.
+
+\end{document}

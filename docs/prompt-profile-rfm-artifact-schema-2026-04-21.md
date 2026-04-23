@@ -1,6 +1,6 @@
 # Prompt-Profile RFM Artifact Schema
 
-Last updated: 2026-04-22 00:03 UTC
+Last updated: 2026-04-23 23:12 UTC
 
 ## Purpose
 
@@ -266,12 +266,27 @@ It should answer:
   - `vector_artifact_hash`
   - `hook_site`
   - `t`
+  - `epsilon`
+  - `thinking_mode`
   - `seeds`
   - `prompt_ids`
   - `generation_config`
   - `grader_version`
   - `output_path`
   - `artifact_sha256`
+  - condition-level metrics:
+    - accuracy / `pass@1`
+    - loop fraction
+    - max-length-hit fraction
+    - long-rollout fraction
+    - average generation length
+    - median generation length
+  - intervention diagnostics where applicable:
+    - mean pre-intervention norm
+    - mean post-intervention norm
+    - norm-preservation error
+    - mean starting angle
+    - mean realized angular movement
 
 ## Implementation Surface
 

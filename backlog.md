@@ -1,36 +1,56 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-23 19:50 UTC
+Last updated: 2026-04-23 23:28 UTC
 
 Reference docs:
 - `docs/main-four-dataset-rollout-rebuild-2026-04-23.md`
-- `docs/prompt-profile-rfm-steering-summary-2026-04-23.md`
+- `docs/prompt-profile-rfm-third-stage-steering-plan.md`
 - `docs/prompt-profile-rfm-artifact-schema-2026-04-21.md`
 - `docs/understand-where-loop-and-max-length-come-from.md`
 
-## Steering summary from the 2026-04-23 thread
+## Third-stage steering backlog
 
-- `LiveCodeBench` stays the first steering benchmark.
-- The active steering claim is now two matched paths, not one mixed path:
-  - thinking `on`: stats -> prompt-level materialization -> RFM -> vector export -> steering
-  - thinking `off`: the same chain
-- Do not use cross-mode rows as stage evidence.
-  - the earlier thinking-on steered rows used the older non-thinking/raw vector bundle, so those rows are runner receipts only
-- Keep the corrected steering contract:
-  - prefill-only
-  - all prompt tokens steered
-  - block-specific direction at each block
-  - both linear and spherical steering
-  - full decode budget
-- If the non-thinking path is still node-fragile, land the first clean mode-consistent row linear-first, then extend to spherical.
-- Keep transfer mode-local too.
-  - no mixed thinking-on / thinking-off average vector
-- Treat the current screen lane as prevalence scouting only.
-  - only promote a new dataset after a mode-tagged collector receipt on that same path still clears the `>= 10%` gate
+The steering backlog is now governed by one canonical doc:
+`docs/prompt-profile-rfm-third-stage-steering-plan.md`.
+
+Core rules:
+
+- Every scientific steering row must close one mode-local chain:
+  `stats -> prompt-level materialization -> probe/RFM training -> vector export -> steering`.
+- Thinking `on` and thinking `off` are separate objects. Do not use cross-mode
+  rows or mixed-mode averaged vectors as stage evidence.
+- The steering contract is fixed for the first real tables:
+  - prefill-only intervention;
+  - all prompt tokens steered;
+  - every block steered by its own block-specific vector;
+  - both linear and spherical conditions;
+  - full source-manifest decode budget, not a reduced pilot cap.
+- Dataset/mode admission into steering requires a rebuilt mode-local
+  `majority_s_0.5` positive rate of at least `10%`.
+- `LiveCodeBench` remains the first steering benchmark because it has the
+  cleanest grader and the least ambiguous code-generation evaluation path. The
+  new claim must use vectors trained from the rebuilt mode-local archives.
+
+Immediate steering TODOs after the rebuilt stats archives land:
+
+1. Materialize `LiveCodeBench` thinking-on and thinking-off prompt-profile
+   objects from the rebuilt archives.
+2. Train prompt-only, activation, and RFM detector tables on both mode-local
+   `LiveCodeBench` objects.
+3. Export thinking-on and thinking-off block-specific vector bundles plus
+   direction diagnostics.
+4. Run the seven-condition full-contract `LiveCodeBench` steering table in
+   thinking `on`.
+5. Run the seven-condition full-contract `LiveCodeBench` steering table in
+   thinking `off`.
+6. Promote `TACO-hard`, `MATH level-5`, and `Omni-MATH >= 7` path-by-path only
+   after their rebuilt mode-local materializations pass the gate and have
+   detector/vector receipts.
 
 ## Fixed current object
 
-- The active rollout-stat task is no longer "repair the March bundle" or "append Omni to the old `800`-prompt queue."
+- The active rollout-stat task starts from the new rebuilt mode-local rollout
+  archives, not from any earlier steering bundle.
 - The current canonical rebuild surface is:
   - `LiveCodeBench`
   - `TACO-hard`
@@ -126,7 +146,7 @@ Reference docs:
 
 ### P1: materialize the next prompt-profile objects from these rebuilt archives
 
-1. Recompute prompt-level labels from the new prompt-rollout archives instead of reusing March-era bundle assumptions.
+1. Recompute prompt-level labels from the new prompt-rollout archives.
 2. Build the mode-tagged prompt-profile objects for all four retained datasets from the rebuilt archives.
 3. Keep thinking `on` and `off` as separate prompt-profile objects all the way through detector training.
 
@@ -138,14 +158,9 @@ Reference docs:
 
 ### P3: only restart steering after the rebuilt stats and detector surfaces exist
 
-1. Do not reuse the old March-era or LiveCodeBench-only vector bundles for this rebuild.
+1. Use only vector bundles exported from the rebuilt mode-local archive for the same dataset and thinking mode.
 2. Do not treat the canceled `2829` to `2838` rerun thread, the canceled `2850` to `2864` slice queue, the dropped `LiveCodeBench-extra` jobs `2876` / `2881`, or the failed `2865` to `2874` env-drop queue as valid scientific receipts.
 3. Restart steering only after a rebuilt mode-local detector/vector object exists for the relevant dataset.
-
-## Historical context
-
-- The older March-provenance audit and the failed LiveCodeBench-only reruns are still useful debugging history, but they are no longer the active backlog surface.
-- Keep those receipts in `roadmap.md` and the task report; do not let them redefine the current queue or the current project objective.
 
 ## Retained reference surfaces
 
