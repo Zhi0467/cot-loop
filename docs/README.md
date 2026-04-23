@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-04-23 18:25 UTC
+Last updated: 2026-04-23 19:50 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -17,6 +17,7 @@ Core docs:
 - Prompt-profile plain-language note: prompt-profile-plain-language-2026-03-30.md
 - Prompt-profile full-train plan: prompt-profile-full-train-plan-2026-04-02.md
 - Prompt-profile RFM + steering stage plan: prompt-profile-rfm-steering-plan-2026-04-21.md
+- Prompt-profile RFM steering summary: prompt-profile-rfm-steering-summary-2026-04-23.md
 - Prompt-profile RFM + steering mode-consistent stage note: prompt-profile-rfm-mode-consistent-stage-2026-04-23.md
 - Prompt-profile RFM + steering grounded stage note: prompt-profile-rfm-steering-grounded-stage-2026-04-23.md
 - Prompt-profile RFM artifact schema: prompt-profile-rfm-artifact-schema-2026-04-21.md
