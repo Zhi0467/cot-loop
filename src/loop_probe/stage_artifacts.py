@@ -276,6 +276,9 @@ def build_steering_run_record(
     model_revision: str | None = None,
     tokenizer_revision: str | None = None,
     condition_config: dict[str, Any] | None = None,
+    source_prompt_text_hash: str | None = None,
+    thinking_mode: str | None = None,
+    prompt_surface_tag: str | None = None,
 ) -> dict[str, Any]:
     record = {
         "schema_name": "prompt_profile_rfm_steering_run.v1",
@@ -295,6 +298,8 @@ def build_steering_run_record(
         record["benchmark"] = benchmark
     if prompt_text_hash is not None:
         record["prompt_text_hash"] = prompt_text_hash
+    if source_prompt_text_hash is not None:
+        record["source_prompt_text_hash"] = source_prompt_text_hash
     if git_commit is not None:
         record["git_commit"] = git_commit
     if model_id is not None:
@@ -305,4 +310,8 @@ def build_steering_run_record(
         record["tokenizer_revision"] = tokenizer_revision
     if condition_config is not None:
         record["condition_config"] = condition_config
+    if thinking_mode is not None:
+        record["thinking_mode"] = thinking_mode
+    if prompt_surface_tag is not None:
+        record["prompt_surface_tag"] = prompt_surface_tag
     return record

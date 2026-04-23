@@ -84,6 +84,7 @@ ATTN_IMPLEMENTATION="${ATTN_IMPLEMENTATION:-}"
 MODEL_ID="${MODEL_ID:-}"
 MODEL_REVISION="${MODEL_REVISION:-}"
 TOKENIZER_REVISION="${TOKENIZER_REVISION:-}"
+THINKING_MODE="${THINKING_MODE:-on}"
 HOOK_SITE="${HOOK_SITE:-prefill_layer_output_all_tokens}"
 LIVECODEBENCH_REPO="${LIVECODEBENCH_REPO:-}"
 RELEASE_VERSION="${RELEASE_VERSION:-}"
@@ -105,6 +106,7 @@ cmd=(
   --batch-size "${BATCH_SIZE}"
   --dtype "${DTYPE}"
   --hook-site "${HOOK_SITE}"
+  --thinking-mode "${THINKING_MODE}"
 )
 
 if [[ -n "${EPSILON}" ]]; then

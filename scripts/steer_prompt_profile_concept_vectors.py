@@ -45,6 +45,8 @@ from loop_probe.types import DatasetSpec
 DEFAULT_T = 0.3
 DEFAULT_EPSILON = 0.2
 DEFAULT_HOOK_SITE = "prefill_layer_output_all_tokens"
+DEFAULT_THINKING_MODE = "on"
+QWEN_NON_THINKING_SUFFIX = "<think>\n\n</think>\n\n"
 DEFAULT_GRADER_VERSION_BY_TASK = {
     "math_freeform": "math_verify",
     "multiple_choice_gpqa": "structured_json_letter.v1",
@@ -104,6 +106,11 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--dtype", choices=("float16", "bfloat16", "float32"), default="bfloat16")
     parser.add_argument("--attn-implementation", default=None)
     parser.add_argument("--hook-site", default=DEFAULT_HOOK_SITE)
+    parser.add_argument(
+        "--thinking-mode",
+        choices=("on", "off"),
+        default=DEFAULT_THINKING_MODE,
+    )
     parser.add_argument("--livecodebench-repo", default="")
     parser.add_argument("--release-version", default=None)
     parser.add_argument("--model-id", default=None)
@@ -298,6 +305,66 @@ def _prompt_hash(prompts: list[str]) -> str:
 
 def _prompt_ids_hash(prompt_ids: list[int]) -> str:
     return stable_json_sha256(prompt_ids)
+
+
+def _prompt_surface_tag(thinking_mode: str) -> str:
+    if thinking_mode == "off":
+        return "HF non-thinking steering surface"
+    return "HF thinking-on steering surface"
+
+
+def _apply_qwen_thinking_mode_to_prompt(
+    prompt: str,
+    *,
+    thinking_mode: str,
+    model_id: str,
+) -> str:
+    if thinking_mode == "on":
+        return prompt
+    model_id_lower = model_id.lower()
+    if "qwen" not in model_id_lower:
+        raise SystemExit(
+            "--thinking-mode=off is currently only implemented for Qwen-family prompts."
+        )
+    if prompt.endswith(QWEN_NON_THINKING_SUFFIX):
+        return prompt
+    assistant_prefix = "<|im_start|>assistant\n"
+    if not prompt.endswith(assistant_prefix):
+        raise SystemExit(
+            "Cannot apply Qwen non-thinking prompt transform because prompt does not end "
+            f"with the expected assistant prefix {assistant_prefix!r}."
+        )
+    return prompt + QWEN_NON_THINKING_SUFFIX
+
+
+def _apply_prompt_surface(
+    items: list[SteeringPromptItem],
+    *,
+    model_id: str,
+    thinking_mode: str,
+) -> tuple[list[SteeringPromptItem], dict[str, Any]]:
+    transformed_items: list[SteeringPromptItem] = []
+    for item in items:
+        transformed_items.append(
+            SteeringPromptItem(
+                sample_id=item.sample_id,
+                prompt=_apply_qwen_thinking_mode_to_prompt(
+                    item.prompt,
+                    thinking_mode=thinking_mode,
+                    model_id=model_id,
+                ),
+                gold_answer=item.gold_answer,
+                gold_index=item.gold_index,
+                question_id=item.question_id,
+            )
+        )
+    return transformed_items, {
+        "tag": _prompt_surface_tag(thinking_mode),
+        "thinking_mode": thinking_mode,
+        "qwen_non_thinking_suffix": (
+            QWEN_NON_THINKING_SUFFIX if thinking_mode == "off" else None
+        ),
+    }
 
 
 def _resolve_release_version(
@@ -1395,6 +1462,12 @@ def main() -> None:
         else int(_manifest_rollout_value(source_manifest, "max_model_len", default=40960))
     )
 
+    source_prompt_hash = _prompt_hash([item.prompt for item in items])
+    items, prompt_surface = _apply_prompt_surface(
+        items,
+        model_id=model_id,
+        thinking_mode=args.thinking_mode,
+    )
     prompt_hash = _prompt_hash([item.prompt for item in items])
     git_commit = current_git_commit(ROOT)
     device = _resolve_device(args.device)
@@ -1425,10 +1498,14 @@ def main() -> None:
         "vector_bundle_hash": vector_bundle_hash,
         "selected_layers": sorted(layer_payloads),
         "prompt_ids": prompt_ids,
+        "source_prompt_text_hash": source_prompt_hash,
         "prompt_text_hash": prompt_hash,
         "model_id": model_id,
         "model_revision": model_revision,
         "tokenizer_revision": tokenizer_revision,
+        "thinking_mode": args.thinking_mode,
+        "prompt_surface_tag": prompt_surface["tag"],
+        "prompt_surface": prompt_surface,
         "git_commit": git_commit,
         "device": str(device),
         "dtype": args.dtype,
@@ -1505,6 +1582,7 @@ def main() -> None:
                 seeds=[int(seed) for seed in args.seed],
                 prompt_ids=prompt_ids,
                 prompt_text_hash=prompt_hash,
+                source_prompt_text_hash=source_prompt_hash,
                 generation_config=config_payload["generation_config"],
                 grader_version=grader_version,
                 output_path=str(condition_dir),
@@ -1513,6 +1591,8 @@ def main() -> None:
                 model_revision=model_revision,
                 tokenizer_revision=tokenizer_revision,
                 condition_config=last_condition_config,
+                thinking_mode=args.thinking_mode,
+                prompt_surface_tag=str(prompt_surface["tag"]),
             ),
         )
         condition_summary = {
