@@ -1,28 +1,28 @@
 # CoT Loop Detection via Probe Classifiers
 
-This repository studies whether chain-of-thought loop risk is predictable from internal activations and rollout telemetry. The active stage is now a corrected five-dataset rollout-stat rebuild for `Qwen/Qwen3-1.7B`, not another March patch-up: `LiveCodeBench`, `LiveCodeBench-extra`, `TACO-hard`, `MATH level-5`, and `Omni-MATH >= 7`, each collected with explicit thinking `on` / `off` surfaces and reusable prompt-rollout archives. The durable status surface for that reset is `docs/main-four-dataset-rollout-rebuild-2026-04-23.md`, which now records the full-or-`1000` sizing contract, the `LiveCodeBench-extra` disjointness repair under HF chat templates, the TACO loader/grader fixes, the promotion of full HF `Omni-MATH >= 7`, and the live ten-job queue under `/data/scratch/murphy/outputs/cot-loop-detection/main_five_dataset_rebuild_full_or_1k_20260423/`. The older March-provenance and LiveCodeBench-only rerun thread is now historical debugging context rather than the current contract.
+This repository studies whether chain-of-thought loop risk is predictable from internal activations and rollout telemetry. The active stage is now a corrected four-dataset rollout-stat rebuild for `Qwen/Qwen3-1.7B`, not another March patch-up: `LiveCodeBench`, `TACO-hard`, `MATH level-5`, and `Omni-MATH >= 7`, each collected with explicit thinking `on` / `off` surfaces and reusable prompt-rollout archives. The durable status surface for that reset is `docs/main-four-dataset-rollout-rebuild-2026-04-23.md`, which now records the full-or-`1000` sizing contract, the TACO loader/grader fixes, the promotion of full HF `Omni-MATH >= 7`, the explicit removal of mistaken `LiveCodeBench-extra` lane, and the live eight-job queue still writing under the already-created remote root `/data/scratch/murphy/outputs/cot-loop-detection/main_five_dataset_rebuild_full_or_1k_20260423/`. The older March-provenance, LiveCodeBench-only rerun, and dropped `LiveCodeBench-extra` thread are historical debugging context rather than the current contract.
 
 ## Overview
 
 The project now has three durable evidence streams:
 - the probe line asks whether loop risk is detectable from stacked prompt-prefill activations, either by slicing one layer or by voting across all layers;
-- the rollout-statistics line measures how often looping and max-length hits actually occur under the repaired v2 collector contract, with the current rebuild surface focused on `LiveCodeBench`, `LiveCodeBench-extra`, `TACO-hard`, `MATH level-5`, and `Omni-MATH >= 7`;
+- the rollout-statistics line measures how often looping and max-length hits actually occur under the repaired v2 collector contract, with the current rebuild surface focused on `LiveCodeBench`, `TACO-hard`, `MATH level-5`, and `Omni-MATH >= 7`;
 - the trigger-attention line replays saved loop rows to ask where the model is attending around the repeated trigger region, but that line should now be treated as merged background evidence rather than the active phase boundary.
 
 Latest status:
-- the current live execution object is the five-dataset rebuild described in `docs/main-four-dataset-rollout-rebuild-2026-04-23.md`:
+- the current live execution object is the four-dataset rebuild described in `docs/main-four-dataset-rollout-rebuild-2026-04-23.md`:
   - the suite launcher is `scripts/launch_main_rollout_stats_suite.py`
   - the live output root is `/data/scratch/murphy/outputs/cot-loop-detection/main_five_dataset_rebuild_full_or_1k_20260423/`
   - the sizing contract is now:
     - `LiveCodeBench`: full dataset (`1055`)
-    - `LiveCodeBench-extra`: full disjoint remainder (`255`)
     - `TACO-hard`: `1000` of `5536`
     - `MATH level-5`: `1000` of `2304`
     - `Omni-MATH >= 7`: full HF slice (`916`)
-  - `LiveCodeBench-extra` is now genuinely disjoint on the HF chat-template surface because exclusion matches both archived prompt text and archived `sample_id`; the live sidecar already records `excluded_prompt_count = 800`
-  - the current live queue is `2875` through `2884`
-    - `2875` (`LiveCodeBench`, on) and `2876` (`LiveCodeBench-extra`, on) are `RUNNING`
-    - `2877` through `2884` are pending behind them
+  - `LiveCodeBench-extra` has been dropped from the active object because it is a strict subset of the retained `LiveCodeBench` surface, not a separate benchmark
+  - the current live queue is the retained eight-job subset of `2875` through `2884`
+    - `2875` (`LiveCodeBench`, on) and `2877` (`TACO-hard`, on) are `RUNNING`
+    - `2878` is pending on resources
+    - `2879`, `2880`, `2882`, `2883`, and `2884` are pending on priority
   - the first corrected relaunch `2865` through `2874` was canceled by a launcher bug, not a model bug:
     - the sbatch wrapper dropped `CONDA_ENV`, so every job exited immediately before first row with `no runtime env found (.venv missing and CONDA_ENV not set)`
   - the TACO path is no longer provisional:

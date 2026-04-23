@@ -53,7 +53,6 @@ class MainRolloutDataset:
     lm_style_override: str | None = None
     max_samples: int | None = None
     requires_livecodebench_repo: bool = False
-    requires_exclude_prompt_jsonl: bool = False
 
 
 SUITE_DATASETS: tuple[MainRolloutDataset, ...] = (
@@ -66,17 +65,6 @@ SUITE_DATASETS: tuple[MainRolloutDataset, ...] = (
         release_version="release_v6",
         lm_style_override="HFChatTemplate",
         requires_livecodebench_repo=True,
-    ),
-    MainRolloutDataset(
-        key="livecodebench_extra",
-        display_name="LiveCodeBench-extra",
-        task_kind="livecodebench_codegen",
-        dataset="livecodebench/code_generation_lite",
-        split="test",
-        release_version="release_v6",
-        lm_style_override="HFChatTemplate",
-        requires_livecodebench_repo=True,
-        requires_exclude_prompt_jsonl=True,
     ),
     MainRolloutDataset(
         key="taco_hard",
@@ -152,7 +140,6 @@ def build_collect_env(
     suite_config: MainRolloutSuiteConfig,
     output_root: str,
     livecodebench_repo: str | None = None,
-    lcb_extra_exclude_prompt_jsonl: str | None = None,
 ) -> dict[str, str]:
     dataset = get_suite_dataset(dataset_key)
     mode = thinking_mode.strip().lower()
@@ -160,10 +147,6 @@ def build_collect_env(
         raise ValueError(f"Unsupported thinking mode {thinking_mode!r}; expected 'on' or 'off'.")
     if dataset.requires_livecodebench_repo and not livecodebench_repo:
         raise ValueError(f"{dataset.key} requires a LiveCodeBench repo path.")
-    if dataset.requires_exclude_prompt_jsonl and not lcb_extra_exclude_prompt_jsonl:
-        raise ValueError(
-            f"{dataset.key} requires an exclusion archive via --lcb-extra-exclude-prompt-jsonl."
-        )
 
     out_dir = os.path.join(output_root, dataset.key)
     out_path = os.path.join(out_dir, f"{dataset.key}__thinking_{mode}.json")
@@ -218,6 +201,4 @@ def build_collect_env(
         env["LM_STYLE_OVERRIDE"] = dataset.lm_style_override
     if dataset.requires_livecodebench_repo:
         env["LIVECODEBENCH_REPO"] = str(livecodebench_repo)
-    if dataset.requires_exclude_prompt_jsonl:
-        env["EXCLUDE_PROMPT_JSONL"] = str(lcb_extra_exclude_prompt_jsonl)
     return env

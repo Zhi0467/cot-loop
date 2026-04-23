@@ -1,20 +1,19 @@
-# Main Five-Dataset Rollout Rebuild — 2026-04-23
+# Main Four-Dataset Rollout Rebuild — 2026-04-23
 
-Last updated: 2026-04-23 17:02 UTC
+Last updated: 2026-04-23 18:25 UTC
 
 ## Scope
 
-This note replaces the earlier "patch the March rows" framing for the current rollout-stat task. The canonical rebuild surface is now a paired thinking `on` / `off` collector run over five datasets:
+This note replaces the earlier "patch the March rows" framing for the current rollout-stat task. The canonical rebuild surface is now a paired thinking `on` / `off` collector run over four datasets:
 
 - `LiveCodeBench`
-- `LiveCodeBench-extra`
 - `TACO-hard`
 - `MATH level-5`
 - `Omni-MATH >= 7`
 
 The point is not just to refresh summary stats. These runs also need to leave reusable prompt-rollout archives for later prompt-profile relabeling, probe training, and steering.
 
-This note also supersedes the earlier slice-based queue. After Wangzhi asked for full datasets where possible, or at least `1000` rows on larger sets, the old `2850` through `2864` queue stopped being the right contract.
+This note also supersedes the earlier slice-based queue. After Wangzhi asked for full datasets where possible, or at least `1000` rows on larger sets, the old `2850` through `2864` queue stopped being the right contract. One more correction then became definitive: `LiveCodeBench-extra` is not an independent dataset here, because those `255` rows are a strict subset of the same `release_v6` `LiveCodeBench` surface under the same model and decode contract. Jobs `2876` and `2881` were therefore canceled and that lane was removed from the canonical suite.
 
 ## Canonical run contract
 
@@ -41,13 +40,6 @@ Dataset-specific contract:
   - release: `release_v6`
   - prompt surface: `LM_STYLE_OVERRIDE=HFChatTemplate`
   - active size: full dataset (`1055`)
-- `LiveCodeBench-extra`
-  - same as `LiveCodeBench`
-  - disjointness enforced through `EXCLUDE_PROMPT_JSONL=/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_projection_livecodebench_majority05_seed0_20260323/data/diagnostics/prompt_rollout_archive.jsonl`
-  - active size: full disjoint remainder (`255`)
-  - implementation note:
-    - exclusion now matches archived prompt text **or** archived benchmark `sample_id`
-    - this repair was required because prompt-text-only exclusion stopped working once the collector switched to the HF chat-template prompt surface
 - `TACO-hard`
   - task kind: `taco_codegen`
   - dataset: `BAAI/TACO`
@@ -77,12 +69,11 @@ Dataset-specific contract:
 
 ## Runtime corrections landed during rebuild
 
-Four real runtime/path bugs had to be fixed before the current suite was honest:
+Three real runtime/path bugs had to be fixed before the current suite was honest:
 
 1. The TACO native grader was incorrectly rebinding top-level functions as instance methods, which made even trivial call-based toy programs fail. The grader now returns top-level callables directly and still instantiates `Solution` when that class form is present.
 2. `BAAI/TACO` can no longer be loaded through the old `TACO.py` dataset script under the current `datasets` library. The shared dataset loader now falls back to the Hugging Face parquet surface `hf://datasets/BAAI/TACO/ALL/<split>-*.parquet`, which restored stable ingest.
-3. `LiveCodeBench-extra` exclusion had been silently broken on the HF chat-template surface. The earlier exclusion path only matched prompt text, but the archived March exclusion bundle was built from raw prompt strings. The collector now also excludes by archived benchmark `sample_id`, which restores the intended `255`-row disjoint remainder.
-4. The first corrected relaunch still died immediately because the sbatch wrapper did not propagate the runtime env. `scripts/launch_main_rollout_stats_suite.py` now forwards `CONDA_ENV` / `CONDA_DEFAULT_ENV` into submitted jobs and fails fast if neither is present.
+3. The first corrected relaunch still died immediately because the sbatch wrapper did not propagate the runtime env. `scripts/launch_main_rollout_stats_suite.py` now forwards `CONDA_ENV` / `CONDA_DEFAULT_ENV` into submitted jobs and fails fast if neither is present.
 
 The shared collector wrapper also now carries an explicit `THINKING_MODE` environment knob instead of relying on ad hoc extra arguments.
 
@@ -123,24 +114,16 @@ Verified archive surface:
 
 This is the reuse surface needed for later probe training and steering.
 
-### Size and disjointness receipts
+### Size receipts
 
 The active queue now matches Wangzhi's size rule exactly:
 
 - `LiveCodeBench`: `1055`
-- `LiveCodeBench-extra`: `255`
 - `TACO-hard`: `5536`, so use `1000`
 - `MATH level-5`: `2304`, so use `1000`
 - `Omni-MATH >= 7`: `916`
 
-The `LiveCodeBench-extra` sidecar now proves that the exclusion repair is active on the live HF-chat queue:
-
-- `exclude_prompt_jsonl` points at the archived March bundle
-- `excluded_prompt_count = 800`
-- `excluded_archive_prompt_count = 800`
-- `excluded_archive_sample_id_count = 800`
-
-So the new `LiveCodeBench-extra` run is no longer silently overlapping the archived March prompt pool.
+The dropped `LiveCodeBench-extra` lane should not be reused from its canceled partial outputs. Its benchmark rows are already contained inside the retained full `LiveCodeBench` run.
 
 ## Live submission
 
@@ -151,6 +134,8 @@ Fresh clean checkout used for submission:
 Output root:
 
 - `/data/scratch/murphy/outputs/cot-loop-detection/main_five_dataset_rebuild_full_or_1k_20260423`
+
+That directory name is historical because it was created before the subset mistake was corrected. The active manifest and live queue under it now describe only the retained four-dataset surface.
 
 Suite manifest:
 
@@ -168,22 +153,24 @@ Queue history:
   - failed immediately before first row because the jobs started without `CONDA_ENV`
 - live corrected relaunch:
   - `2875` `q3-main5r2b-livecodebench-on`
-  - `2876` `q3-main5r2b-livecodebench_extra-on`
   - `2877` `q3-main5r2b-taco_hard-on`
   - `2878` `q3-main5r2b-math_level5-on`
   - `2879` `q3-main5r2b-omni_math_ge7-on`
   - `2880` `q3-main5r2b-livecodebench-off`
-  - `2881` `q3-main5r2b-livecodebench_extra-off`
   - `2882` `q3-main5r2b-taco_hard-off`
   - `2883` `q3-main5r2b-math_level5-off`
   - `2884` `q3-main5r2b-omni_math_ge7-off`
+- dropped after subset correction:
+  - `2876` `q3-main5r2b-livecodebench_extra-on`
+  - `2881` `q3-main5r2b-livecodebench_extra-off`
 
 Queue state at note time:
 
-- `2875` and `2876` are `RUNNING` on `wth-gpu-01`
-- `2877` is `PENDING (Resources)`
-- `2878` through `2884` are `PENDING (Priority)`
+- `2875` (`LiveCodeBench`, on) is `RUNNING` on `wth-gpu-01`
+- `2877` (`TACO-hard`, on) is `RUNNING` on `wth-gpu-01`
+- `2878` is `PENDING (Resources)`
+- `2879`, `2880`, `2882`, `2883`, and `2884` are `PENDING (Priority)`
 
 ## What this note demotes
 
-The earlier March-provenance / narrow-`LiveCodeBench` repair thread is now historical debugging context. Do not treat the canceled or failed `2829`–`2838` reruns, the canceled slice queue `2850`–`2864`, or the env-dropped relaunch `2865`–`2874` as the active science surface for this stage. The active object is the five-dataset paired rebuild described here.
+The earlier March-provenance / narrow-`LiveCodeBench` repair thread is now historical debugging context. Do not treat the canceled or failed `2829`–`2838` reruns, the canceled slice queue `2850`–`2864`, the dropped subset jobs `2876` / `2881`, or the env-dropped relaunch `2865`–`2874` as the active science surface for this stage. The active object is the four-dataset paired rebuild described here.

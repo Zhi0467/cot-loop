@@ -58,11 +58,6 @@ def _parse_args() -> argparse.Namespace:
         default="",
         help="LiveCodeBench checkout used by the LiveCodeBench datasets.",
     )
-    parser.add_argument(
-        "--lcb-extra-exclude-prompt-jsonl",
-        default="",
-        help="Prompt archive used to keep LiveCodeBench-extra disjoint.",
-    )
     parser.add_argument("--model-id", default="Qwen/Qwen3-1.7B")
     parser.add_argument("--temperature", type=float, default=0.2)
     parser.add_argument("--num-generations", type=int, default=10)
@@ -118,12 +113,6 @@ def main() -> None:
         raise SystemExit(f"Slurm wrapper not found: {args.slurm_script}")
     if args.livecodebench_repo and not os.path.isdir(args.livecodebench_repo):
         raise SystemExit(f"LiveCodeBench repo path does not exist: {args.livecodebench_repo}")
-    if args.lcb_extra_exclude_prompt_jsonl and not os.path.isfile(args.lcb_extra_exclude_prompt_jsonl):
-        raise SystemExit(
-            "--lcb-extra-exclude-prompt-jsonl does not exist: "
-            f"{args.lcb_extra_exclude_prompt_jsonl}"
-        )
-
     os.makedirs(args.output_root, exist_ok=True)
     runtime_conda_env = (
         os.environ.get("CONDA_ENV")
@@ -152,7 +141,6 @@ def main() -> None:
                 suite_config=suite_config,
                 output_root=args.output_root,
                 livecodebench_repo=args.livecodebench_repo or None,
-                lcb_extra_exclude_prompt_jsonl=args.lcb_extra_exclude_prompt_jsonl or None,
             )
             if runtime_conda_env:
                 env_updates = dict(env_updates)

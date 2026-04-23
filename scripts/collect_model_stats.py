@@ -126,8 +126,7 @@ def _parse_args() -> argparse.Namespace:
         help=(
             "Optional JSONL archive with top-level 'prompt' and/or 'sample_id' fields. "
             "Matching prompts or archived sample indices are excluded before max-sample "
-            "truncation. Intended for disjoint follow-up screens such as "
-            "LiveCodeBench-extra."
+            "truncation. Intended for disjoint follow-up screens or curated benchmark subsets."
         ),
     )
     parser.add_argument("--model-id", default="Qwen/Qwen3-1.7B")

@@ -1,6 +1,6 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-23 17:02 UTC
+Last updated: 2026-04-23 18:25 UTC
 
 Reference docs:
 - `docs/main-four-dataset-rollout-rebuild-2026-04-23.md`
@@ -12,7 +12,6 @@ Reference docs:
 - The active rollout-stat task is no longer "repair the March bundle" or "append Omni to the old `800`-prompt queue."
 - The current canonical rebuild surface is:
   - `LiveCodeBench`
-  - `LiveCodeBench-extra`
   - `TACO-hard`
   - `MATH level-5`
   - `Omni-MATH >= 7`
@@ -30,20 +29,17 @@ Reference docs:
   - `max_num_batched_tokens=4096`
 - Dataset-size contract:
   - `LiveCodeBench`: full dataset (`1055`)
-  - `LiveCodeBench-extra`: full disjoint remainder (`255`)
   - `TACO-hard`: `1000` of `5536`
   - `MATH level-5`: `1000` of `2304`
   - `Omni-MATH >= 7`: full HF slice (`916`)
 - Prompt/verifier contract:
-  - `LiveCodeBench` and `LiveCodeBench-extra` use `LM_STYLE_OVERRIDE=HFChatTemplate`
+  - `LiveCodeBench` uses `LM_STYLE_OVERRIDE=HFChatTemplate`
   - `TACO-hard`, `MATH level-5`, and `Omni-MATH >= 7` use `PROMPT_FORMAT=chat_template`
   - `TACO-hard` uses the native execution-based grader over saved `input_output`
   - `Omni-MATH >= 7` now uses `KbsdJames/Omni-MATH`, split `test`, with `difficulty >= 7`
   - `data/omni_math_ge7_screen_300.jsonl` remains a useful historical screen artifact but is no longer the active stats source
-- Disjointness contract:
-  - `LiveCodeBench-extra` must exclude the archived March pool on the current HF chat-template surface
-  - exclusion now matches either archived prompt text or archived benchmark `sample_id`
-  - the live sidecar already records `excluded_prompt_count = 800`
+- Dataset correction:
+  - `LiveCodeBench-extra` is dropped everywhere because it is a strict subset of `LiveCodeBench` on the same `release_v6` surface, not an independent benchmark lane
 - Reuse contract:
   - finished archives must preserve `record_id`, prompt text, `prompt_token_ids`, rollout `completion_text`, `completion_token_ids`, and raw row metadata so the same rollouts can later drive prompt-profile relabeling, probe training, and steering
 
@@ -78,28 +74,28 @@ Reference docs:
 - Queue history that matters:
   - the old slice-based jobs `2850` through `2857` and `2863` / `2864` were canceled after Wangzhi tightened the size contract
   - the first corrected relaunch `2865` through `2874` failed immediately because the sbatch wrapper dropped `CONDA_ENV`
-  - `scripts/launch_main_rollout_stats_suite.py` now propagates `CONDA_ENV` / `CONDA_DEFAULT_ENV`, and the live relaunch is `2875` through `2884`
+  - `scripts/launch_main_rollout_stats_suite.py` now propagates `CONDA_ENV` / `CONDA_DEFAULT_ENV`
+  - after Wangzhi pointed out that `LiveCodeBench-extra` is a strict subset of `LiveCodeBench`, I canceled its two live jobs (`2876`, `2881`) and removed it from the canonical suite definition
 - Live submitted suite:
   - `2875` `q3-main5r2b-livecodebench-on`
-  - `2876` `q3-main5r2b-livecodebench_extra-on`
   - `2877` `q3-main5r2b-taco_hard-on`
   - `2878` `q3-main5r2b-math_level5-on`
   - `2879` `q3-main5r2b-omni_math_ge7-on`
   - `2880` `q3-main5r2b-livecodebench-off`
-  - `2881` `q3-main5r2b-livecodebench_extra-off`
   - `2882` `q3-main5r2b-taco_hard-off`
   - `2883` `q3-main5r2b-math_level5-off`
   - `2884` `q3-main5r2b-omni_math_ge7-off`
 - Current queue state:
-  - `2875` and `2876` are running
-  - `2877` is pending on resources
-  - `2878` through `2884` are pending on priority
+  - `2875` (`LiveCodeBench`, on) is running
+  - `2877` (`TACO-hard`, on) is running
+  - `2878` is pending on resources
+  - `2879`, `2880`, `2882`, `2883`, and `2884` are pending on priority
 
 ## Active TODOs
 
 ### P0: keep the rebuild receipts clean
 
-1. Monitor `2875` through `2884` until all ten receipts land.
+1. Monitor `2875`, `2877`, `2878`, `2879`, `2880`, `2882`, `2883`, and `2884` until all eight retained receipts land.
 2. Treat any first-row failure as a launch/runtime bug, not as a scientific result.
 3. Preserve the paired contract if repairs are needed:
    - same dataset
@@ -110,7 +106,7 @@ Reference docs:
 ### P1: materialize the next prompt-profile objects from these rebuilt archives
 
 1. Recompute prompt-level labels from the new prompt-rollout archives instead of reusing March-era bundle assumptions.
-2. Build the mode-tagged prompt-profile objects for all five datasets from the rebuilt archives.
+2. Build the mode-tagged prompt-profile objects for all four retained datasets from the rebuilt archives.
 3. Keep thinking `on` and `off` as separate prompt-profile objects all the way through detector training.
 
 ### P2: train mode-local probes and vectors from the rebuilt data
@@ -122,7 +118,7 @@ Reference docs:
 ### P3: only restart steering after the rebuilt stats and detector surfaces exist
 
 1. Do not reuse the old March-era or LiveCodeBench-only vector bundles for this rebuild.
-2. Do not treat the canceled `2829` to `2838` rerun thread, the canceled `2850` to `2864` slice queue, or the failed `2865` to `2874` env-drop queue as valid scientific receipts.
+2. Do not treat the canceled `2829` to `2838` rerun thread, the canceled `2850` to `2864` slice queue, the dropped `LiveCodeBench-extra` jobs `2876` / `2881`, or the failed `2865` to `2874` env-drop queue as valid scientific receipts.
 3. Restart steering only after a rebuilt mode-local detector/vector object exists for the relevant dataset.
 
 ## Historical context
