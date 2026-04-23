@@ -61,6 +61,17 @@ def load_rows_from_dataset(
     config: str | None,
     split: str,
 ) -> list[dict[str, object]]:
+    def _load_hf_parquet_rows() -> list[dict[str, object]]:
+        base = f"hf://datasets/{dataset}/"
+        if config:
+            base = f"{base}{config}/"
+        ds = load_dataset(
+            "parquet",
+            data_files={split: f"{base}{split}-*.parquet"},
+            split=split,
+        )
+        return list(ds)
+
     lower = dataset.lower()
     if lower.endswith(".parquet"):
         ds = load_dataset(
@@ -78,8 +89,21 @@ def load_rows_from_dataset(
         return list(ds)
     if os.path.isfile(dataset):
         return load_local_rows(dataset)
-    ds = load_dataset(dataset, config, split=split)
-    return list(ds)
+    if dataset == "BAAI/TACO":
+        return _load_hf_parquet_rows()
+    try:
+        ds = load_dataset(dataset, config, split=split)
+        return list(ds)
+    except RuntimeError as exc:
+        if "Dataset scripts are no longer supported" not in str(exc):
+            raise
+        try:
+            return _load_hf_parquet_rows()
+        except Exception as parquet_exc:
+            raise RuntimeError(
+                f"Dataset '{dataset}' could not be loaded via the retired script path "
+                "or the HF parquet fallback."
+            ) from parquet_exc
 
 
 def parse_row_filter_json(raw: str | None) -> dict[str, dict[str, object]] | None:
