@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-04-23 04:22 UTC
+Last updated: 2026-04-23 05:55 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -9,6 +9,7 @@ Purpose:
 Core docs:
 - Project roadmap: ../roadmap.md
 - Open experiment ledger / next runs: ../backlog.md
+- Main four-dataset rebuild note: main-four-dataset-rollout-rebuild-2026-04-23.md
 - Degeneracy-origin rollout-stat plan: ../understand-where-loop-and-max-length-come-from.md
 - Prompt-profile implementation path: prompt-profile-probe.md
 - Prompt-profile evaluation contract: prompt-profile-eval-contract.md
@@ -86,6 +87,14 @@ Key outputs:
 - Detailed reopened-round summary PDF: ../outputs/prefill_rounds_1_to_12_detailed_summary/prefill_rounds_1_to_12_detailed_summary.pdf
 
 Current live status:
+- `main-four-dataset-rollout-rebuild-2026-04-23.md` is now the live rollout-stat status surface:
+  - it replaces the narrower March-repair / LiveCodeBench-only rerun framing for the current task;
+  - it fixes the canonical dataset set to `LiveCodeBench`, `LiveCodeBench-extra`, `TACO-hard`, and `MATH level-5`;
+  - it records the two runtime fixes that made the suite runnable again:
+    - TACO native grading had to stop rebinding top-level functions as methods;
+    - `BAAI/TACO` now loads through the HF parquet surface because the old `TACO.py` dataset-script path is retired under the current `datasets` library;
+  - it records the archive-level smoke receipt proving that prompt text, token ids, rollout text, completion token ids, and row metadata are all preserved for later reuse;
+  - it points at the live suite output root `../outputs/model_stats/main_four_dataset_rebuild_20260423/` and the remote run root `/data/scratch/murphy/outputs/cot-loop-detection/main_four_dataset_rebuild_20260423/`.
 - `prompt-profile-rfm-steering-grounded-stage-2026-04-23.md` is now the live status surface for this stage:
   - it keeps the repaired `LiveCodeBench` object fixed at fit-train / val / test `280 / 128 / 160` with positives `140 / 35 / 54`;
   - it separates finished evidence, live evidence, and blocked evidence instead of treating the whole stage as one undifferentiated status blob;

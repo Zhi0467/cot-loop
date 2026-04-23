@@ -1,133 +1,112 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-23 04:22 UTC
+Last updated: 2026-04-23 05:55 UTC
 
 Reference docs:
-- `docs/prompt-profile-rfm-mode-consistent-stage-2026-04-23.md`
-- `docs/prompt-profile-rfm-steering-grounded-stage-2026-04-23.md` (superseded intermediate note)
-- `docs/prompt-profile-rfm-steering-plan-2026-04-21.md` (historical plan)
+- `docs/main-four-dataset-rollout-rebuild-2026-04-23.md`
+- `docs/prompt-profile-rfm-artifact-schema-2026-04-21.md`
+- `docs/understand-where-loop-and-max-length-come-from.md`
 
 ## Fixed current object
 
-- Active benchmark-local anchor:
-  - repaired `LiveCodeBench` prompt-level `majority_s_0.5`
-  - fit-train / val / test = `280 / 128 / 160`
-  - positives = `140 / 35 / 54`
-- New stage rule:
-  - no cross-mode steering claim
-  - each path must close `stats -> probe -> steer` inside one mode
-- Repo surface is still ahead of the published PR:
-  - local branch: `task/1776752262-rfm-stage0`
-  - local head before this backlog rewrite: `dabe924`
-  - draft PR `#11` published head still `5a521d1`
-
-## Durable evidence that still stands
-
-- Repaired predecessor detector/vector bundle:
-  - root:
-    - `/data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/`
-  - layer `27`
-  - validation `PR-AUC 0.6555`
-  - test `PR-AUC 0.7055`
-  - test `ROC-AUC 0.8590`
-  - all `28` layers have mean bootstrap cosine `>= 0.781`
-  - late layers `23` to `26` are still the most coherent
-- Thinking-on baseline receipt that may still be reusable:
-  - `no_steer`: `2 / 160` `pass@1`, loop fraction `0.65625`, over-half-budget fraction `0.6375`
-- Positive-enrichment pilot leaderboard:
-  - `LiveCodeBench-extra`: `255` profiled, `141` positives, positive rate `0.5529`, completion-tail fraction `0.5765`, loop fraction `0.3029`
-  - `TACO-hard`: `229` profiled, `186` positives, positive rate `0.8122`, completion-tail fraction `0.8308`, loop fraction `0.3723`
-  - `MATH level-5` parallel path: `261` profiled, `40` positives, positive rate `0.1533`, completion-tail fraction `0.2126`, loop fraction `0.0738`, success fraction `0.7739`
-  - `Omni-MATH >= 7`: dependency-pending behind `2818`
-
-## Demoted evidence
-
-- The finished steered thinking-on row
-  - `plus_v_linear`: `2 / 160` `pass@1`, loop fraction `0.6125`, over-half-budget fraction `0.6000`
-  is now implementation-only rather than valid stage evidence, because its config points at:
-  - `vector_export_dir = /data/scratch/murphy/outputs/cot-loop-detection/prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/vector_exports`
-  and that vector bundle points back to:
-  - `preprocessing.source_data_dir = /data/scratch/murphy/outputs/cot-loop-detection/livecodebench_mean_relative_from_archive_20260323`
-- The live cross-mode steering jobs were canceled at `2026-04-23 04:22 UTC`:
-  - `2804`
-  - `2811`
-  - `2815`
-  - `2816`
-- Treat the old thinking-on steered rows only as runner receipts:
-  - full decode `30000`
-  - hook site `prefill_layer_output_all_tokens`
-  - all-prompt-token prefill intervention
-  - ledger / diagnostics plumbing works
-
-## Active TODOs
-
-### P0: keep the queue on the right science surface
-
-- running:
-  - `2818` - `pp-screen-math5`
-  - `2829` - `q3-lcb-thon`
-- pending:
-  - `2819` - `pp-screen-omni7`
-  - `2830` - `q3-lcb-thoff`
-- Do not relaunch any steered thinking-on job until a thinking-on-trained vector bundle exists.
-
-### P1: close the `LiveCodeBench` thinking-on path
-
-1. Finish `2829` and freeze the exact thinking-on stats receipt.
-2. Materialize the prompt-level `majority_s_0.5` stage object on those thinking-on rollouts.
-3. Train the thinking-on layerwise RFM and compare it against prompt-only / activation baselines on that same mode-local object.
-4. Export the thinking-on vector bundle and rerun bootstrap direction-stability diagnostics.
-5. Rerun the full seven-condition thinking-on steering table from those thinking-on vectors:
-   - `no_steer`
-   - `minus_v_linear`
-   - `plus_v_linear`
-   - `random_linear`
-   - `minus_v_spherical`
-   - `plus_v_spherical`
-   - `random_spherical`
-
-### P2: close the `LiveCodeBench` thinking-off path
-
-1. Finish `2830` and freeze the exact thinking-off stats receipt.
-2. Materialize the prompt-level `majority_s_0.5` stage object on those thinking-off rollouts.
-3. Train the thinking-off RFM and export the thinking-off vector bundle.
-4. Rerun the non-thinking steering table from that matched bundle.
-5. If node geometry is still fragile, use a narrow linear-first order:
-   - `no_steer`
-   - `minus_v_linear`
-   - `plus_v_linear`
-   - `random_linear`
-   then extend to spherical once the first mode-consistent non-thinking row lands.
-
-### P3: keep screening and promotion mode-local
-
-- The current screening pilot is still useful, but it is prevalence-first rather than admission-final.
-- For any dataset promoted beyond `LiveCodeBench`, require a mode-tagged collector receipt on the chosen path before probe training.
-- Promotion rule still stays literal inside each path:
-  - only promote datasets whose repaired prompt-majority positive rate stays `>= 10%`
-- Immediate candidate order from the current pilot:
+- The active rollout-stat task is no longer "repair the March bundle" or "finish a LiveCodeBench-only thinking comparison."
+- The current canonical rebuild surface is:
+  - `LiveCodeBench`
   - `LiveCodeBench-extra`
   - `TACO-hard`
   - `MATH level-5`
-  - `Omni-MATH >= 7`
+- Every dataset is being collected twice:
+  - thinking `on`
+  - thinking `off`
+- Shared collection contract:
+  - model `Qwen/Qwen3-1.7B`
+  - `temperature=0.2`
+  - `num_generations=10`
+  - `max_samples=800`
+  - `max_tokens=81920`
+  - `max_model_len=40960`
+  - `tp=1`, `dp=1`
+  - `max_num_seqs=10`
+  - `max_num_batched_tokens=4096`
+- Prompt/verifier contract:
+  - `LiveCodeBench` and `LiveCodeBench-extra` use `LM_STYLE_OVERRIDE=HFChatTemplate`
+  - `TACO-hard` and `MATH level-5` use `PROMPT_FORMAT=chat_template`
+  - `TACO-hard` uses the native execution-based grader over saved `input_output`
+- Reuse contract:
+  - finished archives must preserve `record_id`, prompt text, `prompt_token_ids`, rollout `completion_text`, `completion_token_ids`, and raw row metadata so the same rollouts can later drive prompt-profile relabeling, probe training, and steering
 
-### P4: keep vector pooling and transfer mode-local too
+## Validated runtime surface
 
-- Do not mix thinking-on and thinking-off bundles into one average vector.
-- Any future average-vector transfer needs:
-  - at least two readable benchmark-local vector bundles
-  - in the same mode
-  - with report-style receipts
+- Stale positive-screening jobs were canceled before relaunch:
+  - `2843`
+  - `2845`
+- TACO-specific fixes that are now required knowledge:
+  - the native grader must treat top-level functions as top-level callables rather than rebinding them as instance methods
+  - `BAAI/TACO` must be loaded through the HF parquet surface because the old `TACO.py` dataset-script path is retired under the current `datasets` library
+- Smoke receipts:
+  - TACO GPU smoke:
+    - `/data/scratch/murphy/outputs/cot-loop-detection/main_four_dataset_smoke/taco_hard_on_smoke.json`
+  - that smoke proved the archive surface is sufficient for later reuse:
+    - `record_id`
+    - full prompt text
+    - `prompt_token_ids`
+    - rollout `completion_text`
+    - rollout `completion_token_ids`
+    - preserved `record_metadata`
+- Chat-template control check:
+  - thinking `on` leaves the plain assistant prefix
+  - thinking `off` injects the empty `<think>\n\n</think>\n\n` block
 
-## Defer until the two-path core is closed
+## Live queue
 
-- Reusing the old thinking-on `plus_v_linear` row as if it were valid causal evidence
-- Any rerun of the canceled cross-mode steering jobs
-- Averaged cross-benchmark transfer before two mode-local bundles exist
-- Non-thinking spherical expansion before the first matched non-thinking linear row lands
-- RFM multiseed / split-seed sensitivity as a blocker for the two-path LiveCodeBench core
+- Fresh remote submission checkout:
+  - `/data/scratch/murphy/projects/worktrees/cot-loop-main4-rebuild`
+- Main output root:
+  - `/data/scratch/murphy/outputs/cot-loop-detection/main_four_dataset_rebuild_20260423`
+- Submitted suite:
+  - `2850` `q3-main4r1-livecodebench-on`
+  - `2851` `q3-main4r1-livecodebench_extra-on`
+  - `2852` `q3-main4r1-taco_hard-on`
+  - `2853` `q3-main4r1-math_level5-on`
+  - `2854` `q3-main4r1-livecodebench-off`
+  - `2855` `q3-main4r1-livecodebench_extra-off`
+  - `2856` `q3-main4r1-taco_hard-off`
+  - `2857` `q3-main4r1-math_level5-off`
+- Current queue state:
+  - `2850` and `2851` are running
+  - `2852` through `2857` are waiting behind them
 
-## Runtime and infra notes
+## Active TODOs
 
-- The positive-enrichment pilot is still running from the home worktree with home-backed caches / outputs because `/data` is effectively full.
-- Treat the current pilot outputs as candidate-discovery artifacts, not as silent mode-local admissions into the steering registry.
+### P0: keep the rebuild receipts clean
+
+1. Monitor `2850` through `2857` until all eight receipts land.
+2. Treat any first-row failure as a launch/runtime bug, not as a scientific result.
+3. Preserve the paired contract if repairs are needed:
+   - same dataset
+   - same sampling config
+   - same thinking tag
+4. Keep the suite manifest and final JSON/archive outputs together under the same output root.
+
+### P1: materialize the next prompt-profile objects from these rebuilt archives
+
+1. Recompute prompt-level labels from the new prompt-rollout archives instead of reusing March-era bundle assumptions.
+2. Build the mode-tagged prompt-profile objects for the four datasets from the rebuilt archives.
+3. Keep thinking `on` and `off` as separate prompt-profile objects all the way through detector training.
+
+### P2: train mode-local probes and vectors from the rebuilt data
+
+1. Train probe / RFM surfaces only on rebuilt mode-matched archives.
+2. Export vector bundles only after the corresponding rebuilt prompt-profile objects exist.
+3. Keep benchmark-local and mode-local provenance explicit in the vector metadata.
+
+### P3: only restart steering after the rebuilt stats and detector surfaces exist
+
+1. Do not reuse the old March-era or LiveCodeBench-only vector bundles for this rebuild.
+2. Do not treat the canceled `2829` to `2838` rerun thread as a valid scientific receipt.
+3. Restart steering only after a rebuilt mode-local detector/vector object exists for the relevant dataset.
+
+## Historical context
+
+- The older March-provenance audit and the failed LiveCodeBench-only reruns are still useful debugging history, but they are no longer the active backlog surface.
+- Keep those receipts in `roadmap.md` and the task report; do not let them redefine the current queue or the current project objective.

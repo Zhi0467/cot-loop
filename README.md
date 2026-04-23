@@ -1,15 +1,25 @@
 # CoT Loop Detection via Probe Classifiers
 
-This repository studies whether chain-of-thought loop risk is predictable from internal activations and rollout telemetry. The original workflow centered on prompt-prefill last-token probes, and the current active stage is a screened prompt-profile RFM-plus-steering extension on the frozen Qwen prompt-profile bundle. The durable status surface is now `docs/prompt-profile-rfm-steering-grounded-stage-2026-04-23.md`: the active benchmark-local object is still repaired `LiveCodeBench` `majority_s_0.5` (`280 / 128 / 160` with positives `140 / 35 / 54`), only two full-contract thinking-on steering rows are finished so far (`no_steer` and `plus_v_linear`), the remaining five thinking-on rows are still running, and the non-thinking comparison is currently blocked by dirty-slot CUDA OOM before first row. Under the repaired-train positive-rate gate (`>= 10%` after screening), only the original `LiveCodeBench` object is already admitted; `LiveCodeBench-extra`, `TACO-hard`, and `MATH level-5` are the current positive-enrichment candidates in flight. The merged trigger-attention audit remains useful background context, but it is no longer the live blocker surface for the next stage.
+This repository studies whether chain-of-thought loop risk is predictable from internal activations and rollout telemetry. The active stage is now a rebuilt four-dataset rollout-stat suite for `Qwen/Qwen3-1.7B`, not another March patch-up: `LiveCodeBench`, `LiveCodeBench-extra`, `TACO-hard`, and `MATH level-5`, each collected with explicit thinking `on` / `off` surfaces and reusable prompt-rollout archives. The durable status surface for that reset is `docs/main-four-dataset-rollout-rebuild-2026-04-23.md`, which records the corrected dataset/verifier/chat-template contract, the TACO loader/grader fixes that were needed to make the suite runnable again, the smoke receipts, and the live eight-job queue under `/data/scratch/murphy/outputs/cot-loop-detection/main_four_dataset_rebuild_20260423/`. The older March-provenance and LiveCodeBench-only rerun thread is now historical debugging context rather than the current contract.
 
 ## Overview
 
 The project now has three durable evidence streams:
 - the probe line asks whether loop risk is detectable from stacked prompt-prefill activations, either by slicing one layer or by voting across all layers;
-- the rollout-statistics line measures how often looping and max-length hits actually occur under the repaired v2 collector contract across `MATH-500`, `AIME`, `GPQA`, `MMLU-Pro`, and `LiveCodeBench`;
+- the rollout-statistics line measures how often looping and max-length hits actually occur under the repaired v2 collector contract, with the current rebuild surface focused on `LiveCodeBench`, `LiveCodeBench-extra`, `TACO-hard`, and `MATH level-5`;
 - the trigger-attention line replays saved loop rows to ask where the model is attending around the repeated trigger region, but that line should now be treated as merged background evidence rather than the active phase boundary.
 
 Latest status:
+- the current live execution object is the four-dataset rebuild described in `docs/main-four-dataset-rollout-rebuild-2026-04-23.md`:
+  - the suite launcher is `scripts/launch_main_rollout_stats_suite.py`
+  - the new main output root is `/data/scratch/murphy/outputs/cot-loop-detection/main_four_dataset_rebuild_20260423/`
+  - submitted jobs `2850` to `2857` cover the four datasets times thinking `on` / `off`
+  - `2850` (`LiveCodeBench`, on) and `2851` (`LiveCodeBench-extra`, on) are already running; the remaining six jobs are queued behind them
+  - the TACO path is no longer provisional:
+    - `src/loop_probe/adapters/taco_codegen.py` now provides the native execution-based grader
+    - `src/loop_probe/adapters/_common.py` now falls back to `hf://datasets/BAAI/TACO/ALL/<split>-*.parquet` because the old `TACO.py` dataset-script path is retired under the current `datasets` library
+  - the reuse surface is now explicit in the collector artifacts:
+    - prompt archives preserve `record_id`, prompt text, prompt token ids, rollout completion text, completion token ids, and raw row metadata
 - upstream PRs `#9` and `#10` are both merged, so the repo is no longer sitting on an open GitHub review surface for the old prompt-profile or trigger-attention lines.
 - the merged trigger-attention note is still scientifically narrow:
   - it is background evidence about prompt-dominant final-layer attention plus a mid-stack previous-loop signal on the saved loop rows;
