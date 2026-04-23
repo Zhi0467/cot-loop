@@ -1,8 +1,8 @@
 [project]
 name = "cot-loop"
 version = "0.1.0"
-description = "Repro scripts for looping analysis (Figure 1)."
-readme = "FIG1_REPRO.md"
+description = "Research code for predicting chain-of-thought loop and max-length failures from prompt-prefill activations and paired rollout statistics."
+readme = "README.md"
 requires-python = ">=3.10"
 
 dependencies = [
