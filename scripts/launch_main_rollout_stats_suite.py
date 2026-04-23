@@ -74,7 +74,12 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--max-num-seqs", type=int, default=10)
     parser.add_argument("--max-num-batched-tokens", type=int, default=4096)
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--max-samples", type=int, default=800)
+    parser.add_argument(
+        "--max-samples",
+        type=int,
+        default=None,
+        help="Fallback max-sample cap for datasets without an explicit suite cap.",
+    )
     return parser.parse_args()
 
 
@@ -120,6 +125,16 @@ def main() -> None:
         )
 
     os.makedirs(args.output_root, exist_ok=True)
+    runtime_conda_env = (
+        os.environ.get("CONDA_ENV")
+        or os.environ.get("CONDA_DEFAULT_ENV")
+        or ""
+    )
+    if args.submit and not runtime_conda_env:
+        raise SystemExit(
+            "Submitting the suite requires a runtime env. Set CONDA_ENV or activate "
+            "the desired conda env before running the launcher."
+        )
     manifest: dict[str, object] = {
         "schema_name": "main_rollout_stats_suite.v2",
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -139,6 +154,9 @@ def main() -> None:
                 livecodebench_repo=args.livecodebench_repo or None,
                 lcb_extra_exclude_prompt_jsonl=args.lcb_extra_exclude_prompt_jsonl or None,
             )
+            if runtime_conda_env:
+                env_updates = dict(env_updates)
+                env_updates["CONDA_ENV"] = runtime_conda_env
             job_name = f"{args.job_prefix}-{dataset_key}-{mode}"
             preview = _command_preview(env_updates, args.slurm_script, job_name)
             manifest["jobs"].append(

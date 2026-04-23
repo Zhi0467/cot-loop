@@ -31,7 +31,7 @@ class MainRolloutSuiteConfig:
     max_num_batched_tokens: int | None = 4096
     seed: int = 0
     statistics: str = DEFAULT_STATISTICS
-    max_samples: int = 800
+    max_samples: int | None = None
 
 
 @dataclass(frozen=True)
@@ -51,6 +51,7 @@ class MainRolloutDataset:
     prompt_format: str | None = None
     release_version: str | None = None
     lm_style_override: str | None = None
+    max_samples: int | None = None
     requires_livecodebench_repo: bool = False
     requires_exclude_prompt_jsonl: bool = False
 
@@ -103,6 +104,7 @@ SUITE_DATASETS: tuple[MainRolloutDataset, ...] = (
         ),
         row_filter={"field_in": {"difficulty": ["HARD", "VERY_HARD"]}},
         prompt_format="chat_template",
+        max_samples=1000,
     ),
     MainRolloutDataset(
         key="math_level5",
@@ -115,16 +117,18 @@ SUITE_DATASETS: tuple[MainRolloutDataset, ...] = (
         metadata_fields=("level", "type"),
         row_filter={"field_in": {"level": ["Level 5"]}},
         prompt_format="chat_template",
+        max_samples=1000,
     ),
     MainRolloutDataset(
         key="omni_math_ge7",
         display_name="Omni-MATH >= 7",
         task_kind="math_freeform",
-        dataset=os.path.join(PROJECT_ROOT, "data", "omni_math_ge7_screen_300.jsonl"),
-        split="screen_300",
+        dataset="KbsdJames/Omni-MATH",
+        split="test",
         question_field="problem",
         answer_field="answer",
         metadata_fields=("difficulty", "domain", "source"),
+        row_filter={"field_ge": {"difficulty": 7}},
         prompt_format="chat_template",
     ),
 )
@@ -163,6 +167,12 @@ def build_collect_env(
 
     out_dir = os.path.join(output_root, dataset.key)
     out_path = os.path.join(out_dir, f"{dataset.key}__thinking_{mode}.json")
+    effective_max_samples = (
+        dataset.max_samples
+        if dataset.max_samples is not None
+        else suite_config.max_samples
+    )
+
     env = {
         "TASK_KIND": dataset.task_kind,
         "DATASET": dataset.dataset,
@@ -177,10 +187,11 @@ def build_collect_env(
         "DTYPE": suite_config.dtype,
         "SEED": str(suite_config.seed),
         "STATISTICS": suite_config.statistics,
-        "MAX_SAMPLES": str(suite_config.max_samples),
         "THINKING_MODE": mode,
         "OUT": out_path,
     }
+    if effective_max_samples is not None:
+        env["MAX_SAMPLES"] = str(effective_max_samples)
     if suite_config.max_num_seqs is not None:
         env["MAX_NUM_SEQS"] = str(suite_config.max_num_seqs)
     if suite_config.max_num_batched_tokens is not None:

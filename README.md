@@ -1,6 +1,6 @@
 # CoT Loop Detection via Probe Classifiers
 
-This repository studies whether chain-of-thought loop risk is predictable from internal activations and rollout telemetry. The active stage is now a rebuilt five-dataset rollout-stat suite for `Qwen/Qwen3-1.7B`, not another March patch-up: `LiveCodeBench`, `LiveCodeBench-extra`, `TACO-hard`, `MATH level-5`, and `Omni-MATH >= 7`, each collected with explicit thinking `on` / `off` surfaces and reusable prompt-rollout archives. The durable status surface for that reset is `docs/main-four-dataset-rollout-rebuild-2026-04-23.md`, which records the corrected dataset/verifier/chat-template contract, the TACO loader/grader fixes, the promoted Omni local dataset surface, and the live ten-job queue under `/data/scratch/murphy/outputs/cot-loop-detection/main_four_dataset_rebuild_20260423/`. The older March-provenance and LiveCodeBench-only rerun thread is now historical debugging context rather than the current contract.
+This repository studies whether chain-of-thought loop risk is predictable from internal activations and rollout telemetry. The active stage is now a corrected five-dataset rollout-stat rebuild for `Qwen/Qwen3-1.7B`, not another March patch-up: `LiveCodeBench`, `LiveCodeBench-extra`, `TACO-hard`, `MATH level-5`, and `Omni-MATH >= 7`, each collected with explicit thinking `on` / `off` surfaces and reusable prompt-rollout archives. The durable status surface for that reset is `docs/main-four-dataset-rollout-rebuild-2026-04-23.md`, which now records the full-or-`1000` sizing contract, the `LiveCodeBench-extra` disjointness repair under HF chat templates, the TACO loader/grader fixes, the promotion of full HF `Omni-MATH >= 7`, and the live ten-job queue under `/data/scratch/murphy/outputs/cot-loop-detection/main_five_dataset_rebuild_full_or_1k_20260423/`. The older March-provenance and LiveCodeBench-only rerun thread is now historical debugging context rather than the current contract.
 
 ## Overview
 
@@ -12,13 +12,19 @@ The project now has three durable evidence streams:
 Latest status:
 - the current live execution object is the five-dataset rebuild described in `docs/main-four-dataset-rollout-rebuild-2026-04-23.md`:
   - the suite launcher is `scripts/launch_main_rollout_stats_suite.py`
-  - the new main output root is `/data/scratch/murphy/outputs/cot-loop-detection/main_four_dataset_rebuild_20260423/`
-  - the first wave `2850` to `2857` covers `LiveCodeBench`, `LiveCodeBench-extra`, `TACO-hard`, and `MATH level-5` times thinking `on` / `off`
-  - the appended Omni pair is `2863` (`Omni-MATH >= 7`, on) and `2864` (`Omni-MATH >= 7`, off)
-  - `2850` (`LiveCodeBench`, on) and `2851` (`LiveCodeBench-extra`, on) are already running; `2852` to `2857`, `2863`, and `2864` are queued behind them
-  - the Omni leg is intentionally local rather than HF-backed:
-    - `data/omni_math_ge7_screen_300.jsonl` is the merged `300`-row `>= 7` screen pool
-    - each row keeps `_source_sample_id`, `problem`, `answer`, `difficulty`, `domain`, and `source`
+  - the live output root is `/data/scratch/murphy/outputs/cot-loop-detection/main_five_dataset_rebuild_full_or_1k_20260423/`
+  - the sizing contract is now:
+    - `LiveCodeBench`: full dataset (`1055`)
+    - `LiveCodeBench-extra`: full disjoint remainder (`255`)
+    - `TACO-hard`: `1000` of `5536`
+    - `MATH level-5`: `1000` of `2304`
+    - `Omni-MATH >= 7`: full HF slice (`916`)
+  - `LiveCodeBench-extra` is now genuinely disjoint on the HF chat-template surface because exclusion matches both archived prompt text and archived `sample_id`; the live sidecar already records `excluded_prompt_count = 800`
+  - the current live queue is `2875` through `2884`
+    - `2875` (`LiveCodeBench`, on) and `2876` (`LiveCodeBench-extra`, on) are `RUNNING`
+    - `2877` through `2884` are pending behind them
+  - the first corrected relaunch `2865` through `2874` was canceled by a launcher bug, not a model bug:
+    - the sbatch wrapper dropped `CONDA_ENV`, so every job exited immediately before first row with `no runtime env found (.venv missing and CONDA_ENV not set)`
   - the TACO path is no longer provisional:
     - `src/loop_probe/adapters/taco_codegen.py` now provides the native execution-based grader
     - `src/loop_probe/adapters/_common.py` now falls back to `hf://datasets/BAAI/TACO/ALL/<split>-*.parquet` because the old `TACO.py` dataset-script path is retired under the current `datasets` library

@@ -83,6 +83,16 @@ class PromptWorkItem:
     record_metadata: dict[str, object] | None = None
 
 
+@dataclass(frozen=True)
+class ExclusionArchive:
+    prompts: frozenset[str]
+    sample_ids: frozenset[int]
+
+    @property
+    def has_any(self) -> bool:
+        return bool(self.prompts or self.sample_ids)
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--task-kind", required=True, choices=TASK_CHOICES)
@@ -111,9 +121,10 @@ def _parse_args() -> argparse.Namespace:
         "--exclude-prompt-jsonl",
         default="",
         help=(
-            "Optional JSONL archive with a top-level 'prompt' field. Matching prompts "
-            "are excluded before max-sample truncation. Intended for disjoint follow-up "
-            "screens such as LiveCodeBench-extra."
+            "Optional JSONL archive with top-level 'prompt' and/or 'sample_id' fields. "
+            "Matching prompts or archived sample indices are excluded before max-sample "
+            "truncation. Intended for disjoint follow-up screens such as "
+            "LiveCodeBench-extra."
         ),
     )
     parser.add_argument("--model-id", default="Qwen/Qwen3-1.7B")
@@ -228,13 +239,14 @@ def _slugify(value: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]+", "_", text).strip("_") or "default"
 
 
-def _load_excluded_prompts(path: str | None) -> set[str]:
+def _load_excluded_prompts(path: str | None) -> ExclusionArchive:
     source = (path or "").strip()
     if not source:
-        return set()
+        return ExclusionArchive(prompts=frozenset(), sample_ids=frozenset())
     if not os.path.exists(source):
         raise SystemExit(f"--exclude-prompt-jsonl path does not exist: {source}")
     prompts: set[str] = set()
+    sample_ids: set[int] = set()
     with open(source, "r", encoding="utf-8") as handle:
         for lineno, line in enumerate(handle, start=1):
             text = line.strip()
@@ -249,7 +261,13 @@ def _load_excluded_prompts(path: str | None) -> set[str]:
             prompt = payload.get("prompt")
             if isinstance(prompt, str):
                 prompts.add(prompt)
-    return prompts
+            sample_id = payload.get("sample_id")
+            if isinstance(sample_id, int) and sample_id >= 0:
+                sample_ids.add(int(sample_id))
+    return ExclusionArchive(
+        prompts=frozenset(prompts),
+        sample_ids=frozenset(sample_ids),
+    )
 
 
 def _derive_output_path(args: argparse.Namespace) -> str:
@@ -457,7 +475,7 @@ def _load_prompt_items(
     args: argparse.Namespace,
     tokenizer: Any | None,
 ) -> tuple[list[PromptWorkItem], dict[str, object], Any]:
-    excluded_prompts = _load_excluded_prompts(args.exclude_prompt_jsonl)
+    exclusion_archive = _load_excluded_prompts(args.exclude_prompt_jsonl)
     if args.task_kind == "livecodebench_codegen":
         if args.prompt_format == "chat_template":
             raise SystemExit(
@@ -480,7 +498,7 @@ def _load_prompt_items(
             )
         except ValueError as exc:
             raise SystemExit(str(exc)) from exc
-    if excluded_prompts and args.task_kind != "livecodebench_codegen":
+    if exclusion_archive.has_any and args.task_kind != "livecodebench_codegen":
         raise SystemExit(
             "--exclude-prompt-jsonl is currently only supported for "
             "livecodebench_codegen."
@@ -736,11 +754,12 @@ def _load_prompt_items(
         )
     prompt_rows = list(zip(benchmark, prompt_records, strict=True))
     excluded_count = 0
-    if excluded_prompts:
+    if exclusion_archive.has_any:
         filtered_rows = [
             (instance, record)
-            for instance, record in prompt_rows
-            if record[1] not in excluded_prompts
+            for original_idx, (instance, record) in enumerate(prompt_rows)
+            if record[1] not in exclusion_archive.prompts
+            and original_idx not in exclusion_archive.sample_ids
         ]
         excluded_count = len(prompt_rows) - len(filtered_rows)
         prompt_rows = filtered_rows
@@ -767,9 +786,13 @@ def _load_prompt_items(
             resolved=resolved_thinking_mode,
         ),
     }
-    if excluded_prompts:
+    if exclusion_archive.has_any:
         metadata["exclude_prompt_jsonl"] = args.exclude_prompt_jsonl
         metadata["excluded_prompt_count"] = int(excluded_count)
+        metadata["excluded_archive_prompt_count"] = int(len(exclusion_archive.prompts))
+        metadata["excluded_archive_sample_id_count"] = int(
+            len(exclusion_archive.sample_ids)
+        )
     return items, metadata, selected_benchmark
 
 

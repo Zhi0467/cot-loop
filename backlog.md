@@ -1,6 +1,6 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-23 16:03 UTC
+Last updated: 2026-04-23 17:02 UTC
 
 Reference docs:
 - `docs/main-four-dataset-rollout-rebuild-2026-04-23.md`
@@ -9,7 +9,7 @@ Reference docs:
 
 ## Fixed current object
 
-- The active rollout-stat task is no longer "repair the March bundle" or "finish a LiveCodeBench-only thinking comparison."
+- The active rollout-stat task is no longer "repair the March bundle" or "append Omni to the old `800`-prompt queue."
 - The current canonical rebuild surface is:
   - `LiveCodeBench`
   - `LiveCodeBench-extra`
@@ -23,19 +23,27 @@ Reference docs:
   - model `Qwen/Qwen3-1.7B`
   - `temperature=0.2`
   - `num_generations=10`
-  - `max_samples=800`
   - `max_tokens=81920`
   - `max_model_len=40960`
   - `tp=1`, `dp=1`
   - `max_num_seqs=10`
   - `max_num_batched_tokens=4096`
+- Dataset-size contract:
+  - `LiveCodeBench`: full dataset (`1055`)
+  - `LiveCodeBench-extra`: full disjoint remainder (`255`)
+  - `TACO-hard`: `1000` of `5536`
+  - `MATH level-5`: `1000` of `2304`
+  - `Omni-MATH >= 7`: full HF slice (`916`)
 - Prompt/verifier contract:
   - `LiveCodeBench` and `LiveCodeBench-extra` use `LM_STYLE_OVERRIDE=HFChatTemplate`
   - `TACO-hard`, `MATH level-5`, and `Omni-MATH >= 7` use `PROMPT_FORMAT=chat_template`
   - `TACO-hard` uses the native execution-based grader over saved `input_output`
-  - `Omni-MATH >= 7` uses the merged local screen pool `data/omni_math_ge7_screen_300.jsonl`
-    - the current pool is `300` screened rows rather than a full HF split
-    - each row preserves `_source_sample_id`, `problem`, `answer`, `difficulty`, `domain`, and `source`
+  - `Omni-MATH >= 7` now uses `KbsdJames/Omni-MATH`, split `test`, with `difficulty >= 7`
+  - `data/omni_math_ge7_screen_300.jsonl` remains a useful historical screen artifact but is no longer the active stats source
+- Disjointness contract:
+  - `LiveCodeBench-extra` must exclude the archived March pool on the current HF chat-template surface
+  - exclusion now matches either archived prompt text or archived benchmark `sample_id`
+  - the live sidecar already records `excluded_prompt_count = 800`
 - Reuse contract:
   - finished archives must preserve `record_id`, prompt text, `prompt_token_ids`, rollout `completion_text`, `completion_token_ids`, and raw row metadata so the same rollouts can later drive prompt-profile relabeling, probe training, and steering
 
@@ -66,27 +74,32 @@ Reference docs:
 - Fresh remote submission checkout:
   - `/data/scratch/murphy/projects/worktrees/cot-loop-main4-rebuild`
 - Main output root:
-  - `/data/scratch/murphy/outputs/cot-loop-detection/main_four_dataset_rebuild_20260423`
-- Submitted suite:
-  - `2850` `q3-main4r1-livecodebench-on`
-  - `2851` `q3-main4r1-livecodebench_extra-on`
-  - `2852` `q3-main4r1-taco_hard-on`
-  - `2853` `q3-main4r1-math_level5-on`
-  - `2854` `q3-main4r1-livecodebench-off`
-  - `2855` `q3-main4r1-livecodebench_extra-off`
-  - `2856` `q3-main4r1-taco_hard-off`
-  - `2857` `q3-main4r1-math_level5-off`
-  - `2863` `q3-main5r1-omni_math_ge7-on`
-  - `2864` `q3-main5r1-omni_math_ge7-off`
+  - `/data/scratch/murphy/outputs/cot-loop-detection/main_five_dataset_rebuild_full_or_1k_20260423`
+- Queue history that matters:
+  - the old slice-based jobs `2850` through `2857` and `2863` / `2864` were canceled after Wangzhi tightened the size contract
+  - the first corrected relaunch `2865` through `2874` failed immediately because the sbatch wrapper dropped `CONDA_ENV`
+  - `scripts/launch_main_rollout_stats_suite.py` now propagates `CONDA_ENV` / `CONDA_DEFAULT_ENV`, and the live relaunch is `2875` through `2884`
+- Live submitted suite:
+  - `2875` `q3-main5r2b-livecodebench-on`
+  - `2876` `q3-main5r2b-livecodebench_extra-on`
+  - `2877` `q3-main5r2b-taco_hard-on`
+  - `2878` `q3-main5r2b-math_level5-on`
+  - `2879` `q3-main5r2b-omni_math_ge7-on`
+  - `2880` `q3-main5r2b-livecodebench-off`
+  - `2881` `q3-main5r2b-livecodebench_extra-off`
+  - `2882` `q3-main5r2b-taco_hard-off`
+  - `2883` `q3-main5r2b-math_level5-off`
+  - `2884` `q3-main5r2b-omni_math_ge7-off`
 - Current queue state:
-  - `2850` and `2851` are running
-  - `2852` through `2857`, `2863`, and `2864` are waiting behind them
+  - `2875` and `2876` are running
+  - `2877` is pending on resources
+  - `2878` through `2884` are pending on priority
 
 ## Active TODOs
 
 ### P0: keep the rebuild receipts clean
 
-1. Monitor `2850` through `2857` plus `2863` / `2864` until all ten receipts land.
+1. Monitor `2875` through `2884` until all ten receipts land.
 2. Treat any first-row failure as a launch/runtime bug, not as a scientific result.
 3. Preserve the paired contract if repairs are needed:
    - same dataset
@@ -109,7 +122,7 @@ Reference docs:
 ### P3: only restart steering after the rebuilt stats and detector surfaces exist
 
 1. Do not reuse the old March-era or LiveCodeBench-only vector bundles for this rebuild.
-2. Do not treat the canceled `2829` to `2838` rerun thread as a valid scientific receipt.
+2. Do not treat the canceled `2829` to `2838` rerun thread, the canceled `2850` to `2864` slice queue, or the failed `2865` to `2874` env-drop queue as valid scientific receipts.
 3. Restart steering only after a rebuilt mode-local detector/vector object exists for the relevant dataset.
 
 ## Historical context
