@@ -129,3 +129,20 @@ Reference docs:
 
 - The older March-provenance audit and the failed LiveCodeBench-only reruns are still useful debugging history, but they are no longer the active backlog surface.
 - Keep those receipts in `roadmap.md` and the task report; do not let them redefine the current queue or the current project objective.
+
+## Retained reference surfaces
+
+- The earlier prompt-profile and trigger-attention surfaces from `main` still stand as reference objects even though they are not the active rollout-stat queue:
+  - unified prompt-profile report: `docs/prompt-profile-unified-report-2026-04-09.md`
+  - natural regression rerun: `docs/prompt-profile-natural-regression-rerun-2026-04-05.md`
+  - corrected OLMo degeneration-origin audit: `docs/olmo-degeneration-origin-audit-2026-04-04.md`
+  - binary capacity controls: `docs/prompt-profile-binary-capacity-controls-2026-04-04.md`
+  - full Qwen3 trigger-attention rerun: `docs/qwen3-loop-trigger-attention-2026-04-14.md`
+- Keep the earlier reporting caveats explicit when those older surfaces are cited again:
+  - the trigger-attention replay still needs a matched non-loop control slice
+  - the fixed-budget full-train prompt-profile surface still has constant `effective_budget`, so "metadata baseline" there effectively means prompt-length-only unless a stronger prompt-shape control is added
+  - use `Spearman rank correlation` explicitly rather than shorthand `rank correlation`
+  - do not describe the project goal as merely "ranking prompts"; the real object is target selection for prompt-prefill prediction
+- Keep the earlier data gaps visible:
+  - the original repaired `LiveCodeBench` row still lacks exact `avg_first_loop_prefix_length`
+  - the old recovered `LiveCodeBench` projection artifact still lacks prompt-level correctness

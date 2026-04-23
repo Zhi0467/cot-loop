@@ -1,0 +1,72 @@
+{
+  "aime": {
+    "mean_current_trigger_mass": 0.16951284557580948,
+    "mean_last_prev_loop_mass": 0.006773191737011075,
+    "mean_prev_loop_mass": 0.03511334303766489,
+    "mean_prompt_mass": 0.7235777974128723,
+    "mean_recent_nonloop_mass": 0.007275872863829136,
+    "num_selected_rows": 2,
+    "summary_layer": 27,
+    "top1_fraction_current_trigger": 0.0625,
+    "top1_fraction_last_previous_loop": 0.0,
+    "top1_fraction_previous_loop": 0.0,
+    "top1_fraction_prompt": 0.9375,
+    "top1_fraction_recent_nonloop": 0.0
+  },
+  "gpqa": {
+    "mean_current_trigger_mass": 0.1540922075510025,
+    "mean_last_prev_loop_mass": 0.008449068292975426,
+    "mean_prev_loop_mass": 0.03830449655652046,
+    "mean_prompt_mass": 0.7551368673642477,
+    "mean_recent_nonloop_mass": 0.01888362513273023,
+    "num_selected_rows": 3,
+    "summary_layer": 27,
+    "top1_fraction_current_trigger": 0.08333333333333333,
+    "top1_fraction_last_previous_loop": 0.0,
+    "top1_fraction_previous_loop": 0.0,
+    "top1_fraction_prompt": 0.9166666666666666,
+    "top1_fraction_recent_nonloop": 0.0
+  },
+  "livecodebench": {
+    "mean_current_trigger_mass": 0.22355077167352042,
+    "mean_last_prev_loop_mass": 0.05609939557810625,
+    "mean_prev_loop_mass": 0.11216769864161809,
+    "mean_prompt_mass": 0.6247315406799316,
+    "mean_recent_nonloop_mass": 0.016518456240495045,
+    "num_selected_rows": 3,
+    "summary_layer": 27,
+    "top1_fraction_current_trigger": 0.16666666666666666,
+    "top1_fraction_last_previous_loop": 0.0,
+    "top1_fraction_previous_loop": 0.0,
+    "top1_fraction_prompt": 0.8333333333333334,
+    "top1_fraction_recent_nonloop": 0.0
+  },
+  "math500": {
+    "mean_current_trigger_mass": 0.1915969749291738,
+    "mean_last_prev_loop_mass": 0.06172106166680654,
+    "mean_prev_loop_mass": 0.10158294936021169,
+    "mean_prompt_mass": 0.654322067896525,
+    "mean_recent_nonloop_mass": 0.04635783533255259,
+    "num_selected_rows": 3,
+    "summary_layer": 27,
+    "top1_fraction_current_trigger": 0.1875,
+    "top1_fraction_last_previous_loop": 0.0,
+    "top1_fraction_previous_loop": 0.0,
+    "top1_fraction_prompt": 0.8125,
+    "top1_fraction_recent_nonloop": 0.0
+  },
+  "mmlu_pro": {
+    "mean_current_trigger_mass": 0.20338861644268036,
+    "mean_last_prev_loop_mass": 0.016119601825873058,
+    "mean_prev_loop_mass": 0.04796086003383001,
+    "mean_prompt_mass": 0.6574927965799967,
+    "mean_recent_nonloop_mass": 0.038481373339891434,
+    "num_selected_rows": 3,
+    "summary_layer": 27,
+    "top1_fraction_current_trigger": 0.20833333333333334,
+    "top1_fraction_last_previous_loop": 0.0,
+    "top1_fraction_previous_loop": 0.0,
+    "top1_fraction_prompt": 0.7916666666666666,
+    "top1_fraction_recent_nonloop": 0.0
+  }
+}

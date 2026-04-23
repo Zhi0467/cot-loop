@@ -2,13 +2,16 @@
 from __future__ import annotations
 
 import argparse
+import gzip
 import json
 import multiprocessing as mp
 import os
 import queue as queue_module
 import re
+import shutil
 import signal
 import sys
+import tempfile
 import time
 import traceback
 from dataclasses import asdict, dataclass
@@ -42,7 +45,7 @@ from loop_probe.collector import (
 from loop_probe.configs import RolloutConfig
 from loop_probe.labeling import (
     aggregate_prompt_profile,
-    first_ngram_loop_prefix_length,
+    find_ngram_loop_trigger,
     profile_target_name,
 )
 from loop_probe.prompt_format import (
@@ -301,6 +304,26 @@ def _progress_path(out_path: str) -> str:
     return f"{base}__progress.json"
 
 
+def _prompt_rollout_replay_path(out_path: str) -> str:
+    base, _ = os.path.splitext(out_path)
+    return f"{base}__rollout_archive.jsonl.gz"
+
+
+def _prompt_rollout_replay_path_for_lcb_checkpoint(checkpoint_path: str) -> str:
+    base, _ = os.path.splitext(checkpoint_path)
+    suffix = "__lcb_records"
+    archived_suffix = f"{suffix}__preexisting_"
+    if base.endswith(suffix):
+        prefix = base[:-len(suffix)]
+        archived_tail = ""
+    elif archived_suffix in base:
+        prefix, archived_tail = base.split(archived_suffix, 1)
+        archived_tail = f"__preexisting_{archived_tail}"
+    else:
+        return ""
+    return f"{prefix}__rollout_archive.jsonl{archived_tail}.gz"
+
+
 def _archive_preexisting_output(path: str) -> None:
     if not os.path.exists(path):
         return
@@ -326,11 +349,19 @@ def _prepare_output_paths(
     out_path: str,
     *,
     preserve_lcb_checkpoint_path: str | None = None,
+    preserve_prompt_rollout_replay_path: str | None = None,
 ) -> None:
     _archive_preexisting_output(out_path)
     _archive_preexisting_output(_prompt_profile_path(out_path))
     _archive_preexisting_output(_prompt_rollout_archive_path(out_path))
     _archive_preexisting_output(_progress_path(out_path))
+    prompt_rollout_replay_path = _prompt_rollout_replay_path(out_path)
+    if not (
+        preserve_prompt_rollout_replay_path
+        and os.path.abspath(prompt_rollout_replay_path)
+        == os.path.abspath(preserve_prompt_rollout_replay_path)
+    ):
+        _archive_preexisting_output(prompt_rollout_replay_path)
     if args.task_kind == "livecodebench_codegen":
         checkpoint_path = _lcb_records_checkpoint_path(out_path)
         if preserve_lcb_checkpoint_path and os.path.abspath(
@@ -1189,6 +1220,9 @@ def _collect_worker_stats(
         chunk_size = max(1, rollout_cfg.max_num_seqs // rollout_cfg.num_generations)
     else:
         chunk_size = len(items)
+    # Keep archive memory bounded even when vLLM is allowed to process the full
+    # dataset as one logical chunk.
+    prompt_rollout_spill_rows = max(1, min(chunk_size, 16))
     for start in range(0, len(items), chunk_size):
         end = min(start + chunk_size, len(items))
         batch_items = items[start:end]
@@ -1235,6 +1269,25 @@ def _collect_worker_stats(
                         tail_threshold=tail_threshold,
                         out_path=progress_out_path,
                     )
+                agg.prompt_rollout_records.append(
+                    {
+                        "sample_id": int(item.sample_id),
+                        "prompt": item.prompt,
+                        "prompt_token_ids": [int(tok) for tok in input_ids],
+                        "prompt_token_count": int(prompt_len),
+                        "effective_max_tokens": int(effective_max),
+                        "gold_answer": item.gold_answer,
+                        "gold_index": item.gold_index,
+                        "question_id": item.question_id,
+                        "prompt_too_long": True,
+                        "rollouts": [],
+                    }
+                )
+                if len(agg.prompt_rollout_records) >= prompt_rollout_spill_rows:
+                    _spill_prompt_rollout_records(
+                        agg,
+                        rank=rank,
+                    )
                 if collector_cfg.task_kind == "livecodebench_codegen":
                     agg.lcb_sample_records.append(
                         LcbSampleRecord(
@@ -1255,6 +1308,9 @@ def _collect_worker_stats(
                     )
                 continue
             valid_items.append((item, [int(tok) for tok in input_ids], prompt_len, effective_max))
+            valid_items.append(
+                (item, [int(tok) for tok in input_ids], prompt_len, effective_max)
+            )
 
         if valid_items:
             for item, prompt_token_ids, prompt_len, effective_max in valid_items:
@@ -1280,11 +1336,14 @@ def _collect_worker_stats(
                         f"{len(output.outputs)}."
                     )
                 prompt_rollout_rows: list[dict[str, object]] = []
+                prompt_rollouts: list[dict[str, Any]] = []
+                prompt_rollout_rows: list[dict[str, object]] = []
                 for generation_index, sample in enumerate(output.outputs):
                     text = str(getattr(sample, "text", ""))
                     token_ids = getattr(sample, "token_ids", None)
                     if not token_ids:
                         token_ids = tokenizer.encode(text, add_special_tokens=False)
+                    token_ids = [int(token_id) for token_id in token_ids]
                     token_ids = [int(token_id) for token_id in token_ids]
                     token_count = len(token_ids)
                     total_token_count = _total_token_count(prompt_len, token_count)
@@ -1293,10 +1352,15 @@ def _collect_worker_stats(
                         or getattr(output, "finish_reason", None)
                         or getattr(sample, "stop_reason", None)
                     )
-                    first_loop_prefix = first_ngram_loop_prefix_length(
+                    loop_trigger = find_ngram_loop_trigger(
                         token_ids,
                         n=loop_n,
                         k=loop_k,
+                    )
+                    first_loop_prefix = (
+                        loop_trigger.first_loop_prefix
+                        if loop_trigger is not None
+                        else None
                     )
                     loop_flag = first_loop_prefix is not None
                     max_length_hit = _hit_max_model_len(
@@ -1319,6 +1383,22 @@ def _collect_worker_stats(
                     if loop_flag and max_length_hit:
                         agg.num_looped_and_max_length_hit += 1
 
+                    prompt_rollouts.append(
+                        {
+                            "generation_index": int(generation_index),
+                            "completion_text": text,
+                            "completion_token_ids": token_ids,
+                            "completion_token_count": int(token_count),
+                            "total_token_count": int(total_token_count),
+                            "finish_reason": finish_reason,
+                            "loop_flag": bool(loop_flag),
+                            "max_length_hit": bool(max_length_hit),
+                            "first_loop_prefix_length": first_loop_prefix,
+                            "loop_trigger": (
+                                asdict(loop_trigger) if loop_trigger is not None else None
+                            ),
+                        }
+                    )
                     correct_flag: int | None = None
                     if collector_cfg.task_kind == "livecodebench_codegen":
                         agg.lcb_sample_records.append(
@@ -1417,6 +1497,30 @@ def _collect_worker_stats(
                     if collector_cfg.task_kind == "livecodebench_codegen":
                         _write_lcb_records_checkpoint(agg, progress_out_path)
 
+                agg.prompt_rollout_records.append(
+                    {
+                        "sample_id": int(item.sample_id),
+                        "prompt": item.prompt,
+                        "prompt_token_ids": prompt_token_ids,
+                        "prompt_token_count": int(prompt_len),
+                        "effective_max_tokens": int(effective_max),
+                        "gold_answer": item.gold_answer,
+                        "gold_index": item.gold_index,
+                        "question_id": item.question_id,
+                        "prompt_too_long": False,
+                        "rollouts": prompt_rollouts,
+                    }
+                )
+                if len(agg.prompt_rollout_records) >= prompt_rollout_spill_rows:
+                    _spill_prompt_rollout_records(
+                        agg,
+                        rank=rank,
+                    )
+
+        _spill_prompt_rollout_records(
+            agg,
+            rank=rank,
+        )
         print(
             f"[collect-dp-rank {rank}] processed {end}/{len(items)} prompts",
             flush=True,
@@ -1450,6 +1554,10 @@ def _worker_main(
             tail_threshold=tail_threshold,
             rank=rank,
         )
+        _spill_prompt_rollout_records(
+            agg,
+            rank=rank,
+        )
     except Exception:
         tb = traceback.format_exc()
         try:
@@ -1458,6 +1566,39 @@ def _worker_main(
             pass
         raise
     out_queue.put((rank, agg, None))
+
+
+def _spill_prompt_rollout_records(
+    agg: WorkerAggregator,
+    *,
+    rank: int,
+) -> None:
+    if not agg.prompt_rollout_records:
+        return
+
+    fd, part_path = tempfile.mkstemp(
+        prefix=f"collect_model_stats_prompt_rollouts_rank{rank}_",
+        suffix=".jsonl.gz",
+    )
+    os.close(fd)
+    try:
+        with gzip.open(part_path, "wt", encoding="utf-8") as handle:
+            for row in agg.prompt_rollout_records:
+                json.dump(row, handle, ensure_ascii=True)
+                handle.write("\n")
+    except Exception:
+        try:
+            os.unlink(part_path)
+        except OSError:
+            pass
+        raise
+
+    agg.prompt_rollout_part_paths.append(part_path)
+    agg.prompt_rollout_records.clear()
+    print(
+        f"[collect-dp-rank {rank}] spooled prompt rollout archive chunk to {part_path}",
+        flush=True,
+    )
 
 
 def _cleanup_worker_group(worker_pid: int, rank: int) -> None:
@@ -1871,6 +2012,54 @@ def _write_lcb_records_checkpoint(agg: WorkerAggregator, out_path: str) -> str:
     return checkpoint_path
 
 
+def _write_prompt_rollout_archive(agg: WorkerAggregator, out_path: str) -> str:
+    if not agg.prompt_rollout_records and not agg.prompt_rollout_part_paths:
+        return ""
+    archive_path = _prompt_rollout_replay_path(out_path)
+    archive_dir = os.path.dirname(archive_path)
+    if archive_dir:
+        os.makedirs(archive_dir, exist_ok=True)
+    with gzip.open(archive_path, "wt", encoding="utf-8") as handle:
+        for row in agg.prompt_rollout_records:
+            json.dump(row, handle, ensure_ascii=True)
+            handle.write("\n")
+        for part_path in agg.prompt_rollout_part_paths:
+            with gzip.open(part_path, "rt", encoding="utf-8") as source_handle:
+                for line in source_handle:
+                    handle.write(line)
+            try:
+                os.unlink(part_path)
+            except OSError:
+                pass
+    print(f"Wrote prompt rollout archive to {archive_path}", flush=True)
+    return archive_path
+
+
+def _restore_prompt_rollout_archive_for_resume(
+    archive_path: str,
+    out_path: str,
+) -> str:
+    if not archive_path:
+        return ""
+    if not os.path.isfile(archive_path):
+        return ""
+
+    destination_path = _prompt_rollout_replay_path(out_path)
+    if os.path.abspath(archive_path) == os.path.abspath(destination_path):
+        return archive_path
+
+    destination_dir = os.path.dirname(destination_path)
+    if destination_dir:
+        os.makedirs(destination_dir, exist_ok=True)
+    shutil.copyfile(archive_path, destination_path)
+    print(
+        "Copied prompt rollout archive from resumed checkpoint to "
+        f"{destination_path}",
+        flush=True,
+    )
+    return destination_path
+
+
 def _prompt_token_summary(agg: WorkerAggregator) -> dict[str, float | int | None]:
     prompt_lengths = [
         int(row["prompt_token_count"])
@@ -1893,6 +2082,11 @@ def _prompt_token_summary(agg: WorkerAggregator) -> dict[str, float | int | None
 def main() -> None:
     args = _parse_args()
     resume_lcb_checkpoint = args.resume_lcb_records_checkpoint.strip()
+    resume_prompt_rollout_archive = (
+        _prompt_rollout_replay_path_for_lcb_checkpoint(resume_lcb_checkpoint)
+        if resume_lcb_checkpoint
+        else ""
+    )
     if resume_lcb_checkpoint and args.task_kind != "livecodebench_codegen":
         raise SystemExit(
             "--resume-lcb-records-checkpoint is only valid with "
@@ -1910,6 +2104,7 @@ def main() -> None:
         args,
         out_path,
         preserve_lcb_checkpoint_path=resume_lcb_checkpoint or None,
+        preserve_prompt_rollout_replay_path=resume_prompt_rollout_archive or None,
     )
 
     tokenizer = None
@@ -1988,6 +2183,13 @@ def main() -> None:
             progress_out_path=out_path,
         )
 
+    prompt_rollout_replay_path = _write_prompt_rollout_archive(agg, out_path)
+    if not prompt_rollout_replay_path and resume_prompt_rollout_archive:
+        prompt_rollout_replay_path = _restore_prompt_rollout_archive_for_resume(
+            resume_prompt_rollout_archive,
+            out_path,
+        )
+
     lcb_native_metrics: dict[str, Any] = {}
     taco_native_metrics: dict[str, object] = {}
     if args.task_kind == "livecodebench_codegen":
@@ -2058,6 +2260,15 @@ def main() -> None:
             **(
                 {"release_version": args.release_version}
                 if args.task_kind == "livecodebench_codegen"
+                else {}
+            ),
+            **(
+                {
+                    "rollout_replay_archive_file": os.path.basename(
+                        prompt_rollout_replay_path
+                    )
+                }
+                if prompt_rollout_replay_path
                 else {}
             ),
             **task_metadata,

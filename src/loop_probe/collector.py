@@ -100,6 +100,8 @@ class WorkerAggregator:
     lcb_sample_records: list[LcbSampleRecord] = field(default_factory=list)
     prompt_profile_rows: list[dict[str, Any]] = field(default_factory=list)
     prompt_rollout_archive_rows: list[dict[str, Any]] = field(default_factory=list)
+    prompt_rollout_records: list[dict[str, Any]] = field(default_factory=list)
+    prompt_rollout_part_paths: list[str] = field(default_factory=list)
 
 
 def merge_aggregators(aggregators: Iterable[WorkerAggregator]) -> WorkerAggregator:
@@ -142,6 +144,8 @@ def merge_aggregators(aggregators: Iterable[WorkerAggregator]) -> WorkerAggregat
         merged.lcb_sample_records.extend(agg.lcb_sample_records)
         merged.prompt_profile_rows.extend(agg.prompt_profile_rows)
         merged.prompt_rollout_archive_rows.extend(agg.prompt_rollout_archive_rows)
+        merged.prompt_rollout_records.extend(agg.prompt_rollout_records)
+        merged.prompt_rollout_part_paths.extend(agg.prompt_rollout_part_paths)
     return merged
 
 
