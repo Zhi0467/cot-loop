@@ -2,6 +2,8 @@
 
 Last updated: 2026-04-23 02:20 UTC
 
+Superseded at 2026-04-23 04:22 UTC by `docs/prompt-profile-rfm-mode-consistent-stage-2026-04-23.md` after the collaborator required separate mode-consistent `thinking-on` and `thinking-off` `stats -> probe -> steer` paths.
+
 ## Exact current object
 
 The active benchmark-local stage is still the repaired `LiveCodeBench` prompt-level `majority_s_0.5` object, not the old stale March archive label and not a mixed cross-benchmark table.

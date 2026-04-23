@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-04-23 02:20 UTC
+Last updated: 2026-04-23 04:22 UTC
 
 Purpose:
 - Store long-lived project documentation that is not part of the main README.
@@ -16,6 +16,7 @@ Core docs:
 - Prompt-profile plain-language note: prompt-profile-plain-language-2026-03-30.md
 - Prompt-profile full-train plan: prompt-profile-full-train-plan-2026-04-02.md
 - Prompt-profile RFM + steering stage plan: prompt-profile-rfm-steering-plan-2026-04-21.md
+- Prompt-profile RFM + steering mode-consistent stage note: prompt-profile-rfm-mode-consistent-stage-2026-04-23.md
 - Prompt-profile RFM + steering grounded stage note: prompt-profile-rfm-steering-grounded-stage-2026-04-23.md
 - Prompt-profile RFM artifact schema: prompt-profile-rfm-artifact-schema-2026-04-21.md
 - LiveCodeBench repaired stage report: livecodebench-repaired-stage-report-2026-04-21.md
@@ -46,6 +47,7 @@ Key outputs:
 - Prompt-profile risk-control bundle: ../outputs/prompt_profile_risk_controls_20260330/
 - Plain-language objective PDF: ../outputs/prompt_profile_plain_language_20260330/prompt_profile_plain_language_20260330.pdf
 - Full-train plan PDF: ../outputs/prompt_profile_full_train_plan_20260402/prompt_profile_full_train_plan_20260402.pdf
+- Mode-consistent stage note PDF: ../outputs/prompt_profile_rfm_mode_consistent_stage_20260423/prompt_profile_rfm_mode_consistent_stage_20260423.pdf
 - Grounded stage note PDF: ../outputs/prompt_profile_rfm_stage_grounded_plan_20260423/prompt_profile_rfm_stage_grounded_plan_20260423.pdf
 - Natural-regression rerun bundle: ../outputs/prompt_profile_natural_regression_rerun_20260405/
 - Natural-regression rerun PDF: ../outputs/prompt_profile_natural_regression_rerun_20260405/prompt_profile_natural_regression_rerun_20260405.pdf

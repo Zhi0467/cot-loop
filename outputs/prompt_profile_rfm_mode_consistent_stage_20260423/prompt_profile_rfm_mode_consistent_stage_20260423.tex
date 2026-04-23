@@ -1,0 +1,101 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+\begin{document}
+
+{\Large \textbf{Prompt-profile RFM steering mode-consistent stage note}}\\
+Generated: 2026-04-23 04:22 UTC
+
+\section*{Exact correction}
+At 2026-04-23 03:50 UTC, Wangzhi tightened the stage contract: stop steering the thinking model with vectors trained on the older non-thinking rollout surface. From here forward, each path has to close the whole chain inside one mode: stats collection, stage materialization, probe training, vector export, and steering. This note supersedes the earlier grounded note as the active stage definition.
+
+\section*{What remains valid}
+The repaired benchmark-local anchor is still \texttt{LiveCodeBench} with fit-train / validation / test counts \texttt{280 / 128 / 160} and positives \texttt{140 / 35 / 54}. The existing repaired detector/vector bundle under \texttt{.../prompt\_profile\_rfm/livecodebench\_full\_bootstrap200\_seed0\_metricfix\_20260421/} is still real enough to keep as the predecessor non-thinking asset: layer \texttt{27}, validation \texttt{PR-AUC 0.6555}, test \texttt{PR-AUC 0.7055}, test \texttt{ROC-AUC 0.8590}, and all \texttt{28} layers with mean bootstrap cosine \texttt{>= 0.781}.
+
+The positive-enrichment pilot is also still useful as candidate discovery:
+
+\begin{table}[h]
+\centering
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{0.28\textwidth}rrrrr>{\raggedright\arraybackslash}p{0.13\textwidth}}
+\toprule
+Candidate & Profiled & Positives & Positive rate & Tail frac & Loop frac & Status \\
+\midrule
+\texttt{LiveCodeBench-extra} & 255 & 141 & 0.5529 & 0.5765 & 0.3029 & running \\
+\texttt{TACO-hard} & 229 & 186 & 0.8122 & 0.8308 & 0.3723 & running \\
+\texttt{MATH level-5} parallel & 261 & 40 & 0.1533 & 0.2126 & 0.0738 & running \\
+\texttt{Omni-MATH >= 7} & 0 & 0 & 0.0000 & -- & -- & dep-pending \\
+\bottomrule
+\end{tabularx}
+\caption{Current screening-pilot checkpoints.}
+\end{table}
+
+\section*{What is demoted}
+The old thinking-on steering rows are no longer valid stage evidence. The finished \texttt{plus\_v\_linear} row on the thinking model points to \texttt{vector\_export\_dir = .../livecodebench\_full\_bootstrap200\_seed0\_metricfix\_20260421/vector\_exports}, and that vector bundle itself points back to \texttt{preprocessing.source\_data\_dir = .../livecodebench\_mean\_relative\_from\_archive\_20260323}. The March provenance audit already established that \texttt{LiveCodeBench} source as the old raw path rather than the newer thinking-on \texttt{HFChatTemplate} surface. So the old steered thinking-on rows now count only as implementation receipts.
+
+At 2026-04-23 04:22 UTC I canceled the remaining live cross-mode steering jobs:
+\begin{itemize}
+\item \texttt{2804} - \texttt{minus\_v\_linear}
+\item \texttt{2811} - \texttt{minus\_v\_spherical}
+\item \texttt{2815} - \texttt{plus\_v\_spherical}
+\item \texttt{2816} - \texttt{random\_spherical}
+\end{itemize}
+
+The finished \texttt{no\_steer} thinking-on row can still survive as a reusable baseline receipt (\texttt{2 / 160} \texttt{pass@1}, loop fraction \texttt{0.65625}), but it is no longer enough to call the thinking-on steering lane partially complete.
+
+\section*{Live queue}
+After the correction, the live queue is:
+\begin{itemize}
+\item running:
+  \begin{itemize}
+  \item \texttt{2818} - \texttt{pp-screen-math5}
+  \item \texttt{2829} - \texttt{q3-lcb-thon}
+  \end{itemize}
+\item pending:
+  \begin{itemize}
+  \item \texttt{2819} - \texttt{pp-screen-omni7} (dependency on \texttt{2818})
+  \item \texttt{2830} - \texttt{q3-lcb-thoff} (resources)
+  \end{itemize}
+\end{itemize}
+
+So the correction has already changed the execution surface in a useful way: the explicit thinking-on collector \texttt{2829} started immediately once the invalid cross-mode steering jobs were removed from the only GPU node.
+
+\section*{Repo reality}
+The repo surface is still ahead of the published PR. The local branch remains \texttt{task/1776752262-rfm-stage0}, local head before this note is \texttt{dabe924}, and the published GitHub surface is still draft PR \texttt{\#11} at head \texttt{5a521d1}. The docs therefore need to carry the correction explicitly rather than rely on the PR body.
+
+\section*{Grand two-path schema}
+\textbf{Path A: thinking-on}
+\begin{enumerate}
+\item finish the explicit thinking-on collector \texttt{2829};
+\item materialize the thinking-on \texttt{majority\_s\_0.5} stage object;
+\item train the layerwise thinking-on RFM on that mode-local object;
+\item export thinking-on vectors and rerun bootstrap direction diagnostics;
+\item rerun the full seven-condition thinking-on steering table from those thinking-on vectors.
+\end{enumerate}
+
+\textbf{Path B: thinking-off}
+\begin{enumerate}
+\item finish the explicit thinking-off collector \texttt{2830};
+\item materialize the thinking-off \texttt{majority\_s\_0.5} stage object;
+\item train the thinking-off RFM and export the thinking-off vector bundle;
+\item rerun the non-thinking steering table from that matched bundle;
+\item if node geometry is still fragile, use a linear-first relaunch order before spherical.
+\end{enumerate}
+
+\textbf{Shared rule}
+\begin{enumerate}
+\item no cross-mode shortcut is now allowed for the main claim;
+\item the current screening pilot can choose what to follow up, but not silently define the steering registry;
+\item any future average-vector transfer must also stay mode-local rather than mixing thinking-on and thinking-off bundles.
+\end{enumerate}
+
+\section*{Bottom line}
+The stage is no longer ``finish the old thinking-on seven-row table and unblock non-thinking later.'' The active object is now two matched pipelines, one for thinking-on and one for thinking-off, each with its own stats receipt, probe bundle, and steering table. The old non-thinking-trained \texttt{LiveCodeBench} vector bundle still matters, but it no longer licenses thinking-on steering claims.
+
+\end{document}

@@ -1,6 +1,6 @@
 # Roadmap - CoT Loop Detection
 
-Last updated: 2026-04-23 02:20 UTC
+Last updated: 2026-04-23 04:22 UTC
 
 Scope:
 - Build and validate a probe pipeline for CoT loop detection across prefill and completion feature views.
@@ -11,6 +11,20 @@ Scope:
 - Milestone 2 gate: complete.
 - Milestone 3 gate: complete.
 - Active milestone: Milestone 5 (deployment readiness).
+- 2026-04-23 04:22 UTC: Wangzhi tightened the stage contract again, and this time it changes the live queue rather than only the wording. The active stage is no longer "finish the old thinking-on steering table, then unblock non-thinking later." It is now a two-path schema where each lane has to close `stats -> probe -> steer` inside one mode. I wrote a new durable note and PDF bundle for that corrected object:
+  - note: `docs/prompt-profile-rfm-mode-consistent-stage-2026-04-23.md`
+  - PDF: `outputs/prompt_profile_rfm_mode_consistent_stage_20260423/prompt_profile_rfm_mode_consistent_stage_20260423.pdf`
+  - scientific demotion:
+    - the old thinking-on steered rows are now implementation receipts only because their config points at `vector_export_dir = .../prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/vector_exports`, and that bundle points back to the raw March `LiveCodeBench` source `.../livecodebench_mean_relative_from_archive_20260323`
+  - queue action:
+    - canceled the remaining live cross-mode steering jobs `2804`, `2811`, `2815`, and `2816`
+    - that immediately freed the node enough for the explicit thinking-on `LiveCodeBench` collector `2829` to start
+    - `2830` (thinking-off) remains pending on resources
+  - current pilot screen is still useful, but only as candidate discovery rather than silent steering-lane admission:
+    - `LiveCodeBench-extra`: `255` profiled, positive rate `0.5529`
+    - `TACO-hard`: `229` profiled, positive rate `0.8122`
+    - `MATH level-5` parallel path: `261` profiled, positive rate `0.1533`
+    - `Omni-MATH >= 7`: still dependency-pending
 - 2026-04-23 02:20 UTC: grounded the April 21 steering-stage plan against the actual repo/runtime state and wrote a new durable note plus PDF bundle:
   - note: `docs/prompt-profile-rfm-steering-grounded-stage-2026-04-23.md`
   - PDF: `outputs/prompt_profile_rfm_stage_grounded_plan_20260423/prompt_profile_rfm_stage_grounded_plan_20260423.pdf`
@@ -129,6 +143,7 @@ Success criteria:
 - Document performance tradeoffs, expected failure modes, and cost profile.
 
 Activity log:
+- 2026-04-23 04:22 UTC: collaborator correction changed the stage object again, and this one invalidated real queued work. The new rule is mode consistency: no steering the thinking model with vectors trained on the older non-thinking/raw bundle. I wrote a new stage note and PDF (`docs/prompt-profile-rfm-mode-consistent-stage-2026-04-23.md`, `outputs/prompt_profile_rfm_mode_consistent_stage_20260423/`) that replaces the earlier grounded note as the active execution surface. Concretely, the finished steered thinking-on row and the still-running steered thinking-on jobs were demoted to implementation receipts because their config points at `vector_export_dir = .../prompt_profile_rfm/livecodebench_full_bootstrap200_seed0_metricfix_20260421/vector_exports`, and that bundle points back to the raw March `LiveCodeBench` archive `.../livecodebench_mean_relative_from_archive_20260323`. I canceled the remaining live cross-mode steering jobs `2804`, `2811`, `2815`, and `2816`, which immediately let the explicit thinking-on `LiveCodeBench` collector `2829` start. The queue is now aligned with the new two-path object: `2829` running, `2830` pending, `2818` still running, `2819` still dependency-pending.
 - 2026-04-21 22:26 UTC: tightened the stage contract around Wangzhi's new post-screening gate instead of leaving it as thread-only advice. The shared stage registry now records repaired train positive counts / rates and only exposes screened-in datasets as active stage inputs. With the current repaired counts, that means `LiveCodeBench` stays active (`140 / 420 = 33.3%`) while `GPQA`, `MATH-500`, and `MMLU-Pro` move to diagnostic-only (`7 / 133`, `18 / 338`, `6 / 518`). The stage note, README, docs index, and backlog were all rewritten to match that narrower object, and the next dataset-level execution queue is now the explicit positive-enrichment screen on `LiveCodeBench-extra`, `TACO-hard`, full `MATH` hard / level-5, and `Omni-MATH` hard rather than cross-benchmark averaging over the old retained-four surface.
 - 2026-04-21 23:41 UTC: turned the new stage-0.5 screen into a real collection surface rather than another queue description. The collector now writes replayable prompt-level sidecars (`__prompt_profile.jsonl`, `__prompt_rollout_archive.jsonl`) with prompt text, prompt token IDs, dataset record identity/metadata, per-rollout completion text, and exact completion token IDs so later activation replay and relabeling can reuse the screen directly. I also added a `codegen_ungraded` adapter for code-generation candidate pools such as `TACO-hard`, exact prompt-text exclusion for `LiveCodeBench-extra`, and fixed the math hard-slice bug where `max_samples` had been applied before the row filter. The first `300`-prompt pass is live now under `/home/murphy/projects/worktrees/cot-loop-positive-screening/` on GPUs `6` and `7`: `LiveCodeBench-extra` then `MATH level-5`, and `TACO-hard` then `Omni-MATH >= 7`. The infrastructure constraint is real here too: `/data` is effectively full and `srun --test-only` pushed the next backfill window to about `2026-04-27`, so this screen is running directly with home-backed caches and outputs instead of the usual `/data/scratch` Slurm layout.
 - 2026-04-21 06:36 UTC: grounded the next deployment-facing prompt-profile stage instead of letting the repo inherit the stale "PR `#10` is the active blocker" story. The new committed note `docs/prompt-profile-rfm-steering-plan-2026-04-21.md` fixes the execution surface explicitly: frozen Qwen prompt-profile archives, benchmark-local `majority_s_0.5`, native layerwise RFM as a sibling to the current MLP baseline, report-first before steering, then fixed-`epsilon` benchmark-local steering and only later an averaged OOD vector control. This is the first durable repo surface that separates three distinct claims cleanly: detector quality, steering utility, and trigger-attention background context.
