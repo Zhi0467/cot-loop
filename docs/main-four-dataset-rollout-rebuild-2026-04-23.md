@@ -143,6 +143,11 @@ Suite manifest:
 - schema: `main_rollout_stats_suite.v2`
 - suite-level `max_samples`: `null`
 
+Cache contract for any relaunch:
+
+- Hugging Face model and dataset caches must resolve to `/data/shared/huggingface` through `slurm/cache_env.sh`.
+- Do not use the old user-specific HF cache fallback under `/data/scratch/murphy/cache` or `/data/users/murphy/cache`.
+
 Queue history:
 
 - canceled old slice queue:

@@ -48,9 +48,10 @@ else
 fi
 mkdir -p "${DEFAULT_CACHE_BASE}"
 
-export HF_HOME="${HF_HOME:-${DEFAULT_CACHE_BASE}/huggingface}"
-export HUGGINGFACE_HUB_CACHE="${HUGGINGFACE_HUB_CACHE:-${HF_HOME}/hub}"
-export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-${HF_HOME}/transformers}"
+# Keep model and dataset downloads in the shared Hugging Face cache, not a
+# user-specific scratch cache.
+# shellcheck source=slurm/cache_env.sh
+source "${COT_LOOP_CACHE_ENV:-slurm/cache_env.sh}"
 export VLLM_CACHE_ROOT="${VLLM_CACHE_ROOT:-${DEFAULT_CACHE_BASE}/vllm}"
 export TORCH_HOME="${TORCH_HOME:-${DEFAULT_CACHE_BASE}/torch}"
 export XDG_CACHE_HOME="${XDG_CACHE_HOME:-${DEFAULT_CACHE_BASE}}"
@@ -67,7 +68,7 @@ PY
 
 HOME_REALPATH="$(canonicalize_path "${HOME}")"
 
-for cache_var in HF_HOME HUGGINGFACE_HUB_CACHE TRANSFORMERS_CACHE VLLM_CACHE_ROOT TORCH_HOME XDG_CACHE_HOME; do
+for cache_var in HF_HOME HUGGINGFACE_HUB_CACHE TRANSFORMERS_CACHE HF_DATASETS_CACHE VLLM_CACHE_ROOT TORCH_HOME XDG_CACHE_HOME; do
   cache_val="${!cache_var}"
   cache_realpath="$(canonicalize_path "${cache_val}")"
   if [[ "${cache_realpath}" == "${HOME_REALPATH}" || "${cache_realpath}" == "${HOME_REALPATH}/"* ]]; then

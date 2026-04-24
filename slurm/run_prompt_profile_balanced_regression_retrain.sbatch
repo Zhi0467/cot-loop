@@ -48,9 +48,10 @@ else
 fi
 
 mkdir -p "${CACHE_BASE}"
-export HF_HOME="${HF_HOME:-${CACHE_BASE}/huggingface}"
-export HUGGINGFACE_HUB_CACHE="${HUGGINGFACE_HUB_CACHE:-${HF_HOME}/hub}"
-export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-${HF_HOME}/transformers}"
+# Keep model and dataset downloads in the shared Hugging Face cache, not a
+# user-specific scratch cache.
+# shellcheck source=slurm/cache_env.sh
+source "${COT_LOOP_CACHE_ENV:-slurm/cache_env.sh}"
 export VLLM_CACHE_ROOT="${VLLM_CACHE_ROOT:-${CACHE_BASE}/vllm}"
 export TORCH_HOME="${TORCH_HOME:-${CACHE_BASE}/torch}"
 export XDG_CACHE_HOME="${XDG_CACHE_HOME:-${CACHE_BASE}}"

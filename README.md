@@ -100,6 +100,8 @@ python scripts/launch_main_rollout_stats_suite.py \
 
 The suite definition (model, sampling config, per-dataset contracts) lives in `src/loop_probe/main_rollout_stats_suite.py`. Per-prompt archives preserve prompt text, prompt token ids, rollout completion text, completion token ids, and raw row metadata so the same rollouts can drive later prompt-profile relabeling, probe training, and mechanism analysis.
 
+Slurm launchers source `slurm/cache_env.sh`; Hugging Face model and dataset caches resolve to `/data/shared/huggingface` by default. Keep HF artifacts there, not under a user-specific `/data/scratch/${USER}/cache` or `/data/users/${USER}/cache` path.
+
 For standalone single-model rollout generation and loop-metric summaries on one dataset:
 
 ```bash

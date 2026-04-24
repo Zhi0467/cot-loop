@@ -55,6 +55,19 @@ When multiple seeds are used (default: `0 1 2`), the script also writes:
 
 Override values with exported environment variables or inline `VAR=... sbatch ...`.
 
+## Cache Defaults
+
+Every Slurm entrypoint that can touch Hugging Face models or datasets sources `slurm/cache_env.sh`. That helper pins:
+
+- `HF_HOME=/data/shared/huggingface`
+- `HUGGINGFACE_HUB_CACHE=/data/shared/huggingface/hub`
+- `HF_HUB_CACHE=/data/shared/huggingface/hub`
+- `TRANSFORMERS_CACHE=/data/shared/huggingface/transformers`
+- `HF_DATASETS_CACHE=/data/shared/huggingface/datasets`
+- `HF_ASSETS_CACHE=/data/shared/huggingface/assets`
+
+Do not let HF model or dataset artifacts fall back to `/data/scratch/${USER}/cache`, `/data/users/${USER}/cache`, or `$HOME/.cache`. Non-HF runtime caches such as vLLM, Torch, and XDG cache can still use the existing non-home user cache base.
+
 Example: build the default stacked dataset and train an ensemble over all layers:
 ```bash
 FEATURE_POOLING=last_token_all_layers_stack \

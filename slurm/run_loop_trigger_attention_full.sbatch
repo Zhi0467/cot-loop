@@ -9,25 +9,36 @@
 
 set -euo pipefail
 
-export HF_HOME="${HF_HOME:-/data/scratch/${USER}/cache/huggingface}"
-export HUGGINGFACE_HUB_CACHE="${HUGGINGFACE_HUB_CACHE:-${HF_HOME}/hub}"
-export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-${HF_HOME}/transformers}"
-export VLLM_CACHE_ROOT="${VLLM_CACHE_ROOT:-/data/scratch/${USER}/cache/vllm}"
-export TORCH_HOME="${TORCH_HOME:-/data/scratch/${USER}/cache/torch}"
-export XDG_CACHE_HOME="${XDG_CACHE_HOME:-/data/scratch/${USER}/cache}"
+REPO_ROOT="${REPO_ROOT:-$(pwd)}"
+cd "${REPO_ROOT}"
+
+if [[ -d "/data/users/${USER}" ]]; then
+  DEFAULT_CACHE_BASE="/data/users/${USER}/cache"
+elif [[ -d "/data/scratch" ]]; then
+  DEFAULT_CACHE_BASE="/data/scratch/${USER}/cache"
+else
+  echo "[trigger-attn-full] no supported non-home cache root found" >&2
+  exit 1
+fi
+mkdir -p "${DEFAULT_CACHE_BASE}"
+
+# Keep model and dataset downloads in the shared Hugging Face cache, not a
+# user-specific scratch cache.
+# shellcheck source=slurm/cache_env.sh
+source "${COT_LOOP_CACHE_ENV:-slurm/cache_env.sh}"
+export VLLM_CACHE_ROOT="${VLLM_CACHE_ROOT:-${DEFAULT_CACHE_BASE}/vllm}"
+export TORCH_HOME="${TORCH_HOME:-${DEFAULT_CACHE_BASE}/torch}"
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-${DEFAULT_CACHE_BASE}}"
+mkdir -p "${VLLM_CACHE_ROOT}" "${TORCH_HOME}" "${XDG_CACHE_HOME}"
 
 source /data/scratch/murphy/venvs/cot-loop-detection-runtime-py310/bin/activate
 
-REPO_ROOT="${REPO_ROOT:-$(pwd)}"
 OUT_DIR="${OUT_DIR:-outputs/qwen3_loop_trigger_attention_full_20260413}"
 MAX_SAMPLES_PER_DATASET="${MAX_SAMPLES_PER_DATASET:-1000}"
 MAX_TRIGGER_PREFIX="${MAX_TRIGGER_PREFIX:-40960}"
 NUM_SHARDS="${NUM_SHARDS:-8}"
 OMP_NUM_THREADS="${OMP_NUM_THREADS:-4}"
 QUERY_POSITION_MODE="${QUERY_POSITION_MODE:-trigger_end}"
-
-cd "${REPO_ROOT}"
-
 mkdir -p "${OUT_DIR}"
 SHARD_ROOT="${OUT_DIR}/shards"
 mkdir -p "${SHARD_ROOT}"
