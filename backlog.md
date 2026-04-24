@@ -1,6 +1,6 @@
 # CoT Loop Detection Backlog
 
-Last updated: 2026-04-23 19:50 UTC
+Last updated: 2026-04-24 11:34 UTC
 
 Reference docs:
 - `docs/main-four-dataset-rollout-rebuild-2026-04-23.md`
@@ -92,6 +92,10 @@ Reference docs:
   - `/data/scratch/murphy/projects/worktrees/cot-loop-main4-rebuild`
 - Main output root:
   - `/data/scratch/murphy/outputs/cot-loop-detection/main_five_dataset_rebuild_full_or_1k_20260423`
+- Current live state:
+  - Wangzhi canceled the retained rollout-stat jobs before the shared-cache follow-up
+  - no Slurm rollout-stat jobs are currently live
+  - no jobs have been relaunched after moving active HF model/dataset caches into `/data/shared/huggingface`
 - Queue history that matters:
   - the old slice-based jobs `2850` through `2857` and `2863` / `2864` were canceled after Wangzhi tightened the size contract
   - the first corrected relaunch `2865` through `2874` failed immediately because the sbatch wrapper dropped `CONDA_ENV`
@@ -107,16 +111,14 @@ Reference docs:
   - `2883` `q3-main5r2b-math_level5-off`
   - `2884` `q3-main5r2b-omni_math_ge7-off`
 - Current queue state:
-  - `2875` (`LiveCodeBench`, on) is running
-  - `2877` (`TACO-hard`, on) is running
-  - `2878` is pending on resources
-  - `2879`, `2880`, `2882`, `2883`, and `2884` are pending on priority
+  - the submitted suite above is canceled history, not an active live queue
+  - a future relaunch should keep the same four-dataset, two-mode contract and use the shared HF cache path
 
 ## Active TODOs
 
 ### P0: keep the rebuild receipts clean
 
-1. Monitor `2875`, `2877`, `2878`, `2879`, `2880`, `2882`, `2883`, and `2884` until all eight retained receipts land.
+1. Relaunch only after deciding that the shared-cache environment and four-dataset manifest are ready to be the new active queue.
 2. Treat any first-row failure as a launch/runtime bug, not as a scientific result.
 3. Preserve the paired contract if repairs are needed:
    - same dataset
