@@ -1,6 +1,6 @@
 # Main Four-Dataset Rollout Rebuild — 2026-04-23
 
-Last updated: 2026-04-23 18:25 UTC
+Last updated: 2026-04-24 06:16 UTC
 
 ## Scope
 
@@ -13,7 +13,13 @@ This note replaces the earlier "patch the March rows" framing for the current ro
 
 The point is not just to refresh summary stats. These runs also need to leave reusable prompt-rollout archives for later prompt-profile relabeling, probe training, and steering.
 
-This note also supersedes the earlier slice-based queue. After Wangzhi asked for full datasets where possible, or at least `1000` rows on larger sets, the old `2850` through `2864` queue stopped being the right contract. One more correction then became definitive: `LiveCodeBench-extra` is not an independent dataset here, because those `255` rows are a strict subset of the same `release_v6` `LiveCodeBench` surface under the same model and decode contract. Jobs `2876` and `2881` were therefore canceled and that lane was removed from the canonical suite.
+This note also supersedes the earlier slice-based queue. After Wangzhi asked for full datasets where possible, or at least `1000` rows on larger sets, the old `2850` through `2864` queue stopped being the right contract. The retained `release_v6` `LiveCodeBench` surface is intentionally kept whole at `1055` prompts as the exception to that cap. One more correction then became definitive: `LiveCodeBench-extra` is not an independent dataset here, because those `255` rows are a strict subset of the same `release_v6` `LiveCodeBench` surface under the same model and decode contract. Jobs `2876` and `2881` were therefore canceled and that lane was removed from the canonical suite.
+
+The checked-in source of truth for this suite is now
+`configs/rollout/main_rollout_stats_suite.json`. The Python module
+`src/probe/main_rollout_stats_suite.py` loads that config and translates it into
+the collector environment; sampling values should not be re-hardcoded in the
+launcher.
 
 ## Canonical run contract
 
@@ -117,7 +123,8 @@ them.
 
 ### Size receipts
 
-The active queue now matches Wangzhi's size rule exactly:
+The active queue now matches Wangzhi's size rule, with `LiveCodeBench`
+intentionally retained as the full `release_v6` exception:
 
 - `LiveCodeBench`: `1055`
 - `TACO-hard`: `5536`, so use `1000`

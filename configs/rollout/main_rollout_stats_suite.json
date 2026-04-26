@@ -1,0 +1,123 @@
+{
+  "schema_name": "main_rollout_stats_suite.config.v1",
+  "suite_config": {
+    "model_id": "Qwen/Qwen3-1.7B",
+    "temperature": 0.2,
+    "num_generations": 10,
+    "max_tokens": 81920,
+    "max_model_len": 40960,
+    "tp": 1,
+    "dp": 1,
+    "dtype": "bfloat16",
+    "max_num_seqs": 10,
+    "max_num_batched_tokens": 4096,
+    "seed": 0,
+    "loop_n": 30,
+    "loop_k": 20,
+    "statistics": [
+      "success_fraction",
+      "loop_fraction",
+      "avg_generation_length",
+      "avg_loop_generation_length",
+      "avg_first_loop_prefix_length",
+      "max_length_hit_fraction",
+      "loop_max_length_hit_fraction",
+      "max_length_hit_loop_fraction",
+      "generation_length_variance",
+      "max_length_hit_success_fraction",
+      "loop_success_fraction",
+      "avg_correct_generation_length",
+      "avg_wrong_generation_length"
+    ],
+    "max_samples": null
+  },
+  "datasets": [
+    {
+      "key": "livecodebench",
+      "display_name": "LiveCodeBench",
+      "task_kind": "livecodebench_codegen",
+      "dataset": "livecodebench/code_generation_lite",
+      "split": "test",
+      "release_version": "release_v6",
+      "lm_style_override": "HFChatTemplate",
+      "requires_livecodebench_repo": true
+    },
+    {
+      "key": "taco_hard",
+      "display_name": "TACO-hard",
+      "task_kind": "taco_codegen",
+      "dataset": "BAAI/TACO",
+      "dataset_config": "ALL",
+      "split": "train",
+      "question_field": "question",
+      "starter_code_field": "starter_code",
+      "record_id_field": "url",
+      "metadata_fields": [
+        "difficulty",
+        "source",
+        "url",
+        "skill_types",
+        "name",
+        "tags",
+        "raw_tags",
+        "input_output",
+        "time_limit",
+        "memory_limit",
+        "Expected Time Complexity",
+        "Expected Auxiliary Space"
+      ],
+      "row_filter": {
+        "field_in": {
+          "difficulty": [
+            "HARD",
+            "VERY_HARD"
+          ]
+        }
+      },
+      "prompt_format": "chat_template",
+      "max_samples": 1000
+    },
+    {
+      "key": "math_level5",
+      "display_name": "MATH level-5",
+      "task_kind": "math_freeform",
+      "dataset": "SuperSecureHuman/competition_math_hf_dataset",
+      "split": "train",
+      "question_field": "problem",
+      "answer_field": "solution",
+      "metadata_fields": [
+        "level",
+        "type"
+      ],
+      "row_filter": {
+        "field_in": {
+          "level": [
+            "Level 5"
+          ]
+        }
+      },
+      "prompt_format": "chat_template",
+      "max_samples": 1000
+    },
+    {
+      "key": "omni_math_ge7",
+      "display_name": "Omni-MATH >= 7",
+      "task_kind": "math_freeform",
+      "dataset": "KbsdJames/Omni-MATH",
+      "split": "test",
+      "question_field": "problem",
+      "answer_field": "answer",
+      "metadata_fields": [
+        "difficulty",
+        "domain",
+        "source"
+      ],
+      "row_filter": {
+        "field_ge": {
+          "difficulty": 7
+        }
+      },
+      "prompt_format": "chat_template"
+    }
+  ]
+}

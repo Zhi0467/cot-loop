@@ -125,6 +125,7 @@ PROMPT_FORMAT="${PROMPT_FORMAT:-}"
 THINKING_MODE="${THINKING_MODE:-}"
 OUT="${OUT:-}"
 RESUME="${RESUME:-}"
+DEFER_CPU_FINALIZE="${DEFER_CPU_FINALIZE:-}"
 EXTRA_ARGS="${EXTRA_ARGS:-}"
 
 if [[ "${TASK_KIND}" == "multiple_choice_gpqa" ]]; then
@@ -149,6 +150,10 @@ if [[ "${TASK_KIND}" == "livecodebench_codegen" ]]; then
   fi
   if [[ ! -d "${LIVECODEBENCH_REPO}" ]]; then
     echo "LIVECODEBENCH_REPO does not exist: ${LIVECODEBENCH_REPO}" >&2
+    exit 1
+  fi
+  if [[ ! -d "${LIVECODEBENCH_REPO}/lcb_runner" ]]; then
+    echo "LIVECODEBENCH_REPO must be the LiveCodeBench checkout root containing lcb_runner/: ${LIVECODEBENCH_REPO}" >&2
     exit 1
   fi
 fi
@@ -248,6 +253,12 @@ fi
 if [[ -n "${RESUME}" ]]; then
   case "${RESUME,,}" in
     1|true|yes|on) ARGS+=(--resume) ;;
+  esac
+fi
+
+if [[ -n "${DEFER_CPU_FINALIZE}" ]]; then
+  case "${DEFER_CPU_FINALIZE,,}" in
+    1|true|yes|on) ARGS+=(--defer-cpu-finalize) ;;
   esac
 fi
 

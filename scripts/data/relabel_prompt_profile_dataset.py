@@ -30,6 +30,8 @@ PROFILE_TARGET_CHOICES = (
     "mean_relative_length",
     "loop_budget_share",
     "majority_tail",
+    "fraction_loop",
+    "fraction_len_0.5",
 )
 
 
@@ -155,10 +157,17 @@ def _resolve_target_spec(
         }
 
     if target_kind == "probability":
-        if resolved_profile_target not in {"s_tail", "p_loop", "p_cap"}:
+        if resolved_profile_target not in {
+            "s_tail",
+            "p_loop",
+            "p_cap",
+            "fraction_loop",
+            "fraction_len_0.5",
+        }:
             raise SystemExit(
                 "--target-kind=probability currently expects "
-                "--profile-target in {s_tail, p_loop, p_cap}."
+                "--profile-target in {s_tail, p_loop, p_cap, fraction_loop, "
+                "fraction_len_0.5}."
             )
         return {
             "kind": "probability",
@@ -211,6 +220,10 @@ def _profile_target_name(
         return "p_loop"
     if profile_target == "p_cap":
         return "p_cap"
+    if profile_target == "fraction_loop":
+        return "fraction_loop"
+    if profile_target == "fraction_len_0.5":
+        return "fraction_len_0.5"
     if profile_target == "majority_tail":
         return f"majority_s_{format(float(tail_threshold), 'g')}"
     raise SystemExit(
@@ -234,6 +247,10 @@ def _profile_target_value(
         return float(profile["p_loop"])
     if profile_target == "p_cap":
         return float(profile["p_cap"])
+    if profile_target == "fraction_loop":
+        return float(profile["fraction_loop"])
+    if profile_target == "fraction_len_0.5":
+        return float(profile["fraction_len_0.5"])
     if profile_target == "majority_tail":
         return float(profile["majority_tail"])
     raise SystemExit(
@@ -439,6 +456,9 @@ def _profile_from_archive_row(
 
     num_rollouts = len(lengths)
     tail_hit_count = int(sum(tail_hits))
+    fraction_len_hits = [
+        int(relative_length >= 0.5) for relative_length in relative_lengths
+    ]
     profile = {
         "num_rollouts": num_rollouts,
         "effective_max_tokens": effective_max_tokens,
@@ -459,6 +479,8 @@ def _profile_from_archive_row(
         / float(num_rollouts),
         "p_cap": sum(cap_hits) / float(num_rollouts),
         "p_loop": sum(loop_flags) / float(num_rollouts),
+        "fraction_loop": sum(loop_flags) / float(num_rollouts),
+        "fraction_len_0.5": sum(fraction_len_hits) / float(num_rollouts),
         "mu_log_rel": sum(math.log1p(value) for value in relative_lengths) / float(num_rollouts),
         "tail_threshold": float(tail_threshold),
         "s_tail": sum(tail_hits) / float(num_rollouts),
@@ -515,6 +537,8 @@ def _rows_for_split(
             target_name: target_value,
             "p_cap": float(profile["p_cap"]),
             "p_loop": float(profile["p_loop"]),
+            "fraction_loop": float(profile["fraction_loop"]),
+            "fraction_len_0.5": float(profile["fraction_len_0.5"]),
             "loop_budget_share": float(profile["loop_budget_share"]),
             "mu_log_rel": float(profile["mu_log_rel"]),
             "mean_length": float(profile["mean_length"]),
@@ -549,6 +573,8 @@ def _rows_for_split(
             target_name: target_value,
             "p_cap": float(profile["p_cap"]),
             "p_loop": float(profile["p_loop"]),
+            "fraction_loop": float(profile["fraction_loop"]),
+            "fraction_len_0.5": float(profile["fraction_len_0.5"]),
             "loop_budget_share": float(profile["loop_budget_share"]),
             "mu_log_rel": float(profile["mu_log_rel"]),
             "mean_length": float(profile["mean_length"]),

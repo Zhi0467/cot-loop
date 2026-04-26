@@ -94,11 +94,12 @@ To (re)collect the paired `thinking on` / `thinking off` rollout-stats bundle on
 
 ```bash
 python scripts/rollout/launch_main_rollout_stats_suite.py \
+  --config configs/rollout/main_rollout_stats_suite.json \
   --output-root outputs/model_stats/main_rollout_stats_rebuild \
   --thinking-modes on,off --submit
 ```
 
-The suite definition (model, sampling config, per-dataset contracts) lives in `src/probe/main_rollout_stats_suite.py`. Per-prompt archives preserve prompt text, prompt token ids, rollout completion text, completion token ids, and raw row metadata so the same rollouts can drive later prompt-profile relabeling, probe training, and mechanism analysis.
+The suite definition (model, sampling config, per-dataset contracts) lives in `configs/rollout/main_rollout_stats_suite.json`; `src/probe/main_rollout_stats_suite.py` loads that file and translates it into collector environment variables. Per-prompt archives preserve prompt text, prompt token ids, rollout completion text, completion token ids, and raw row metadata so the same rollouts can drive later prompt-profile relabeling, probe training, and mechanism analysis.
 
 For standalone single-model rollout generation and loop-metric summaries on one dataset:
 
@@ -124,7 +125,7 @@ Presets live in `src/probe/configs.py` and can be overridden on the CLI (`--temp
 | `openthinker3_7b` | `open-thoughts/OpenThinker3-7B` | 1 | 8 | 0.0 | 30000 |
 | `openthinker3_1p5b` | `open-thoughts/OpenThinker3-1.5B` | 1 | 8 | 0.0 | 30000 |
 
-The rollout-stats suite pins its own contract (`Qwen/Qwen3-1.7B`, `temperature=0.2`, `num_generations=10`, `max_tokens=81920`, `max_model_len=40960`, `max_num_seqs=10`, `max_num_batched_tokens=4096`) and is not controlled through these presets.
+The rollout-stats suite pins its own contract in `configs/rollout/main_rollout_stats_suite.json` (`Qwen/Qwen3-1.7B`, `temperature=0.2`, `num_generations=10`, `max_tokens=81920`, `max_model_len=40960`, `max_num_seqs=10`, `max_num_batched_tokens=4096`) and is not controlled through these presets.
 
 ## Loop and cap-hit definitions
 
@@ -167,6 +168,8 @@ Rollout-stats suite:
 
 ```
 cot-loop/
+├── configs/
+│   └── rollout/                  # Checked-in rollout suite configs
 ├── src/
 │   ├── probe/                    # Probe, rollout, data, and training library code
 │   │   ├── configs.py            # Model/probe presets
@@ -177,7 +180,7 @@ cot-loop/
 │   │   ├── labeling.py           # Loop / cap-hit detection and prompt aggregation
 │   │   ├── bundle_io.py          # rollout_bundle.v1 read/write helpers
 │   │   ├── collector.py          # Repaired v2 rollout-statistics collector
-│   │   ├── main_rollout_stats_suite.py
+│   │   ├── main_rollout_stats_suite.py # Rollout suite config loader
 │   │   ├── adapters/             # Benchmark adapters
 │   │   └── probes/               # Probe architectures
 │   └── steer/                    # Steering-stage registry and artifact helpers

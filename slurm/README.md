@@ -34,10 +34,10 @@ This directory contains SLURM workflows for the CoT loop detector project.
 - optional rollout-completion feature throughput override: `COMPLETION_BATCH_SIZE=...` (default: `1`)
 - task-aware prompt formatting: `TASK_KIND=math_freeform|multiple_choice_gpqa|multiple_choice_mmlupro`
 - prompt-level target controls:
-  - `TARGET_KIND=binary` (legacy loop bit by default, or prompt-majority tail labels with `BINARY_TARGET_MODE=prompt_majority_tail`), `TARGET_KIND=probability` (prompt-level rate target such as `p_loop`, `p_cap`, or `s_t`), or `TARGET_KIND=regression` (prompt-level continuous target)
+  - `TARGET_KIND=binary` (legacy loop bit by default, or prompt-majority tail labels with `BINARY_TARGET_MODE=prompt_majority_tail`), `TARGET_KIND=probability` (prompt-level rate target such as `p_loop`, `fraction_loop`, `p_cap`, `fraction_len_0.5`, or `s_t`), or `TARGET_KIND=regression` (prompt-level continuous target)
   - `BINARY_TARGET_MODE=rollout_label|prompt_majority_tail`
-  - `PROFILE_TAIL_THRESHOLD=0.9` for `s_t` heads
-  - `PROFILE_TARGET=majority_tail` for prompt-majority binary, `PROFILE_TARGET=p_loop|p_cap|s_tail` for prompt-level probability heads, or `PROFILE_TARGET=mean_relative_length` for the dense realized-length regression head
+  - `PROFILE_TAIL_THRESHOLD=0.9` for `s_t` heads; `fraction_len_0.5` always uses the fixed `0.5` threshold
+  - `PROFILE_TARGET=majority_tail` for prompt-majority binary, `PROFILE_TARGET=p_loop|fraction_loop|p_cap|fraction_len_0.5|s_tail` for prompt-level probability heads, or `PROFILE_TARGET=mean_relative_length` for the dense realized-length regression head
   - `SCORE_RULE=mean_prob` for non-binary ensembles
 - canonical prefill dataset controls:
   - `FEATURE_POOLING=last_token_all_layers_stack`
@@ -237,6 +237,54 @@ OUT_DATA_DIR=outputs/prompt_profile_projection_gpqa/data \
 OUT_PROJECTION_DIR=outputs/prompt_profile_projection_gpqa \
 FIGURE_LABEL=GPQA \
 sbatch slurm/mechanism_analysis/run_prompt_profile_projection.sbatch
+```
+
+## Main Rollout-Stats Suite (current canonical surface)
+
+Use `scripts/rollout/launch_main_rollout_stats_suite.py` to submit the paired
+`thinking on` / `thinking off` four-dataset rebuild:
+
+```bash
+python scripts/rollout/launch_main_rollout_stats_suite.py \
+  --config configs/rollout/main_rollout_stats_suite.json \
+  --output-root outputs/model_stats/main_rollout_stats_rebuild \
+  --livecodebench-repo /path/to/LiveCodeBench \
+  --thinking-modes on,off --submit
+```
+
+Without `--submit` the script prints the `sbatch` commands for review without
+submitting them.
+
+The default config is `configs/rollout/main_rollout_stats_suite.json`. Keep the
+locked sampling parameters and dataset list there; use the launcher's override
+flags only for explicit smoke tests or controlled reruns.
+
+### LiveCodeBench repo requirement
+
+`LiveCodeBench` is the only dataset in the suite that requires a local checkout
+of the LiveCodeBench repository. The grader (`lcb_runner`) is not a published
+PyPI package — it is Python source inside the repo, injected into `sys.path` at
+runtime. The grader also reads test-case data via paths relative to the repo
+root, so the checkout must be present on disk even after installation.
+
+Clone it once to a stable location:
+
+```bash
+git clone https://github.com/LiveCodeBench/LiveCodeBench.git /path/to/LiveCodeBench
+```
+
+Then pass `--livecodebench-repo /path/to/LiveCodeBench` to the launcher (or set
+`LIVECODEBENCH_REPO` for the sbatch wrapper directly). The launcher validates
+that the path exists and contains `lcb_runner/` before submitting.
+
+To run only the non-LCB datasets while the checkout is unavailable:
+
+```bash
+python scripts/rollout/launch_main_rollout_stats_suite.py \
+  --config configs/rollout/main_rollout_stats_suite.json \
+  --datasets taco_hard,math_level5,omni_math_ge7 \
+  --output-root outputs/model_stats/main_rollout_stats_rebuild \
+  --thinking-modes on,off --submit
 ```
 
 ## Optional Trajectory Generation

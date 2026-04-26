@@ -196,6 +196,7 @@ def _parse_args() -> argparse.Namespace:
             "For probability targets it applies when "
             "--profile-target=s_tail and the emitted scalar is s_t = P(L / E >= t); "
             "it is ignored by direct rate targets such as p_loop / p_cap. "
+            "The fixed fraction_len_0.5 target always uses threshold 0.5. "
             "for prompt-profile binary targets it defines the per-rollout "
             "tail event used by the strict-majority label."
         ),
@@ -210,7 +211,8 @@ def _parse_args() -> argparse.Namespace:
             "binary labels onto a prompt-profile head. Defaults to "
             "'majority_tail' for prompt-profile binary, 's_tail' for probability, "
             "and 'mean_relative_length' for regression. Probability heads also "
-            "support direct prompt-level rates such as 'p_loop' and 'p_cap'; "
+            "support direct prompt-level rates such as 'p_loop', 'p_cap', "
+            "'fraction_loop', and 'fraction_len_0.5'; "
             "regression heads also support 'loop_budget_share'."
         ),
     )
@@ -1278,6 +1280,8 @@ def _build_prompt_profile_targets(
                 target_name: target_value,
                 "p_cap": float(profile["p_cap"]),
                 "p_loop": float(profile["p_loop"]),
+                "fraction_loop": float(profile["fraction_loop"]),
+                "fraction_len_0.5": float(profile["fraction_len_0.5"]),
                 "loop_budget_share": float(profile["loop_budget_share"]),
                 "mu_log_rel": float(profile["mu_log_rel"]),
                 "mean_length": float(profile["mean_length"]),
@@ -1346,6 +1350,8 @@ def _build_prompt_profile_targets(
                 target_name: target_value,
                 "p_cap": float(profile["p_cap"]),
                 "p_loop": float(profile["p_loop"]),
+                "fraction_loop": float(profile["fraction_loop"]),
+                "fraction_len_0.5": float(profile["fraction_len_0.5"]),
                 "loop_budget_share": float(profile["loop_budget_share"]),
                 "mu_log_rel": float(profile["mu_log_rel"]),
                 "mean_length": float(profile["mean_length"]),
@@ -1642,10 +1648,13 @@ def _resolve_target_spec(
         "s_tail",
         "p_loop",
         "p_cap",
+        "fraction_loop",
+        "fraction_len_0.5",
     }:
         raise SystemExit(
             "--target-kind=probability currently expects "
-            "--profile-target in {s_tail, p_loop, p_cap}."
+            "--profile-target in {s_tail, p_loop, p_cap, fraction_loop, "
+            "fraction_len_0.5}."
         )
     if target_kind == "regression" and profile_target not in {
         "mean_relative_length",

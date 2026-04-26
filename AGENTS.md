@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Focus
-This repository builds a chain-of-thought (CoT) failure predictor from configurable activation views plus the paired rollout-statistics line that explains where degenerate rollouts come from. The active execution object is now the corrected four-dataset rollout-stat rebuild documented in `docs/weeks/2026-W17/main-four-dataset-rollout-rebuild-2026-04-23.md`: `LiveCodeBench`, `TACO-hard`, `MATH level-5`, and `Omni-MATH >= 7`, each collected with explicit thinking `on` / `off` surfaces. Every run on a dataset produces exactly one `rollout_bundle.v1` pair (`<base>.jsonl.gz` for full per-prompt replay, `<base>.json` for metadata + aggregate stats; see `docs/reference/rollout-bundle-v1-schema.md`) so the same rollouts drive prompt-profile relabeling, probe training, and steering without re-running the GPU work. The sizing rule is no longer the earlier `800`-prompt slice: use the full dataset when it is under `1000`, otherwise use `1000`. The older March-repair, LiveCodeBench-only rerun, and mistaken `LiveCodeBench-extra` branch are historical debugging context, not the current stage contract. Before launching work, read `roadmap.md`, `backlog.md`, `docs/weeks/2026-W17/main-four-dataset-rollout-rebuild-2026-04-23.md`, `docs/weeks/2026-W13/prompt-profile-eval-contract.md`, and `docs/weeks/2026-W14/understand-where-loop-and-max-length-come-from.md`.
+This repository builds a chain-of-thought (CoT) failure predictor from configurable activation views plus the paired rollout-statistics line that explains where degenerate rollouts come from. The active execution object is now the corrected four-dataset rollout-stat rebuild documented in `docs/weeks/2026-W17/main-four-dataset-rollout-rebuild-2026-04-23.md`: `LiveCodeBench`, `TACO-hard`, `MATH level-5`, and `Omni-MATH >= 7`, each collected with explicit thinking `on` / `off` surfaces. Every run on a dataset produces exactly one `rollout_bundle.v1` pair (`<base>.jsonl.gz` for full per-prompt replay, `<base>.json` for metadata + aggregate stats; see `docs/reference/rollout-bundle-v1-schema.md`) so the same rollouts drive prompt-profile relabeling, probe training, and steering without re-running the GPU work. The sizing rule is no longer the earlier `800`-prompt slice: use the full dataset when it is under `1000`, otherwise use `1000`, except retained `LiveCodeBench` `release_v6`, which intentionally uses the full `1055` prompts. The older March-repair, LiveCodeBench-only rerun, and mistaken `LiveCodeBench-extra` branch are historical debugging context, not the current stage contract. Before launching work, read `roadmap.md`, `backlog.md`, `docs/weeks/2026-W17/main-four-dataset-rollout-rebuild-2026-04-23.md`, `docs/weeks/2026-W13/prompt-profile-eval-contract.md`, and `docs/weeks/2026-W14/understand-where-loop-and-max-length-come-from.md`.
 
 ## Standing TODOs
 - `docs/standing/todos-2026-W17.md` is the active standing TODO ledger for the current rebuild.
@@ -9,8 +9,19 @@ This repository builds a chain-of-thought (CoT) failure predictor from configura
 - When a task is completed, paused, or its status changes, update the same standing TODO entry so the ledger reflects the current state.
 - Keep standing TODOs simple: track the current active workstreams, not historical notes.
 
+## Rollout Artifact Hygiene
+- Delete stale failed launch artifacts after recording the failure in the standing TODO or relevant run note. "Stale failed launch" means a job/dry-run/canceled duplicate that failed before producing real prompt rows or a valid `rollout_bundle.v1` pair, for example bad sbatch/env setup, missing cache/checkout, failed conda activation, or launcher dry-run manifests.
+- Do not treat mid-run partials the same way. If a rollout fails after generating some prompts, preserve its partial bundle/logs/checkpoints for diagnosis or resume unless the user explicitly asks to remove them. Partial data can explain the failure mode and may be recoverable; startup-stale artifacts only add queue/log clutter.
+- Before deleting, verify the current queue and active output root so running jobs and the latest intended manifest/logs are not removed.
+
+## Rollout CPU Finalization
+- Do not run CPU-only post-hoc grading inside GPU Slurm allocations. `livecodebench_codegen` and `taco_codegen` collection jobs should defer post-hoc grading with `DEFER_CPU_FINALIZE=1`, exit after GPU generation, and write a deferred sidecar.
+- Finalize deferred LCB/TACO bundles outside Slurm with GPUs hidden, for example `CUDA_VISIBLE_DEVICES='' uv run python scripts/rollout/collect_model_stats.py --task-kind livecodebench_codegen --out <bundle-base>.json --livecodebench-repo <repo> --finalize-only`.
+- If a deferred GPU job is canceled after writing rows, resume with `RESUME=1`; the collector can reuse both final bundles and `__rank*.jsonl.gz` partials.
+
 ## Project Structure & Module Organization
-- `src/probe/`: Core library for prompt loading, prefill extraction, rollout generation, loop labeling, probe architectures, and training utilities. `main_rollout_stats_suite.py` holds the canonical four-dataset paired thinking `on` / `off` rebuild contract; `collector.py` is the repaired v2 rollout-statistics path it drives.
+- `configs/rollout/main_rollout_stats_suite.json`: Canonical four-dataset paired thinking `on` / `off` rollout-stats rebuild contract, including shared sampling settings and per-dataset surfaces.
+- `src/probe/`: Core library for prompt loading, prefill extraction, rollout generation, loop labeling, probe architectures, and training utilities. `main_rollout_stats_suite.py` loads the canonical rollout config and translates it into collector environments; `collector.py` is the repaired v2 rollout-statistics path it drives.
 - `src/steer/`: Steering-stage registry and artifact helpers shared by RFM/vector export/steering CLIs.
 - `scripts/`: CLI entry points for data/building, probe training, analysis, and plotting. `scripts/rollout/launch_main_rollout_stats_suite.py` is the active sbatch wrapper for the rebuild and propagates `CONDA_ENV` / `CONDA_DEFAULT_ENV` plus `THINKING_MODE` into submitted jobs.
 - `data/`: Local datasets and documentation. `data/README.md` defines the expected JSONL schema for non-HF local files.
@@ -38,7 +49,7 @@ This repository builds a chain-of-thought (CoT) failure predictor from configura
   `sbatch slurm/train/run_probe_train_e2e.sbatch`.
 - Launch the current canonical four-dataset rollout-stats rebuild (paired thinking on/off, `Qwen/Qwen3-1.7B`):
   `python scripts/rollout/launch_main_rollout_stats_suite.py --output-root outputs/model_stats/main_rollout_stats_rebuild --thinking-modes on,off --submit`.
-  The suite definition (model, sampling config, per-dataset contracts) lives in `src/probe/main_rollout_stats_suite.py`; do not redefine sampling or the dataset list ad hoc.
+  The suite definition (model, sampling config, per-dataset contracts) lives in `configs/rollout/main_rollout_stats_suite.json`; do not redefine sampling or the dataset list ad hoc.
 - Generate rollout data for older standalone labeling/analysis (not used by the current rebuild):
   `python scripts/rollout/run_vllm_generate.py --model-id Qwen/QwQ-32B --data data/aime_2024_2025.jsonl --metrics-out outputs/qwq32b_metrics.csv --tp 8`.
 - Run on SLURM for that older generation path:

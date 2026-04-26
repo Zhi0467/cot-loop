@@ -4,7 +4,7 @@ Purpose
 - Build a binary probe dataset from LLM runs to train a CoT loop detector.
 - The canonical dataset stores the last-token activation from every transformer layer as a stacked `[layer, hidden]` tensor per prompt.
 - Train a probe classifier (linear or MLP) either on one selected layer or as a layerwise voting ensemble.
-- The same builder/trainer path now also supports prompt-level repeated-rollout targets such as `p_loop = E[1[rollout loops]]`, `p_cap = E[1[rollout hits cap]]`, `s_t = P(L / E >= t)`, `mean_relative_length = E[L / E]`, and the auxiliary severity-weighted `loop_budget_share = E[1[rollout loops] * (L / E)]`.
+- The same builder/trainer path now also supports prompt-level repeated-rollout targets such as `p_loop = E[1[rollout loops]]`, `fraction_loop`, `p_cap = E[1[rollout hits cap]]`, `s_t = P(L / E >= t)`, fixed-threshold `fraction_len_0.5`, `mean_relative_length = E[L / E]`, and the auxiliary severity-weighted `loop_budget_share = E[1[rollout loops] * (L / E)]`.
 
 High-level flow
 1. Load Hugging Face dataset rows and read prompt text from `--prompt-field`.
@@ -30,7 +30,7 @@ Key modules
 - `dataloader.py`: dataset/dataloader for training.
 - `bundle_io.py`: `rollout_bundle.v1` archive read/write helpers.
 - `collector.py`: repaired rollout-statistics collector.
-- `main_rollout_stats_suite.py`: canonical paired thinking on/off suite.
+- `main_rollout_stats_suite.py`: loader/translator for `configs/rollout/main_rollout_stats_suite.json`, the canonical paired thinking on/off suite config.
 - `adapters/`: benchmark-specific prompt and grading adapters.
 - `probes/linear_probe.py`: baseline linear classifier.
 - `probes/mlp_probe.py`: one-hidden-layer MLP classifier.

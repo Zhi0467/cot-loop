@@ -32,6 +32,8 @@ current tools.
   "prompt_too_long": false,
   "prompt_profile": {                      // null when `prompt_too_long`
     "p_cap": 0.0, "p_loop": 0.1,
+    "fraction_loop": 0.1,                  // same detector as p_loop, kept as a target name
+    "fraction_len_0.5": 0.2,               // P(length / effective_max_tokens >= 0.5)
     "loop_budget_share": 0.0,
     "mu_log_rel": -2.1,
     "mean_length": 2500.0, "mean_relative_length": 0.061,
@@ -97,8 +99,29 @@ retain the fields we need for full replay.
     "bundle_file": "<base>.jsonl.gz",
     "lcb_native_metrics": { /* populated only for livecodebench_codegen runs */ }
   },
-  "counts": { "num_samples": 400, "num_generated": 4000, ... },
-  "metrics": { "success_fraction": 0.41, "loop_fraction": 0.07, ... }
+  "counts": {
+    "num_samples": 400,
+    "num_generated": 4000,
+    "num_looped": 280,                     // rollout-level loop count
+    "num_prompt_profiled": 400,
+    "num_prompt_any_loop_positive": 120,   // fraction_loop > 0
+    "num_prompt_majority_loop_positive": 12, // fraction_loop > 0.5
+    "num_prompt_any_len_0_5_positive": 180, // fraction_len_0.5 > 0
+    "num_prompt_majority_len_0_5_positive": 40, // fraction_len_0.5 > 0.5
+    "num_prompt_majority_tail_positive": 40 // legacy alias for the configured tail threshold
+  },
+  "metrics": {
+    "success_fraction": 0.41,
+    "loop_fraction": 0.07,                 // num_looped / num_generated
+    "prompt_any_loop_positive_rate": 0.30,
+    "prompt_majority_loop_positive_rate": 0.03,
+    "prompt_mean_fraction_loop": 0.07,
+    "prompt_any_len_0_5_positive_rate": 0.45,
+    "prompt_majority_len_0_5_positive_rate": 0.10,
+    "prompt_mean_fraction_len_0_5": 0.16,
+    "rollout_len_0_5_fraction": 0.16,
+    "completion_tail_fraction": 0.16       // same as rollout_len_0_5_fraction when tail_threshold=0.5
+  }
 }
 ```
 

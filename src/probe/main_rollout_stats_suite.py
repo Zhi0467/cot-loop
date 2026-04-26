@@ -3,34 +3,36 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass
+from typing import Any
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROJECT_ROOT = os.path.dirname(ROOT)
-
-DEFAULT_STATISTICS = (
-    "success_fraction,loop_fraction,avg_generation_length,"
-    "avg_loop_generation_length,avg_first_loop_prefix_length,"
-    "max_length_hit_fraction,loop_max_length_hit_fraction,"
-    "max_length_hit_loop_fraction,generation_length_variance,"
-    "max_length_hit_success_fraction,loop_success_fraction,"
-    "avg_correct_generation_length,avg_wrong_generation_length"
+DEFAULT_SUITE_CONFIG_PATH = os.path.join(
+    PROJECT_ROOT,
+    "configs",
+    "rollout",
+    "main_rollout_stats_suite.json",
 )
+CONFIG_SCHEMA_NAME = "main_rollout_stats_suite.config.v1"
+CPU_POSTHOC_TASK_KINDS = frozenset({"livecodebench_codegen", "taco_codegen"})
 
 
 @dataclass(frozen=True)
 class MainRolloutSuiteConfig:
-    model_id: str = "Qwen/Qwen3-1.7B"
-    temperature: float = 0.2
-    num_generations: int = 10
-    max_tokens: int = 81920
-    max_model_len: int = 40960
+    model_id: str
+    temperature: float
+    num_generations: int
+    max_tokens: int
+    max_model_len: int
     tp: int = 1
     dp: int = 1
     dtype: str = "bfloat16"
-    max_num_seqs: int | None = 10
-    max_num_batched_tokens: int | None = 4096
+    max_num_seqs: int | None = None
+    max_num_batched_tokens: int | None = None
     seed: int = 0
-    statistics: str = DEFAULT_STATISTICS
+    loop_n: int = 30
+    loop_k: int = 20
+    statistics: str = ""
     max_samples: int | None = None
 
 
@@ -47,7 +49,7 @@ class MainRolloutDataset:
     starter_code_field: str | None = None
     record_id_field: str | None = None
     metadata_fields: tuple[str, ...] = ()
-    row_filter: dict[str, dict[str, object]] | None = None
+    row_filter: dict[str, object] | None = None
     prompt_format: str | None = None
     release_version: str | None = None
     lm_style_override: str | None = None
@@ -55,79 +57,160 @@ class MainRolloutDataset:
     requires_livecodebench_repo: bool = False
 
 
-SUITE_DATASETS: tuple[MainRolloutDataset, ...] = (
-    MainRolloutDataset(
-        key="livecodebench",
-        display_name="LiveCodeBench",
-        task_kind="livecodebench_codegen",
-        dataset="livecodebench/code_generation_lite",
-        split="test",
-        release_version="release_v6",
-        lm_style_override="HFChatTemplate",
-        requires_livecodebench_repo=True,
-    ),
-    MainRolloutDataset(
-        key="taco_hard",
-        display_name="TACO-hard",
-        task_kind="taco_codegen",
-        dataset="BAAI/TACO",
-        dataset_config="ALL",
-        split="train",
-        question_field="question",
-        starter_code_field="starter_code",
-        record_id_field="url",
-        metadata_fields=(
-            "difficulty",
-            "source",
-            "url",
-            "skill_types",
-            "name",
-            "tags",
-            "raw_tags",
-            "input_output",
-            "time_limit",
-            "memory_limit",
-            "Expected Time Complexity",
-            "Expected Auxiliary Space",
-        ),
-        row_filter={"field_in": {"difficulty": ["HARD", "VERY_HARD"]}},
-        prompt_format="chat_template",
-        max_samples=1000,
-    ),
-    MainRolloutDataset(
-        key="math_level5",
-        display_name="MATH level-5",
-        task_kind="math_freeform",
-        dataset="SuperSecureHuman/competition_math_hf_dataset",
-        split="train",
-        question_field="problem",
-        answer_field="solution",
-        metadata_fields=("level", "type"),
-        row_filter={"field_in": {"level": ["Level 5"]}},
-        prompt_format="chat_template",
-        max_samples=1000,
-    ),
-    MainRolloutDataset(
-        key="omni_math_ge7",
-        display_name="Omni-MATH >= 7",
-        task_kind="math_freeform",
-        dataset="KbsdJames/Omni-MATH",
-        split="test",
-        question_field="problem",
-        answer_field="answer",
-        metadata_fields=("difficulty", "domain", "source"),
-        row_filter={"field_ge": {"difficulty": 7}},
-        prompt_format="chat_template",
-    ),
-)
+@dataclass(frozen=True)
+class MainRolloutSuiteDefinition:
+    config_path: str
+    suite_config: MainRolloutSuiteConfig
+    datasets: tuple[MainRolloutDataset, ...]
 
 
-def suite_dataset_keys() -> list[str]:
-    return [dataset.key for dataset in SUITE_DATASETS]
+def _resolve_config_path(config_path: str | None) -> str:
+    raw_path = config_path or DEFAULT_SUITE_CONFIG_PATH
+    if os.path.isabs(raw_path):
+        return raw_path
+    return os.path.abspath(os.path.join(PROJECT_ROOT, raw_path))
 
 
-def get_suite_dataset(key: str) -> MainRolloutDataset:
-    for dataset in SUITE_DATASETS:
+def _require_mapping(value: object, *, name: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ValueError(f"{name} must be a JSON object.")
+    return value
+
+
+def _required(raw: dict[str, Any], key: str, *, context: str) -> Any:
+    if key not in raw:
+        raise ValueError(f"{context} is missing required field {key!r}.")
+    return raw[key]
+
+
+def _optional_str(raw: dict[str, Any], key: str) -> str | None:
+    value = raw.get(key)
+    if value is None:
+        return None
+    return str(value)
+
+
+def _optional_int(raw: dict[str, Any], key: str) -> int | None:
+    value = raw.get(key)
+    if value is None:
+        return None
+    return int(value)
+
+
+def _statistics_to_csv(raw: object) -> str:
+    if isinstance(raw, str):
+        return raw
+    if isinstance(raw, list):
+        stats = [str(item).strip() for item in raw if str(item).strip()]
+        if stats:
+            return ",".join(stats)
+    raise ValueError("suite_config.statistics must be a non-empty string or list.")
+
+
+def _suite_config_from_dict(raw: dict[str, Any]) -> MainRolloutSuiteConfig:
+    context = "suite_config"
+    return MainRolloutSuiteConfig(
+        model_id=str(_required(raw, "model_id", context=context)),
+        temperature=float(_required(raw, "temperature", context=context)),
+        num_generations=int(_required(raw, "num_generations", context=context)),
+        max_tokens=int(_required(raw, "max_tokens", context=context)),
+        max_model_len=int(_required(raw, "max_model_len", context=context)),
+        tp=int(raw.get("tp", 1)),
+        dp=int(raw.get("dp", 1)),
+        dtype=str(raw.get("dtype", "bfloat16")),
+        max_num_seqs=_optional_int(raw, "max_num_seqs"),
+        max_num_batched_tokens=_optional_int(raw, "max_num_batched_tokens"),
+        seed=int(raw.get("seed", 0)),
+        loop_n=int(raw.get("loop_n", 30)),
+        loop_k=int(raw.get("loop_k", 20)),
+        statistics=_statistics_to_csv(_required(raw, "statistics", context=context)),
+        max_samples=_optional_int(raw, "max_samples"),
+    )
+
+
+def _dataset_from_dict(raw: dict[str, Any], *, index: int) -> MainRolloutDataset:
+    context = f"datasets[{index}]"
+    metadata_fields = raw.get("metadata_fields", ())
+    if not isinstance(metadata_fields, (list, tuple)):
+        raise ValueError(f"{context}.metadata_fields must be a list when provided.")
+    row_filter = raw.get("row_filter")
+    if row_filter is not None and not isinstance(row_filter, dict):
+        raise ValueError(f"{context}.row_filter must be a JSON object when provided.")
+    return MainRolloutDataset(
+        key=str(_required(raw, "key", context=context)),
+        display_name=str(_required(raw, "display_name", context=context)),
+        task_kind=str(_required(raw, "task_kind", context=context)),
+        dataset=str(_required(raw, "dataset", context=context)),
+        split=str(_required(raw, "split", context=context)),
+        dataset_config=_optional_str(raw, "dataset_config"),
+        question_field=_optional_str(raw, "question_field"),
+        answer_field=_optional_str(raw, "answer_field"),
+        starter_code_field=_optional_str(raw, "starter_code_field"),
+        record_id_field=_optional_str(raw, "record_id_field"),
+        metadata_fields=tuple(str(field) for field in metadata_fields),
+        row_filter=row_filter,
+        prompt_format=_optional_str(raw, "prompt_format"),
+        release_version=_optional_str(raw, "release_version"),
+        lm_style_override=_optional_str(raw, "lm_style_override"),
+        max_samples=_optional_int(raw, "max_samples"),
+        requires_livecodebench_repo=bool(raw.get("requires_livecodebench_repo", False)),
+    )
+
+
+def load_suite_definition(config_path: str | None = None) -> MainRolloutSuiteDefinition:
+    resolved_path = _resolve_config_path(config_path)
+    with open(resolved_path, "r", encoding="utf-8") as handle:
+        raw = _require_mapping(json.load(handle), name=resolved_path)
+
+    schema_name = raw.get("schema_name")
+    if schema_name != CONFIG_SCHEMA_NAME:
+        raise ValueError(
+            f"{resolved_path} has schema_name={schema_name!r}; "
+            f"expected {CONFIG_SCHEMA_NAME!r}."
+        )
+    suite_config = _suite_config_from_dict(
+        _require_mapping(
+            _required(raw, "suite_config", context=resolved_path),
+            name="suite_config",
+        )
+    )
+    raw_datasets = raw.get("datasets")
+    if not isinstance(raw_datasets, list) or not raw_datasets:
+        raise ValueError(f"{resolved_path} must define a non-empty datasets list.")
+    datasets = tuple(
+        _dataset_from_dict(_require_mapping(dataset, name=f"datasets[{index}]"), index=index)
+        for index, dataset in enumerate(raw_datasets)
+    )
+    keys = [dataset.key for dataset in datasets]
+    duplicate_keys = sorted({key for key in keys if keys.count(key) > 1})
+    if duplicate_keys:
+        raise ValueError(f"{resolved_path} has duplicate dataset keys: {duplicate_keys}.")
+    return MainRolloutSuiteDefinition(
+        config_path=resolved_path,
+        suite_config=suite_config,
+        datasets=datasets,
+    )
+
+
+SUITE_DEFINITION = load_suite_definition()
+SUITE_CONFIG = SUITE_DEFINITION.suite_config
+SUITE_DATASETS = SUITE_DEFINITION.datasets
+
+
+def suite_dataset_keys(
+    suite_definition: MainRolloutSuiteDefinition | None = None,
+) -> list[str]:
+    definition = suite_definition or SUITE_DEFINITION
+    return [dataset.key for dataset in definition.datasets]
+
+
+def get_suite_dataset(
+    key: str,
+    *,
+    suite_definition: MainRolloutSuiteDefinition | None = None,
+) -> MainRolloutDataset:
+    definition = suite_definition or SUITE_DEFINITION
+    for dataset in definition.datasets:
         if dataset.key == key:
             return dataset
     raise KeyError(f"Unknown suite dataset key: {key}")
@@ -140,8 +223,9 @@ def build_collect_env(
     suite_config: MainRolloutSuiteConfig,
     output_root: str,
     livecodebench_repo: str | None = None,
+    suite_definition: MainRolloutSuiteDefinition | None = None,
 ) -> dict[str, str]:
-    dataset = get_suite_dataset(dataset_key)
+    dataset = get_suite_dataset(dataset_key, suite_definition=suite_definition)
     mode = thinking_mode.strip().lower()
     if mode not in {"on", "off"}:
         raise ValueError(f"Unsupported thinking mode {thinking_mode!r}; expected 'on' or 'off'.")
@@ -169,6 +253,8 @@ def build_collect_env(
         "DP": str(suite_config.dp),
         "DTYPE": suite_config.dtype,
         "SEED": str(suite_config.seed),
+        "LOOP_N": str(suite_config.loop_n),
+        "LOOP_K": str(suite_config.loop_k),
         "STATISTICS": suite_config.statistics,
         "THINKING_MODE": mode,
         "OUT": out_path,
@@ -201,4 +287,10 @@ def build_collect_env(
         env["LM_STYLE_OVERRIDE"] = dataset.lm_style_override
     if dataset.requires_livecodebench_repo:
         env["LIVECODEBENCH_REPO"] = str(livecodebench_repo)
+        env["LCB_NUM_PROCESS_EVALUATE"] = os.environ.get(
+            "LCB_NUM_PROCESS_EVALUATE",
+            "32",
+        )
+    if dataset.task_kind in CPU_POSTHOC_TASK_KINDS:
+        env["DEFER_CPU_FINALIZE"] = "1"
     return env

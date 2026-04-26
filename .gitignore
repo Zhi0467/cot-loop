@@ -22,9 +22,16 @@ __pycache__/
 wandb/
 outputs/probe_data/
 outputs/probe_runs/
+outputs/model_stats/
 
 # macOS Google Drive folder icons.
 Icon?
 
 # accidental absolute-path mirror from local machine
 Users/
+
+.codex
+
+.cursor/
+.cursorrules
+.vscode/

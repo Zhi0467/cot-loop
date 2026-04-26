@@ -17,6 +17,7 @@ import os
 import queue as queue_module
 import re
 import signal
+import shlex
 import sys
 import time
 import traceback
@@ -86,6 +87,7 @@ TASK_CHOICES = (
     "multiple_choice_mmlupro",
     "livecodebench_codegen",
 )
+CPU_POSTHOC_TASK_KINDS = frozenset({"livecodebench_codegen", "taco_codegen"})
 STATS_CONTRACT_VERSION = "rollout_stats_v2"
 
 
@@ -116,7 +118,7 @@ class ExclusionArchive:
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--task-kind", required=True, choices=TASK_CHOICES)
-    parser.add_argument("--dataset", required=True)
+    parser.add_argument("--dataset", default="")
     parser.add_argument("--dataset-config", default=None)
     parser.add_argument("--split", default="test")
     parser.add_argument("--max-samples", type=int, default=None)
@@ -202,6 +204,24 @@ def _parse_args() -> argparse.Namespace:
             "Continue a prior run by skipping sample_ids already present in the "
             "bundle file at the resolved out path. All other arguments must match "
             "the prior run."
+        ),
+    )
+    parser.add_argument(
+        "--defer-cpu-finalize",
+        action="store_true",
+        help=(
+            "For CPU-only post-hoc graders such as LiveCodeBench and TACO, stop "
+            "after writing generated rollout rows and mark grading as deferred. "
+            "Run --finalize-only later with GPUs hidden to fill pass/fail labels "
+            "and rewrite the sidecar."
+        ),
+    )
+    parser.add_argument(
+        "--finalize-only",
+        action="store_true",
+        help=(
+            "Finalize an existing bundle without generating. This runs CPU-only "
+            "post-hoc grading and sidecar rewriting and does not require vLLM."
         ),
     )
     parser.add_argument("--trust-remote-code", action="store_true", default=True)
@@ -326,6 +346,38 @@ def _rank_bundle_path(bundle_path: str, rank: int) -> str:
     return f"{base}__rank{rank}.jsonl.gz"
 
 
+def _completed_sample_ids_for_resume(paths: Iterable[str]) -> set[int]:
+    """Return completed sample ids from valid rows, repairing canceled gzip tails."""
+    completed: set[int] = set()
+    for path in paths:
+        if not os.path.isfile(path):
+            continue
+        rows: list[dict[str, Any]] = []
+        try:
+            for row in iter_bundle_rows(path):
+                rows.append(row)
+        except (OSError, EOFError, json.JSONDecodeError) as exc:
+            if rows:
+                _archive_preexisting(path)
+                rewrite_bundle(path, rows)
+                print(
+                    f"Rewrote resumable prefix with {len(rows)} row(s) after "
+                    f"truncated/corrupt bundle tail in {path}: {exc}",
+                    flush=True,
+                )
+            else:
+                _archive_preexisting(path)
+                print(
+                    f"Archived unreadable empty/invalid resume bundle {path}: {exc}",
+                    flush=True,
+                )
+        for row in rows:
+            sid = row.get("sample_id")
+            if isinstance(sid, int):
+                completed.add(int(sid))
+    return completed
+
+
 def _normalize_finish_reason(reason: object) -> str:
     if hasattr(reason, "value"):
         reason = getattr(reason, "value")
@@ -389,13 +441,18 @@ def _run_dataset_preflight(args: argparse.Namespace) -> None:
             )
 
 
-def _run_dependency_preflight(args: argparse.Namespace) -> None:
-    try:
-        import vllm  # noqa: F401
-    except Exception as exc:
-        raise SystemExit(
-            "vLLM is required for collect_model_stats. Install vLLM first."
-        ) from exc
+def _run_dependency_preflight(
+    args: argparse.Namespace,
+    *,
+    require_vllm: bool,
+) -> None:
+    if require_vllm:
+        try:
+            import vllm  # noqa: F401
+        except Exception as exc:
+            raise SystemExit(
+                "vLLM is required for collect_model_stats. Install vLLM first."
+            ) from exc
 
     if args.task_kind == "math_freeform":
         math_freeform.preflight()
@@ -1228,6 +1285,8 @@ def _build_bundle_row(
             "target_kind": "binary",
             "p_cap": float(profile["p_cap"]),
             "p_loop": float(profile["p_loop"]),
+            "fraction_loop": float(profile["fraction_loop"]),
+            "fraction_len_0.5": float(profile["fraction_len_0.5"]),
             "loop_budget_share": float(profile["loop_budget_share"]),
             "mu_log_rel": float(profile["mu_log_rel"]),
             "mean_length": float(profile["mean_length"]),
@@ -1364,6 +1423,7 @@ def _run_collection(
     tail_threshold: float,
     bundle_path: str,
     skip_sample_ids: set[int],
+    preserve_rank_bundles: bool = False,
 ) -> WorkerAggregator:
     if collector_cfg.rollout_cfg.dp == 1:
         return _collect_worker_stats(
@@ -1384,8 +1444,9 @@ def _run_collection(
         )
 
     rank_paths = [_rank_bundle_path(bundle_path, rank) for rank in range(worker_count)]
-    for path in rank_paths:
-        _archive_preexisting(path)
+    if not preserve_rank_bundles:
+        for path in rank_paths:
+            _archive_preexisting(path)
 
     ctx = mp.get_context("spawn")
     out_queue = ctx.Queue()
@@ -1692,6 +1753,13 @@ def _prompt_profile_summary(
     prompt_count_too_long = 0
     profiled_prompt_count = 0
     positive_count = 0
+    any_loop_positive_count = 0
+    majority_loop_positive_count = 0
+    any_len_0_5_positive_count = 0
+    majority_len_0_5_positive_count = 0
+    fraction_loop_sum = 0.0
+    fraction_len_0_5_sum = 0.0
+    total_len_0_5_hits = 0.0
     total_tail_hits = 0
     total_rollouts = 0
     rollout_lengths: list[int] = []
@@ -1708,9 +1776,19 @@ def _prompt_profile_summary(
         if not isinstance(profile, dict) or int(profile.get("num_rollouts", 0)) <= 0:
             continue
         profiled_prompt_count += 1
+        num_rollouts = int(profile.get("num_rollouts", 0))
+        fraction_loop = float(profile.get("fraction_loop", profile.get("p_loop", 0.0)))
+        fraction_len_0_5 = float(profile.get("fraction_len_0.5", 0.0))
         positive_count += int(profile.get("majority_tail", 0))
+        any_loop_positive_count += int(fraction_loop > 0.0)
+        majority_loop_positive_count += int(fraction_loop > 0.5)
+        any_len_0_5_positive_count += int(fraction_len_0_5 > 0.0)
+        majority_len_0_5_positive_count += int(fraction_len_0_5 > 0.5)
+        fraction_loop_sum += fraction_loop
+        fraction_len_0_5_sum += fraction_len_0_5
+        total_len_0_5_hits += fraction_len_0_5 * float(num_rollouts)
         total_tail_hits += int(profile.get("tail_hit_count", 0))
-        total_rollouts += int(profile.get("num_rollouts", 0))
+        total_rollouts += num_rollouts
         for length in profile.get("lengths") or []:
             rollout_lengths.append(int(length))
     return {
@@ -1720,13 +1798,52 @@ def _prompt_profile_summary(
         "prompt_count_profiled": profiled_prompt_count,
         "prompt_count_too_long": prompt_count_too_long,
         "prompt_positive_count": positive_count,
+        "prompt_any_loop_positive_count": any_loop_positive_count,
+        "prompt_majority_loop_positive_count": majority_loop_positive_count,
+        "prompt_any_len_0_5_positive_count": any_len_0_5_positive_count,
+        "prompt_majority_len_0_5_positive_count": majority_len_0_5_positive_count,
         "prompt_positive_rate": (
             float(positive_count) / float(profiled_prompt_count)
             if profiled_prompt_count
             else None
         ),
+        "prompt_any_loop_positive_rate": (
+            float(any_loop_positive_count) / float(profiled_prompt_count)
+            if profiled_prompt_count
+            else None
+        ),
+        "prompt_majority_loop_positive_rate": (
+            float(majority_loop_positive_count) / float(profiled_prompt_count)
+            if profiled_prompt_count
+            else None
+        ),
+        "prompt_any_len_0_5_positive_rate": (
+            float(any_len_0_5_positive_count) / float(profiled_prompt_count)
+            if profiled_prompt_count
+            else None
+        ),
+        "prompt_majority_len_0_5_positive_rate": (
+            float(majority_len_0_5_positive_count) / float(profiled_prompt_count)
+            if profiled_prompt_count
+            else None
+        ),
+        "prompt_mean_fraction_loop": (
+            fraction_loop_sum / float(profiled_prompt_count)
+            if profiled_prompt_count
+            else None
+        ),
+        "prompt_mean_fraction_len_0_5": (
+            fraction_len_0_5_sum / float(profiled_prompt_count)
+            if profiled_prompt_count
+            else None
+        ),
         "completion_tail_fraction": (
             float(total_tail_hits) / float(total_rollouts)
+            if total_rollouts
+            else None
+        ),
+        "rollout_len_0_5_fraction": (
+            float(total_len_0_5_hits) / float(total_rollouts)
             if total_rollouts
             else None
         ),
@@ -1750,37 +1867,16 @@ def _sort_bundle(bundle_path: str) -> None:
     rewrite_bundle(bundle_path, _bundle_row_sorted(rows))
 
 
-def main() -> None:
-    args = _parse_args()
-    _run_dataset_preflight(args)
-    _run_dependency_preflight(args)
-    rollout_cfg = _build_rollout_config(args)
-    statistics = _parse_statistics(args.statistics)
-    out_path = args.out or _derive_output_path(args)
-    sidecar_path, bundle_path = bundle_paths(out_path)
+def _load_sidecar_metadata(sidecar_path: str) -> dict[str, Any] | None:
+    if not os.path.exists(sidecar_path):
+        return None
+    with open(sidecar_path, "r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+    metadata = payload.get("metadata")
+    return dict(metadata) if isinstance(metadata, dict) else None
 
-    skip_sample_ids: set[int] = set()
-    if args.resume:
-        skip_sample_ids = completed_sample_ids(bundle_path)
-        if skip_sample_ids:
-            print(
-                f"Resuming: {len(skip_sample_ids)} sample(s) already present in {bundle_path}",
-                flush=True,
-            )
-        _archive_preexisting(sidecar_path)
-    else:
-        _archive_preexisting(sidecar_path)
-        _archive_preexisting(bundle_path)
 
-    tokenizer = AutoTokenizer.from_pretrained(
-        rollout_cfg.model_id,
-        trust_remote_code=rollout_cfg.trust_remote_code,
-        use_fast=True,
-    )
-    items, task_metadata, lcb_benchmark = _load_prompt_items(args, tokenizer)
-    if not items:
-        raise SystemExit("No prompt items were loaded for collection.")
-
+def _resolved_generation_config(rollout_cfg: RolloutConfig) -> dict[str, Any]:
     resolved_top_p, resolved_top_k = resolve_sampling_defaults(
         rollout_cfg.model_id,
         top_p=rollout_cfg.top_p,
@@ -1789,82 +1885,185 @@ def main() -> None:
     resolved_generation_config = rollout_cfg.to_dict()
     resolved_generation_config["top_p"] = resolved_top_p
     resolved_generation_config["top_k"] = resolved_top_k
+    return resolved_generation_config
 
-    collector_cfg = CollectorConfig(
-        rollout_cfg=rollout_cfg,
-        seed=args.seed,
-        task_kind=args.task_kind,
-        statistics=statistics,
-        livecodebench_repo=args.livecodebench_repo or None,
-        release_version=args.release_version,
-        lm_style_override=args.lm_style_override,
-        progress_metadata=None,
+
+def _select_lcb_benchmark_from_bundle(
+    bundle_path: str,
+    *,
+    repo_path: str,
+    release_version: str,
+) -> Any:
+    question_ids: list[str] = []
+    for row in iter_bundle_rows(bundle_path):
+        question_id = str(row.get("question_id") or row.get("record_id") or "")
+        if question_id:
+            question_ids.append(question_id)
+    if not question_ids:
+        raise SystemExit(f"No LiveCodeBench question_id values found in {bundle_path}.")
+
+    benchmark, _format_prompt = livecodebench_codegen.load_benchmark(
+        repo_path,
+        release_version,
     )
+    benchmark_by_question_id = {
+        str(instance.question_id): instance
+        for instance in benchmark
+    }
+    missing = [
+        question_id
+        for question_id in question_ids
+        if question_id not in benchmark_by_question_id
+    ]
+    if missing:
+        raise SystemExit(
+            "Bundle contains LiveCodeBench question_id values that are absent from "
+            f"{release_version}: {missing[:10]}"
+        )
+    return [benchmark_by_question_id[question_id] for question_id in question_ids]
 
-    agg = _run_collection(
-        items,
-        collector_cfg,
-        loop_n=args.loop_n,
-        loop_k=args.loop_k,
-        tail_threshold=args.profile_tail_threshold,
-        bundle_path=bundle_path,
-        skip_sample_ids=skip_sample_ids,
-    )
 
-    # Normalize row order so consumers can assume ascending sample_id.
-    _sort_bundle(bundle_path)
-
+def _run_cpu_posthoc_grading(
+    args: argparse.Namespace,
+    *,
+    bundle_path: str,
+    lcb_benchmark: Any | None = None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
     lcb_native_metrics: dict[str, Any] = {}
     taco_native_metrics: dict[str, Any] = {}
     if args.task_kind == "livecodebench_codegen":
+        benchmark = lcb_benchmark
+        if benchmark is None:
+            benchmark = _select_lcb_benchmark_from_bundle(
+                bundle_path,
+                repo_path=args.livecodebench_repo,
+                release_version=args.release_version,
+            )
         lcb_native_metrics = _finalize_lcb_grading(
             bundle_path,
-            benchmark=lcb_benchmark,
+            benchmark=benchmark,
             repo_path=args.livecodebench_repo,
             release_version=args.release_version,
         )
     elif args.task_kind == "taco_codegen":
         taco_native_metrics = _finalize_taco_grading(bundle_path)
+    return lcb_native_metrics, taco_native_metrics
 
+
+def _posthoc_grading_metadata(
+    args: argparse.Namespace,
+    *,
+    status: str | None,
+) -> dict[str, Any] | None:
+    if args.task_kind not in CPU_POSTHOC_TASK_KINDS:
+        return None
+    command_parts = [
+        "uv",
+        "run",
+        "python",
+        "scripts/rollout/collect_model_stats.py",
+        "--task-kind",
+        args.task_kind,
+        "--out",
+        args.out or _derive_output_path(args),
+        "--finalize-only",
+        "--statistics",
+        args.statistics,
+        "--loop-n",
+        str(args.loop_n),
+        "--loop-k",
+        str(args.loop_k),
+        "--profile-tail-threshold",
+        str(args.profile_tail_threshold),
+    ]
+    if args.livecodebench_repo:
+        command_parts.extend(["--livecodebench-repo", args.livecodebench_repo])
+    if args.task_kind == "livecodebench_codegen":
+        command_parts.extend(["--release-version", args.release_version])
+    return {
+        "required": True,
+        "status": status or "finalized",
+        "device_class": "cpu",
+        "finalize_command": (
+            "CUDA_VISIBLE_DEVICES='' "
+            + " ".join(shlex.quote(part) for part in command_parts)
+        ),
+    }
+
+
+def _build_sidecar_payload(
+    args: argparse.Namespace,
+    *,
+    rollout_cfg: RolloutConfig,
+    statistics: list[str],
+    bundle_path: str,
+    task_metadata: dict[str, object] | None,
+    lcb_native_metrics: dict[str, Any],
+    taco_native_metrics: dict[str, Any],
+    base_metadata: dict[str, Any] | None = None,
+    posthoc_grading_status: str | None = None,
+) -> dict[str, Any]:
     agg = _aggregate_bundle_counters(bundle_path)
-
     metrics = compute_metrics(agg, statistics)
     prompt_profile_summary = _prompt_profile_summary(
         bundle_path,
         tail_threshold=args.profile_tail_threshold,
     )
 
-    sidecar_metadata: dict[str, Any] = {
-        "schema": BUNDLE_SCHEMA,
-        "bundle_file": os.path.basename(bundle_path),
-        "dataset": args.dataset,
-        "config": args.dataset_config,
-        "split": args.split,
-        "task_kind": args.task_kind,
-        "model_id": rollout_cfg.model_id,
-        "generation_config": resolved_generation_config,
-        "stats_contract_version": STATS_CONTRACT_VERSION,
-        "seed": args.seed,
-        "statistics": statistics,
-        "loop_detector": {"n": args.loop_n, "k": args.loop_k},
-        "tail_threshold": float(args.profile_tail_threshold),
-        "prompt_token_summary": _prompt_token_summary(bundle_path),
-        "prompt_profile_summary": prompt_profile_summary,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        **({"max_samples": args.max_samples} if args.max_samples is not None else {}),
-        **(
-            {"release_version": args.release_version}
-            if args.task_kind == "livecodebench_codegen"
-            else {}
-        ),
-        **task_metadata,
-    }
+    if base_metadata is not None:
+        sidecar_metadata = dict(base_metadata)
+        sidecar_metadata.update(
+            {
+                "schema": BUNDLE_SCHEMA,
+                "bundle_file": os.path.basename(bundle_path),
+                "statistics": statistics,
+                "stats_contract_version": STATS_CONTRACT_VERSION,
+                "loop_detector": {"n": args.loop_n, "k": args.loop_k},
+                "tail_threshold": float(args.profile_tail_threshold),
+                "prompt_token_summary": _prompt_token_summary(bundle_path),
+                "prompt_profile_summary": prompt_profile_summary,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+    else:
+        sidecar_metadata = {
+            "schema": BUNDLE_SCHEMA,
+            "bundle_file": os.path.basename(bundle_path),
+            "dataset": args.dataset,
+            "config": args.dataset_config,
+            "split": args.split,
+            "task_kind": args.task_kind,
+            "model_id": rollout_cfg.model_id,
+            "generation_config": _resolved_generation_config(rollout_cfg),
+            "stats_contract_version": STATS_CONTRACT_VERSION,
+            "seed": args.seed,
+            "statistics": statistics,
+            "loop_detector": {"n": args.loop_n, "k": args.loop_k},
+            "tail_threshold": float(args.profile_tail_threshold),
+            "prompt_token_summary": _prompt_token_summary(bundle_path),
+            "prompt_profile_summary": prompt_profile_summary,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            **({"max_samples": args.max_samples} if args.max_samples is not None else {}),
+            **(
+                {"release_version": args.release_version}
+                if args.task_kind == "livecodebench_codegen"
+                else {}
+            ),
+            **(task_metadata or {}),
+        }
+
     if lcb_native_metrics:
         sidecar_metadata["lcb_native_metrics"] = lcb_native_metrics
     if taco_native_metrics:
         sidecar_metadata["taco_native_metrics"] = taco_native_metrics
+    posthoc_metadata = _posthoc_grading_metadata(
+        args,
+        status=posthoc_grading_status,
+    )
+    if posthoc_metadata is not None:
+        sidecar_metadata["posthoc_grading"] = posthoc_metadata
 
-    sidecar_payload = {
+    return {
         "schema": BUNDLE_SCHEMA,
         "metadata": sidecar_metadata,
         "counts": {
@@ -1886,14 +2085,189 @@ def main() -> None:
             "num_prompt_majority_tail_positive": int(
                 prompt_profile_summary["prompt_positive_count"]
             ),
+            "num_prompt_any_loop_positive": int(
+                prompt_profile_summary["prompt_any_loop_positive_count"]
+            ),
+            "num_prompt_majority_loop_positive": int(
+                prompt_profile_summary["prompt_majority_loop_positive_count"]
+            ),
+            "num_prompt_any_len_0_5_positive": int(
+                prompt_profile_summary["prompt_any_len_0_5_positive_count"]
+            ),
+            "num_prompt_majority_len_0_5_positive": int(
+                prompt_profile_summary["prompt_majority_len_0_5_positive_count"]
+            ),
         },
         "metrics": {
             **metrics,
             "majority_s_0.5_positive_rate": prompt_profile_summary["prompt_positive_rate"],
+            "prompt_any_loop_positive_rate": prompt_profile_summary[
+                "prompt_any_loop_positive_rate"
+            ],
+            "prompt_majority_loop_positive_rate": prompt_profile_summary[
+                "prompt_majority_loop_positive_rate"
+            ],
+            "prompt_mean_fraction_loop": prompt_profile_summary[
+                "prompt_mean_fraction_loop"
+            ],
+            "prompt_any_len_0_5_positive_rate": prompt_profile_summary[
+                "prompt_any_len_0_5_positive_rate"
+            ],
+            "prompt_majority_len_0_5_positive_rate": prompt_profile_summary[
+                "prompt_majority_len_0_5_positive_rate"
+            ],
+            "prompt_mean_fraction_len_0_5": prompt_profile_summary[
+                "prompt_mean_fraction_len_0_5"
+            ],
             "completion_tail_fraction": prompt_profile_summary["completion_tail_fraction"],
+            "rollout_len_0_5_fraction": prompt_profile_summary[
+                "rollout_len_0_5_fraction"
+            ],
             "median_generation_length": prompt_profile_summary["median_generation_length"],
         },
     }
+
+
+def _finalize_existing_bundle(args: argparse.Namespace) -> None:
+    if args.task_kind not in CPU_POSTHOC_TASK_KINDS:
+        raise SystemExit(
+            "--finalize-only is only meaningful for CPU post-hoc task kinds: "
+            f"{sorted(CPU_POSTHOC_TASK_KINDS)}"
+        )
+    _run_dataset_preflight(args)
+    _run_dependency_preflight(args, require_vllm=False)
+    rollout_cfg = _build_rollout_config(args)
+    statistics = _parse_statistics(args.statistics)
+    if not args.out and not args.dataset:
+        raise SystemExit("--finalize-only requires --out unless --dataset is provided.")
+    out_path = args.out or _derive_output_path(args)
+    sidecar_path, bundle_path = bundle_paths(out_path)
+    if not os.path.exists(bundle_path):
+        raise SystemExit(f"Bundle path does not exist: {bundle_path}")
+
+    base_metadata = _load_sidecar_metadata(sidecar_path)
+    _sort_bundle(bundle_path)
+    lcb_native_metrics, taco_native_metrics = _run_cpu_posthoc_grading(
+        args,
+        bundle_path=bundle_path,
+    )
+    if os.path.exists(sidecar_path):
+        _archive_preexisting(sidecar_path)
+    sidecar_payload = _build_sidecar_payload(
+        args,
+        rollout_cfg=rollout_cfg,
+        statistics=statistics,
+        bundle_path=bundle_path,
+        task_metadata=None,
+        lcb_native_metrics=lcb_native_metrics,
+        taco_native_metrics=taco_native_metrics,
+        base_metadata=base_metadata,
+        posthoc_grading_status="finalized",
+    )
+    write_bundle_sidecar(sidecar_path, sidecar_payload)
+    print(f"Finalized rollout bundle at {bundle_path}", flush=True)
+    print(f"Wrote rollout sidecar to {sidecar_path}", flush=True)
+
+
+def main() -> None:
+    args = _parse_args()
+    if args.finalize_only:
+        _finalize_existing_bundle(args)
+        return
+    if not args.dataset:
+        raise SystemExit("--dataset is required unless --finalize-only is set.")
+    _run_dataset_preflight(args)
+    _run_dependency_preflight(args, require_vllm=True)
+    rollout_cfg = _build_rollout_config(args)
+    statistics = _parse_statistics(args.statistics)
+    out_path = args.out or _derive_output_path(args)
+    sidecar_path, bundle_path = bundle_paths(out_path)
+
+    skip_sample_ids: set[int] = set()
+    if args.resume:
+        resume_paths = [bundle_path]
+        if rollout_cfg.dp > 1:
+            resume_paths.extend(
+                _rank_bundle_path(bundle_path, rank)
+                for rank in range(rollout_cfg.dp)
+            )
+        skip_sample_ids = _completed_sample_ids_for_resume(resume_paths)
+        if skip_sample_ids:
+            print(
+                f"Resuming: {len(skip_sample_ids)} sample(s) already present across "
+                f"{len(resume_paths)} bundle path(s)",
+                flush=True,
+            )
+        _archive_preexisting(sidecar_path)
+    else:
+        _archive_preexisting(sidecar_path)
+        _archive_preexisting(bundle_path)
+
+    tokenizer = AutoTokenizer.from_pretrained(
+        rollout_cfg.model_id,
+        trust_remote_code=rollout_cfg.trust_remote_code,
+        use_fast=True,
+    )
+    items, task_metadata, lcb_benchmark = _load_prompt_items(args, tokenizer)
+    if not items:
+        raise SystemExit("No prompt items were loaded for collection.")
+
+    collector_cfg = CollectorConfig(
+        rollout_cfg=rollout_cfg,
+        seed=args.seed,
+        task_kind=args.task_kind,
+        statistics=statistics,
+        livecodebench_repo=args.livecodebench_repo or None,
+        release_version=args.release_version,
+        lm_style_override=args.lm_style_override,
+        progress_metadata=None,
+    )
+
+    agg = _run_collection(
+        items,
+        collector_cfg,
+        loop_n=args.loop_n,
+        loop_k=args.loop_k,
+        tail_threshold=args.profile_tail_threshold,
+        bundle_path=bundle_path,
+        skip_sample_ids=skip_sample_ids,
+        preserve_rank_bundles=args.resume,
+    )
+
+    # Normalize row order so consumers can assume ascending sample_id.
+    _sort_bundle(bundle_path)
+
+    lcb_native_metrics: dict[str, Any] = {}
+    taco_native_metrics: dict[str, Any] = {}
+    posthoc_grading_status: str | None = None
+    should_defer_cpu_finalize = (
+        args.defer_cpu_finalize and args.task_kind in CPU_POSTHOC_TASK_KINDS
+    )
+    if should_defer_cpu_finalize:
+        posthoc_grading_status = "deferred"
+        print(
+            f"Deferred CPU-only post-hoc grading for {args.task_kind}; "
+            "run --finalize-only with CUDA_VISIBLE_DEVICES='' after generation.",
+            flush=True,
+        )
+    elif args.task_kind in CPU_POSTHOC_TASK_KINDS:
+        lcb_native_metrics, taco_native_metrics = _run_cpu_posthoc_grading(
+            args,
+            bundle_path=bundle_path,
+            lcb_benchmark=lcb_benchmark,
+        )
+        posthoc_grading_status = "finalized"
+
+    sidecar_payload = _build_sidecar_payload(
+        args,
+        rollout_cfg=rollout_cfg,
+        statistics=statistics,
+        bundle_path=bundle_path,
+        task_metadata=task_metadata,
+        lcb_native_metrics=lcb_native_metrics,
+        taco_native_metrics=taco_native_metrics,
+        posthoc_grading_status=posthoc_grading_status,
+    )
 
     write_bundle_sidecar(sidecar_path, sidecar_payload)
     print(f"Wrote rollout bundle to {bundle_path}", flush=True)

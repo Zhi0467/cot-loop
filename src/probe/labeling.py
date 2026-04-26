@@ -12,6 +12,8 @@ PROMPT_PROFILE_TARGET_CHOICES = (
     "mean_relative_length",
     "loop_budget_share",
     "majority_tail",
+    "fraction_loop",
+    "fraction_len_0.5",
 )
 
 
@@ -286,6 +288,7 @@ def aggregate_prompt_profile(
     loop_flags = [stat.loop_flag for stat in stats]
     first_loop_prefix_lengths = [stat.first_loop_prefix for stat in stats]
     tail_hits = [int(stat.relative_length >= tail_threshold) for stat in stats]
+    fraction_len_hits = [int(stat.relative_length >= 0.5) for stat in stats]
     tail_hit_count = sum(tail_hits)
     mu_log_rel = sum(math.log1p(stat.relative_length) for stat in stats) / float(
         num_rollouts
@@ -310,6 +313,8 @@ def aggregate_prompt_profile(
         / float(num_rollouts),
         "p_cap": sum(cap_hits) / float(num_rollouts),
         "p_loop": sum(loop_flags) / float(num_rollouts),
+        "fraction_loop": sum(loop_flags) / float(num_rollouts),
+        "fraction_len_0.5": sum(fraction_len_hits) / float(num_rollouts),
         "mu_log_rel": mu_log_rel,
         "tail_threshold": float(tail_threshold),
         "s_tail": sum(tail_hits) / float(num_rollouts),
@@ -332,6 +337,10 @@ def profile_target_name(
         return "p_loop"
     if profile_target == "p_cap":
         return "p_cap"
+    if profile_target == "fraction_loop":
+        return "fraction_loop"
+    if profile_target == "fraction_len_0.5":
+        return "fraction_len_0.5"
     if profile_target == "majority_tail":
         threshold_text = format(float(tail_threshold), "g")
         return f"majority_s_{threshold_text}"
@@ -356,6 +365,10 @@ def profile_target_value(
         return float(profile["p_loop"])
     if profile_target == "p_cap":
         return float(profile["p_cap"])
+    if profile_target == "fraction_loop":
+        return float(profile["fraction_loop"])
+    if profile_target == "fraction_len_0.5":
+        return float(profile["fraction_len_0.5"])
     if profile_target == "majority_tail":
         return float(profile["majority_tail"])
     raise ValueError(
